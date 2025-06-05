@@ -1,1 +1,2 @@
-* text=auto eol=lf
+To be final check, the whole Admin for user management has not been admin-only since the other routes will be used for the customers. 
+This will be further check in a later date after communication. 

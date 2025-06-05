@@ -17,7 +17,8 @@ from .views import (
     SessionManagementView,
     ActiveSessionsView,
     UserSessionsView,
-    SessionStatisticsView
+    SessionStatisticsView,
+    APIDocumentationView
 )
 
 urlpatterns = [

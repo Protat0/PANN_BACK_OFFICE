@@ -3,7 +3,7 @@ import axios from 'axios';
 
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -53,7 +53,7 @@ api.interceptors.response.use(
         // Attempt to refresh token
         const refreshToken = localStorage.getItem('refreshToken');
         if (refreshToken) {
-          const response = await axios.post(`${process.env.VUE_APP_API_BASE_URL}/auth/refresh`, {
+          const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/auth/refresh/`, {
             refresh_token: refreshToken
           });
           
@@ -114,4 +114,241 @@ api.interceptors.response.use(
   }
 );
 
-export default api;
+// API Service Class
+class ApiService {
+  // Helper method to handle responses
+  handleResponse(response) {
+    return response.data;
+  }
+
+  // Helper method to handle errors
+  handleError(error) {
+    const message = error.response?.data?.error || 
+                   error.response?.data?.message || 
+                   error.message || 
+                   'An unexpected error occurred';
+    throw new Error(message);
+  }
+
+  // AUTH METHODS
+  async login(email, password) {
+    try {
+      const response = await api.post('/auth/login/', { email, password });
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async logout() {
+    try {
+      const response = await api.post('/auth/logout/');
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async refreshToken(refreshToken) {
+    try {
+      const response = await api.post('/auth/refresh/', { refresh_token: refreshToken });
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async getCurrentUser() {
+    try {
+      const response = await api.get('/auth/me/');
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async verifyToken(token) {
+    try {
+      const response = await api.post('/auth/verify-token/', { token });
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  // USER METHODS
+  async getUsers() {
+    try {
+      const response = await api.get('/users/');
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async getUser(userId) {
+    try {
+      const response = await api.get(`/users/${userId}/`);
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async createUser(userData) {
+    try {
+      const response = await api.post('/users/', userData);
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async updateUser(userId, userData) {
+    try {
+      const response = await api.put(`/users/${userId}/`, userData);
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async deleteUser(userId) {
+    try {
+      const response = await api.delete(`/users/${userId}/`);
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async getUserByEmail(email) {
+    try {
+      const response = await api.get(`/users/email/${email}/`);
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async getUserByUsername(username) {
+    try {
+      const response = await api.get(`/users/username/${username}/`);
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  // CUSTOMER METHODS
+  async getCustomers() {
+    try {
+      console.log('Making API call to get customers...');
+      const response = await api.get('/customers/');
+      console.log('Customers API response:', response);
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error('Error in getCustomers:', error);
+      this.handleError(error);
+    }
+  }
+
+  async getCustomer(customerId) {
+    try {
+      const response = await api.get(`/customers/${customerId}/`);
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async createCustomer(customerData) {
+    try {
+      const response = await api.post('/customers/', customerData);
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async updateCustomer(customerId, customerData) {
+    try {
+      const response = await api.put(`/customers/${customerId}/`, customerData);
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async deleteCustomer(customerId) {
+    try {
+      const response = await api.delete(`/customers/${customerId}/`);
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  // SESSION METHODS
+  async getActiveSessions() {
+    try {
+      const response = await api.get('/sessions/active/');
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async getUserSessions(userId) {
+    try {
+      const response = await api.get(`/sessions/user/${userId}/`);
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async getSessionStatistics() {
+    try {
+      const response = await api.get('/sessions/statistics/');
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async getSessionLogs() {
+    try {
+      const response = await api.get('/session-logs/');
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  // SYSTEM METHODS
+  async getSystemStatus() {
+    try {
+      const response = await api.get('/');
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async healthCheck() {
+    try {
+      const response = await api.get('/health/');
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+}
+
+// Create and export singleton instance
+const apiService = new ApiService();
+
+// Also export the axios instance for direct use if needed
+export { api };
+export default apiService;

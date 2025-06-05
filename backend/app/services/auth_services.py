@@ -65,7 +65,7 @@ class AuthService:
             return None
     
     def login(self, email: str, password: str):
-        """Authenticate user and return tokens"""
+        """Authenticate user and return tokens - ADMIN ONLY"""
         try:
             # Find user by email
             user = self.user_collection.find_one({"email": email})
@@ -81,6 +81,13 @@ class AuthService:
             if user_status != "active":
                 raise Exception("Account is not active")
             
+            # ADMIN-ONLY CHECK: Verify user has admin role
+            user_role = user.get("role", "").lower()
+            if user_role != "admin":
+                # Log unauthorized access attempt
+                print(f"Non-admin login attempt blocked: {email} (role: {user_role})")
+                raise Exception("Access denied. This system is restricted to administrators only.")
+            
             # Update last login 
             self.user_collection.update_one(
                 {"_id": user["_id"]},
@@ -92,7 +99,7 @@ class AuthService:
             access_token = self.create_access_token(token_data)
             refresh_token = self.create_refresh_token(token_data)
             
-            # Log the login session
+            # Log the admin login session
             try:
                 from .session_services import SessionLogService
                 session_service = SessionLogService()
@@ -100,9 +107,11 @@ class AuthService:
                     "user_id": str(user["_id"]),
                     "username": user.get("username", user["email"]),
                     "email": user["email"],
-                    "branch_id": 1  # Default branch
+                    "branch_id": 1,  # Default branch
+                    "role": "admin"  # Explicitly mark as admin session
                 }
                 session_service.log_login(session_user)
+                print(f"Admin login successful: {user['email']}")
             except Exception as session_error:
                 print(f"Session logging error: {session_error}")
                 # Don't fail login if session logging fails
@@ -120,10 +129,17 @@ class AuthService:
                     "id": str(user["_id"]),
                     "email": user["email"],
                     "role": user["role"],
-                    "name": user.get("full_name", "")
+                    "name": user.get("full_name", ""),
+                    "username": user.get("username", ""),
+                    "status": user.get("status", "active")
                 }
             }
-        
+            
+        except Exception as e:
+            # Log failed login attempts for security monitoring
+            print(f"Login failed for {email}: {str(e)}")
+            raise e
+            
         except Exception as e:
             raise Exception(str(e))
     
