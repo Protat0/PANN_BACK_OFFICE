@@ -51,7 +51,7 @@ venv\Scripts\activate
 source venv/Scripts/activate
 
 # Install Python dependencies
-pip install django djangorestframework django-cors-headers pymongo djongo python-decouple pytz dnspython
+pip install django djangorestframework django-cors-headers pymongo djongo python-decouple pytz dnspython bcrypt cryptography python-jose passlib motor
 
 # Run migrations (creates initial database tables)
 python manage.py migrate
