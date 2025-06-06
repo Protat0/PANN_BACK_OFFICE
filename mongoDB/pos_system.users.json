@@ -1,0 +1,147 @@
+[{
+  "_id": {
+    "$oid": "683dd3e59b70f774ffe0bd95"
+  },
+  "username": "testuser",
+  "email": "test@example.com",
+  "password": "$2b$12$viLAiGUOTBYgC/RAhL5eO.I8gKyNoIbKn6ddzZfiKYGY/is.v5bcq",
+  "full_name": "Test User",
+  "role": "admin",
+  "date_created": {
+    "$date": "2025-06-02T16:40:05.605Z"
+  },
+  "last_updated": {
+    "$date": "2025-06-03T07:13:04.208Z"
+  },
+  "status": "active",
+  "last_login": {
+    "$date": "2025-06-05T14:20:03.834Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "683dda192d6dd7ec13ee15d6"
+  },
+  "username": "jane@example.com",
+  "email": "jane@example.com",
+  "password": "$2b$12$ji0Nd3BawF.yZZJqoZ737OdglNPNRvUYivjI6U1bN1rBaH4wLFwAK",
+  "full_name": "Jane Smith",
+  "role": "customer",
+  "status": "active",
+  "date_created": {
+    "$date": "2025-06-02T17:06:33.453Z"
+  },
+  "last_updated": {
+    "$date": "2025-06-02T17:06:33.453Z"
+  },
+  "source": "customer_registration",
+  "last_login": {
+    "$date": "2025-06-05T13:57:21.458Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "683e9f332fb0625c7ce16952"
+  },
+  "username": "jane@example.com",
+  "email": "jane@example.com",
+  "password": "$2b$12$W/ZJhcn6m7RUkBquEz99juKaSdjwRDO5pzcn2KyLhPetiNhX4k/ZK",
+  "full_name": "Jane Smith",
+  "role": "customer",
+  "status": "active",
+  "date_created": {
+    "$date": "2025-06-03T07:07:31.738Z"
+  },
+  "last_updated": {
+    "$date": "2025-06-03T07:07:31.738Z"
+  },
+  "source": "customer_registration"
+},
+{
+  "_id": {
+    "$oid": "683eac180bb54e97fc564d92"
+  },
+  "username": "admin",
+  "email": "admin@pannpos.com",
+  "password": "$2b$12$H.YLhDajVbyMHp2X38rFaeFtKrWoAD1ATUORgNST16yBirjbQDi.i",
+  "full_name": "PANN Admin",
+  "role": "admin",
+  "date_created": {
+    "$date": "2025-06-03T08:02:32.382Z"
+  },
+  "last_updated": {
+    "$date": "2025-06-03T08:02:32.382Z"
+  },
+  "status": "active",
+  "last_login": {
+    "$date": "2025-06-03T08:03:21.218Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "683eac1f0bb54e97fc564d94"
+  },
+  "full_name": "PANN Customer",
+  "email": "customer@pannpos.com",
+  "password": "$2b$12$gNOYeo7DOJW/whSUavtOVeJc05Ap5Cvs7n8lSQI07Ce8RaI5XEK6K",
+  "phone": "09123456789",
+  "date_created": {
+    "$date": "2025-06-03T08:02:39.801Z"
+  },
+  "last_updated": {
+    "$date": "2025-06-03T08:02:39.801Z"
+  },
+  "status": "active"
+},
+{
+  "_id": {
+    "$oid": "683eb6105be1b7d3e95f277c"
+  },
+  "username": "validuser",
+  "email": "valid@example.com",
+  "password": "$2b$12$S/IbsmOlvtikrkK.Ti.xiuuZvk.OxqDj7ajahLctktqbc6jUvrBv6",
+  "full_name": "Valid User",
+  "role": "customer",
+  "status": "active",
+  "date_created": {
+    "$date": "2025-06-03T08:45:04.759Z"
+  },
+  "last_updated": {
+    "$date": "2025-06-03T08:45:04.759Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "6841a18d37eca0bad1552dc7"
+  },
+  "username": "Reymond",
+  "email": "Reymond@gmail.com",
+  "password": "$2b$12$OsZsWOncNKBkAtYRTQPCzO9t9IuEwsbphZRNybrnWKnwUeppaDdTi",
+  "full_name": "Reymond CebuPac",
+  "role": "employee",
+  "status": "active",
+  "date_created": {
+    "$date": "2025-06-05T13:54:21.963Z"
+  },
+  "last_updated": {
+    "$date": "2025-06-05T13:54:21.963Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "6841a20f37eca0bad1552dd5"
+  },
+  "username": "graham@gmail.com",
+  "email": "graham@gmail.com",
+  "password": "$2b$12$/Lk50/ZBE7wspq3581Sge.k39iBKTnbHaY81OXlm889JRDByBnUOi",
+  "full_name": "Graham Bell",
+  "role": "customer",
+  "status": "active",
+  "date_created": {
+    "$date": "2025-06-05T13:56:31.326Z"
+  },
+  "last_updated": {
+    "$date": "2025-06-05T13:56:31.326Z"
+  },
+  "source": "customer_registration"
+}]
