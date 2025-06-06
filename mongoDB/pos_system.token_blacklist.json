@@ -1,0 +1,99 @@
+[{
+  "_id": {
+    "$oid": "683ea5a9e323c5b5808342db"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODNkZDNlNTliNzBmNzc0ZmZlMGJkOTUiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE3NDg5Mzc4NDksInR5cGUiOiJhY2Nlc3MifQ.OXOy7wWQ5XhffsTHyxV35E4lDAzv7z__rpMTOx2qqKY",
+  "blacklisted_at": {
+    "$date": "2025-06-03T07:35:05.606Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "683ea632b5d5ddffb42fac6c"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODNkZDNlNTliNzBmNzc0ZmZlMGJkOTUiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE3NDg5MzgwMjMsInR5cGUiOiJhY2Nlc3MifQ.92ax3--xTXdruUp1ehbcE7XKddtZGjvBxM0ZshK4swI",
+  "blacklisted_at": {
+    "$date": "2025-06-03T07:37:22.941Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "683eac620bb54e97fc564d9d"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODNlYWMxODBiYjU0ZTk3ZmM1NjRkOTIiLCJlbWFpbCI6ImFkbWluQHBhbm5wb3MuY29tIiwicm9sZSI6ImFkbWluIiwiZXhwIjoxNzQ4OTM5NjAxLCJ0eXBlIjoiYWNjZXNzIn0.RGJGfx-Ndp0AjRLwwANwve5Q8q6yFMMHdSl5Gc19ecc",
+  "blacklisted_at": {
+    "$date": "2025-06-03T08:03:46.781Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "68400da4221a1528ae51d92b"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODNkZDNlNTliNzBmNzc0ZmZlMGJkOTUiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE3NDkwMzAwNTAsInR5cGUiOiJhY2Nlc3MifQ.6P8hJbCzYJBV0brMfM6vhcWshxzLhbSFQ5Q2YFMj-GM",
+  "blacklisted_at": {
+    "$date": "2025-06-04T09:11:00.397Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "68406f446ec9ac0bceafbcda"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODNkZDNlNTliNzBmNzc0ZmZlMGJkOTUiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE3NDkwNTQyMjQsInR5cGUiOiJhY2Nlc3MifQ.zp8GxGWf69iSVwg77QYQ8_S1abpgVOqUwsc4wj2wrK8",
+  "blacklisted_at": {
+    "$date": "2025-06-04T16:07:32.317Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "68410372cdb6b3784cc3222e"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODNkZDNlNTliNzBmNzc0ZmZlMGJkOTUiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE3NDkwNTUwOTEsInR5cGUiOiJhY2Nlc3MifQ.N3D2YmbOU4JDEs6bRAfJzd3WQI_SN1_XW-WMhaP_SzI",
+  "blacklisted_at": {
+    "$date": "2025-06-05T02:39:46.900Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "68419c6937eca0bad1552dbd"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODNkZDNlNTliNzBmNzc0ZmZlMGJkOTUiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE3NDkwOTMwMTIsInR5cGUiOiJhY2Nlc3MifQ.H1h0-Hti4YycWiUkN2bfS72stKJs1uvcYGrmXcIWvwk",
+  "blacklisted_at": {
+    "$date": "2025-06-05T13:32:25.651Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "6841a23b37eca0bad1552dde"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODNkZGExOTJkNmRkN2VjMTNlZTE1ZDYiLCJlbWFpbCI6ImphbmVAZXhhbXBsZS5jb20iLCJyb2xlIjoiY3VzdG9tZXIiLCJleHAiOjE3NDkxMzMzNTIsInR5cGUiOiJhY2Nlc3MifQ.YTouTvIFjD5lPOQ7E9QWDZ-SI7nbiYlBnVCFDEht6pU",
+  "blacklisted_at": {
+    "$date": "2025-06-05T13:57:15.858Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "6841a25137eca0bad1552de6"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODNkZGExOTJkNmRkN2VjMTNlZTE1ZDYiLCJlbWFpbCI6ImphbmVAZXhhbXBsZS5jb20iLCJyb2xlIjoiY3VzdG9tZXIiLCJleHAiOjE3NDkxMzM2NDEsInR5cGUiOiJhY2Nlc3MifQ.chuwqXjGH64r__hPvDGOnlAiB39RAvf8yx4blFwoHxM",
+  "blacklisted_at": {
+    "$date": "2025-06-05T13:57:37.664Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "6841a72166bd0ed28fe003c6"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODNkZDNlNTliNzBmNzc0ZmZlMGJkOTUiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE3NDkxMzQwNzcsInR5cGUiOiJhY2Nlc3MifQ.uNU2V0iqJA1FmM3YTOVdzczhS84XlMqnDjJkSPOchz4",
+  "blacklisted_at": {
+    "$date": "2025-06-05T14:18:09.962Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "6841a92266bd0ed28fe003e4"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODNkZDNlNTliNzBmNzc0ZmZlMGJkOTUiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE3NDkxMzUwMDMsInR5cGUiOiJhY2Nlc3MifQ.ThqloBn4-gKKsrIsC4Qb3gL78SnOxV-_gm6GTesSlXo",
+  "blacklisted_at": {
+    "$date": "2025-06-05T14:26:42.454Z"
+  }
+}]
