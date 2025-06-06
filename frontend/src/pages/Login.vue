@@ -88,6 +88,8 @@
 </template>
 
 <script>
+import apiService from '../services/api.js'
+
 export default {
   name: 'LoginPage',
   data() {
@@ -99,7 +101,7 @@ export default {
       loading: false,
       error: null,
       successMessage: null,
-      // FIXED: Use VITE_ prefix and correct API URL
+      // Use the API service base URL
       apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
       isDev: import.meta.env.DEV
     }
@@ -117,28 +119,13 @@ export default {
           throw new Error('Please fill in all fields')
         }
 
-        console.log('Attempting login to:', `${this.apiBaseUrl}/auth/login/`)
+        console.log('Attempting login with API service...')
+        console.log('API Base URL:', this.apiBaseUrl)
 
-        // Make API call to Django backend - FIXED endpoint
-        const response = await fetch(`${this.apiBaseUrl}/auth/login/`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            email: this.loginForm.email,
-            password: this.loginForm.password
-          })
-        })
-
-        console.log('Response status:', response.status)
-        const data = await response.json()
-        console.log('Response data:', data)
-
-        if (!response.ok) {
-          throw new Error(data.message || data.error || `HTTP ${response.status}: Login failed`)
-        }
+        // Use the API service instead of direct fetch
+        const data = await apiService.login(this.loginForm.email, this.loginForm.password)
+        
+        console.log('Login response data:', data)
 
         // Handle successful login
         await this.handleLoginSuccess(data)
@@ -186,18 +173,8 @@ export default {
 
     async handleLogout() {
       try {
-        // Call logout endpoint if your backend requires it
-        const token = localStorage.getItem('authToken')
-        
-        if (token) {
-          await fetch(`${this.apiBaseUrl}/auth/logout/`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            }
-          })
-        }
+        // Use API service for logout
+        await apiService.logout()
       } catch (error) {
         console.error('Logout error:', error)
       } finally {
@@ -221,32 +198,40 @@ export default {
       alert('Forgot password functionality would be implemented here')
     },
 
-    // Development helper method
+    // Development helper method using API service
     async testConnection() {
       try {
         this.error = null
         this.successMessage = null
         
-        console.log('Testing connection to:', `${this.apiBaseUrl}/health/`)
+        console.log('Testing connection with API service...')
         
-        const response = await fetch(`${this.apiBaseUrl}/health/`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json'
-          }
-        })
-        
-        const data = await response.json()
+        // Use the health check method from API service
+        const data = await apiService.healthCheck()
         console.log('Health check response:', data)
         
-        if (response.ok) {
-          this.successMessage = 'API connection successful!'
-        } else {
-          this.error = `API connection failed: ${response.status}`
-        }
+        this.successMessage = 'API connection successful!'
       } catch (error) {
         console.error('Connection test failed:', error)
         this.error = `Connection failed: ${error.message}`
+      }
+    },
+
+    // Alternative system status test
+    async testSystemStatus() {
+      try {
+        this.error = null
+        this.successMessage = null
+        
+        console.log('Testing system status...')
+        
+        const data = await apiService.getSystemStatus()
+        console.log('System status response:', data)
+        
+        this.successMessage = 'System status check successful!'
+      } catch (error) {
+        console.error('System status test failed:', error)
+        this.error = `System status failed: ${error.message}`
       }
     },
 
@@ -278,6 +263,7 @@ export default {
     console.log('Login component mounted')
     console.log('API Base URL:', this.apiBaseUrl)
     console.log('Environment:', import.meta.env.MODE)
+    console.log('API Service imported successfully:', !!apiService)
   }
 }
 </script>
