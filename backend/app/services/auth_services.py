@@ -6,7 +6,7 @@ from ..database import get_collection
 from .session_services import SessionLogService
 
 # JWT settings
-SECRET_KEY = "PacersFinalsGame5"  #Default is your-secret-key-here-change-in-production
+SECRET_KEY = "your-secret-key-here-change-in-production"  #Default is your-secret-key-here-change-in-production
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 7
