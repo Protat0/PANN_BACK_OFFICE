@@ -22,10 +22,10 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     'api',
+    'reports',  # ← Move reports here instead of DJANGO_APPS
     # 'inventory',  # You'll add these as your POS grows
     # 'sales',
     # 'customers',
-    # 'reports',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -61,16 +61,23 @@ TEMPLATES = [
 
 # REST Framework settings
 REST_FRAMEWORK = {
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
-    ],
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
     ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 50
+    'PAGE_SIZE': 20,
 }
+
+#CORS Settings
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # Vue.js dev server
+    "http://127.0.0.1:3000",
+]
+
+CORS_ALLOW_CREDENTIALS = True
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'

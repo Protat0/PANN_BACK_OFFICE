@@ -1,0 +1,8 @@
+pip install djangorestframework-simplejwt
+pip install django-cors-headers
+pip install django-filter
+pip install celery
+pip install redis
+pip install reportlab
+pip install openpyxl
+pip install pandas
