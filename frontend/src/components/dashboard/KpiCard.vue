@@ -77,11 +77,10 @@ export default {
 .kpi-card {
   background: white;
   border-radius: 16px;
-  padding: 1.5rem; /* Reduced from 2rem */
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  border-left: 5px solid #e5e7eb;
+  padding: 1.5rem;
+  border: 3px solid #e5e7eb; /* Full outline instead of left border */
   transition: all 0.3s ease;
-  min-height: 125px; /* Reduced from 180px (30% reduction) */
+  min-height: 125px;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -89,12 +88,11 @@ export default {
 }
 
 .kpi-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px); /* Reduced hover effect since no shadow */
 }
 
 .kpi-card.profit {
-  border-left-color: var(--primary);
+  border-color: var(--primary);
 }
 
 .kpi-card.profit::before {
@@ -110,7 +108,7 @@ export default {
 }
 
 .kpi-card.products {
-  border-left-color: var(--success);
+  border-color: var(--success);
 }
 
 .kpi-card.products::before {
@@ -126,7 +124,7 @@ export default {
 }
 
 .kpi-card.income {
-  border-left-color: var(--secondary);
+  border-color: var(--secondary);
 }
 
 .kpi-card.income::before {
@@ -142,7 +140,7 @@ export default {
 }
 
 .kpi-card.sold {
-  border-left-color: var(--info);
+  border-color: var(--info);
 }
 
 .kpi-card.sold::before {
@@ -158,7 +156,7 @@ export default {
 }
 
 .kpi-card.orders {
-  border-left-color: var(--error);
+  border-color: var(--error);
 }
 
 .kpi-card.orders::before {
@@ -174,7 +172,7 @@ export default {
 }
 
 .kpi-card.target {
-  border-left-color: var(--primary-medium);
+  border-color: var(--primary-medium);
 }
 
 .kpi-card.target::before {
@@ -193,7 +191,7 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 1rem; /* Reduced from 1.5rem */
+  margin-bottom: 1rem;
   position: relative;
   z-index: 1;
 }
@@ -215,28 +213,32 @@ export default {
   font-weight: 700;
   white-space: nowrap;
   flex-shrink: 0;
+  border: 1px solid transparent; /* Add border to change badges */
 }
 
 .kpi-change.positive {
   background-color: var(--success-light);
   color: var(--success-dark);
+  border-color: var(--success);
 }
 
 .kpi-change.negative {
   background-color: var(--error-light);
   color: var(--error-dark);
+  border-color: var(--error);
 }
 
 .kpi-change.neutral {
   background-color: var(--neutral-light);
   color: var(--neutral-dark);
+  border-color: var(--neutral);
 }
 
 .kpi-value {
-  font-size: 2rem; /* Reduced from 2.25rem */
+  font-size: 2rem;
   font-weight: 800;
   color: #1f2937;
-  margin-bottom: 0.5rem; /* Reduced from 0.75rem */
+  margin-bottom: 0.5rem;
   line-height: 1.1;
   position: relative;
   z-index: 1;
@@ -252,7 +254,7 @@ export default {
 }
 
 .progress-section {
-  margin-top: 1rem; /* Reduced from 1.5rem */
+  margin-top: 1rem;
   position: relative;
   z-index: 1;
 }
@@ -262,6 +264,7 @@ export default {
   height: 10px;
   background-color: #e5e7eb;
   border-radius: 6px;
+  border: 1px solid #d1d5db; /* Add border to progress bar */
   overflow: hidden;
   margin-bottom: 0.75rem;
 }
@@ -269,7 +272,7 @@ export default {
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, #6366f1, #8b5cf6);
-  border-radius: 6px;
+  border-radius: 5px; /* Slightly smaller to account for parent border */
   transition: width 0.6s ease;
   position: relative;
 }
@@ -293,7 +296,7 @@ export default {
 .progress-info {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 1rem; /* Reduced from 1.25rem */
+  margin-bottom: 1rem;
 }
 
 .progress-percentage {
@@ -305,7 +308,7 @@ export default {
 .see-more-btn {
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
   color: white;
-  border: none;
+  border: 1px solid #6366f1; /* Add border to button */
   padding: 0.75rem 1.5rem;
   border-radius: 10px;
   font-size: 0.9rem;
@@ -318,8 +321,9 @@ export default {
 }
 
 .see-more-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  transform: translateY(-1px); /* Reduced since no shadow */
+  border-color: #4f46e5;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
 }
 
 .see-more-btn:active {
@@ -329,8 +333,8 @@ export default {
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .kpi-card {
-    padding: 1.25rem; /* Reduced from 1.5rem */
-    min-height: 110px; /* Reduced from 160px */
+    padding: 1.25rem;
+    min-height: 110px;
   }
   
   .kpi-header {
@@ -342,7 +346,7 @@ export default {
   }
   
   .kpi-value {
-    font-size: 1.75rem; /* Reduced from 1.875rem */
+    font-size: 1.75rem;
     margin-bottom: 0.5rem;
   }
   
