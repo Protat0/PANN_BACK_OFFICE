@@ -1,12 +1,13 @@
 from bson import ObjectId
 from datetime import datetime
-from ..database import get_collection
+from ..database import db_manager  # ✅ Updated import
 from ..models import User
 import bcrypt
 
 class UserService:
     def __init__(self):
-        self.collection = get_collection('users')
+        self.db = db_manager.get_database()  # ✅ Get database connection
+        self.collection = self.db.users  # ✅ Use cloud database
     
     def convert_object_id(self, document):
         """Convert ObjectId to string for JSON serialization"""

@@ -2,8 +2,7 @@ from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from bson import ObjectId
 import bcrypt
-from ..database import get_collection
-from .session_services import SessionLogService
+from ..database import db_manager
 
 # JWT settings
 SECRET_KEY = "your-secret-key-here-change-in-production"  #Default is your-secret-key-here-change-in-production
@@ -13,8 +12,9 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 class AuthService:
     def __init__(self):
-        self.user_collection = get_collection('users')
-        self.blacklist_collection = get_collection('token_blacklist')
+        self.db = db_manager.get_database()
+        self.user_collection = self.db.users
+        self.blacklist_collection = self.db.token_blacklist
     
     def convert_object_id(self, document):
         """Convert ObjectId to string for JSON serialization"""
@@ -139,9 +139,6 @@ class AuthService:
             # Log failed login attempts for security monitoring
             print(f"Login failed for {email}: {str(e)}")
             raise e
-            
-        except Exception as e:
-            raise Exception(str(e))
     
     def logout(self, token: str):
         """Logout user by blacklisting token"""

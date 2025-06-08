@@ -1,10 +1,11 @@
 from datetime import datetime
 from bson import ObjectId
-from ..database import get_collection
+from ..database import db_manager  # ✅ Updated import
 
 class SessionLogService:
     def __init__(self):
-        self.collection = get_collection('session_logs')
+        self.db = db_manager.get_database()  # ✅ Get database connection
+        self.collection = self.db.session_logs  # ✅ Use cloud database
     
     def convert_object_id(self, document):
         if document and '_id' in document:

@@ -1,11 +1,12 @@
 from datetime import datetime, timedelta
 from bson import ObjectId
-from ..database import get_collection
+from ..database import db_manager  # ✅ Updated import
 
 class SessionManagementService:
     def __init__(self):
-        self.session_collection = get_collection('session_logs')
-        self.user_collection = get_collection('users')
+        self.db = db_manager.get_database()  # ✅ Get database connection
+        self.session_collection = self.db.session_logs  # ✅ Use cloud database
+        self.user_collection = self.db.users  # ✅ Use cloud database
     
     def convert_object_id(self, document):
         """Convert ObjectId to string for JSON serialization"""
