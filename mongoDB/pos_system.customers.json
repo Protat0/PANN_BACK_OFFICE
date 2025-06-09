@@ -1,0 +1,92 @@
+[{
+  "_id": {
+    "$oid": "683dd93c431e7112715bb6ec"
+  },
+  "full_name": "Stella Mariz",
+  "email": "john@example.com",
+  "phone": "09123456789",
+  "delivery_address": {
+    "street": "123 Main St",
+    "city": "Cebu",
+    "postal_code": "6000"
+  },
+  "loyalty_points": 0,
+  "date_created": {
+    "$date": "2025-06-02T17:02:52.522Z"
+  },
+  "last_updated": {
+    "$date": "2025-06-04T16:09:01.311Z"
+  }
+},
+{
+  "_id": {
+    "$oid": "683dda192d6dd7ec13ee15d6"
+  },
+  "customer_id": "683dda192d6dd7ec13ee15d6",
+  "full_name": "Jane Smith",
+  "email": "jane@example.com",
+  "phone": "09123456789",
+  "delivery_address": {
+    "street": "456 Oak St",
+    "city": "Cebu",
+    "postal_code": "6000"
+  },
+  "loyalty_points": 0,
+  "last_purchase": null,
+  "date_created": {
+    "$date": "2025-06-02T17:06:33.457Z"
+  },
+  "last_updated": {
+    "$date": "2025-06-02T17:06:33.457Z"
+  },
+  "status": "active",
+  "source": "customer_registration"
+},
+{
+  "_id": {
+    "$oid": "683e9f332fb0625c7ce16952"
+  },
+  "customer_id": "683e9f332fb0625c7ce16952",
+  "full_name": "Jane Smith",
+  "email": "jane@example.com",
+  "phone": "09123456789",
+  "delivery_address": {
+    "street": "456 Oak St",
+    "city": "Cebu",
+    "postal_code": "6000"
+  },
+  "loyalty_points": 0,
+  "last_purchase": null,
+  "date_created": {
+    "$date": "2025-06-03T07:07:31.765Z"
+  },
+  "last_updated": {
+    "$date": "2025-06-03T07:07:31.765Z"
+  },
+  "status": "active",
+  "source": "customer_registration"
+},
+{
+  "_id": {
+    "$oid": "6841a20f37eca0bad1552dd5"
+  },
+  "customer_id": "6841a20f37eca0bad1552dd5",
+  "full_name": "Graham Bell",
+  "email": "graham@gmail.com",
+  "phone": "942194129",
+  "delivery_address": {
+    "street": "kilidkilid sa amo",
+    "city": "Cebu",
+    "postal_code": "6000"
+  },
+  "loyalty_points": 0,
+  "last_purchase": null,
+  "date_created": {
+    "$date": "2025-06-05T13:56:31.343Z"
+  },
+  "last_updated": {
+    "$date": "2025-06-05T13:56:31.343Z"
+  },
+  "status": "active",
+  "source": "customer_registration"
+}]
