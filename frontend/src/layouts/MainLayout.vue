@@ -12,6 +12,15 @@
       <!-- Header Bar -->
       <header class="content-header">
         <h1>{{ currentPageTitle }}</h1>
+        
+        <!-- Header Right Section with Notifications -->
+        <div class="header-right">
+          <!-- Notification Bell -->
+          <NotificationBell />
+          
+          <!-- User Info -->
+         
+        </div>
       </header>
 
       <!-- Page Content - This will now show the routed component -->
@@ -37,11 +46,13 @@
 
 <script>
 import Sidebar from '../components/Sidebar.vue'
+import NotificationBell from '../components/NotificationsBell.vue'
 
 export default {
   name: 'MainLayout',
   components: {
-    Sidebar
+    Sidebar,
+    NotificationBell
   },
   data() {
     return {
@@ -61,13 +72,18 @@ export default {
         '/suppliers': 'Suppliers',
         '/promotions': 'Promotions',
         '/sales-by-item': 'Sales by Item',
-        '/sales-by-category': 'Sales by Category'
+        '/sales-by-category': 'Sales by Category',
+        '/notifications': 'Notifications'  // Added notifications page title
       }
-      return titles[this.$route.path] || 'POS System'
+      return titles[this.$route.path] || 'PANN POS System'
     },
     userInfo() {
       const userData = localStorage.getItem('userData')
       return userData ? JSON.parse(userData) : {}
+    },
+    userInitials() {
+      const name = this.userInfo.full_name || this.userInfo.username || 'U'
+      return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     }
   },
   methods: {
@@ -146,6 +162,9 @@ export default {
   border-bottom: 1px solid #e5e7eb;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .content-header h1 {
@@ -153,6 +172,45 @@ export default {
   font-size: 1.875rem;
   font-weight: 600;
   margin: 0;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.user-info:hover {
+  background-color: #f3f4f6;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.user-name {
+  font-weight: 500;
+  color: #374151;
+  display: none;
 }
 
 .page-content {
@@ -219,6 +277,12 @@ export default {
 }
 
 /* Responsive design */
+@media (min-width: 768px) {
+  .user-name {
+    display: block;
+  }
+}
+
 @media (max-width: 1024px) {
   .page-content {
     padding: 2rem;
@@ -241,6 +305,15 @@ export default {
   .content-header h1 {
     font-size: 1.5rem;
   }
+  
+  .header-right {
+    gap: 0.5rem;
+  }
+  
+  .user-avatar {
+    width: 36px;
+    height: 36px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -250,6 +323,13 @@ export default {
   
   .content-header {
     padding: 1rem;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  
+  .header-right {
+    justify-content: space-between;
   }
 }
-</style>
+</style>  
