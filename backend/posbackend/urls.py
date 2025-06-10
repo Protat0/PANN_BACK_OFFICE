@@ -20,7 +20,7 @@ from django.http import HttpResponse
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/v1/', include('app.urls')),
+    path('api/v1/', include('api.urls')),  
     path('api/v1/notifications/', include('notifications.urls')),
-    path('', lambda request: HttpResponse("POS System API is running!")),
+    path('', lambda request: HttpResponse("PANN POS System API is running! 🍜")),
 ]
