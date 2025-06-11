@@ -28,6 +28,9 @@ class UserService:
     def create_user(self, user_data):
         """Create a new user"""
         try:
+            # Import notification service
+            from notifications.services import notification_service
+            
             # Hash password
             if 'password' in user_data:
                 user_data['password'] = self.hash_password(user_data['password'])
@@ -35,13 +38,41 @@ class UserService:
             # Add timestamps and default status
             user_data['date_created'] = datetime.utcnow()
             user_data['last_updated'] = datetime.utcnow()
-            user_data['status'] = user_data.get('status', 'active')  # Add this line
+            user_data['status'] = user_data.get('status', 'active')
             
             # Insert user
             result = self.collection.insert_one(user_data)
+            user_id = result.inserted_id
+            
+            # Create notification if the role is employee
+            try:
+                user_role = user_data.get('role', '').lower()
+                
+                if user_role == 'employee':
+                    user_name = user_data.get('full_name', user_data.get('username', 'New Employee'))
+                    
+                    notification_service.create_notification(
+                        title="New Employee Added",
+                        message=f"A new employee '{user_name}' has been added to the system",
+                        priority="medium",
+                        notification_type="system",
+                        metadata={
+                            "user_id": str(user_id),
+                            "employee_name": user_name,
+                            "employee_email": user_data.get('email', ''),
+                            "employee_role": user_role,
+                            "action_type": "employee_created",
+                            "source": "user_creation"
+                        }
+                    )
+                    
+            except Exception as notification_error:
+                # Log the notification error but don't fail the user creation
+                print(f"Failed to create notification for new employee: {notification_error}")
+                # You can add proper logging here instead of print
             
             # Get created user
-            created_user = self.collection.find_one({'_id': result.inserted_id})
+            created_user = self.collection.find_one({'_id': user_id})
             return self.convert_object_id(created_user)
         
         except Exception as e:

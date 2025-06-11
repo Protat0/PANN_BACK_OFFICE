@@ -6,9 +6,9 @@ import bcrypt
 
 class CustomerService:
     def __init__(self):
-        self.db = db_manager.get_database()  # ✅ Get database connection
-        self.customer_collection = self.db.customers  # ✅ Use cloud database
-        self.user_collection = self.db.users  # ✅ Use cloud database
+        self.db = db_manager.get_database()  
+        self.customer_collection = self.db.customers  
+        self.user_collection = self.db.users 
     
     def convert_object_id(self, document):
         """Convert ObjectId to string for JSON serialization"""
@@ -25,6 +25,9 @@ class CustomerService:
     def create_customer(self, customer_data):
         """Create a new customer in both users and customers collections"""
         try:
+            # Import notification service
+            from notifications.services import notification_service
+            
             # Extract user-related data
             user_data = {
                 "username": customer_data.get("username", customer_data.get("email")),
@@ -61,6 +64,29 @@ class CustomerService:
             # Insert into customers collection
             self.customer_collection.insert_one(customer_specific_data)
             
+            # Create general notification for new customer registration
+            try:
+                customer_name = customer_data.get("full_name", customer_data.get("email", "New Customer"))
+                
+                notification_service.create_notification(
+                    title="New Customer Registration",
+                    message=f"A new customer '{customer_name}' has registered in the system",
+                    priority="low",
+                    notification_type="system",
+                    metadata={
+                        "customer_id": str(user_id),
+                        "customer_email": customer_data["email"],
+                        "customer_name": customer_name,
+                        "registration_source": "customer_registration",
+                        "action_type": "customer_created"
+                    }
+                )
+                
+            except Exception as notification_error:
+                # Log the notification error but don't fail the customer creation
+                print(f"Failed to create notification for new customer: {notification_error}")
+                # You can add proper logging here instead of print
+            
             # Return the customer data
             created_customer = self.customer_collection.find_one({'_id': user_id})
             return self.convert_object_id(created_customer)
@@ -70,7 +96,7 @@ class CustomerService:
             if 'user_id' in locals():
                 self.user_collection.delete_one({'_id': user_id})
             raise Exception(f"Error creating customer: {str(e)}")
-    
+        
     def get_all_customers(self):
         """Get all customers"""
         try:
