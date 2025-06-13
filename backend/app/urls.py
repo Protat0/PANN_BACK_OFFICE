@@ -7,6 +7,16 @@ from .views import (
     UserByUsernameView,
     CustomerListView,
     CustomerDetailView,
+    ProductListView,
+    ProductDetailView,
+    ProductBySkuView,
+    ProductStockUpdateView,
+    LowStockProductsView,
+    ExpiringProductsView,
+    BulkStockUpdateView,  # Add this
+    StockHistoryView, 
+    BulkStockUpdateView,  # New view for bulk operations
+    StockHistoryView,     # New view for stock history
     LoginView,
     LogoutView,
     RefreshTokenView,
@@ -34,6 +44,20 @@ urlpatterns = [
     # Customer endpoints
     path('customers/', CustomerListView.as_view(), name='customer-list'),
     path('customers/<str:customer_id>/', CustomerDetailView.as_view(), name='customer-detail'),
+    
+    # Product endpoints
+    path('products/', ProductListView.as_view(), name='product-list'),
+    path('products/<str:product_id>/', ProductDetailView.as_view(), name='product-detail'),
+    path('products/sku/<str:sku>/', ProductBySkuView.as_view(), name='product-by-sku'),
+    
+    # Stock management endpoints
+    path('products/<str:product_id>/stock/', ProductStockUpdateView.as_view(), name='product-stock-update'),
+    path('products/stock/bulk-update/', BulkStockUpdateView.as_view(), name='bulk-stock-update'),
+    path('products/<str:product_id>/stock/history/', StockHistoryView.as_view(), name='stock-history'),
+    
+    # Product reports endpoints
+    path('products/reports/low-stock/', LowStockProductsView.as_view(), name='low-stock-products'),
+    path('products/reports/expiring/', ExpiringProductsView.as_view(), name='expiring-products'),
     
     # Authentication endpoints
     path('auth/login/', LoginView.as_view(), name='login'),

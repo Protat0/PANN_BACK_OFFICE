@@ -11,7 +11,7 @@
     <main class="main-content" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
       <!-- Header Bar -->
       <header class="content-header">
-        <h1>{{ currentPageTitle }}</h1>
+        <h1>Product Details</h1>
       </header>
 
       <!-- Page Content - This will now show the routed component -->
