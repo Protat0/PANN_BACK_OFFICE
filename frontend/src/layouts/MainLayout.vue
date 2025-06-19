@@ -67,6 +67,7 @@ export default {
         '/accounts': 'User Accounts',
         '/customers': 'Customers',
         '/products': 'Products',
+        '/products/bulk': 'Add Products (Bulk)',
         '/categories': 'Categories',
         '/logs': 'Inventory Logs',
         '/suppliers': 'Suppliers',
@@ -74,7 +75,13 @@ export default {
         '/sales-by-item': 'Sales by Item',
         '/sales-by-category': 'Sales by Category'
       }
-      return titles[this.$route.path] || 'POS System'
+      
+      // Handle dynamic product detail routes
+      if (this.$route.path.startsWith('/products/') && this.$route.path !== '/products/bulk') {
+        return 'Product Details'
+      }
+      
+      return titles[this.$route.path] || 'Product Details'
     },
     userInfo() {
       const userData = localStorage.getItem('userData')
@@ -153,10 +160,14 @@ export default {
 
 .content-header {
   background: white;
-  padding: 2rem 2.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  /* Match sidebar header height: logo + toggle section + padding */
+  height: 100px; /* This matches the sidebar header total height */
+  padding: 0 2.5rem;
+  border-bottom: 1px solid var(--neutral-medium);
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   flex-shrink: 0;
+  display: flex;
+  align-items: center; /* Center the title vertically */
 }
 
 .header-content {
@@ -167,7 +178,7 @@ export default {
 }
 
 .content-header h1 {
-  color: #1f2937;
+  color: var(--tertiary-dark);
   font-size: 1.875rem;
   font-weight: 600;
   margin: 0;
@@ -228,7 +239,7 @@ export default {
 
 .modal-content h2 {
   margin-bottom: 1rem;
-  color: #1f2937;
+  color: var(--tertiary-dark);
 }
 
 .profile-info {
@@ -237,11 +248,11 @@ export default {
 
 .profile-info p {
   margin-bottom: 0.5rem;
-  color: #6b7280;
+  color: var(--tertiary-medium);
 }
 
 .modal-content button {
-  background-color: #6366f1;
+  background-color: var(--primary);
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
@@ -253,7 +264,7 @@ export default {
 }
 
 .modal-content button:hover {
-  background-color: #4f46e5;
+  background-color: var(--primary-dark);
 }
 
 /* Responsive design */
@@ -263,7 +274,7 @@ export default {
   }
   
   .content-header {
-    padding: 1.5rem 2rem;
+    padding: 0 2rem;
   }
   
   .header-right {
@@ -277,7 +288,8 @@ export default {
   }
   
   .content-header {
-    padding: 1rem 1.5rem;
+    padding: 0 1.5rem;
+    height: 80px; /* Slightly smaller on mobile */
   }
   
   .content-header h1 {
@@ -299,7 +311,12 @@ export default {
   }
   
   .content-header {
-    padding: 1rem;
+    padding: 0 1rem;
+    height: 70px; /* Even smaller on very small screens */
+  }
+  
+  .content-header h1 {
+    font-size: 1.25rem;
   }
   
   .header-content {
