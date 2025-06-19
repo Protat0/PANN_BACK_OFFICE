@@ -9,6 +9,8 @@ import MainLayout from '../layouts/MainLayout.vue'
 import Dashboard from '../pages/Dashboard.vue'
 import Accounts from '../pages/Accounts.vue'
 import Customers from '../pages/Customers.vue'
+import SalesByCategory from '../pages/reports/SalesByCategory.vue'
+import SalesByItem from '../pages/reports/SalesByItem.vue'
 
 // Auth guard function
 function requireAuth(to, from, next) {
@@ -70,6 +72,16 @@ const router = createRouter({
           path: 'home',
           name: 'home',
           component: HomeView
+        },
+        {
+          path: 'sales-by-item',
+          name: 'SalesByItem',
+          component: SalesByItem
+        },
+        {
+          path: 'sales-by-category',
+          name: 'SalesByCategory',
+          component: SalesByCategory
         },
         {
           path: 'about',

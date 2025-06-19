@@ -1,8 +1,39 @@
 <template>
   <div class="customers-page">
+    <!-- KPI Cards Row -->
+    <div class="kpi-cards-container">
+      <KpiCard
+        title="Active Users"
+        value="₱78,452.23"
+        subtitle="From the last month"
+        change="+24%"
+        change-type="positive"
+        variant="profit"
+        class="kpi-card"
+      />
+      <KpiCard
+        title="Monthly New Users"
+        value="1,247"
+        subtitle="Active customers"
+        change="+12%"
+        change-type="positive"
+        variant="customers"
+        class="kpi-card"
+      />
+      <KpiCard
+        title="Daily Customer Logins"
+        value="₱985.50"
+        subtitle="Last 30 days"
+        change="-3%"
+        change-type="negative"
+        variant="order"
+        class="kpi-card"
+      />
+    </div>
+
     <!-- Header Section -->
     <div class="page-header">
-      <!-- Search Bar replacing the title -->
+      <!-- Search Bar -->
       <div class="search-section">
         <div class="search-container">
           <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -30,6 +61,7 @@
         </div>
       </div>
       
+      <!-- Action Buttons -->
       <div class="header-actions">
         <button 
           class="btn btn-secondary" 
@@ -290,9 +322,13 @@
 
 <script>
 import apiService from '../services/api.js'
+import KpiCard from '../components/dashboard/KpiCard.vue'
 
 export default {
   name: 'CustomersPage',
+  components: {
+    KpiCard,
+  },
   data() {
     return {
       customers: [],
@@ -591,17 +627,17 @@ export default {
   },
 
   async mounted() {
-  console.log('Customers component mounted')
-  
-  // Force scroll to top immediately
-  window.scrollTo(0, 0)
-  
-  await this.fetchCustomers()
-  
-  // Ensure we're at top after data loads
-  this.$nextTick(() => {
+    console.log('Customers component mounted')
+    
+    // Force scroll to top immediately
     window.scrollTo(0, 0)
-  })
+    
+    await this.fetchCustomers()
+    
+    // Ensure we're at top after data loads
+    this.$nextTick(() => {
+      window.scrollTo(0, 0)
+    })
   }
 }
 </script>
@@ -613,6 +649,26 @@ export default {
   margin: 0 auto;
   background-color: #f8fafc;
   min-height: 100vh;
+}
+
+/* KPI Cards Container */
+.kpi-cards-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.kpi-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.kpi-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
 }
 
 .page-header {
@@ -1061,6 +1117,12 @@ input[type="checkbox"] {
     padding: 1rem;
   }
   
+  .kpi-cards-container {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
   .table-container {
     overflow-x: auto;
   }
@@ -1081,6 +1143,11 @@ input[type="checkbox"] {
 }
 
 @media (max-width: 768px) {
+  .kpi-cards-container {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
   .page-header {
     flex-direction: column;
     gap: 1rem;
@@ -1129,6 +1196,28 @@ input[type="checkbox"] {
   }
 }
 
+@media (max-width: 640px) {
+  .kpi-cards-container {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .page-header {
+    gap: 0.75rem;
+  }
+
+  .header-actions {
+    grid-template-columns: repeat(2, 1fr);
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .btn {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+  }
+}
+
 @media (max-width: 480px) {
   .search-container {
     flex-direction: column;
@@ -1144,5 +1233,13 @@ input[type="checkbox"] {
   .search-input::placeholder {
     font-size: 0.875rem;
   }
-}
-</style>
+
+  .kpi-cards-container {
+    gap: 0.5rem;
+  }
+
+  .header-actions {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+}</style>

@@ -7,7 +7,7 @@ import bcrypt
 class UserService:
     def __init__(self):
         self.db = db_manager.get_database()  # ✅ Get database connection
-        self.collection = self.db.users  # ✅ Use cloud database
+        self.collection = self.db.users 
     
     def convert_object_id(self, document):
         """Convert ObjectId to string for JSON serialization"""

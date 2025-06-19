@@ -271,9 +271,9 @@ export default {
       }
     }
   },
-  mounted() {
-    this.fetchNotifications()
-    this.startPolling()
+  mounted() { //This was used for debugging and ensuring that the notifications does get recent entries. 
+   // this.fetchNotifications()
+    //this.startPolling()
   },
   beforeUnmount() {
     this.stopPolling()
