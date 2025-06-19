@@ -133,6 +133,7 @@
 
 <script>
 import { ref, onMounted, watch, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import productsApiService from '@/services/apiProducts.js';
 import ProductOverview from '@/components/products/ProductOverview.vue';
 import AddProductModal from '@/components/products/AddProductModal.vue';
@@ -156,6 +157,7 @@ export default {
     console.log('📋 Received props:', props);
     console.log('🆔 Product ID from route:', props.id);
 
+    const router = useRouter();
     const productData = ref({});
     const loading = ref(false);
     const error = ref(null);
@@ -264,9 +266,46 @@ export default {
       activeTab.value = tab;
     };
 
-    const handleDelete = () => {
+    const handleDelete = async () => {
       console.log('🗑️ Delete button clicked for product:', props.id);
-      // Add delete functionality here
+      
+      if (!productData.value || !productData.value.product_name) {
+        error.value = 'Product data not available for deletion';
+        return;
+      }
+
+      const productName = productData.value.product_name;
+      const confirmed = confirm(`Are you sure you want to delete "${productName}"?\n\nThis action cannot be undone.`);
+      
+      if (!confirmed) return;
+
+      formLoading.value = true;
+      error.value = null;
+
+      try {
+        console.log('🔄 Deleting product with ID:', props.id);
+        await productsApiService.deleteProduct(props.id);
+        
+        console.log('✅ Product deleted successfully');
+        successMessage.value = `Product "${productName}" has been deleted successfully`;
+        
+        // Navigate back to products list after successful deletion
+        setTimeout(() => {
+          console.log('🔄 Navigating back to products list');
+          try {
+            router.push('/products');
+          } catch (routerError) {
+            console.error('Router navigation failed:', routerError);
+            window.location.href = '/products'; // Fallback navigation
+          }
+        }, 1500);
+        
+      } catch (err) {
+        console.error('❌ Error deleting product:', err);
+        error.value = `Failed to delete product: ${err.message}`;
+      } finally {
+        formLoading.value = false;
+      }
     };
 
     const handleEdit = () => {

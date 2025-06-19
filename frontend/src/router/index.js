@@ -11,6 +11,7 @@ import Accounts from '../pages/Accounts.vue'
 import Customers from '../pages/Customers.vue'
 import Products from '../pages/inventory/Products.vue'
 import ProductDetails from '../pages/inventory/ProductDetails.vue'
+import ProductBulkEntry from '../pages/inventory/ProductBulkEntry.vue'
 
 // Auth guard function
 function requireAuth(to, from, next) {
@@ -72,6 +73,11 @@ const router = createRouter({
           path: 'products',
           name: 'Products',
           component: Products
+        },
+        {
+          path: 'products/bulk',
+          name: 'ProductBulkEntry',
+          component: ProductBulkEntry
         },
         {
           path: 'products/:id',

@@ -1,4 +1,4 @@
-// services/apiProducts.js
+// services/apiProducts.js - UPDATED VERSION
 import { api } from './api.js';
 
 class ProductsApiService {
@@ -20,7 +20,7 @@ class ProductsApiService {
   
   /**
    * Get all products with optional query parameters
-   * @param {Object} params - Query parameters (page, limit, search, category, etc.)
+   * @param {Object} params - Query parameters (page, limit, search, category, include_deleted, etc.)
    * @returns {Promise<Object>} Products list with pagination info
    */
   async getProducts(params = {}) {
@@ -38,11 +38,13 @@ class ProductsApiService {
   /**
    * Get a specific product by ID
    * @param {string} productId - Product ID
+   * @param {boolean} includeDeleted - Whether to include soft-deleted products
    * @returns {Promise<Object>} Product details
    */
-  async getProduct(productId) {
+  async getProduct(productId, includeDeleted = false) {
     try {
-      const response = await api.get(`/products/${productId}/`);
+      const params = includeDeleted ? { include_deleted: true } : {};
+      const response = await api.get(`/products/${productId}/`, { params });
       return this.handleResponse(response);
     } catch (error) {
       this.handleError(error);
@@ -52,11 +54,13 @@ class ProductsApiService {
   /**
    * Get a product by SKU
    * @param {string} sku - Product SKU
+   * @param {boolean} includeDeleted - Whether to include soft-deleted products
    * @returns {Promise<Object>} Product details
    */
-  async getProductBySku(sku) {
+  async getProductBySku(sku, includeDeleted = false) {
     try {
-      const response = await api.get(`/products/sku/${sku}/`);
+      const params = includeDeleted ? { include_deleted: true } : {};
+      const response = await api.get(`/products/sku/${sku}/`, { params });
       return this.handleResponse(response);
     } catch (error) {
       this.handleError(error);
@@ -100,7 +104,7 @@ class ProductsApiService {
    */
   async patchProduct(productId, productData) {
     try {
-      const response = await api.patch(`/products/${productId}/`, productData);
+      const response = await api.patch(`/products/${productId}/update/`, productData);
       return this.handleResponse(response);
     } catch (error) {
       this.handleError(error);
@@ -108,13 +112,15 @@ class ProductsApiService {
   }
 
   /**
-   * Delete a product
+   * Delete a product (soft delete by default)
    * @param {string} productId - Product ID
+   * @param {boolean} hardDelete - Whether to permanently delete (hard delete)
    * @returns {Promise<void>}
    */
-  async deleteProduct(productId) {
+  async deleteProduct(productId, hardDelete = false) {
     try {
-      const response = await api.delete(`/products/${productId}/`);
+      const params = hardDelete ? { hard_delete: true } : {};
+      const response = await api.delete(`/products/${productId}/delete/`, { params });
       return this.handleResponse(response);
     } catch (error) {
       this.handleError(error);
@@ -122,15 +128,26 @@ class ProductsApiService {
   }
 
   /**
-   * Bulk delete products
-   * @param {Array<string>} productIds - Array of product IDs
-   * @returns {Promise<Object>} Deletion result
+   * Restore a soft-deleted product
+   * @param {string} productId - Product ID
+   * @returns {Promise<Object>} Restored product
    */
-  async bulkDeleteProducts(productIds) {
+  async restoreProduct(productId) {
     try {
-      const response = await api.delete('/products/', { 
-        data: { product_ids: productIds } 
-      });
+      const response = await api.post(`/products/${productId}/restore/`);
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Get all soft-deleted products
+   * @returns {Promise<Array>} Deleted products
+   */
+  async getDeletedProducts() {
+    try {
+      const response = await api.get('/products/deleted/');
       return this.handleResponse(response);
     } catch (error) {
       this.handleError(error);
@@ -212,7 +229,7 @@ class ProductsApiService {
   }
 
   /**
-   * Bulk update stock for multiple products - NEW METHOD
+   * Bulk update stock for multiple products - FIXED URL
    * @param {Array<Object>} stockUpdates - Array of stock updates
    * @returns {Promise<Object>} Bulk update result
    */
@@ -228,13 +245,54 @@ class ProductsApiService {
   }
 
   /**
-   * Get stock history for a product - NEW METHOD
+   * Get stock history for a product - FIXED URL
    * @param {string} productId - Product ID
    * @returns {Promise<Object>} Stock history
    */
   async getStockHistory(productId) {
     try {
       const response = await api.get(`/products/${productId}/stock/history/`);
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Adjust stock for sale - NEW METHOD
+   * @param {string} productId - Product ID
+   * @param {number} quantitySold - Quantity sold
+   * @returns {Promise<Object>} Updated stock info
+   */
+  async adjustStockForSale(productId, quantitySold) {
+    try {
+      const response = await api.post(`/products/${productId}/stock/adjust/`, {
+        quantity_sold: parseInt(quantitySold)
+      });
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Restock product from supplier - NEW METHOD
+   * @param {string} productId - Product ID
+   * @param {number} quantityReceived - Quantity received
+   * @param {Object} supplierInfo - Supplier information
+   * @returns {Promise<Object>} Updated stock info
+   */
+  async restockProduct(productId, quantityReceived, supplierInfo = null) {
+    try {
+      const payload = {
+        quantity_received: parseInt(quantityReceived)
+      };
+      
+      if (supplierInfo) {
+        payload.supplier_info = supplierInfo;
+      }
+      
+      const response = await api.post(`/products/${productId}/restock/`, payload);
       return this.handleResponse(response);
     } catch (error) {
       this.handleError(error);
@@ -272,16 +330,14 @@ class ProductsApiService {
   }
 
   /**
-   * Get products by category
+   * Get products by category - FIXED URL
    * @param {string} categoryId - Category ID
    * @param {Object} params - Additional query parameters
    * @returns {Promise<Object>} Products in category
    */
   async getProductsByCategory(categoryId, params = {}) {
     try {
-      const response = await api.get('/products/', { 
-        params: { ...params, category: categoryId } 
-      });
+      const response = await api.get(`/products/category/${categoryId}/`, { params });
       return this.handleResponse(response);
     } catch (error) {
       this.handleError(error);
@@ -305,38 +361,143 @@ class ProductsApiService {
     }
   }
 
-  // BULK OPERATIONS
+  // BULK OPERATIONS - COMPLETELY FIXED
 
   /**
-   * Bulk create products
+   * Bulk create products - FINAL FIXED VERSION
    * @param {Array<Object>} productsData - Array of product data
+   * @param {Object} options - Additional options (validation_only, etc.)
    * @returns {Promise<Object>} Bulk creation result
    */
-  async bulkCreateProducts(productsData) {
+  async bulkCreateProducts(productsData, options = {}) {
     try {
-      const response = await api.post('/products/bulk/', { products: productsData });
+      console.log('=== BULK CREATE DEBUG START ===');
+      console.log('Input products count:', productsData.length);
+      console.log('Sample product (first):', productsData[0]);
+      console.log('URL being called:', '/products/bulk-create/');
+      
+      // CRITICAL FIX: Based on your backend views, it expects { products: [...] }
+      const payload = { 
+        products: productsData
+      };
+      
+      // Add validation option if requested
+      if (options.validate_only) {
+        payload.validate_only = options.validate_only;
+      }
+      
+      console.log('Final payload structure:', {
+        hasProducts: 'products' in payload,
+        productsCount: payload.products.length,
+        validateOnly: payload.validate_only || false
+      });
+      
+      console.log('Making POST request...');
+      const response = await api.post('/products/bulk-create/', payload);
+      
+      console.log('=== RESPONSE RECEIVED ===');
+      console.log('Status:', response.status);
+      console.log('Response data:', response.data);
+      console.log('=== BULK CREATE DEBUG END ===');
+      
       return this.handleResponse(response);
     } catch (error) {
+      console.error('=== BULK CREATE ERROR ===');
+      console.error('HTTP Status:', error.response?.status);
+      console.error('Error data:', error.response?.data);
+      console.error('Request URL:', error.config?.url);
+      console.error('Request method:', error.config?.method);
+      
+      // Try to parse the request data to see what we actually sent
+      try {
+        const requestData = error.config?.data;
+        if (typeof requestData === 'string') {
+          console.error('Request payload:', JSON.parse(requestData));
+        } else {
+          console.error('Request payload:', requestData);
+        }
+      } catch (parseError) {
+        console.error('Could not parse request data');
+      }
+      
+      console.error('Full error object:', error);
+      console.error('=== END ERROR DEBUG ===');
+      
       this.handleError(error);
     }
   }
 
   /**
-   * Bulk update products
-   * @param {Array<Object>} productsData - Array of product updates
-   * @returns {Promise<Object>} Bulk update result
+   * Validate bulk products without creating them - LOCAL VALIDATION
+   * @param {Array<Object>} productsData - Array of product data
+   * @returns {Promise<Object>} Validation result
    */
-  async bulkUpdateProducts(productsData) {
+  async validateBulkProducts(productsData) {
     try {
-      const response = await api.put('/products/bulk/', { products: productsData });
-      return this.handleResponse(response);
+      // Local validation since backend endpoint might not exist
+      const validationErrors = [];
+      
+      productsData.forEach((product, index) => {
+        // Required fields validation
+        if (!product.product_name || product.product_name.trim() === '') {
+          validationErrors.push({
+            index,
+            field: 'product_name',
+            error: 'Product name is required'
+          });
+        }
+        
+        // Numeric validation
+        if (product.stock && isNaN(parseInt(product.stock))) {
+          validationErrors.push({
+            index,
+            field: 'stock',
+            error: 'Stock must be a number'
+          });
+        }
+        
+        if (product.cost_price && isNaN(parseFloat(product.cost_price))) {
+          validationErrors.push({
+            index,
+            field: 'cost_price',
+            error: 'Cost price must be a number'
+          });
+        }
+        
+        if (product.selling_price && isNaN(parseFloat(product.selling_price))) {
+          validationErrors.push({
+            index,
+            field: 'selling_price',
+            error: 'Selling price must be a number'
+          });
+        }
+        
+        // Business logic validation
+        if (product.cost_price && product.selling_price && 
+            parseFloat(product.cost_price) >= parseFloat(product.selling_price)) {
+          validationErrors.push({
+            index,
+            field: 'selling_price',
+            error: 'Selling price must be higher than cost price'
+          });
+        }
+      });
+      
+      return {
+        validation_only: true,
+        total_products: productsData.length,
+        valid_products: productsData.length - validationErrors.length,
+        validation_errors: validationErrors
+      };
     } catch (error) {
       this.handleError(error);
     }
   }
 
+  // IMPORT/EXPORT OPERATIONS - FIXED URLS
+
   /**
-   * Export products data
+   * Export products data - FIXED URL
    * @param {Object} params - Export parameters (format, filters, etc.)
    * @returns {Promise<Blob>} Exported file
    */
@@ -353,23 +514,89 @@ class ProductsApiService {
   }
 
   /**
-   * Import products from file
+   * Import products from file - FIXED URL
    * @param {File} file - CSV or Excel file
-   * @param {Object} options - Import options
+   * @param {Object} options - Import options (validate_only, etc.)
    * @returns {Promise<Object>} Import result
    */
   async importProducts(file, options = {}) {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      
+      // Add options to form data
       Object.keys(options).forEach(key => {
         formData.append(key, options[key]);
       });
 
+      console.log('Uploading file for import:', file.name);
+      
       const response = await api.post('/products/import/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          console.log(`Upload progress: ${percentCompleted}%`);
+        }
+      });
+      
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error('Import error:', error.response?.data || error.message);
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Download import template - FIXED URL
+   * @param {string} format - Template format ('csv' or 'xlsx')
+   * @returns {Promise<Blob>} Template file
+   */
+  async downloadImportTemplate(format = 'csv') {
+    try {
+      const response = await api.get('/products/import/template/', { 
+        params: { format },
+        responseType: 'blob'
+      });
+      
+      return response.data;
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  // SYNCHRONIZATION METHODS - NEW
+
+  /**
+   * Sync products between local and cloud - NEW METHOD
+   * @param {string} direction - 'to_cloud' or 'to_local'
+   * @param {Array} products - Products to sync (for to_cloud)
+   * @returns {Promise<Object>} Sync result
+   */
+  async syncProducts(direction = 'to_cloud', products = []) {
+    try {
+      const payload = {
+        direction,
+        ...(direction === 'to_cloud' && { products })
+      };
+      
+      const response = await api.post('/products/sync/', payload);
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Get unsynced products - NEW METHOD
+   * @param {string} source - 'local' or 'cloud'
+   * @returns {Promise<Array>} Unsynced products
+   */
+  async getUnsyncedProducts(source = 'local') {
+    try {
+      const response = await api.get('/products/sync/unsynced/', {
+        params: { source }
       });
       return this.handleResponse(response);
     } catch (error) {
@@ -377,31 +604,26 @@ class ProductsApiService {
     }
   }
 
-  // BARCODE OPERATIONS
-
   /**
-   * Generate barcode for product
+   * Get/Update sync status for a product - NEW METHOD
    * @param {string} productId - Product ID
-   * @param {Object} options - Barcode generation options
-   * @returns {Promise<Object>} Barcode data
+   * @param {Object} updateData - Update data (optional)
+   * @returns {Promise<Object>} Sync status
    */
-  async generateBarcode(productId, options = {}) {
+  async syncStatus(productId, updateData = null) {
     try {
-      const response = await api.post(`/products/${productId}/barcode/`, options);
-      return this.handleResponse(response);
+      if (updateData) {
+        // Update sync status
+        const response = await api.put(`/products/${productId}/sync/status/`, updateData);
+        return this.handleResponse(response);
+      } else {
+        // Get sync status
+        const response = await api.get(`/products/${productId}/sync/status/`);
+        return this.handleResponse(response);
+      }
     } catch (error) {
       this.handleError(error);
     }
-  }
-
-  /**
-   * Update product barcode
-   * @param {string} productId - Product ID
-   * @param {string} barcode - New barcode
-   * @returns {Promise<Object>} Updated product
-   */
-  async updateBarcode(productId, barcode) {
-    return this.patchProduct(productId, { barcode });
   }
 
   // UTILITY METHODS
@@ -409,11 +631,12 @@ class ProductsApiService {
   /**
    * Check if product exists by SKU
    * @param {string} sku - Product SKU
+   * @param {boolean} includeDeleted - Whether to include soft-deleted products
    * @returns {Promise<boolean>} Whether product exists
    */
-  async productExistsBySku(sku) {
+  async productExistsBySku(sku, includeDeleted = false) {
     try {
-      await this.getProductBySku(sku);
+      await this.getProductBySku(sku, includeDeleted);
       return true;
     } catch (error) {
       if (error.message.includes('404') || error.message.includes('Not Found')) {
@@ -431,7 +654,7 @@ class ProductsApiService {
   async getProductStock(productId) {
     try {
       const product = await this.getProduct(productId);
-      return product.stock || 0; // Fixed property name
+      return product.stock || 0;
     } catch (error) {
       this.handleError(error);
     }
@@ -450,6 +673,94 @@ class ProductsApiService {
     } catch (error) {
       this.handleError(error);
     }
+  }
+
+  /**
+   * Check if product is deleted
+   * @param {string} productId - Product ID
+   * @returns {Promise<boolean>} Whether product is soft-deleted
+   */
+  async isProductDeleted(productId) {
+    try {
+      const product = await this.getProduct(productId, true); // Include deleted
+      return product.isDeleted === true;
+    } catch (error) {
+      if (error.message.includes('404') || error.message.includes('Not Found')) {
+        return false; // Product doesn't exist at all
+      }
+      throw error;
+    }
+  }
+
+  // BATCH PROCESSING HELPERS
+
+  /**
+   * Process products in batches to avoid overwhelming the server
+   * @param {Array<Object>} products - Array of products to process
+   * @param {Function} processFn - Function to process each batch
+   * @param {number} batchSize - Size of each batch (default: 20)
+   * @returns {Promise<Array>} Array of batch results
+   */
+  async processBatches(products, processFn, batchSize = 20) {
+    const results = [];
+    
+    for (let i = 0; i < products.length; i += batchSize) {
+      const batch = products.slice(i, i + batchSize);
+      
+      try {
+        console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(products.length/batchSize)}`);
+        const batchResult = await processFn(batch);
+        results.push({
+          batchIndex: Math.floor(i/batchSize),
+          success: true,
+          result: batchResult
+        });
+        
+        // Add small delay between batches to avoid overwhelming server
+        await new Promise(resolve => setTimeout(resolve, 250));
+        
+      } catch (error) {
+        console.error(`Error in batch ${Math.floor(i/batchSize) + 1}:`, error);
+        results.push({
+          batchIndex: Math.floor(i/batchSize),
+          success: false,
+          error: error.message
+        });
+      }
+    }
+    
+    return results;
+  }
+
+  /**
+   * Create products in batches - FIXED METHOD
+   * @param {Array<Object>} products - Array of products to create
+   * @param {number} batchSize - Size of each batch
+   * @returns {Promise<Object>} Batch creation results
+   */
+  async createProductsInBatches(products, batchSize = 15) {
+    const batchResults = await this.processBatches(
+      products, 
+      (batch) => this.bulkCreateProducts(batch),
+      batchSize
+    );
+    
+    // Aggregate results
+    const successfulBatches = batchResults.filter(r => r.success);
+    const totalSuccessful = successfulBatches
+      .reduce((sum, r) => sum + (r.result?.results?.total_successful || 0), 0);
+      
+    const totalFailed = successfulBatches
+      .reduce((sum, r) => sum + (r.result?.results?.total_failed || 0), 0);
+    
+    return {
+      total_batches: batchResults.length,
+      successful_batches: successfulBatches.length,
+      failed_batches: batchResults.filter(r => !r.success).length,
+      total_successful: totalSuccessful,
+      total_failed: totalFailed,
+      batch_details: batchResults
+    };
   }
 }
 

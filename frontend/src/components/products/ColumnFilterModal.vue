@@ -15,15 +15,12 @@
         <!-- Quick Actions -->
         <div class="quick-actions">
           <button @click="selectAll" class="btn btn-primary">
-            <span class="icon">✅</span>
             Show All
           </button>
           <button @click="selectNone" class="btn btn-secondary">
-            <span class="icon">❌</span>
             Hide All
           </button>
           <button @click="resetToDefault" class="btn btn-info">
-            <span class="icon">🔄</span>
             Reset Default
           </button>
         </div>
@@ -33,7 +30,11 @@
           <!-- Essential Columns (Always Required) -->
           <div class="column-group">
             <h3 class="group-title">
-              <span class="group-icon">🔒</span>
+              <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <circle cx="12" cy="16" r="1"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
               Essential Columns
               <small>(Always visible)</small>
             </h3>
@@ -51,7 +52,6 @@
                     disabled
                   />
                   <label :for="`col-${column.key}`" class="column-label">
-                    <span class="column-icon">{{ column.icon }}</span>
                     <div class="column-info">
                       <span class="column-name">{{ column.name }}</span>
                       <span class="column-description">{{ column.description }}</span>
@@ -65,7 +65,13 @@
           <!-- Basic Information -->
           <div class="column-group">
             <h3 class="group-title">
-              <span class="group-icon">📋</span>
+              <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14,2 14,8 20,8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10,9 9,9 8,9"/>
+              </svg>
               Basic Information
             </h3>
             <div class="columns-grid">
@@ -83,7 +89,6 @@
                     @change="updateColumnVisibility"
                   />
                   <label :for="`col-${column.key}`" class="column-label">
-                    <span class="column-icon">{{ column.icon }}</span>
                     <div class="column-info">
                       <span class="column-name">{{ column.name }}</span>
                       <span class="column-description">{{ column.description }}</span>
@@ -97,7 +102,10 @@
           <!-- Financial Information -->
           <div class="column-group">
             <h3 class="group-title">
-              <span class="group-icon">💰</span>
+              <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="1" x2="12" y2="23"/>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
               Financial Information
             </h3>
             <div class="columns-grid">
@@ -115,7 +123,6 @@
                     @change="updateColumnVisibility"
                   />
                   <label :for="`col-${column.key}`" class="column-label">
-                    <span class="column-icon">{{ column.icon }}</span>
                     <div class="column-info">
                       <span class="column-name">{{ column.name }}</span>
                       <span class="column-description">{{ column.description }}</span>
@@ -129,7 +136,12 @@
           <!-- Status & Dates -->
           <div class="column-group">
             <h3 class="group-title">
-              <span class="group-icon">📅</span>
+              <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
               Status & Dates
             </h3>
             <div class="columns-grid">
@@ -147,7 +159,6 @@
                     @change="updateColumnVisibility"
                   />
                   <label :for="`col-${column.key}`" class="column-label">
-                    <span class="column-icon">{{ column.icon }}</span>
                     <div class="column-info">
                       <span class="column-name">{{ column.name }}</span>
                       <span class="column-description">{{ column.description }}</span>
@@ -184,7 +195,6 @@
           Cancel
         </button>
         <button @click="applyChanges" class="btn btn-primary">
-          <span class="icon">✅</span>
           Apply Changes
         </button>
       </div>
@@ -216,20 +226,17 @@ export default {
         {
           key: 'checkbox',
           name: 'Selection',
-          description: 'Select multiple items',
-          icon: '☑️'
+          description: 'Select multiple items'
         },
         {
           key: 'productName',
           name: 'Product Name',
-          description: 'Primary product identifier',
-          icon: '🏷️'
+          description: 'Primary product identifier'
         },
         {
           key: 'actions',
           name: 'Actions',
-          description: 'Edit, view, delete options',
-          icon: '⚙️'
+          description: 'Edit, view, delete options'
         }
       ],
       
@@ -238,26 +245,22 @@ export default {
         {
           key: 'id',
           name: 'Product ID',
-          description: 'Unique product identifier',
-          icon: '🆔'
+          description: 'Unique product identifier'
         },
         {
           key: 'sku',
           name: 'SKU',
-          description: 'Stock keeping unit code',
-          icon: '📋'
+          description: 'Stock keeping unit code'
         },
         {
           key: 'category',
           name: 'Category',
-          description: 'Product category',
-          icon: '📂'
+          description: 'Product category'
         },
         {
           key: 'stock',
           name: 'Stock Level',
-          description: 'Current inventory count',
-          icon: '📦'
+          description: 'Current inventory count'
         }
       ],
       
@@ -266,14 +269,12 @@ export default {
         {
           key: 'costPrice',
           name: 'Cost Price',
-          description: 'Purchase cost per unit',
-          icon: '💵'
+          description: 'Purchase cost per unit'
         },
         {
           key: 'sellingPrice',
           name: 'Selling Price',
-          description: 'Retail price per unit',
-          icon: '💰'
+          description: 'Retail price per unit'
         }
       ],
       
@@ -282,14 +283,12 @@ export default {
         {
           key: 'status',
           name: 'Status',
-          description: 'Active/inactive state',
-          icon: '🟢'
+          description: 'Active/inactive state'
         },
         {
           key: 'expiryDate',
           name: 'Expiry Date',
-          description: 'Product expiration date',
-          icon: '📅'
+          description: 'Product expiration date'
         }
       ]
     }
@@ -481,7 +480,7 @@ export default {
 
 .header-subtitle {
   margin: 0;
-  color: var(--tertiary);
+  color: var(--tertiary-medium);
   font-size: 0.875rem;
 }
 
@@ -490,7 +489,7 @@ export default {
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  color: var(--tertiary);
+  color: var(--tertiary-medium);
   padding: 0.25rem;
   border-radius: 0.375rem;
   transition: all 0.2s ease;
@@ -526,7 +525,7 @@ export default {
 .group-title {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
   margin: 0 0 1rem 0;
   font-size: 1.125rem;
   font-weight: 600;
@@ -535,13 +534,16 @@ export default {
 
 .group-title small {
   font-size: 0.75rem;
-  color: var(--tertiary);
+  color: var(--tertiary-medium);
   font-weight: 400;
   margin-left: 0.5rem;
 }
 
 .group-icon {
-  font-size: 1.25rem;
+  width: 18px;
+  height: 18px;
+  color: var(--primary);
+  stroke-width: 1.5;
 }
 
 .columns-grid {
@@ -572,7 +574,7 @@ export default {
 }
 
 .column-item.essential {
-  border-color: var(--tertiary);
+  border-color: var(--tertiary-medium);
   background: var(--tertiary-light);
   opacity: 0.7;
   cursor: not-allowed;
@@ -604,14 +606,8 @@ export default {
 .column-label {
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
   cursor: pointer;
   flex: 1;
-}
-
-.column-icon {
-  font-size: 1.25rem;
-  margin-top: 0.125rem;
 }
 
 .column-info {
@@ -628,7 +624,7 @@ export default {
 
 .column-description {
   font-size: 0.8125rem;
-  color: var(--tertiary);
+  color: var(--tertiary-medium);
   line-height: 1.4;
 }
 
@@ -725,10 +721,6 @@ export default {
   background-color: var(--info-dark);
 }
 
-.btn .icon {
-  font-size: 1rem;
-}
-
 /* Responsive Design */
 @media (max-width: 768px) {
   .modal-content {
@@ -769,16 +761,16 @@ export default {
 }
 
 .modal-body::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--neutral-light);
   border-radius: 4px;
 }
 
 .modal-body::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: var(--neutral-medium);
   border-radius: 4px;
 }
 
 .modal-body::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: var(--neutral-dark);
 }
 </style>

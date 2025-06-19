@@ -3,24 +3,78 @@
     <!-- Header Section -->
     <div class="page-header">
       <h1 class="page-title">Product Management</h1>
-        <div class="header-actions">
-            <button 
-                class="btn btn-secondary" 
-                @click="deleteSelected" 
-                :disabled="selectedProducts.length === 0 || loading"
-            >
-                Delete Selected ({{ selectedProducts.length }})
+      <div class="header-actions">
+        <button 
+          class="btn btn-secondary" 
+          @click="deleteSelected" 
+          :disabled="selectedProducts.length === 0 || loading"
+        >
+          Delete Selected ({{ selectedProducts.length }})
+        </button>
+        
+        <!-- Combined Add Products Dropdown -->
+        <div class="dropdown-container" ref="addDropdown">
+          <button 
+            class="btn btn-success dropdown-trigger" 
+            @click="toggleAddDropdown"
+            :class="{ active: showAddDropdown }"
+          >
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Add Products
+            <svg class="dropdown-arrow" :class="{ rotated: showAddDropdown }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6,9 12,15 18,9"/>
+            </svg>
+          </button>
+          
+          <div v-show="showAddDropdown" class="dropdown-menu">
+            <button class="dropdown-item" @click="handleSingleProduct">
+              <svg class="dropdown-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v6m0 6v6"/>
+              </svg>
+              <div class="dropdown-item-content">
+                <span class="dropdown-item-title">Single Product</span>
+                <span class="dropdown-item-desc">Add one product manually</span>
+              </div>
             </button>
-            <button class="btn btn-success" @click="showAddProductModal">
-                Add Product
+            
+            <button class="dropdown-item" @click="handleBulkAdd">
+              <svg class="dropdown-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <line x1="9" y1="12" x2="15" y2="12"/>
+                <line x1="12" y1="9" x2="12" y2="15"/>
+              </svg>
+              <div class="dropdown-item-content">
+                <span class="dropdown-item-title">Bulk Entry</span>
+                <span class="dropdown-item-desc">Add multiple products (5-20 items)</span>
+              </div>
             </button>
-            <button class="btn btn-primary" @click="exportData">
-                Export
+            
+            <button class="dropdown-item" @click="handleImport">
+              <svg class="dropdown-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14,2 14,8 20,8"/>
+                <line x1="12" y1="18" x2="12" y2="12"/>
+                <polyline points="9,15 12,12 15,15"/>
+              </svg>
+              <div class="dropdown-item-content">
+                <span class="dropdown-item-title">Import File</span>
+                <span class="dropdown-item-desc">Upload CSV/Excel (20+ items)</span>
+              </div>
             </button>
-            <button class="btn btn-info" @click="refreshData" :disabled="loading">
-                {{ loading ? 'Loading...' : 'Refresh' }}
-            </button>
+          </div>
         </div>
+        
+        <button class="btn btn-primary" @click="exportData">
+          Export
+        </button>
+        <button class="btn btn-info" @click="refreshData" :disabled="loading">
+          {{ loading ? 'Loading...' : 'Refresh' }}
+        </button>
+      </div>
     </div>
 
     <!-- Filters -->
@@ -101,124 +155,175 @@
 
     <!-- Table Controls Section -->
     <div v-if="!loading || products.length > 0" class="table-controls">
-        <div class="table-controls-left">
-            <button class="btn btn-info column-filter-btn" @click="showColumnFilter">
-            Customize Columns
-            </button>
+      <div class="table-controls-left">
+        <button class="btn btn-info column-filter-btn" @click="showColumnFilter">
+          Customize Columns
+        </button>
+      </div>
+      <div class="table-controls-right">
+        <div class="table-summary">
+          Showing {{ filteredProducts.length }} of {{ products.length }} products
         </div>
-        <div class="table-controls-right">
-            <div class="table-summary">
-            Showing {{ filteredProducts.length }} of {{ products.length }} products
-            </div>
-        </div>
+      </div>
     </div>
 
     <!-- Data Table -->
     <DataTable v-if="!loading || products.length > 0">
-        <template #header>
-            <tr>
-            <!-- Always visible columns -->
-            <th class="checkbox-column">
-                <input 
-                type="checkbox" 
-                @change="selectAll" 
-                :checked="allSelected"
-                :indeterminate="someSelected"
-                />
-            </th>
-            <th v-if="columnVisibility.id">ID</th>
-            <th>Product Name</th> <!-- Always visible -->
-            <th v-if="columnVisibility.category">Category</th>
-            <th v-if="columnVisibility.sku">SKU</th>
-            <th v-if="columnVisibility.stock">Stock</th>
-            <th v-if="columnVisibility.costPrice">Cost Price</th>
-            <th v-if="columnVisibility.sellingPrice">Selling Price</th>
-            <th v-if="columnVisibility.status">Status</th>
-            <th v-if="columnVisibility.expiryDate">Expiry Date</th>
-            <th class="actions-column">Actions</th> <!-- Always visible -->
-            </tr>
-        </template>
+      <template #header>
+        <tr>
+          <!-- Always visible columns -->
+          <th class="checkbox-column">
+            <input 
+              type="checkbox" 
+              @change="selectAll" 
+              :checked="allSelected"
+              :indeterminate="someSelected"
+            />
+          </th>
+          <th v-if="columnVisibility.id">ID</th>
+          <th>Product Name</th> <!-- Always visible -->
+          <th v-if="columnVisibility.category">Category</th>
+          <th v-if="columnVisibility.sku">SKU</th>
+          <th v-if="columnVisibility.stock">Stock</th>
+          <th v-if="columnVisibility.costPrice">Cost Price</th>
+          <th v-if="columnVisibility.sellingPrice">Selling Price</th>
+          <th v-if="columnVisibility.status">Status</th>
+          <th v-if="columnVisibility.expiryDate">Expiry Date</th>
+          <th class="actions-column">Actions</th> <!-- Always visible -->
+        </tr>
+      </template>
 
-        <template #body>
-            <tr 
-            v-for="product in filteredProducts" 
-            :key="product._id"
-            :class="getRowClass(product)"
-            >
-            <!-- Always visible columns -->
-            <td class="checkbox-column">
-                <input 
-                type="checkbox" 
-                :value="product._id"
-                v-model="selectedProducts"
-                />
-            </td>
-            <td v-if="columnVisibility.id" class="id-column">{{ product._id.slice(-6) }}</td>
-            <td class="product-name-column">
-                <div class="product-info">
-                <span class="product-name">{{ product.product_name }}</span>
-                <span class="product-unit">{{ product.unit }}</span>
-                </div>
-            </td>
-            <td v-if="columnVisibility.category" class="category-column">
-                <span :class="['category-badge', `category-${getCategorySlug(product.category_id)}`]">
-                {{ getCategoryName(product.category_id) }}
-                </span>
-            </td>
-            <td v-if="columnVisibility.sku" class="sku-column">
-                <span class="sku-value">{{ product.SKU }}</span>
-            </td>
-            <td v-if="columnVisibility.stock" class="stock-column">
-                <div class="stock-info">
-                <span :class="getStockClass(product)">{{ product.stock }}</span>
-                <span class="stock-threshold">(Min: {{ product.low_stock_threshold }})</span>
-                </div>
-            </td>
-            <td v-if="columnVisibility.costPrice" class="price-column">₱{{ formatPrice(product.cost_price) }}</td>
-            <td v-if="columnVisibility.sellingPrice" class="price-column">₱{{ formatPrice(product.selling_price) }}</td>
-            <td v-if="columnVisibility.status" class="status-column">
-                <span :class="['status-badge', `status-${product.status}`]">
-                {{ formatStatus(product.status) }}
-                </span>
-            </td>
-            <td v-if="columnVisibility.expiryDate" class="expiry-column">
-                <span :class="getExpiryClass(product.expiry_date)" :title="getExpiryTooltip(product.expiry_date)">
-                {{ formatDate(product.expiry_date) }}
-                </span>
-            </td>
-            <td class="actions-column">
-                <div class="action-buttons">
-                <button class="action-btn" @click="editProduct(product)" title="Edit">
-                    ✏️
-                </button>
-                <button 
-                class="action-btn" @click="navigateToProductDetails(product._id)" title="View Details">
-                    👁️
-                </button>
-                <button class="action-btn" @click="restockProduct(product)" title="Restock">
-                    📦
-                </button>
-                <button 
-                    class="action-btn"
-                    @click="toggleProductStatus(product)" 
-                    :title="product.status === 'active' ? 'Deactivate' : 'Activate'"
-                >
-                    {{ product.status === 'active' ? '🔒' : '🔓' }}
-                </button>
-                <button class="action-btn delete" @click="deleteProduct(product)" title="Delete">
-                    🗑️
-                </button>
-                </div>
-            </td>
-            </tr>
-        </template>
+      <template #body>
+        <tr 
+          v-for="product in filteredProducts" 
+          :key="product._id"
+          :class="getRowClass(product)"
+        >
+          <!-- Always visible columns -->
+          <td class="checkbox-column">
+            <input 
+              type="checkbox" 
+              :value="product._id"
+              v-model="selectedProducts"
+            />
+          </td>
+          <td v-if="columnVisibility.id" class="id-column">{{ product._id.slice(-6) }}</td>
+          <td class="product-name-column">
+            <div class="product-info">
+              <span :class="['product-name', getProductNameClass(product)]">{{ product.product_name }}</span>
+              <span class="product-unit">{{ product.unit }}</span>
+            </div>
+          </td>
+          <td v-if="columnVisibility.category" class="category-column">
+            <span :class="['category-badge', `category-${getCategorySlug(product.category_id)}`]">
+              {{ getCategoryName(product.category_id) }}
+            </span>
+          </td>
+          <td v-if="columnVisibility.sku" class="sku-column">
+            <span class="sku-value">{{ product.SKU }}</span>
+          </td>
+          <td v-if="columnVisibility.stock" class="stock-column">
+            <div class="stock-info">
+              <span :class="getStockClass(product)">{{ product.stock }}</span>
+              <span class="stock-threshold">(Min: {{ product.low_stock_threshold }})</span>
+            </div>
+          </td>
+          <td v-if="columnVisibility.costPrice" class="price-column">₱{{ formatPrice(product.cost_price) }}</td>
+          <td v-if="columnVisibility.sellingPrice" class="price-column">₱{{ formatPrice(product.selling_price) }}</td>
+          <td v-if="columnVisibility.status" class="status-column">
+            <span :class="['status-badge', `status-${product.status}`]">
+              {{ formatStatus(product.status) }}
+            </span>
+          </td>
+          <td v-if="columnVisibility.expiryDate" class="expiry-column">
+            <span :class="getExpiryClass(product.expiry_date)" :title="getExpiryTooltip(product.expiry_date)">
+              {{ formatDate(product.expiry_date) }}
+            </span>
+          </td>
+          <td class="actions-column">
+            <div class="action-buttons">
+              <!-- Edit Action -->
+              <button 
+                class="action-btn edit-btn" 
+                @click="editProduct(product)" 
+                title="Edit Product"
+              >
+                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="m18.5 2.5 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </button>
+
+              <!-- View Details Action -->
+              <button 
+                class="action-btn view-btn" 
+                @click="navigateToProductDetails(product._id)" 
+                title="View Details"
+              >
+                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
+
+              <!-- Stock Update Action -->
+              <button 
+                class="action-btn stock-btn" 
+                @click="restockProduct(product)" 
+                title="Update Stock"
+              >
+                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                  <line x1="8" y1="21" x2="16" y2="21"/>
+                  <line x1="12" y1="17" x2="12" y2="21"/>
+                  <path d="M7 13h10"/>
+                  <path d="M10 10v3"/>
+                  <path d="M14 10v3"/>
+                </svg>
+              </button>
+
+              <!-- Status Toggle Action -->
+              <button 
+                class="action-btn status-btn"
+                :class="{ 'inactive': product.status !== 'active' }"
+                @click="toggleProductStatus(product)" 
+                :title="product.status === 'active' ? 'Deactivate Product' : 'Activate Product'"
+              >
+                <svg v-if="product.status === 'active'" class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <circle cx="12" cy="16" r="1"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                <svg v-else class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <circle cx="12" cy="16" r="1"/>
+                  <path d="M7 11V7a5 5 0 0 1 8.6 2.5"/>
+                </svg>
+              </button>
+
+              <!-- Delete Action -->
+              <button 
+                class="action-btn delete-btn" 
+                @click="deleteProduct(product)" 
+                title="Delete Product"
+              >
+                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3,6 5,6 21,6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  <line x1="10" y1="11" x2="10" y2="17"/>
+                  <line x1="14" y1="11" x2="14" y2="17"/>
+                </svg>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </template>
     </DataTable>    
-
 
     <!-- Empty State -->
     <div v-if="!loading && filteredProducts.length === 0 && !error" class="empty-state">
       <p>{{ products.length === 0 ? 'No products found' : 'No products match the current filters' }}</p>
-      <button v-if="products.length === 0" class="btn btn-primary" @click="showAddProductModal">
+      <button v-if="products.length === 0" class="btn btn-primary" @click="handleSingleProduct">
         Add First Product
       </button>
       <button v-else class="btn btn-secondary" @click="clearFilters">
@@ -270,10 +375,10 @@
     />
 
     <ColumnFilterModal
-        :show="showColumnFilterModal"
-        :current-visible-columns="columnVisibility"
-        @close="closeColumnFilter"
-        @apply="applyColumnFilter"
+      :show="showColumnFilterModal"
+      :current-visible-columns="columnVisibility"
+      @close="closeColumnFilter"
+      @apply="applyColumnFilter"
     />
   </div>
 </template>
@@ -306,6 +411,9 @@ export default {
       error: null,
       successMessage: null,
       
+      // Dropdown state
+      showAddDropdown: false,
+      
       // Report data
       lowStockCount: 0,
       expiringCount: 0,
@@ -335,7 +443,7 @@ export default {
       stockFormLoading: false,
       stockFormError: null,
 
-        // Column Filter Modal
+      // Column Filter Modal
       showColumnFilterModal: false,
       columnVisibility: {
         id: false,
@@ -346,7 +454,7 @@ export default {
         sellingPrice: true,
         status: true,
         expiryDate: true,
-        }
+      }
     }
   },
   computed: {
@@ -357,7 +465,58 @@ export default {
       return this.selectedProducts.length > 0 && this.selectedProducts.length < this.filteredProducts.length
     }
   },
+  async mounted() {
+    console.log('Products component mounted')
+    this.loadColumnVisibility()
+    await this.fetchProducts()
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', this.handleClickOutside)
+  },
+  
+  beforeUnmount() {
+    // Clean up event listener
+    document.removeEventListener('click', this.handleClickOutside)
+  },
+  
   methods: {
+    // Click outside handler for dropdown
+    handleClickOutside(event) {
+      if (this.$refs.addDropdown && !this.$refs.addDropdown.contains(event.target)) {
+        this.showAddDropdown = false
+      }
+    },
+
+    // Dropdown Methods
+    toggleAddDropdown(event) {
+      event.stopPropagation()
+      this.showAddDropdown = !this.showAddDropdown
+    },
+    
+    closeAddDropdown() {
+      this.showAddDropdown = false
+    },
+    
+    handleSingleProduct(event) {
+      event.stopPropagation()
+      this.showAddProductModal()
+      this.closeAddDropdown()
+    },
+    
+    handleBulkAdd(event) {
+      event.stopPropagation()
+      // Navigate to bulk add page
+      this.$router.push('/products/bulk')
+      this.closeAddDropdown()
+    },
+    
+    handleImport(event) {
+      event.stopPropagation()
+      // TODO: Show import modal
+      console.log('Show import modal')
+      this.closeAddDropdown()
+    },
+
     async fetchProducts() {
       this.loading = true
       this.error = null
@@ -879,6 +1038,12 @@ export default {
       return categoryId?.toLowerCase().replace(/\s+/g, '-') || 'unknown'
     },
 
+    getProductNameClass(product) {
+      if (product.stock === 0) return 'out-of-stock'
+      if (product.stock <= product.low_stock_threshold) return 'low-stock'
+      return ''
+    },
+
     getRowClass(product) {
       const classes = []
       
@@ -890,12 +1055,6 @@ export default {
         classes.push('inactive')
       }
       
-      if (product.stock === 0) {
-        classes.push('out-of-stock')
-      } else if (product.stock <= product.low_stock_threshold) {
-        classes.push('low-stock')
-      }
-      
       return classes.join(' ')
     },
 
@@ -903,19 +1062,6 @@ export default {
       if (product.stock === 0) return 'stock-zero'
       if (product.stock <= product.low_stock_threshold) return 'stock-low'
       return 'stock-normal'
-    },
-
-    getExpiryClass(expiryDate) {
-      if (!expiryDate) return ''
-      
-      const today = new Date()
-      const expiry = new Date(expiryDate)
-      const daysUntilExpiry = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24))
-      
-      if (daysUntilExpiry < 0) return 'expired'
-      if (daysUntilExpiry <= 7) return 'expiring-soon'
-      if (daysUntilExpiry <= 30) return 'expiring-month'
-      return ''
     },
 
     getDaysUntilExpiry(expiryDate) {
@@ -947,12 +1093,6 @@ export default {
         day: '2-digit'
       })
     }
-  },
-
-  async mounted() {
-    console.log('Products component mounted')
-    this.loadColumnVisibility()
-    await this.fetchProducts()
   }
 }
 </script>
@@ -1041,7 +1181,7 @@ export default {
 }
 
 .report-label {
-  color: var(--tertiary);
+  color: var(--tertiary-medium);
   font-size: 0.875rem;
 }
 
@@ -1137,6 +1277,113 @@ export default {
   cursor: not-allowed;
 }
 
+/* Dropdown Styles */
+.dropdown-container {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: relative;
+}
+
+.dropdown-trigger.active {
+  background-color: var(--success-dark) !important;
+}
+
+.btn-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.dropdown-arrow {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s ease;
+}
+
+.dropdown-arrow.rotated {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid var(--neutral);
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  z-index: 1000;
+  overflow: hidden;
+  animation: dropdownSlide 0.2s ease;
+  min-width: 280px;
+}
+
+@keyframes dropdownSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 1rem 1.25rem;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid var(--neutral-light);
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background-color: var(--primary-light);
+}
+
+.dropdown-icon {
+  width: 20px;
+  height: 20px;
+  color: var(--primary);
+  flex-shrink: 0;
+  stroke-width: 1.5;
+}
+
+.dropdown-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.dropdown-item-title {
+  font-weight: 600;
+  color: var(--tertiary-dark);
+  font-size: 0.9375rem;
+}
+
+.dropdown-item-desc {
+  font-size: 0.8125rem;
+  color: var(--tertiary-medium);
+  line-height: 1.3;
+}
+
 .loading-state, .error-state {
   text-align: center;
   padding: 3rem;
@@ -1157,6 +1404,22 @@ export default {
   border-radius: 0.5rem;
   margin-bottom: 1rem;
   text-align: center;
+}
+
+.table-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.table-summary {
+  color: var(--tertiary-medium);
+  font-size: 0.875rem;
 }
 
 .checkbox-column {
@@ -1184,11 +1447,22 @@ export default {
 .product-name {
   font-weight: 500;
   color: var(--tertiary-dark);
+  transition: color 0.2s ease;
+}
+
+.product-name.low-stock {
+  color: var(--error);
+  font-weight: 600;
+}
+
+.product-name.out-of-stock {
+  color: var(--error-dark);
+  font-weight: 600;
 }
 
 .product-unit {
   font-size: 0.75rem;
-  color: var(--tertiary);
+  color: var(--tertiary-medium);
 }
 
 .category-column {
@@ -1226,8 +1500,10 @@ export default {
 
 .sku-column {
   width: 120px;
-  font-family: monospace;
-  font-size: 0.8125rem;
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--tertiary-dark);
 }
 
 .stock-column {
@@ -1242,7 +1518,7 @@ export default {
 
 .stock-threshold {
   font-size: 0.75rem;
-  color: var(--tertiary);
+  color: var(--tertiary-medium);
 }
 
 .stock-zero {
@@ -1272,12 +1548,15 @@ export default {
 }
 
 .status-badge {
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.5rem;
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.025em;
+  min-width: 70px;
+  text-align: center;
+  display: inline-block;
 }
 
 .status-badge.status-active {
@@ -1291,22 +1570,67 @@ export default {
 }
 
 .expiry-column {
-  width: 120px;
-  font-size: 0.8125rem;
+  width: 140px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.5rem;
+}
+
+.expiry-column span {
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  background-color: var(--neutral-light);
+  color: var(--tertiary-dark);
+  border: 1px solid var(--neutral-medium);
+  min-width: 70px;
+  text-align: center;
+  display: inline-block;
 }
 
 .expired {
-  color: var(--error);
-  font-weight: 600;
+  background-color: var(--error-light) !important;
+  color: var(--error-dark) !important;
+  border: 1px solid var(--error) !important;
+  font-weight: 700;
+  animation: pulse-error 2s infinite;
 }
 
 .expiring-soon {
-  color: var(--error-medium);
-  font-weight: 500;
+  background-color: #FEF3C7 !important;
+  color: #92400E !important;
+  border: 1px solid #F59E0B !important;
+  font-weight: 600;
 }
 
 .expiring-month {
-  color: var(--info);
+  background-color: var(--info-light) !important;
+  color: var(--info-dark) !important;
+  border: 1px solid var(--info) !important;
+  font-weight: 500;
+}
+
+.expiry-column span:not(.expired):not(.expiring-soon):not(.expiring-month) {
+  background-color: var(--primary-light);
+  color: var(--primary-dark);
+  border: 1px solid var(--primary);
+}
+
+@keyframes pulse-error {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+.expiry-column span:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
 }
 
 .actions-column {
@@ -1318,37 +1642,107 @@ export default {
   display: flex;
   gap: 0.25rem;
   justify-content: center;
+  align-items: center;
 }
 
 .action-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid;
   border-radius: 0.25rem;
-  transition: all 0.2s ease;
-  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background-color: transparent;
+  position: relative;
 }
 
-.action-btn:hover {
+.action-icon {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.5;
+  transition: all 0.15s ease;
+}
+
+.edit-btn {
+  color: var(--secondary);
+  border-color: var(--secondary);
+}
+
+.view-btn {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.stock-btn {
+  color: var(--info);
+  border-color: var(--info);
+}
+
+.status-btn {
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.status-btn.inactive {
+  color: var(--tertiary-medium);
+  border-color: var(--tertiary-medium);
+}
+
+.delete-btn {
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.edit-btn:hover {
+  background-color: var(--secondary-light);
+  color: var(--secondary-dark);
+}
+
+.view-btn:hover {
+  background-color: var(--primary-light);
+  color: var(--primary-dark);
+}
+
+.stock-btn:hover {
+  background-color: var(--info-light);
+  color: var(--info-dark);
+}
+
+.status-btn:hover {
+  background-color: var(--success-light);
+  color: var(--success-dark);
+}
+
+.status-btn.inactive:hover {
   background-color: var(--neutral-medium);
+  color: var(--tertiary-dark);
 }
 
-.action-btn.delete:hover {
+.delete-btn:hover {
   background-color: var(--error-light);
+  color: var(--error-dark);
 }
 
-/* Row styling */
+.action-btn:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: -2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--tertiary-dark);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.65rem;
+  white-space: nowrap;
+  z-index: 1000;
+}
+
 :deep(.data-table tbody tr.inactive) {
   opacity: 0.6;
-}
-
-:deep(.data-table tbody tr.out-of-stock) {
-  background-color: var(--error-light);
-}
-
-:deep(.data-table tbody tr.low-stock) {
-  background-color: var(--secondary-light);
 }
 
 :deep(.data-table tbody tr.selected) {
@@ -1358,18 +1752,38 @@ export default {
 .empty-state {
   text-align: center;
   padding: 3rem;
-  color: var(--tertiary);
+  color: var(--tertiary-medium);
   background: white;
   border-radius: 0.75rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
 }
 
-/* Custom checkbox styling */
 input[type="checkbox"] {
   width: 16px;
   height: 16px;
   accent-color: var(--primary);
   cursor: pointer;
+}
+
+/* Responsive dropdown */
+@media (max-width: 768px) {
+  .dropdown-menu {
+    min-width: 250px;
+    right: 0;
+    left: auto;
+  }
+  
+  .dropdown-item {
+    padding: 0.875rem 1rem;
+  }
+  
+  .dropdown-item-title {
+    font-size: 0.875rem;
+  }
+  
+  .dropdown-item-desc {
+    font-size: 0.75rem;
+  }
 }
 
 /* Responsive Design */
@@ -1412,135 +1826,7 @@ input[type="checkbox"] {
 
   .action-buttons {
     flex-direction: column;
-    gap: 0.125rem;
-  }
-
-  .report-cards {
-    grid-template-columns: 1fr;
-  }
-}
-
-.sku-column {
-  width: 120px;
-  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--primary-dark);
-  background-color: var(--primary-light);
-  padding: 0.75rem 1rem;
-  border-radius: 0.375rem;
-  border: 1px solid var(--primary-medium);
-}
-
-/* Expiry Date Column - Enhanced visibility with better color coding */
-.expiry-column {
-  width: 140px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  padding: 0.5rem;
-}
-
-/* Default expiry date styling */
-.expiry-column span {
-  padding: 0.375rem 0.75rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  background-color: var(--neutral-light);
-  color: var(--tertiary-dark);
-  border: 1px solid var(--neutral-medium);
-}
-
-/* Expired items - High priority alert */
-.expired {
-  background-color: var(--error-light) !important;
-  color: var(--error-dark) !important;
-  border: 1px solid var(--error) !important;
-  font-weight: 700;
-  animation: pulse-error 2s infinite;
-}
-
-/* Expiring soon (within 7 days) - Warning state */
-.expiring-soon {
-  background-color: #FEF3C7 !important;
-  color: #92400E !important;
-  border: 1px solid #F59E0B !important;
-  font-weight: 600;
-}
-
-/* Expiring within a month - Info state */
-.expiring-month {
-  background-color: var(--info-light) !important;
-  color: var(--info-dark) !important;
-  border: 1px solid var(--info) !important;
-  font-weight: 500;
-}
-
-/* Fresh items (more than 30 days) */
-.expiry-column span:not(.expired):not(.expiring-soon):not(.expiring-month) {
-  background-color: var(--success-light);
-  color: var(--success-dark);
-  border: 1px solid var(--success);
-}
-
-/* Add pulse animation for expired items */
-@keyframes pulse-error {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.8;
-    transform: scale(1.05);
-  }
-}
-
-/* Hover effects for better interactivity */
-.sku-column:hover {
-  background-color: var(--primary-medium);
-  color: white;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(115, 146, 226, 0.3);
-  transition: all 0.2s ease;
-}
-
-.expiry-column span:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
-}
-
-/* Improve table cell padding for these columns */
-:deep(.data-table td.sku-column),
-:deep(.data-table td.expiry-column) {
-  padding: 0.75rem;
-  vertical-align: middle;
-}
-
-/* Add tooltip-like styling for better UX */
-.sku-column::before {
-  content: "SKU: ";
-  font-size: 0.7rem;
-  color: var(--primary-medium);
-  font-weight: 400;
-  display: block;
-  margin-bottom: 0.25rem;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .sku-column {
-    font-size: 0.8rem;
-    padding: 0.5rem;
-  }
-  
-  .expiry-column {
-    width: 120px;
-    font-size: 0.8rem;
-  }
-  
-  .expiry-column span {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
+    gap: 0.25rem;
   }
 }
 </style>

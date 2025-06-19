@@ -58,15 +58,25 @@
 
           <div class="form-group">
             <label for="SKU">SKU: <span class="required">*</span></label>
-            <input 
-              id="SKU"
-              v-model="form.SKU" 
-              type="text" 
-              required 
-              :disabled="loading"
-              placeholder="Enter SKU"
-              class="form-input"
-            />
+            <div class="input-with-validation">
+              <input 
+                id="SKU"
+                v-model="form.SKU" 
+                type="text" 
+                required 
+                :disabled="loading || isValidatingSku"
+                placeholder="Enter SKU"
+                class="form-input"
+                :class="{ 'error': skuError, 'validating': isValidatingSku }"
+                @blur="validateSKU"
+              />
+              <div v-if="isValidatingSku" class="validation-spinner">
+                <div class="spinner-small"></div>
+              </div>
+            </div>
+            <div v-if="skuError" class="field-error">
+              {{ skuError }}
+            </div>
           </div>
         </div>
 
@@ -314,7 +324,9 @@ export default {
         image: null
       },
       imagePreview: null,
-      imageFile: null
+      imageFile: null,
+      skuError: null,
+      isValidatingSku: false
     }
   },
   computed: {
@@ -330,6 +342,7 @@ export default {
              this.form.selling_price >= 0 &&
              this.form.stock >= 0 &&
              this.form.low_stock_threshold >= 0
+             !this.skuError
     }
   },
   watch: {
@@ -398,6 +411,8 @@ export default {
         }
         this.imagePreview = null
         this.imageFile = null
+        this.skuError = null
+        this.isValidatingSku = false
       }
     },
 
@@ -431,6 +446,38 @@ export default {
         this.imagePreview = e.target.result
       }
       reader.readAsDataURL(file)
+    },
+
+    async validateSKU() {
+      if (!this.form.SKU || this.form.SKU.trim() === '') {
+        this.skuError = null
+        return
+      }
+
+      // Don't validate if we're editing and SKU hasn't changed
+      if (this.isEditMode && this.product && this.form.SKU === this.product.SKU) {
+        this.skuError = null
+        return
+      }
+
+      this.isValidatingSku = true
+      
+      try {
+        // You'll need to import your products API service
+        // import productsApiService from '../../services/apiProducts.js'
+        
+        const exists = await productsApiService.productExistsBySku(this.form.SKU)
+        if (exists) {
+          this.skuError = 'This SKU already exists'
+        } else {
+          this.skuError = null
+        }
+      } catch (error) {
+        console.error('Error validating SKU:', error)
+        this.skuError = null
+      } finally {
+        this.isValidatingSku = false
+      }
     },
 
     removeImage() {
