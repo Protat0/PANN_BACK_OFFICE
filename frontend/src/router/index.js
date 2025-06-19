@@ -9,8 +9,6 @@ import MainLayout from '../layouts/MainLayout.vue'
 import Dashboard from '../pages/Dashboard.vue'
 import Accounts from '../pages/Accounts.vue'
 import Customers from '../pages/Customers.vue'
-import SalesByCategory from '../pages/reports/SalesByCategory.vue'
-import SalesByItem from '../pages/reports/SalesByItem.vue'
 
 // Auth guard function
 function requireAuth(to, from, next) {
@@ -67,6 +65,22 @@ const router = createRouter({
           path: 'customers',
           name: 'Customers',
           component: Customers
+        },
+        {
+          path: 'products',
+          name: 'Products',
+          component: Products
+        },
+        {
+          path: 'products/bulk',
+          name: 'ProductBulkEntry',
+          component: ProductBulkEntry
+        },
+        {
+          path: 'products/:id',
+          name: 'ProductDetails',
+          component: ProductDetails,
+          props: true // This passes the route params as props to the component
         },
         {
           path: 'home',
