@@ -9,9 +9,15 @@ import MainLayout from '../layouts/MainLayout.vue'
 import Dashboard from '../pages/Dashboard.vue'
 import Accounts from '../pages/Accounts.vue'
 import Customers from '../pages/Customers.vue'
+
+// Inventory pages
 import Products from '../pages/inventory/Products.vue'
 import ProductDetails from '../pages/inventory/ProductDetails.vue'
 import ProductBulkEntry from '../pages/inventory/ProductBulkEntry.vue'
+
+// Suppliers pages
+import Suppliers from '../pages/suppliers/Suppliers.vue'
+import SupplierDetails from '../pages/suppliers/SupplierDetails.vue'
 
 // Auth guard function
 function requireAuth(to, from, next) {
@@ -69,6 +75,7 @@ const router = createRouter({
           name: 'Customers',
           component: Customers
         },
+        // Inventory routes
         {
           path: 'products',
           name: 'Products',
@@ -85,6 +92,27 @@ const router = createRouter({
           component: ProductDetails,
           props: true // This passes the route params as props to the component
         },
+        // Suppliers routes
+        {
+          path: 'suppliers',
+          name: 'Suppliers',
+          component: Suppliers
+        },
+        {
+          path: 'suppliers/:supplierId',
+          name: 'SupplierDetails',
+          component: SupplierDetails,
+          props: true, // This passes the route params as props to the component
+          meta: {
+            title: 'Supplier Details',
+            breadcrumb: [
+              { name: 'Dashboard', path: '/dashboard' },
+              { name: 'Suppliers', path: '/suppliers' },
+              { name: 'Details', path: null }
+            ]
+          }
+        },
+        // Other routes
         {
           path: 'home',
           name: 'home',
@@ -108,6 +136,12 @@ const router = createRouter({
 // Global navigation guard for debugging
 router.beforeEach((to, from, next) => {
   console.log(`Navigating from ${from.path} to ${to.path}`)
+  
+  // Optional: Set page title based on route meta
+  if (to.meta && to.meta.title) {
+    document.title = `${to.meta.title} - Your App Name`
+  }
+  
   next()
 })
 
