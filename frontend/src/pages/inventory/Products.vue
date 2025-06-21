@@ -1,168 +1,191 @@
 <template>
-  <div class="products-page">
+  <div class="container-fluid py-4 products-page">
     <!-- Header Section -->
-    <div class="page-header">
-      <h1 class="page-title">Product Management</h1>
-      <div class="header-actions">
-        <button 
-          class="btn btn-secondary" 
-          @click="deleteSelected" 
-          :disabled="selectedProducts.length === 0 || loading"
-        >
-          Delete Selected ({{ selectedProducts.length }})
-        </button>
-        
-        <!-- Combined Add Products Dropdown -->
-        <div class="dropdown-container" ref="addDropdown">
+    <div class="d-flex justify-content-between align-items-center mb-4 page-header">
+      <h1 class="h2 fw-semibold text-primary-dark mb-0">Product Management</h1>
+      <div class="d-flex gap-2 flex-wrap">
+        <!-- Add Products Dropdown -->
+        <div class="dropdown" ref="addDropdown">
           <button 
-            class="btn btn-success dropdown-trigger" 
+            class="btn btn-success-light btn-with-icon dropdown-toggle" 
+            type="button"
             @click="toggleAddDropdown"
-            :class="{ active: showAddDropdown }"
+            :class="{ 'active': showAddDropdown }"
           >
-            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
+            <Plus :size="16" />
             Add Products
-            <svg class="dropdown-arrow" :class="{ rotated: showAddDropdown }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="6,9 12,15 18,9"/>
-            </svg>
           </button>
           
-          <div v-show="showAddDropdown" class="dropdown-menu">
-            <button class="dropdown-item" @click="handleSingleProduct">
-              <svg class="dropdown-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M12 1v6m0 6v6"/>
-              </svg>
-              <div class="dropdown-item-content">
-                <span class="dropdown-item-title">Single Product</span>
-                <span class="dropdown-item-desc">Add one product manually</span>
+          <div 
+            class="dropdown-menu custom-dropdown-menu" 
+            :class="{ 'show': showAddDropdown }"
+          >
+            <button class="dropdown-item custom-dropdown-item" @click="handleSingleProduct">
+              <div class="d-flex align-items-center gap-3">
+                <Plus :size="18" class="text-primary" />
+                <div>
+                  <div class="fw-semibold">Single Product</div>
+                  <small class="text-muted">Add one product manually</small>
+                </div>
               </div>
             </button>
             
-            <button class="dropdown-item" @click="handleBulkAdd">
-              <svg class="dropdown-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                <line x1="9" y1="12" x2="15" y2="12"/>
-                <line x1="12" y1="9" x2="12" y2="15"/>
-              </svg>
-              <div class="dropdown-item-content">
-                <span class="dropdown-item-title">Bulk Entry</span>
-                <span class="dropdown-item-desc">Add multiple products (5-20 items)</span>
+            <button class="dropdown-item custom-dropdown-item" @click="handleBulkAdd">
+              <div class="d-flex align-items-center gap-3">
+                <Package :size="18" class="text-primary" />
+                <div>
+                  <div class="fw-semibold">Bulk Entry</div>
+                  <small class="text-muted">Add multiple products (5-20 items)</small>
+                </div>
               </div>
             </button>
             
-            <button class="dropdown-item" @click="handleImport">
-              <svg class="dropdown-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14,2 14,8 20,8"/>
-                <line x1="12" y1="18" x2="12" y2="12"/>
-                <polyline points="9,15 12,12 15,15"/>
-              </svg>
-              <div class="dropdown-item-content">
-                <span class="dropdown-item-title">Import File</span>
-                <span class="dropdown-item-desc">Upload CSV/Excel (20+ items)</span>
+            <button class="dropdown-item custom-dropdown-item" @click="handleImport">
+              <div class="d-flex align-items-center gap-3">
+                <FileText :size="18" class="text-primary" />
+                <div>
+                  <div class="fw-semibold">Import File</div>
+                  <small class="text-muted">Upload CSV/Excel (20+ items)</small>
+                </div>
               </div>
             </button>
           </div>
         </div>
         
-        <button class="btn btn-primary" @click="exportData">
+        <button 
+          class="btn btn-primary-light btn-with-icon"
+          @click="exportData"
+        >
+          <Download :size="16" />
           Export
         </button>
-        <button class="btn btn-info" @click="refreshData" :disabled="loading">
+        <button 
+          class="btn btn-info-light btn-with-icon"
+          @click="refreshData" 
+          :disabled="loading"
+          :class="{ 'btn-loading': loading }"
+        >
+          <RefreshCw :size="16" :class="{ 'spin': loading }" />
           {{ loading ? 'Loading...' : 'Refresh' }}
         </button>
       </div>
     </div>
 
-    <!-- Filters -->
-    <div class="filters-section">
-      <div class="filter-group">
-        <label for="categoryFilter">Filter by Category:</label>
-        <select id="categoryFilter" v-model="categoryFilter" @change="applyFilters">
-          <option value="all">All Categories</option>
-          <option value="noodles">Noodles</option>
-          <option value="drinks">Drinks</option>
-          <option value="toppings">Toppings</option>
-        </select>
+    <!-- Reports Section -->
+    <div class="row mb-4" v-if="!loading">
+      <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card border-start border-danger border-4 h-100 report-card" @click="showLowStockReport">
+          <div class="card-body">
+            <h6 class="card-title text-tertiary-dark mb-2">Low Stock Alert</h6>
+            <h2 class="text-danger fw-bold mb-1">{{ lowStockCount }}</h2>
+            <small class="text-tertiary-medium">Items Below Threshold</small>
+          </div>
+        </div>
       </div>
-      
-      <div class="filter-group">
-        <label for="statusFilter">Filter by Status:</label>
-        <select id="statusFilter" v-model="statusFilter" @change="applyFilters">
-          <option value="all">All Status</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="out-of-stock">Out of Stock</option>
-        </select>
-      </div>
-
-      <div class="filter-group">
-        <label for="stockFilter">Stock Level:</label>
-        <select id="stockFilter" v-model="stockFilter" @change="applyFilters">
-          <option value="all">All Stock Levels</option>
-          <option value="low-stock">Low Stock</option>
-          <option value="in-stock">In Stock</option>
-          <option value="out-of-stock">Out of Stock</option>
-        </select>
-      </div>
-
-      <div class="filter-group">
-        <label for="searchFilter">Search:</label>
-        <input 
-          id="searchFilter" 
-          v-model="searchFilter" 
-          @input="applyFilters"
-          type="text" 
-          placeholder="Search by name, SKU, or barcode..."
-        />
+      <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card border-start border-info border-4 h-100 report-card" @click="showExpiringReport">
+          <div class="card-body">
+            <h6 class="card-title text-tertiary-dark mb-2">Expiring Soon</h6>
+            <h2 class="text-info fw-bold mb-1">{{ expiringCount }}</h2>
+            <small class="text-tertiary-medium">Items Expiring in 30 Days</small>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Reports Section -->
-    <div class="reports-section" v-if="!loading">
-      <div class="report-cards">
-        <div class="report-card low-stock" @click="showLowStockReport">
-          <h3>Low Stock Alert</h3>
-          <p class="report-count">{{ lowStockCount }}</p>
-          <span class="report-label">Items Below Threshold</span>
-        </div>
-        <div class="report-card expiring" @click="showExpiringReport">
-          <h3>Expiring Soon</h3>
-          <p class="report-count">{{ expiringCount }}</p>
-          <span class="report-label">Items Expiring in 30 Days</span>
+    <!-- Filters -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6 col-lg-3">
+            <label for="categoryFilter" class="form-label text-tertiary-dark fw-medium">Category</label>
+            <select id="categoryFilter" class="form-select" v-model="categoryFilter" @change="applyFilters">
+              <option value="all">All Categories</option>
+              <option value="noodles">Noodles</option>
+              <option value="drinks">Drinks</option>
+              <option value="toppings">Toppings</option>
+            </select>
+          </div>
+          
+          <div class="col-md-6 col-lg-3">
+            <label for="statusFilter" class="form-label text-tertiary-dark fw-medium">Status</label>
+            <select id="statusFilter" class="form-select" v-model="statusFilter" @change="applyFilters">
+              <option value="all">All Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="out-of-stock">Out of Stock</option>
+            </select>
+          </div>
+
+          <div class="col-md-6 col-lg-3">
+            <label for="stockFilter" class="form-label text-tertiary-dark fw-medium">Stock Level</label>
+            <select id="stockFilter" class="form-select" v-model="stockFilter" @change="applyFilters">
+              <option value="all">All Stock Levels</option>
+              <option value="low-stock">Low Stock</option>
+              <option value="in-stock">In Stock</option>
+              <option value="out-of-stock">Out of Stock</option>
+            </select>
+          </div>
+
+          <div class="col-md-6 col-lg-3">
+            <label for="searchFilter" class="form-label text-tertiary-dark fw-medium">Search</label>
+            <input 
+              id="searchFilter" 
+              v-model="searchFilter" 
+              @input="applyFilters"
+              type="text" 
+              class="form-control"
+              placeholder="Search by name, SKU, or barcode..."
+            />
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading && products.length === 0" class="loading-state">
-      <p>Loading products...</p>
+    <div v-if="loading && products.length === 0" class="text-center py-5">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <p class="mt-3 text-tertiary-medium">Loading products...</p>
     </div>
 
     <!-- Error State -->
-    <div v-if="error" class="error-state">
-      <p>{{ error }}</p>
+    <div v-if="error" class="alert alert-danger text-center" role="alert">
+      <p class="mb-3">{{ error }}</p>
       <button class="btn btn-primary" @click="refreshData">Try Again</button>
     </div>
 
     <!-- Success Message -->
-    <div v-if="successMessage" class="success-message">
+    <div v-if="successMessage" class="alert alert-success text-center" role="alert">
       {{ successMessage }}
     </div>
 
-    <!-- Table Controls Section -->
-    <div v-if="!loading || products.length > 0" class="table-controls">
-      <div class="table-controls-left">
-        <button class="btn btn-info column-filter-btn" @click="showColumnFilter">
-          Customize Columns
-        </button>
-      </div>
-      <div class="table-controls-right">
-        <div class="table-summary">
-          Showing {{ filteredProducts.length }} of {{ products.length }} products
+    <!-- Table Controls -->
+    <div v-if="!loading || products.length > 0" class="card mb-3">
+      <div class="card-body py-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="d-flex align-items-center gap-3">
+            <button 
+              class="btn btn-sm btn-info-light btn-with-icon-sm" 
+              @click="showColumnFilter"
+            >
+              <Columns :size="16" />
+              Customize Columns
+            </button>
+            <button 
+              class="btn btn-sm btn-with-icon-sm btn-dynamic-danger"
+              @click="deleteSelected" 
+              :disabled="selectedProducts.length === 0 || loading"
+              :class="selectedProducts.length > 0 ? 'has-items' : 'no-items'"
+            >
+              <Trash2 :size="16" />
+              Delete Selected ({{ selectedProducts.length }})
+            </button>
+          </div>
+          <small class="text-tertiary-medium">
+            Showing {{ filteredProducts.length }} of {{ products.length }} products
+          </small>
         </div>
       </div>
     </div>
@@ -171,25 +194,25 @@
     <DataTable v-if="!loading || products.length > 0">
       <template #header>
         <tr>
-          <!-- Always visible columns -->
-          <th class="checkbox-column">
+          <th style="width: 40px;">
             <input 
               type="checkbox" 
+              class="form-check-input" 
               @change="selectAll" 
               :checked="allSelected"
               :indeterminate="someSelected"
             />
           </th>
-          <th v-if="columnVisibility.id">ID</th>
-          <th>Product Name</th> <!-- Always visible -->
-          <th v-if="columnVisibility.category">Category</th>
-          <th v-if="columnVisibility.sku">SKU</th>
-          <th v-if="columnVisibility.stock">Stock</th>
-          <th v-if="columnVisibility.costPrice">Cost Price</th>
-          <th v-if="columnVisibility.sellingPrice">Selling Price</th>
-          <th v-if="columnVisibility.status">Status</th>
-          <th v-if="columnVisibility.expiryDate">Expiry Date</th>
-          <th class="actions-column">Actions</th> <!-- Always visible -->
+          <th v-if="columnVisibility.id" style="width: 80px;">ID</th>
+          <th>Product Name</th>
+          <th v-if="columnVisibility.category" style="width: 120px;">Category</th>
+          <th v-if="columnVisibility.sku" style="width: 120px;">SKU</th>
+          <th v-if="columnVisibility.stock" style="width: 120px;">Stock</th>
+          <th v-if="columnVisibility.costPrice" style="width: 100px;">Cost Price</th>
+          <th v-if="columnVisibility.sellingPrice" style="width: 100px;">Selling Price</th>
+          <th v-if="columnVisibility.status" style="width: 100px;">Status</th>
+          <th v-if="columnVisibility.expiryDate" style="width: 140px;">Expiry Date</th>
+          <th style="width: 160px;">Actions</th>
         </tr>
       </template>
 
@@ -199,136 +222,133 @@
           :key="product._id"
           :class="getRowClass(product)"
         >
-          <!-- Always visible columns -->
-          <td class="checkbox-column">
+          <td>
             <input 
               type="checkbox" 
+              class="form-check-input"
               :value="product._id"
               v-model="selectedProducts"
             />
           </td>
-          <td v-if="columnVisibility.id" class="id-column">{{ product._id.slice(-6) }}</td>
-          <td class="product-name-column">
-            <div class="product-info">
-              <span :class="['product-name', getProductNameClass(product)]">{{ product.product_name }}</span>
-              <span class="product-unit">{{ product.unit }}</span>
+          <td v-if="columnVisibility.id" class="font-monospace text-secondary fw-medium">
+            {{ product._id.slice(-6) }}
+          </td>
+          <td>
+            <div>
+              <div :class="['fw-medium', getProductNameClass(product)]">{{ product.product_name }}</div>
+              <small class="text-tertiary-medium">{{ product.unit }}</small>
             </div>
           </td>
-          <td v-if="columnVisibility.category" class="category-column">
-            <span :class="['category-badge', `category-${getCategorySlug(product.category_id)}`]">
+          <td v-if="columnVisibility.category">
+            <span :class="['badge', 'rounded-pill', getCategoryBadgeClass(product.category_id)]">
               {{ getCategoryName(product.category_id) }}
             </span>
           </td>
-          <td v-if="columnVisibility.sku" class="sku-column">
-            <span class="sku-value">{{ product.SKU }}</span>
+          <td v-if="columnVisibility.sku" class="font-monospace fw-semibold text-tertiary-dark">
+            {{ product.SKU }}
           </td>
-          <td v-if="columnVisibility.stock" class="stock-column">
-            <div class="stock-info">
-              <span :class="getStockClass(product)">{{ product.stock }}</span>
-              <span class="stock-threshold">(Min: {{ product.low_stock_threshold }})</span>
+          <td v-if="columnVisibility.stock">
+            <div>
+              <span :class="['fw-medium', getStockClass(product)]">{{ product.stock }}</span>
+              <br>
+              <small class="text-tertiary-medium">(Min: {{ product.low_stock_threshold }})</small>
             </div>
           </td>
-          <td v-if="columnVisibility.costPrice" class="price-column">₱{{ formatPrice(product.cost_price) }}</td>
-          <td v-if="columnVisibility.sellingPrice" class="price-column">₱{{ formatPrice(product.selling_price) }}</td>
-          <td v-if="columnVisibility.status" class="status-column">
-            <span :class="['status-badge', `status-${product.status}`]">
+          <td v-if="columnVisibility.costPrice" class="text-end fw-medium">
+            ₱{{ formatPrice(product.cost_price) }}
+          </td>
+          <td v-if="columnVisibility.sellingPrice" class="text-end fw-medium">
+            ₱{{ formatPrice(product.selling_price) }}
+          </td>
+          <td v-if="columnVisibility.status">
+            <span :class="['badge', 'rounded-pill', getStatusBadgeClass(product.status)]">
               {{ formatStatus(product.status) }}
             </span>
           </td>
-          <td v-if="columnVisibility.expiryDate" class="expiry-column">
-            <span :class="getExpiryClass(product.expiry_date)" :title="getExpiryTooltip(product.expiry_date)">
+          <td v-if="columnVisibility.expiryDate">
+            <span 
+              :class="['badge', 'rounded-pill', getExpiryBadgeClass(product.expiry_date)]"
+              :title="getExpiryTooltip(product.expiry_date)"
+            >
               {{ formatDate(product.expiry_date) }}
             </span>
           </td>
-          <td class="actions-column">
-            <div class="action-buttons">
-              <!-- Edit Action -->
+          <td>
+            <div class="d-flex gap-1 justify-content-center">
               <button 
-                class="action-btn edit-btn" 
-                @click="editProduct(product)" 
+                class="btn btn-outline-secondary btn-icon-only btn-xs action-btn" 
+                @click="editProduct(product)"
+                data-bs-toggle="tooltip"
                 title="Edit Product"
               >
-                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                  <path d="m18.5 2.5 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                </svg>
+                <Edit :size="12" />
               </button>
-
-              <!-- View Details Action -->
               <button 
-                class="action-btn view-btn" 
-                @click="navigateToProductDetails(product._id)" 
+                class="btn btn-outline-primary btn-icon-only btn-xs action-btn" 
+                @click="navigateToProductDetails(product._id)"
+                data-bs-toggle="tooltip"
                 title="View Details"
               >
-                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                  <circle cx="12" cy="12" r="3"/>
-                </svg>
+                <Eye :size="12" />
               </button>
-
-              <!-- Stock Update Action -->
               <button 
-                class="action-btn stock-btn" 
-                @click="restockProduct(product)" 
+                class="btn btn-outline-info btn-icon-only btn-xs action-btn" 
+                @click="restockProduct(product)"
+                data-bs-toggle="tooltip"
                 title="Update Stock"
               >
-                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                  <line x1="8" y1="21" x2="16" y2="21"/>
-                  <line x1="12" y1="17" x2="12" y2="21"/>
-                  <path d="M7 13h10"/>
-                  <path d="M10 10v3"/>
-                  <path d="M14 10v3"/>
-                </svg>
+                <Package :size="12" />
               </button>
-
-              <!-- Status Toggle Action -->
               <button 
-                class="action-btn status-btn"
-                :class="{ 'inactive': product.status !== 'active' }"
-                @click="toggleProductStatus(product)" 
+                class="btn btn-outline-success btn-icon-only btn-xs action-btn"
+                @click="toggleProductStatus(product)"
+                data-bs-toggle="tooltip"
                 :title="product.status === 'active' ? 'Deactivate Product' : 'Activate Product'"
+                :class="{ 'btn-outline-warning': product.status !== 'active' }"
               >
-                <svg v-if="product.status === 'active'" class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                  <circle cx="12" cy="16" r="1"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-                <svg v-else class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                  <circle cx="12" cy="16" r="1"/>
-                  <path d="M7 11V7a5 5 0 0 1 8.6 2.5"/>
-                </svg>
+                <Lock v-if="product.status === 'active'" :size="12" />
+                <Unlock v-else :size="12" />
               </button>
-
-              <!-- Delete Action -->
               <button 
-                class="action-btn delete-btn" 
-                @click="deleteProduct(product)" 
+                class="btn btn-outline-danger btn-icon-only btn-xs action-btn" 
+                @click="deleteProduct(product)"
+                data-bs-toggle="tooltip"
                 title="Delete Product"
               >
-                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="3,6 5,6 21,6"/>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                  <line x1="10" y1="11" x2="10" y2="17"/>
-                  <line x1="14" y1="11" x2="14" y2="17"/>
-                </svg>
+                <Trash2 :size="12" />
               </button>
             </div>
           </td>
         </tr>
       </template>
-    </DataTable>    
+    </DataTable>
 
     <!-- Empty State -->
-    <div v-if="!loading && filteredProducts.length === 0 && !error" class="empty-state">
-      <p>{{ products.length === 0 ? 'No products found' : 'No products match the current filters' }}</p>
-      <button v-if="products.length === 0" class="btn btn-primary" @click="handleSingleProduct">
-        Add First Product
-      </button>
-      <button v-else class="btn btn-secondary" @click="clearFilters">
-        Clear Filters
-      </button>
+    <div v-if="!loading && filteredProducts.length === 0 && !error" class="text-center py-5">
+      <div class="card">
+        <div class="card-body py-5">
+          <Package :size="48" class="text-tertiary-medium mb-3" />
+          <p class="text-tertiary-medium mb-3">
+            {{ products.length === 0 ? 'No products found' : 'No products match the current filters' }}
+          </p>
+          <button 
+            v-if="products.length === 0" 
+            class="btn btn-primary-light btn-with-icon" 
+            @click="handleSingleProduct"
+          >
+            <Plus :size="16" />
+            Add First Product
+          </button>
+          <button 
+            v-else 
+            class="btn btn-secondary-light btn-with-icon" 
+            @click="clearFilters"
+          >
+            <RefreshCw :size="16" />
+            Clear Filters
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Modular Components -->
@@ -385,22 +405,52 @@
 
 <script>
 import productsApiService from '../../services/apiProducts.js'
-import DataTable from '../../components/TableTemplate.vue'
 import AddProductModal from '../../components/products/AddProductModal.vue'
 import StockUpdateModal from '../../components/products/StockUpdateModal.vue'
 import ViewProductModal from '../../components/products/ViewProductModal.vue'
 import ReportsModal from '../../components/products/ReportsModal.vue'
 import ColumnFilterModal from '../../components/products/ColumnFilterModal.vue'
+import DataTable from '@/components/common/TableTemplate.vue'
+import { 
+  Plus, 
+  Download, 
+  RefreshCw, 
+  Edit, 
+  Eye, 
+  Package, 
+  Lock, 
+  Unlock, 
+  Trash2,
+  Columns,
+  AlertTriangle,
+  Calendar,
+  MoreVertical,
+  FileText
+} from 'lucide-vue-next'
 
 export default {
   name: 'Products',
   components: {
-    DataTable,
     AddProductModal,
     StockUpdateModal,
     ViewProductModal,
     ColumnFilterModal,
-    ReportsModal
+    ReportsModal,
+    DataTable,
+    Plus,
+    Download,
+    RefreshCw,
+    Edit,
+    Eye,
+    Package,
+    Lock,
+    Unlock,
+    Trash2,
+    Columns,
+    AlertTriangle,
+    Calendar,
+    MoreVertical,
+    FileText
   },
   data() {
     return {
@@ -475,7 +525,6 @@ export default {
   },
   
   beforeUnmount() {
-    // Clean up event listener
     document.removeEventListener('click', this.handleClickOutside)
   },
   
@@ -498,21 +547,19 @@ export default {
     },
     
     handleSingleProduct(event) {
-      event.stopPropagation()
+      if (event) event.stopPropagation()
       this.showAddProductModal()
       this.closeAddDropdown()
     },
     
     handleBulkAdd(event) {
       event.stopPropagation()
-      // Navigate to bulk add page
       this.$router.push('/products/bulk')
       this.closeAddDropdown()
     },
     
     handleImport(event) {
       event.stopPropagation()
-      // TODO: Show import modal
       console.log('Show import modal')
       this.closeAddDropdown()
     },
@@ -525,7 +572,6 @@ export default {
         console.log('Fetching products from API...')
         const data = await productsApiService.getProducts()
         
-        // Handle different response formats
         if (data.results) {
           this.products = data.results
         } else if (Array.isArray(data)) {
@@ -547,16 +593,13 @@ export default {
 
     async fetchReportCounts() {
       try {
-        // Get low stock count
         const lowStockData = await productsApiService.getLowStockProducts()
         this.lowStockCount = Array.isArray(lowStockData) ? lowStockData.length : (lowStockData.count || 0)
         
-        // Get expiring products count (next 30 days)
         const expiringData = await productsApiService.getExpiringProducts({ days_ahead: 30 })
         this.expiringCount = Array.isArray(expiringData) ? expiringData.length : (expiringData.count || 0)
       } catch (error) {
         console.error('Error fetching report counts:', error)
-        // Don't show error for report counts, just log it
       }
     },
 
@@ -607,7 +650,6 @@ export default {
     },
 
     exportReportData(reportData) {
-      // Handle export from ReportsModal
       const headers = reportData.type === 'low-stock' 
         ? ['Product Name', 'SKU', 'Category', 'Current Stock', 'Threshold']
         : ['Product Name', 'SKU', 'Category', 'Current Stock', 'Expiry Date', 'Days Until Expiry']
@@ -645,12 +687,10 @@ export default {
     applyFilters() {
       let filtered = [...this.products]
 
-      // Category filter
       if (this.categoryFilter !== 'all') {
         filtered = filtered.filter(product => product.category_id === this.categoryFilter)
       }
 
-      // Status filter
       if (this.statusFilter !== 'all') {
         if (this.statusFilter === 'out-of-stock') {
           filtered = filtered.filter(product => product.stock === 0)
@@ -659,7 +699,6 @@ export default {
         }
       }
 
-      // Stock filter
       if (this.stockFilter !== 'all') {
         if (this.stockFilter === 'low-stock') {
           filtered = filtered.filter(product => 
@@ -672,7 +711,6 @@ export default {
         }
       }
 
-      // Search filter
       if (this.searchFilter.trim()) {
         const search = this.searchFilter.toLowerCase()
         filtered = filtered.filter(product => 
@@ -892,7 +930,6 @@ export default {
 
     async exportData() {
       try {
-        // Try to use the API export function first
         const blob = await productsApiService.exportProducts({
           format: 'csv',
           filters: {
@@ -911,7 +948,6 @@ export default {
       } catch (error) {
         console.error('API export failed, falling back to client-side export:', error)
         
-        // Fallback to client-side export
         const headers = ['ID', 'Name', 'SKU', 'Category', 'Stock', 'Cost Price', 'Selling Price', 'Status', 'Expiry Date']
         const csvContent = [
           headers.join(','),
@@ -938,7 +974,6 @@ export default {
       }
     },
 
-    // Column Filter Methods
     showColumnFilter() {
       this.showColumnFilterModal = true
     },
@@ -949,11 +984,7 @@ export default {
     
     applyColumnFilter(newColumnVisibility) {
       this.columnVisibility = { ...newColumnVisibility }
-      
-      // Save to localStorage for persistence
       localStorage.setItem('products-column-visibility', JSON.stringify(this.columnVisibility))
-      
-      // Optional: Show success message
       this.successMessage = 'Column visibility updated successfully'
       setTimeout(() => {
         this.successMessage = null
@@ -961,7 +992,6 @@ export default {
     },
     
     loadColumnVisibility() {
-      // Load saved column visibility from localStorage
       const saved = localStorage.getItem('products-column-visibility')
       if (saved) {
         try {
@@ -973,25 +1003,23 @@ export default {
     },
     
     navigateToProductDetails(productId) {
-      console.log('🔄 Navigation triggered!');
-      console.log('📦 Product ID:', productId);
-      console.log('🌐 Navigating to:', `/products/${productId}`);
+      console.log('🔄 Navigation triggered!')
+      console.log('📦 Product ID:', productId)
+      console.log('🌐 Navigating to:', `/products/${productId}`)
       
-      // Check if productId exists and is valid
       if (!productId) {
-        console.error('❌ Error: Product ID is null or undefined!');
-        return;
+        console.error('❌ Error: Product ID is null or undefined!')
+        return
       }
       
       try {
-        this.$router.push(`/products/${productId}`);
-        console.log('✅ Router.push executed successfully');
+        this.$router.push(`/products/${productId}`)
+        console.log('✅ Router.push executed successfully')
       } catch (error) {
-        console.error('❌ Router navigation error:', error);
+        console.error('❌ Router navigation error:', error)
       }
     },
 
-    // Enhanced tooltip method for expiry dates
     getExpiryTooltip(expiryDate) {
       if (!expiryDate) return 'No expiry date set'
       
@@ -1010,21 +1038,19 @@ export default {
       return `Expires in ${daysUntilExpiry} days - Good condition`
     },
 
-    // Enhanced expiry class method
-    getExpiryClass(expiryDate) {
-      if (!expiryDate) return 'no-expiry'
+    getExpiryBadgeClass(expiryDate) {
+      if (!expiryDate) return 'text-bg-secondary'
       
       const today = new Date()
       const expiry = new Date(expiryDate)
       const daysUntilExpiry = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24))
       
-      if (daysUntilExpiry < 0) return 'expired'
-      if (daysUntilExpiry <= 7) return 'expiring-soon'
-      if (daysUntilExpiry <= 30) return 'expiring-month'
-      return 'fresh'
+      if (daysUntilExpiry < 0) return 'text-bg-danger pulsing-badge'
+      if (daysUntilExpiry <= 7) return 'text-bg-warning'
+      if (daysUntilExpiry <= 30) return 'text-bg-info'
+      return 'text-bg-success'
     },
 
-    // Utility methods
     getCategoryName(categoryId) {
       const categories = {
         'noodles': 'Noodles',
@@ -1034,34 +1060,43 @@ export default {
       return categories[categoryId] || categoryId
     },
 
-    getCategorySlug(categoryId) {
-      return categoryId?.toLowerCase().replace(/\s+/g, '-') || 'unknown'
+    getCategoryBadgeClass(categoryId) {
+      const classes = {
+        'noodles': 'text-bg-secondary',
+        'drinks': 'text-bg-primary', 
+        'toppings': 'text-bg-info'
+      }
+      return classes[categoryId] || 'text-bg-light'
     },
 
     getProductNameClass(product) {
-      if (product.stock === 0) return 'out-of-stock'
-      if (product.stock <= product.low_stock_threshold) return 'low-stock'
-      return ''
+      if (product.stock === 0) return 'text-danger fw-bold'
+      if (product.stock <= product.low_stock_threshold) return 'text-danger fw-semibold'
+      return 'text-tertiary-dark'
     },
 
     getRowClass(product) {
       const classes = []
       
       if (this.selectedProducts.includes(product._id)) {
-        classes.push('selected')
+        classes.push('table-primary')
       }
       
       if (product.status === 'inactive') {
-        classes.push('inactive')
+        classes.push('text-muted')
       }
       
       return classes.join(' ')
     },
 
     getStockClass(product) {
-      if (product.stock === 0) return 'stock-zero'
-      if (product.stock <= product.low_stock_threshold) return 'stock-low'
-      return 'stock-normal'
+      if (product.stock === 0) return 'text-danger fw-bold'
+      if (product.stock <= product.low_stock_threshold) return 'text-warning fw-semibold'
+      return 'text-success fw-medium'
+    },
+
+    getStatusBadgeClass(status) {
+      return status === 'active' ? 'text-bg-success' : 'text-bg-danger'
     },
 
     getDaysUntilExpiry(expiryDate) {
@@ -1098,230 +1133,13 @@ export default {
 </script>
 
 <style scoped>
-.products-page {
-  padding: 1.5rem;
-  max-width: 1400px;
-  margin: 0 auto;
-  background-color: var(--neutral-light);
-  min-height: 100vh;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.page-title {
-  font-size: 2rem;
-  font-weight: 600;
-  color: var(--primary-dark);
-  margin: 0;
-}
-
-.header-actions {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.reports-section {
-  margin-bottom: 1.5rem;
-}
-
-.report-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-}
-
-.report-card {
-  background: white;
-  padding: 1.5rem;
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border-left: 4px solid var(--primary);
-}
-
-.report-card.low-stock {
-  border-left-color: var(--error);
-}
-
-.report-card.expiring {
-  border-left-color: var(--info);
-}
-
-.report-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15);
-}
-
-.report-card h3 {
-  margin: 0 0 0.5rem 0;
-  color: var(--tertiary-dark);
-  font-size: 1rem;
-  font-weight: 500;
-}
-
-.report-count {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--primary);
-  margin: 0;
-}
-
-.report-card.low-stock .report-count {
-  color: var(--error);
-}
-
-.report-card.expiring .report-count {
-  color: var(--info);
-}
-
-.report-label {
-  color: var(--tertiary-medium);
-  font-size: 0.875rem;
-}
-
-.filters-section {
-  background: white;
-  padding: 1.5rem;
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  margin-bottom: 1.5rem;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-}
-
-.filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.filter-group label {
-  font-weight: 500;
-  color: var(--tertiary-dark);
-  font-size: 0.875rem;
-}
-
-.filter-group select,
-.filter-group input {
-  padding: 0.5rem;
-  border: 1px solid var(--neutral);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  background: white;
-  color: var(--tertiary-dark);
-}
-
-.filter-group select:focus,
-.filter-group input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(115, 146, 226, 0.1);
-}
-
-.btn {
-  padding: 0.5rem 1.25rem;
-  border-radius: 0.5rem;
-  border: none;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.875rem;
-  white-space: nowrap;
-}
-
-.btn-primary {
-  background-color: var(--primary);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background-color: var(--primary-dark);
-}
-
-.btn-secondary {
-  background-color: var(--neutral-medium);
-  color: var(--tertiary-dark);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background-color: var(--neutral-dark);
-}
-
-.btn-success {
-  background-color: var(--success);
-  color: white;
-}
-
-.btn-success:hover:not(:disabled) {
-  background-color: var(--success-dark);
-}
-
-.btn-info {
-  background-color: var(--info);
-  color: white;
-}
-
-.btn-info:hover:not(:disabled) {
-  background-color: var(--info-dark);
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Dropdown Styles */
-.dropdown-container {
-  position: relative;
-  display: inline-block;
-}
-
-.dropdown-trigger {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  position: relative;
-}
-
-.dropdown-trigger.active {
-  background-color: var(--success-dark) !important;
-}
-
-.btn-icon {
-  width: 16px;
-  height: 16px;
-}
-
-.dropdown-arrow {
-  width: 16px;
-  height: 16px;
-  transition: transform 0.2s ease;
-}
-
-.dropdown-arrow.rotated {
-  transform: rotate(180deg);
-}
-
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: white;
-  border: 1px solid var(--neutral);
-  border-radius: 0.75rem;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  z-index: 1000;
-  overflow: hidden;
-  animation: dropdownSlide 0.2s ease;
+/* Custom dropdown styling */
+.custom-dropdown-menu {
   min-width: 280px;
+  border: 1px solid var(--neutral);
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  animation: dropdownSlide 0.2s ease;
 }
 
 @keyframes dropdownSlide {
@@ -1335,285 +1153,47 @@ export default {
   }
 }
 
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  width: 100%;
+.custom-dropdown-item {
   padding: 1rem 1.25rem;
-  background: none;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.2s ease;
   border-bottom: 1px solid var(--neutral-light);
+  transition: all 0.2s ease;
 }
 
-.dropdown-item:last-child {
+.custom-dropdown-item:last-child {
   border-bottom: none;
 }
 
-.dropdown-item:hover {
+.custom-dropdown-item:hover {
   background-color: var(--primary-light);
 }
 
-.dropdown-icon {
-  width: 20px;
-  height: 20px;
-  color: var(--primary);
-  flex-shrink: 0;
-  stroke-width: 1.5;
+/* Report cards hover effect */
+.report-card {
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.dropdown-item-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  flex: 1;
+.report-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15);
 }
 
-.dropdown-item-title {
-  font-weight: 600;
-  color: var(--tertiary-dark);
-  font-size: 0.9375rem;
+/* Custom color classes using colors.css variables */
+.text-primary-dark {
+  color: var(--primary-dark) !important;
 }
 
-.dropdown-item-desc {
-  font-size: 0.8125rem;
-  color: var(--tertiary-medium);
-  line-height: 1.3;
+.text-tertiary-dark {
+  color: var(--tertiary-dark) !important;
 }
 
-.loading-state, .error-state {
-  text-align: center;
-  padding: 3rem;
-  background: white;
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+.text-tertiary-medium {
+  color: var(--tertiary-medium) !important;
 }
 
-.error-state {
-  color: var(--error);
-}
-
-.success-message {
-  background-color: var(--success-light);
-  border: 1px solid var(--success);
-  color: var(--success-dark);
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  margin-bottom: 1rem;
-  text-align: center;
-}
-
-.table-controls {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-  padding: 1rem;
-  background: white;
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-}
-
-.table-summary {
-  color: var(--tertiary-medium);
-  font-size: 0.875rem;
-}
-
-.checkbox-column {
-  width: 40px;
-  text-align: center;
-}
-
-.id-column {
-  width: 80px;
-  font-weight: 500;
-  color: var(--secondary);
-  font-family: monospace;
-}
-
-.product-name-column {
-  min-width: 200px;
-}
-
-.product-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.product-name {
-  font-weight: 500;
-  color: var(--tertiary-dark);
-  transition: color 0.2s ease;
-}
-
-.product-name.low-stock {
-  color: var(--error);
-  font-weight: 600;
-}
-
-.product-name.out-of-stock {
-  color: var(--error-dark);
-  font-weight: 600;
-}
-
-.product-unit {
-  font-size: 0.75rem;
-  color: var(--tertiary-medium);
-}
-
-.category-column {
-  width: 120px;
-}
-
-.category-badge {
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.375rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-}
-
-.category-badge.category-noodles {
-  background-color: var(--secondary-light);
-  color: var(--secondary-dark);
-}
-
-.category-badge.category-drinks {
-  background-color: var(--primary-light);
-  color: var(--primary-dark);
-}
-
-.category-badge.category-toppings {
-  background-color: var(--info-light);
-  color: var(--info-dark);
-}
-
-.category-badge.category-unknown {
-  background-color: var(--neutral-medium);
-  color: var(--tertiary-dark);
-}
-
-.sku-column {
-  width: 120px;
-  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--tertiary-dark);
-}
-
-.stock-column {
-  width: 120px;
-}
-
-.stock-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.stock-threshold {
-  font-size: 0.75rem;
-  color: var(--tertiary-medium);
-}
-
-.stock-zero {
-  color: var(--error);
-  font-weight: 600;
-}
-
-.stock-low {
-  color: var(--error-medium);
-  font-weight: 500;
-}
-
-.stock-normal {
-  color: var(--success);
-  font-weight: 500;
-}
-
-.price-column {
-  width: 100px;
-  text-align: right;
-  font-weight: 500;
-  color: var(--tertiary-dark);
-}
-
-.status-column {
-  width: 100px;
-}
-
-.status-badge {
-  padding: 0.375rem 0.75rem;
-  border-radius: 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-  min-width: 70px;
-  text-align: center;
-  display: inline-block;
-}
-
-.status-badge.status-active {
-  background-color: var(--success-light);
-  color: var(--success-dark);
-}
-
-.status-badge.status-inactive {
-  background-color: var(--error-light);
-  color: var(--error-dark);
-}
-
-.expiry-column {
-  width: 140px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  padding: 0.5rem;
-}
-
-.expiry-column span {
-  padding: 0.375rem 0.75rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  background-color: var(--neutral-light);
-  color: var(--tertiary-dark);
-  border: 1px solid var(--neutral-medium);
-  min-width: 70px;
-  text-align: center;
-  display: inline-block;
-}
-
-.expired {
-  background-color: var(--error-light) !important;
-  color: var(--error-dark) !important;
-  border: 1px solid var(--error) !important;
-  font-weight: 700;
+/* Pulsing animation for expired items */
+.pulsing-badge {
   animation: pulse-error 2s infinite;
-}
-
-.expiring-soon {
-  background-color: #FEF3C7 !important;
-  color: #92400E !important;
-  border: 1px solid #F59E0B !important;
-  font-weight: 600;
-}
-
-.expiring-month {
-  background-color: var(--info-light) !important;
-  color: var(--info-dark) !important;
-  border: 1px solid var(--info) !important;
-  font-weight: 500;
-}
-
-.expiry-column span:not(.expired):not(.expiring-soon):not(.expiring-month) {
-  background-color: var(--primary-light);
-  color: var(--primary-dark);
-  border: 1px solid var(--primary);
 }
 
 @keyframes pulse-error {
@@ -1627,206 +1207,53 @@ export default {
   }
 }
 
-.expiry-column span:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+/* Spin animation for refresh button */
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Form controls focus states */
+.form-select:focus,
+.form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
+}
+
+/* Table row selection */
+.table tbody tr.table-primary {
+  background-color: var(--primary-light) !important;
+}
+
+/* Products page background */
+.products-page {
+  background-color: var(--neutral-light);
+  min-height: 100vh;
+}
+
+/* Action buttons spacing */
+.action-btn {
   transition: all 0.2s ease;
 }
 
-.actions-column {
-  width: 160px;
-  text-align: center;
+.action-btn:hover {
+  transform: translateY(-1px);
 }
 
-.action-buttons {
-  display: flex;
-  gap: 0.25rem;
-  justify-content: center;
-  align-items: center;
-}
-
-.action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid;
-  border-radius: 0.25rem;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  background-color: transparent;
-  position: relative;
-}
-
-.action-icon {
-  width: 14px;
-  height: 14px;
-  stroke-width: 1.5;
-  transition: all 0.15s ease;
-}
-
-.edit-btn {
-  color: var(--secondary);
-  border-color: var(--secondary);
-}
-
-.view-btn {
-  color: var(--primary);
-  border-color: var(--primary);
-}
-
-.stock-btn {
-  color: var(--info);
-  border-color: var(--info);
-}
-
-.status-btn {
-  color: var(--success);
-  border-color: var(--success);
-}
-
-.status-btn.inactive {
-  color: var(--tertiary-medium);
-  border-color: var(--tertiary-medium);
-}
-
-.delete-btn {
-  color: var(--error);
-  border-color: var(--error);
-}
-
-.edit-btn:hover {
-  background-color: var(--secondary-light);
-  color: var(--secondary-dark);
-}
-
-.view-btn:hover {
-  background-color: var(--primary-light);
-  color: var(--primary-dark);
-}
-
-.stock-btn:hover {
-  background-color: var(--info-light);
-  color: var(--info-dark);
-}
-
-.status-btn:hover {
-  background-color: var(--success-light);
-  color: var(--success-dark);
-}
-
-.status-btn.inactive:hover {
-  background-color: var(--neutral-medium);
-  color: var(--tertiary-dark);
-}
-
-.delete-btn:hover {
-  background-color: var(--error-light);
-  color: var(--error-dark);
-}
-
-.action-btn:hover::after {
-  content: attr(title);
-  position: absolute;
-  bottom: -2rem;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--tertiary-dark);
-  color: white;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
-  font-size: 0.65rem;
-  white-space: nowrap;
-  z-index: 1000;
-}
-
-:deep(.data-table tbody tr.inactive) {
-  opacity: 0.6;
-}
-
-:deep(.data-table tbody tr.selected) {
-  background-color: var(--primary-light);
-}
-
-.empty-state {
-  text-align: center;
-  padding: 3rem;
-  color: var(--tertiary-medium);
-  background: white;
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-}
-
-input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--primary);
-  cursor: pointer;
-}
-
-/* Responsive dropdown */
+/* Responsive adjustments */
 @media (max-width: 768px) {
-  .dropdown-menu {
+  .custom-dropdown-menu {
     min-width: 250px;
     right: 0;
     left: auto;
   }
   
-  .dropdown-item {
+  .custom-dropdown-item {
     padding: 0.875rem 1rem;
-  }
-  
-  .dropdown-item-title {
-    font-size: 0.875rem;
-  }
-  
-  .dropdown-item-desc {
-    font-size: 0.75rem;
-  }
-}
-
-/* Responsive Design */
-@media (max-width: 1024px) {
-  .products-page {
-    padding: 1rem;
-  }
-
-  .filters-section {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
-  }
-  
-  .header-actions {
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-  
-  .page-title {
-    font-size: 1.5rem;
-    text-align: center;
-  }
-  
-  .btn {
-    padding: 0.5rem 1rem;
-    font-size: 0.8125rem;
-  }
-
-  .filters-section {
-    grid-template-columns: 1fr;
-    padding: 1rem;
-  }
-
-  .action-buttons {
-    flex-direction: column;
-    gap: 0.25rem;
   }
 }
 </style>

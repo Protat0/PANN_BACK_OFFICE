@@ -180,7 +180,7 @@
                   type="text"
                   placeholder="Product name"
                   class="table-input"
-                  @input="calculateSellingPrice(index)"
+                  @input="calculateSellingPrice(index); handleProductDataChange()"
                 />
               </td>
               
@@ -192,6 +192,7 @@
                   placeholder="Auto-generated"
                   class="table-input sku-input"
                   @blur="validateSKU(index)"
+                  @input="handleProductDataChange"
                 />
                 <div v-if="product.sku_error" class="field-error">{{ product.sku_error }}</div>
               </td>
@@ -201,6 +202,7 @@
                 <select 
                   v-model="product.category_id"
                   class="table-select"
+                  @change="handleProductDataChange"
                 >
                   <option value="">Select category</option>
                   <option value="noodles">Noodles</option>
@@ -218,7 +220,7 @@
                   min="0"
                   placeholder="0.00"
                   class="table-input price-input"
-                  @input="calculateSellingPrice(index)"
+                  @input="calculateSellingPrice(index); handleProductDataChange()"
                 />
               </td>
               
@@ -231,7 +233,7 @@
                   max="1000"
                   placeholder="25"
                   class="table-input markup-input"
-                  @input="calculateSellingPrice(index)"
+                  @input="calculateSellingPrice(index); handleProductDataChange()"
                 />
                 <span class="markup-suffix">%</span>
               </td>
@@ -245,7 +247,7 @@
                   min="0"
                   placeholder="0.00"
                   class="table-input price-input"
-                  @input="calculateMarkup(index)"
+                  @input="calculateMarkup(index); handleProductDataChange()"
                 />
               </td>
               
@@ -257,6 +259,7 @@
                   min="0"
                   placeholder="0"
                   class="table-input stock-input"
+                  @input="handleProductDataChange"
                 />
               </td>
               
@@ -310,6 +313,22 @@
       @confirm="handleNotificationConfirm"
       @retry="handleNotificationRetry"
     />
+
+    <SaveAsDraftModal
+      ref="saveDraftModal"
+      :show="showDraftModal"
+      modal-id="productBulkDraftModal"
+      title="Unsaved Product Data"
+      subtitle="You have unsaved products"
+      message="You have unsaved product data that will be lost if you leave this page. Would you like to save your progress as a draft?"
+      :data-summary="draftDataSummary"
+      :default-draft-name="`Bulk Products ${new Date().toLocaleDateString()}`"
+      :loading="draftLoading"
+      @save-draft="handleSaveDraft"
+      @discard="handleDiscardDraft"
+      @cancel="handleCancelDraft"
+      @close="handleModalClose"
+    />
   </div>
 </template>
 
@@ -317,13 +336,51 @@
 import productsApiService from '../../services/apiProducts.js'
 import BarcodeScanner from '../../components/products/BarcodeScanner.vue'
 import NotificationModal from '../../components/common/NotificationModal.vue'
+import SaveAsDraftModal from '../../components/common/SaveAsDraftModal.vue'
+import { useSaveAsDraftModal } from '../../composables/ui/useSaveAsDraftModal.js'
 
 export default {
   name: 'ProductBulkEntry',
   components: {
     BarcodeScanner,
-    NotificationModal
+    NotificationModal,
+    SaveAsDraftModal
   },
+
+  setup() {
+    const {
+      modalRef,
+      isLoading: draftLoading,
+      modalConfig,
+      currentDraftData,
+      hasUnsavedChanges,
+      shouldShowDraftContent,
+      showModal: composableShowModal,
+      hideModal: composableHideModal,
+      handleSaveDraft: composableSaveDraft,
+      handleDiscard: composableDiscard,
+      handleCancel: composableCancel,
+      createDataSummary,
+      setupBeforeUnloadHandler
+    } = useSaveAsDraftModal()
+    
+    return {
+      draftModalRef: modalRef,
+      draftLoading,
+      draftModalConfig: modalConfig,
+      currentDraftData,
+      hasUnsavedChanges,
+      shouldShowDraftContent, 
+      composableShowModal,
+      composableHideModal,
+      composableSaveDraft,
+      composableDiscard,
+      composableCancel,
+      createDataSummary,
+      setupBeforeUnloadHandler
+    }
+  },
+
   data() {
     return {
       products: [],
@@ -338,7 +395,12 @@ export default {
         title: '',
         message: '',
         details: null
-      }
+      },
+      hasConfirmedLeave: false,
+      pendingNavigation: null,
+      cleanupBeforeUnload: null,
+      // ADD THIS - Control modal visibility directly
+      showDraftModal: false
     }
   },
   computed: {
@@ -357,12 +419,80 @@ export default {
     progressPercentage() {
       if (this.products.length === 0) return 0
       return Math.round((this.validProducts / this.products.length) * 100)
+    },
+
+    hasUnsavedWork() {
+      return this.products.some(product => {
+        // Only consider it "unsaved work" if user has actually entered meaningful data
+        const hasProductName = product.product_name && product.product_name.trim().length > 0
+        const hasSKU = product.SKU && product.SKU.trim().length > 0  
+        const hasCostPrice = product.cost_price && product.cost_price > 0
+        const hasSellingPrice = product.selling_price && product.selling_price > 0
+        const hasCategory = product.category_id && product.category_id !== ''
+        const hasImage = product.image_file || product.image_preview
+        
+        // Only count as "unsaved work" if user has filled in actual data
+        return hasProductName || hasSKU || hasCostPrice || hasSellingPrice || hasCategory || hasImage
+      })
+    },
+
+    draftDataSummary() {
+      return this.createDataSummary({
+        products: this.products.filter(p => p.product_name?.trim() || p.cost_price),
+        totalProducts: this.products.length,
+        validProducts: this.validProducts,
+        invalidProducts: this.invalidProducts
+      })
     }
   },
-  mounted() {
-    // Start with one empty row
-    this.addNewRow()
-  },
+
+    watch: {
+      // Watch the composable's isVisible state
+      isVisible(newValue) {
+        if (newValue && this.$refs.saveDraftModal) {
+          this.$refs.saveDraftModal.show()
+        } else if (!newValue && this.$refs.saveDraftModal) {
+          this.$refs.saveDraftModal.hide()
+        }
+      },
+      
+      // Add this watcher to control the draft content display
+      shouldShowDraftContent(newValue) {
+        console.log('Draft content should show:', newValue)
+      }
+    },
+
+    mounted() {
+      // Start with one empty row
+      this.addNewRow()
+      
+      // Setup before unload handler for unsaved changes
+      this.cleanupBeforeUnload = this.setupBeforeUnloadHandler(() => {
+        if (this.hasUnsavedWork) {
+          return 'You have unsaved product data. Are you sure you want to leave?'
+        }
+      })
+    },
+
+    beforeUnmount() {
+      if (this.cleanupBeforeUnload) {
+        this.cleanupBeforeUnload()
+      }
+    },
+
+    beforeRouteLeave(to, from, next) {
+      if (this.hasUnsavedWork && !this.hasConfirmedLeave) {
+        try {
+          this.showDraftModalBeforeLeave(next)
+        } catch (error) {
+          console.error('Error showing draft modal:', error)
+          // If there's an error, just allow navigation
+          next()
+        }
+      } else {
+        next()
+      }
+    },
   methods: {
     addNewRow() {
       const newProduct = {
@@ -380,13 +510,14 @@ export default {
         image_file: null,
         sku_error: null
       }
-      
       this.products.push(newProduct)
+      this.handleProductDataChange()
     },
     
     removeRow(index) {
       if (this.products.length > 1) {
         this.products.splice(index, 1)
+        this.handleProductDataChange()
       }
     },
     
@@ -401,6 +532,7 @@ export default {
       }
       
       this.products.splice(index + 1, 0, duplicate)
+      this.handleProductDataChange()
     },
     
     clearAll() {
@@ -437,6 +569,65 @@ export default {
         const markup = ((product.selling_price - product.cost_price) / product.cost_price) * 100
         product.markup_percentage = parseFloat(markup.toFixed(2))
       }
+    },
+
+    async handleSaveDraft(draftInfo) {
+      try {
+        await this.composableSaveDraft(draftInfo)
+        this.showSuccess(`Draft "${draftInfo.name}" saved successfully!`)
+        
+        // Hide modal
+        this.showDraftModal = false
+        
+        if (this.pendingNavigation) {
+          this.hasConfirmedLeave = true
+          this.pendingNavigation()
+          this.pendingNavigation = null
+        }
+      } catch (error) {
+        this.showError('Failed to save draft. Please try again.')
+      }
+    },
+
+    handleDiscardDraft() {
+      this.composableDiscard()
+      this.showDraftModal = false
+      
+      if (this.pendingNavigation) {
+        this.hasConfirmedLeave = true
+        this.pendingNavigation()
+        this.pendingNavigation = null
+      }
+    },
+
+    handleCancelDraft() {
+      this.composableCancel()
+      this.showDraftModal = false
+      this.pendingNavigation = null
+    },
+
+    handleModalClose() {
+      this.showDraftModal = false
+    },
+
+    handleProductDataChange() {
+      // Only set draft data if there's meaningful unsaved work
+      if (this.hasUnsavedWork) {
+        this.currentDraftData = {
+          products: [...this.products],
+          totalProducts: this.products.length,
+          validProducts: this.validProducts,
+          timestamp: new Date().toISOString()
+        }
+      } else {
+        // Clear draft data if there's no meaningful work
+        this.currentDraftData = null
+      }
+    },
+
+    showDraftModalBeforeLeave(next) {
+      this.pendingNavigation = next
+      this.showDraftModal = true
     },
     
     async validateSKU(index) {
@@ -494,6 +685,7 @@ export default {
           product.image_preview = e.target.result
         }
         reader.readAsDataURL(file)
+        this.handleProductDataChange()
       }
     },
     
@@ -653,6 +845,15 @@ export default {
         // Show success notification if we have any successful creates
         if (successfulCount > 0) {
           console.log('✅ Triggering success notification...')
+          
+          this.currentDraftData = null
+          // RESET TABLE IMMEDIATELY UPON SUCCESS - BEFORE SHOWING MODAL
+          console.log('🔄 Resetting table after successful product creation...')
+          this.products = []
+          this.nextId = 1
+          this.addNewRow()
+          this.clearMessages()
+          console.log('✅ Table reset complete, new products array:', this.products)
           
           // Set notification data
           this.notificationData = {

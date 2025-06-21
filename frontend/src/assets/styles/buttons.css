@@ -1,0 +1,368 @@
+/* ==========================================================================
+   BUTTON UTILITIES - Bootstrap Compatible
+   Using colors.css variables with Bootstrap's CSS custom properties system
+   ========================================================================== */
+
+/* ==========================================================================
+   GLOBAL BUTTON BORDER RADIUS OVERRIDE
+   Increases corner radius for all buttons across the project
+   ========================================================================== */
+
+.btn {
+  --bs-btn-border-radius: 0.75rem;
+  border-radius: 0.75rem !important;
+}
+
+/* ==========================================================================
+   BUTTON SIZES
+   Extends Bootstrap's default btn-sm, btn-lg with additional sizes
+   ========================================================================== */
+
+.btn-xs {
+  --bs-btn-padding-y: 0.25rem;
+  --bs-btn-padding-x: 0.5rem;
+  --bs-btn-font-size: 0.75rem;
+  --bs-btn-border-radius: 0.5rem;
+}
+
+.btn-sm {
+  /* Bootstrap default: 0.375rem 0.75rem */
+  --bs-btn-padding-y: 0.375rem;
+  --bs-btn-padding-x: 0.75rem;
+  --bs-btn-font-size: 0.875rem;
+  --bs-btn-border-radius: 0.625rem;
+}
+
+.btn-md {
+  /* Standard size - same as default btn */
+  --bs-btn-padding-y: 0.5rem;
+  --bs-btn-padding-x: 1rem;
+  --bs-btn-font-size: 1rem;
+  --bs-btn-border-radius: 0.75rem;
+}
+
+.btn-lg {
+  /* Bootstrap default: 0.75rem 1.5rem */
+  --bs-btn-padding-y: 0.75rem;
+  --bs-btn-padding-x: 1.5rem;
+  --bs-btn-font-size: 1.125rem;
+  --bs-btn-border-radius: 0.875rem;
+}
+
+/* ==========================================================================
+   LIGHT COLOR VARIANTS
+   Using colors.css variables with Bootstrap's system
+   ========================================================================== */
+
+/* Primary Light */
+.btn-primary-light {
+  --bs-btn-bg: var(--primary-light);
+  --bs-btn-border-color: var(--primary);
+  --bs-btn-color: var(--primary-dark);
+  --bs-btn-hover-bg: var(--primary);
+  --bs-btn-hover-border-color: var(--primary-dark);
+  --bs-btn-hover-color: white;
+  --bs-btn-active-bg: var(--primary-medium);
+  --bs-btn-active-border-color: var(--primary-dark);
+  --bs-btn-active-color: white;
+  --bs-btn-focus-shadow-rgb: 115, 146, 226;
+}
+
+/* Secondary Light */
+.btn-secondary-light {
+  --bs-btn-bg: var(--secondary-light);
+  --bs-btn-border-color: var(--secondary);
+  --bs-btn-color: var(--secondary-dark);
+  --bs-btn-hover-bg: var(--secondary);
+  --bs-btn-hover-border-color: var(--secondary-dark);
+  --bs-btn-hover-color: white;
+  --bs-btn-active-bg: var(--secondary-medium);
+  --bs-btn-active-border-color: var(--secondary-dark);
+  --bs-btn-active-color: white;
+  --bs-btn-focus-shadow-rgb: 160, 123, 227;
+}
+
+/* Success Light */
+.btn-success-light {
+  --bs-btn-bg: var(--success-light);
+  --bs-btn-border-color: var(--success);
+  --bs-btn-color: var(--success-dark);
+  --bs-btn-hover-bg: var(--success);
+  --bs-btn-hover-border-color: var(--success-dark);
+  --bs-btn-hover-color: white;
+  --bs-btn-active-bg: var(--success-medium);
+  --bs-btn-active-border-color: var(--success-dark);
+  --bs-btn-active-color: white;
+  --bs-btn-focus-shadow-rgb: 94, 180, 136;
+}
+
+/* Info Light */
+.btn-info-light {
+  --bs-btn-bg: var(--info-light);
+  --bs-btn-border-color: var(--info);
+  --bs-btn-color: var(--info-dark);
+  --bs-btn-hover-bg: var(--info);
+  --bs-btn-hover-border-color: var(--info-dark);
+  --bs-btn-hover-color: white;
+  --bs-btn-active-bg: var(--info-medium);
+  --bs-btn-active-border-color: var(--info-dark);
+  --bs-btn-active-color: white;
+  --bs-btn-focus-shadow-rgb: 127, 89, 139;
+}
+
+/* Error Light */
+.btn-error-light {
+  --bs-btn-bg: var(--error-light);
+  --bs-btn-border-color: var(--error);
+  --bs-btn-color: var(--error-dark);
+  --bs-btn-hover-bg: var(--error);
+  --bs-btn-hover-border-color: var(--error-dark);
+  --bs-btn-hover-color: white;
+  --bs-btn-active-bg: var(--error-medium);
+  --bs-btn-active-border-color: var(--error-dark);
+  --bs-btn-active-color: white;
+  --bs-btn-focus-shadow-rgb: 229, 57, 53;
+}
+
+/* ==========================================================================
+   ICON BUTTON UTILITIES
+   For buttons with icons - handles spacing and alignment
+   ========================================================================== */
+
+.btn-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-with-icon-xs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.btn-with-icon-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.btn-with-icon-lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Icon only buttons (square) */
+.btn-icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  padding: 0.5rem;
+}
+
+.btn-icon-only.btn-xs {
+  padding: 0.25rem;
+}
+
+.btn-icon-only.btn-sm {
+  padding: 0.375rem;
+}
+
+.btn-icon-only.btn-lg {
+  padding: 0.75rem;
+}
+
+/* ==========================================================================
+   SPECIAL BUTTON STATES
+   Dynamic states and loading indicators
+   ========================================================================== */
+
+/* Loading Button */
+.btn-loading {
+  position: relative;
+  pointer-events: none;
+  color: transparent !important;
+}
+
+.btn-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: btn-spin 0.8s linear infinite;
+}
+
+@keyframes btn-spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* Dynamic Danger Button (for delete operations) */
+.btn-dynamic-danger {
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-dynamic-danger.has-items {
+  --bs-btn-bg: var(--error);
+  --bs-btn-border-color: var(--error);
+  --bs-btn-color: white;
+  --bs-btn-hover-bg: var(--error-dark);
+  --bs-btn-hover-border-color: var(--error-dark);
+  --bs-btn-hover-color: white;
+}
+
+.btn-dynamic-danger.no-items {
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: var(--neutral-medium);
+  --bs-btn-color: var(--tertiary-medium);
+  --bs-btn-hover-bg: var(--neutral-light);
+  --bs-btn-hover-border-color: var(--neutral-medium);
+  --bs-btn-hover-color: var(--tertiary-medium);
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   BUTTON GROUPS & COMBINATIONS
+   For grouped buttons and toolbars
+   ========================================================================== */
+
+.btn-group-uniform .btn {
+  min-width: 120px;
+  justify-content: center;
+}
+
+.btn-group-uniform.btn-group-sm .btn {
+  min-width: 100px;
+}
+
+.btn-group-uniform.btn-group-lg .btn {
+  min-width: 140px;
+}
+
+/* Toolbar spacing */
+.btn-toolbar-spaced {
+  gap: 0.5rem;
+}
+
+.btn-toolbar-spaced .btn-group {
+  gap: 0.25rem;
+}
+
+/* ==========================================================================
+   RESPONSIVE BUTTON ADJUSTMENTS
+   Mobile-friendly button sizes and spacing
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .btn-responsive {
+    --bs-btn-padding-y: 0.5rem;
+    --bs-btn-padding-x: 0.75rem;
+    --bs-btn-font-size: 0.875rem;
+  }
+  
+  .btn-with-icon {
+    gap: 0.375rem;
+  }
+  
+  .btn-group-uniform .btn {
+    min-width: 80px;
+  }
+  
+  .btn-toolbar-spaced {
+    gap: 0.25rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .btn-mobile-full {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .btn-mobile-stack .btn {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+  
+  .btn-mobile-stack .btn:last-child {
+    margin-bottom: 0;
+  }
+}
+
+/* ==========================================================================
+   ACCESSIBILITY ENHANCEMENTS
+   Better focus states and high contrast support
+   ========================================================================== */
+
+.btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.btn-with-icon:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .btn-primary-light,
+  .btn-secondary-light,
+  .btn-success-light,
+  .btn-info-light,
+  .btn-error-light {
+    --bs-btn-border-width: 2px;
+  }
+}
+
+/* ==========================================================================
+   UTILITY CLASSES
+   Additional helper classes for common patterns
+   ========================================================================== */
+
+/* Shadow variants */
+.btn-shadow-sm {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.btn-shadow {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.btn-shadow-lg {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Remove shadows on hover for flat design */
+.btn-flat:hover {
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* Rounded variants */
+.btn-rounded {
+  border-radius: 1.5rem !important;
+}
+
+.btn-pill {
+  border-radius: 50rem !important;
+}
+
+/* Text transform utilities */
+.btn-uppercase {
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.btn-capitalize {
+  text-transform: capitalize;
+}
