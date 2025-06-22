@@ -138,13 +138,15 @@ import productsApiService from '@/services/apiProducts.js';
 import ProductOverview from '@/components/products/ProductOverview.vue';
 import AddProductModal from '@/components/products/AddProductModal.vue';
 import StockUpdateModal from '@/components/products/StockUpdateModal.vue';
+import CardTemplate from '@/components/common/CardTemplate.vue'
 
 export default {
   name: 'ProductDetails',
   components: {
     ProductOverview,
     AddProductModal,
-    StockUpdateModal
+    StockUpdateModal,
+    CardTemplate
   },
   props: {
     id: {

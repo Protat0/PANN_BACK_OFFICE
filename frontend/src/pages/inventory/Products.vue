@@ -1,18 +1,18 @@
 <template>
-  <div class="container-fluid py-4 products-page">
+  <div class="container-fluid pt-2 pb-4 products-page">
     <!-- Header Section -->
-    <div class="d-flex justify-content-between align-items-center mb-4 page-header">
-      <h1 class="h2 fw-semibold text-primary-dark mb-0">Product Management</h1>
+    <div class="d-flex justify-content-between align-items-center mb-3 page-header">
+      <h1 class="h3 fw-semibold text-primary-dark mb-0">Product Management</h1>
       <div class="d-flex gap-2 flex-wrap">
         <!-- Add Products Dropdown -->
         <div class="dropdown" ref="addDropdown">
           <button 
-            class="btn btn-success-light btn-with-icon dropdown-toggle" 
+            class="btn btn-add btn-sm btn-with-icon-sm dropdown-toggle"
             type="button"
             @click="toggleAddDropdown"
             :class="{ 'active': showAddDropdown }"
           >
-            <Plus :size="16" />
+            <Plus :size="14" />
             Add Products
           </button>
           
@@ -22,7 +22,7 @@
           >
             <button class="dropdown-item custom-dropdown-item" @click="handleSingleProduct">
               <div class="d-flex align-items-center gap-3">
-                <Plus :size="18" class="text-primary" />
+                <Plus :size="16" class="text-primary" />
                 <div>
                   <div class="fw-semibold">Single Product</div>
                   <small class="text-muted">Add one product manually</small>
@@ -32,7 +32,7 @@
             
             <button class="dropdown-item custom-dropdown-item" @click="handleBulkAdd">
               <div class="d-flex align-items-center gap-3">
-                <Package :size="18" class="text-primary" />
+                <Package :size="16" class="text-primary" />
                 <div>
                   <div class="fw-semibold">Bulk Entry</div>
                   <small class="text-muted">Add multiple products (5-20 items)</small>
@@ -42,7 +42,7 @@
             
             <button class="dropdown-item custom-dropdown-item" @click="handleImport">
               <div class="d-flex align-items-center gap-3">
-                <FileText :size="18" class="text-primary" />
+                <FileText :size="16" class="text-primary" />
                 <div>
                   <div class="fw-semibold">Import File</div>
                   <small class="text-muted">Upload CSV/Excel (20+ items)</small>
@@ -53,43 +53,70 @@
         </div>
         
         <button 
-          class="btn btn-primary-light btn-with-icon"
+          class="btn btn-export btn-sm btn-with-icon-sm"
           @click="exportData"
         >
-          <Download :size="16" />
+          <Download :size="14" />
           Export
         </button>
+        
         <button 
-          class="btn btn-info-light btn-with-icon"
+          class="btn btn-refresh btn-sm btn-with-icon-sm"
           @click="refreshData" 
           :disabled="loading"
           :class="{ 'btn-loading': loading }"
         >
-          <RefreshCw :size="16" :class="{ 'spin': loading }" />
+          <RefreshCw :size="14" :class="{ 'spin': loading }" />
           {{ loading ? 'Loading...' : 'Refresh' }}
         </button>
       </div>
     </div>
 
     <!-- Reports Section -->
-    <div class="row mb-4" v-if="!loading">
-      <div class="col-md-6 col-lg-3 mb-3">
-        <div class="card border-start border-danger border-4 h-100 report-card" @click="showLowStockReport">
-          <div class="card-body">
-            <h6 class="card-title text-tertiary-dark mb-2">Low Stock Alert</h6>
-            <h2 class="text-danger fw-bold mb-1">{{ lowStockCount }}</h2>
-            <small class="text-tertiary-medium">Items Below Threshold</small>
-          </div>
-        </div>
+    <div class="row mb-3" v-if="!loading">
+      <div class="col-6 col-md-3 mb-2">
+        <CardTemplate
+          size="sm"
+          border-color="danger"
+          border-position="start"
+          title="Low Stock"
+          :value="lowStockCount"
+          subtitle="Critical Items"
+          clickable
+          @click="showLowStockReport"
+        />
       </div>
-      <div class="col-md-6 col-lg-3 mb-3">
-        <div class="card border-start border-info border-4 h-100 report-card" @click="showExpiringReport">
-          <div class="card-body">
-            <h6 class="card-title text-tertiary-dark mb-2">Expiring Soon</h6>
-            <h2 class="text-info fw-bold mb-1">{{ expiringCount }}</h2>
-            <small class="text-tertiary-medium">Items Expiring in 30 Days</small>
-          </div>
-        </div>
+      <div class="col-6 col-md-3 mb-2">
+        <CardTemplate
+          size="sm"
+          border-color="info"
+          border-position="start"
+          title="Expiring"
+          :value="expiringCount"
+          subtitle="30 Days"
+          clickable
+          @click="showExpiringReport"
+        />
+      </div>
+      <div class="col-6 col-md-3 mb-2">
+        <CardTemplate
+          size="sm"
+          border-color="success"
+          border-position="start"
+          title="Total"
+          :value="products.length"
+          subtitle="Products"
+        />
+      </div>
+      <div class="col-6 col-md-3 mb-2">
+        <CardTemplate
+          size="sm"
+          border-color="primary"
+          border-position="start"
+          title="Categories"
+          value="3"
+          subtitle="Active"
+        />
       </div>
     </div>
 
@@ -167,14 +194,14 @@
         <div class="d-flex justify-content-between align-items-center">
           <div class="d-flex align-items-center gap-3">
             <button 
-              class="btn btn-sm btn-info-light btn-with-icon-sm" 
+              class="btn btn-filter btn-with-icon-sm"
               @click="showColumnFilter"
             >
               <Columns :size="16" />
               Customize Columns
             </button>
             <button 
-              class="btn btn-sm btn-with-icon-sm btn-dynamic-danger"
+              class="btn btn-sm btn-delete-dynamic btn-with-icon-sm"
               @click="deleteSelected" 
               :disabled="selectedProducts.length === 0 || loading"
               :class="selectedProducts.length > 0 ? 'has-items' : 'no-items'"
@@ -333,7 +360,7 @@
           </p>
           <button 
             v-if="products.length === 0" 
-            class="btn btn-primary-light btn-with-icon" 
+            class="btn btn-primary-medium btn-with-icon" 
             @click="handleSingleProduct"
           >
             <Plus :size="16" />
@@ -341,7 +368,7 @@
           </button>
           <button 
             v-else 
-            class="btn btn-secondary-light btn-with-icon" 
+            class="btn btn-secondary-medium btn-with-icon"
             @click="clearFilters"
           >
             <RefreshCw :size="16" />
@@ -353,27 +380,17 @@
 
     <!-- Modular Components -->
     <AddProductModal
-      :show="showModal"
-      :product="isEditMode ? selectedProduct : null"
-      :loading="formLoading"
-      :error="formError"
-      @close="closeModal"
-      @submit="saveProduct"
+      ref="addProductModal"
+      @success="handleProductSuccess"
     />
 
     <StockUpdateModal
-      :show="showStockModal"
-      :product="stockProduct"
-      :loading="stockFormLoading"
-      :error="stockFormError"
-      @close="closeStockModal"
-      @submit="saveStockUpdate"
+      ref="stockUpdateModal"
+      @success="handleStockUpdateSuccess"
     />
 
     <ViewProductModal
-      :show="showViewModal"
-      :product="selectedProduct"
-      @close="closeViewModal"
+      ref="viewProductModal"
       @edit="editProduct"
       @restock="restockProduct"
       @toggle-status="toggleProductStatus"
@@ -381,14 +398,7 @@
     />
 
     <ReportsModal
-      :show="showReportsModal"
-      :type="reportType"
-      :title="reportTitle"
-      :data="reportData"
-      :loading="reportsLoading"
-      @close="closeReportsModal"
-      @export="exportReportData"
-      @refresh="refreshReport"
+      ref="reportsModal"
       @view-product="viewProduct"
       @edit-product="editProduct"
       @restock-product="restockProduct"
@@ -411,6 +421,7 @@ import ViewProductModal from '../../components/products/ViewProductModal.vue'
 import ReportsModal from '../../components/products/ReportsModal.vue'
 import ColumnFilterModal from '../../components/products/ColumnFilterModal.vue'
 import DataTable from '@/components/common/TableTemplate.vue'
+import CardTemplate from '@/components/common/CardTemplate.vue'
 import { 
   Plus, 
   Download, 
@@ -437,6 +448,7 @@ export default {
     ColumnFilterModal,
     ReportsModal,
     DataTable,
+    CardTemplate,
     Plus,
     Download,
     RefreshCw,
@@ -467,11 +479,6 @@ export default {
       // Report data
       lowStockCount: 0,
       expiringCount: 0,
-      reportData: [],
-      reportType: '',
-      reportTitle: '',
-      showReportsModal: false,
-      reportsLoading: false,
       
       // Filters
       categoryFilter: 'all',
@@ -479,21 +486,7 @@ export default {
       stockFilter: 'all',
       searchFilter: '',
       
-      // Modal states
-      showModal: false,
-      showViewModal: false,
-      showStockModal: false,
-      isEditMode: false,
-      formLoading: false,
-      formError: null,
-      selectedProduct: null,
-      
-      // Stock update form
-      stockProduct: null,
-      stockFormLoading: false,
-      stockFormError: null,
-
-      // Column Filter Modal
+      // Column Filter
       showColumnFilterModal: false,
       columnVisibility: {
         id: false,
@@ -604,48 +597,22 @@ export default {
     },
 
     async showLowStockReport() {
-      this.reportsLoading = true
-      try {
-        this.reportData = await productsApiService.getLowStockProducts()
-        this.reportType = 'low-stock'
-        this.reportTitle = 'Low Stock Report'
-        this.showReportsModal = true
-      } catch (error) {
-        console.error('Error fetching low stock report:', error)
-        this.error = `Failed to load low stock report: ${error.message}`
-      } finally {
-        this.reportsLoading = false
+      // ReportsModal exposes showLowStockModal method
+      if (this.$refs.reportsModal && this.$refs.reportsModal.showLowStockModal) {
+        await this.$refs.reportsModal.showLowStockModal()
       }
     },
 
     async showExpiringReport() {
-      this.reportsLoading = true
-      try {
-        this.reportData = await productsApiService.getExpiringProducts({ days_ahead: 30 })
-        this.reportType = 'expiring'
-        this.reportTitle = 'Products Expiring in 30 Days'
-        this.showReportsModal = true
-      } catch (error) {
-        console.error('Error fetching expiring products report:', error)
-        this.error = `Failed to load expiring products report: ${error.message}`
-      } finally {
-        this.reportsLoading = false
+      // ReportsModal exposes showExpiringModal method
+      if (this.$refs.reportsModal && this.$refs.reportsModal.showExpiringModal) {
+        await this.$refs.reportsModal.showExpiringModal()
       }
     },
 
-    closeReportsModal() {
-      this.showReportsModal = false
-      this.reportData = []
-      this.reportType = ''
-      this.reportTitle = ''
-      this.reportsLoading = false
-    },
-
     async refreshReport() {
-      if (this.reportType === 'low-stock') {
-        await this.showLowStockReport()
-      } else if (this.reportType === 'expiring') {
-        await this.showExpiringReport()
+      if (this.$refs.reportsModal && this.$refs.reportsModal.refreshReportData) {
+        await this.$refs.reportsModal.refreshReportData()
       }
     },
 
@@ -809,107 +776,32 @@ export default {
     },
 
     showAddProductModal() {
-      this.isEditMode = false
-      this.selectedProduct = null
-      this.formError = null
-      this.showModal = true
-    },
-
-    editProduct(product) {
-      this.isEditMode = true
-      this.selectedProduct = product
-      this.formError = null
-      this.showViewModal = false
-      this.showModal = true
-    },
-
-    viewProduct(product) {
-      this.selectedProduct = product
-      this.showViewModal = true
-    },
-
-    restockProduct(product) {
-      this.stockProduct = product
-      this.stockFormError = null
-      this.showStockModal = true
-    },
-
-    closeStockModal() {
-      this.showStockModal = false
-      this.stockProduct = null
-      this.stockFormError = null
-    },
-
-    async saveStockUpdate(stockData) {
-      this.stockFormLoading = true
-      this.stockFormError = null
-
-      try {
-        await productsApiService.updateProductStock(this.stockProduct._id, stockData)
-        
-        const operation = stockData.operation_type
-        const quantity = stockData.quantity
-        let message = ''
-        
-        if (operation === 'add') {
-          message = `Added ${quantity} units to "${this.stockProduct.product_name}"`
-        } else if (operation === 'remove') {
-          message = `Removed ${quantity} units from "${this.stockProduct.product_name}"`
-        } else {
-          message = `Set stock to ${quantity} units for "${this.stockProduct.product_name}"`
-        }
-        
-        this.successMessage = message
-        this.closeStockModal()
-        await this.fetchProducts()
-        
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
-      } catch (error) {
-        console.error('Error updating stock:', error)
-        this.stockFormError = error.message
-      } finally {
-        this.stockFormLoading = false
+      if (this.$refs.addProductModal && this.$refs.addProductModal.openAdd) {
+        this.$refs.addProductModal.openAdd()
       }
     },
 
-    closeModal() {
-      this.showModal = false
-      this.isEditMode = false
-      this.selectedProduct = null
-      this.formError = null
+    editProduct(product) {
+      // Close view modal if it's open
+      if (this.$refs.viewProductModal && this.$refs.viewProductModal.close) {
+        this.$refs.viewProductModal.close()
+      }
+      // Open edit modal
+      if (this.$refs.addProductModal && this.$refs.addProductModal.openEdit) {
+        this.$refs.addProductModal.openEdit(product)
+      }
     },
 
-    closeViewModal() {
-      this.showViewModal = false
-      this.selectedProduct = null
+    viewProduct(product) {
+      if (this.$refs.viewProductModal && this.$refs.viewProductModal.open) {
+        this.$refs.viewProductModal.open(product)
+      }
     },
 
-    async saveProduct(productData) {
-      this.formLoading = true
-      this.formError = null
-
-      try {
-        if (this.isEditMode) {
-          await productsApiService.updateProduct(this.selectedProduct._id, productData)
-          this.successMessage = `Product "${productData.product_name}" updated successfully`
-        } else {
-          await productsApiService.createProduct(productData)
-          this.successMessage = `Product "${productData.product_name}" created successfully`
-        }
-
-        this.closeModal()
-        await this.fetchProducts()
-        
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
-      } catch (error) {
-        console.error('Error saving product:', error)
-        this.formError = error.message
-      } finally {
-        this.formLoading = false
+    restockProduct(product) {
+      // StockUpdateModal exposes openStock method
+      if (this.$refs.stockUpdateModal && this.$refs.stockUpdateModal.openStock) {
+        this.$refs.stockUpdateModal.openStock(product)
       }
     },
 
@@ -926,6 +818,24 @@ export default {
         console.error('Error generating barcode:', error)
         this.error = `Failed to generate barcode: ${error.message}`
       }
+    },
+
+    handleProductSuccess(result) {
+      this.successMessage = result.message
+      this.fetchProducts()
+      
+      setTimeout(() => {
+        this.successMessage = null
+      }, 3000)
+    },
+
+    handleStockUpdateSuccess(result) {
+      this.successMessage = result.message
+      this.fetchProducts()
+      
+      setTimeout(() => {
+        this.successMessage = null
+      }, 3000)
     },
 
     async exportData() {
@@ -975,6 +885,7 @@ export default {
     },
 
     showColumnFilter() {
+      // ColumnFilterModal still uses the old pattern with props
       this.showColumnFilterModal = true
     },
     
@@ -986,6 +897,7 @@ export default {
       this.columnVisibility = { ...newColumnVisibility }
       localStorage.setItem('products-column-visibility', JSON.stringify(this.columnVisibility))
       this.successMessage = 'Column visibility updated successfully'
+      this.showColumnFilterModal = false
       setTimeout(() => {
         this.successMessage = null
       }, 2000)
@@ -1165,17 +1077,6 @@ export default {
 
 .custom-dropdown-item:hover {
   background-color: var(--primary-light);
-}
-
-/* Report cards hover effect */
-.report-card {
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.report-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15);
 }
 
 /* Custom color classes using colors.css variables */
