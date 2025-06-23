@@ -1,8 +1,39 @@
 <template>
   <div class="customers-page">
+    <!-- KPI Cards Row -->
+    <div class="kpi-cards-container">
+      <KpiCard
+        title="Active Users"
+        :value="activeUsersCount"
+        subtitle="Total Active Users"
+        change=""
+        change-type="positive"
+        variant=""
+        class="kpi-card"
+      />
+      <KpiCard
+        title="Monthly New Users"
+        :value="monthlyUsersCount"
+        subtitle="This month's new users"
+        change=""
+        change-type="positive"
+        variant=""
+        class="kpi-card"
+      />
+      <KpiCard
+        title="Daily Customer Logins"
+        :value="dailyUsersCount"
+        subtitle="Last 24 hours"
+        change=""
+        change-type="positive"
+        variant=""
+        class="kpi-card"
+      />
+    </div>
+
     <!-- Header Section -->
     <div class="page-header">
-      <!-- Search Bar replacing the title -->
+      <!-- Search Bar -->
       <div class="search-section">
         <div class="search-container">
           <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -30,6 +61,7 @@
         </div>
       </div>
       
+      <!-- Action Buttons -->
       <div class="header-actions">
         <button 
           class="btn btn-secondary" 
@@ -155,6 +187,17 @@
         <h2>{{ isEditMode ? 'Edit Customer' : 'Add New Customer' }}</h2>
         
         <form @submit.prevent="saveCustomer" class="customer-form">
+          <div class="form-group">
+            <label for="username">Username:</label>
+            <input 
+              id="username"
+              v-model="customerForm.username" 
+              type="text" 
+              required 
+              :disabled="formLoading"
+            />
+          </div>
+          
           <div class="form-group">
             <label for="full_name">Full Name:</label>
             <input 
@@ -290,9 +333,15 @@
 
 <script>
 import apiService from '../services/api.js'
+import KpiCard from '../components/dashboard/KpiCard.vue'
+import CustomerApiService from '../services/apiCustomers.js'
+
 
 export default {
   name: 'CustomersPage',
+  components: {
+    KpiCard,
+  },
   data() {
     return {
       customers: [],
@@ -311,8 +360,14 @@ export default {
       formError: null,
       selectedCustomer: null,
       
+      //KPI CARDS
+      activeUsersCount: 'Loading...',
+      monthlyUsersCount: 'Loading...',
+      dailyUsersCount: 'Loading...',
+
       // Customer form data
       customerForm: {
+        username: '',
         full_name: '',
         email: '',
         phone: '',
@@ -462,6 +517,7 @@ export default {
     showAddCustomerModal() {
       this.isEditMode = false
       this.customerForm = {
+        username: '',
         full_name: '',
         email: '',
         phone: '',
@@ -480,6 +536,7 @@ export default {
       this.isEditMode = true
       this.selectedCustomer = customer
       this.customerForm = {
+        username: customer.username || '',
         full_name: customer.full_name || '',
         email: customer.email || '',
         phone: customer.phone || '',
@@ -591,18 +648,52 @@ export default {
   },
 
   async mounted() {
-  console.log('Customers component mounted')
-  
-  // Force scroll to top immediately
-  window.scrollTo(0, 0)
-  
-  await this.fetchCustomers()
-  
-  // Ensure we're at top after data loads
-  this.$nextTick(() => {
+    console.log('Customers component mounted')
+    
+    // Handle Active Users
+    try {
+      const result = await CustomerApiService.ActiveUser()
+      console.log('Active API response:', result)
+      console.log('Active API response stringified:', JSON.stringify(result))
+      this.activeUsersCount = result.active_customers.toString()
+    } catch (error) {
+      console.error('Failed to load active users:', error)
+      this.activeUsersCount = 'Error'
+    }
+
+    // Handle Monthly Users  
+    try {
+      const monthlyResult = await CustomerApiService.MonthlyUser()
+      console.log('Monthly API response:', monthlyResult)
+      console.log('Monthly API response stringified:', JSON.stringify(monthlyResult))
+      this.monthlyUsersCount = monthlyResult.monthly_customers.toString()
+    } catch (error) {
+      console.error('Failed to load monthly users:', error)
+      this.monthlyUsersCount = 'Error'
+    }
+
+    // Handle Daily Users
+    try {
+      const dailyResult = await CustomerApiService.DailyUser()
+      console.log('Daily API response:', dailyResult)
+      console.log('Daily API response stringified:', JSON.stringify(dailyResult))
+      this.dailyUsersCount = dailyResult.daily_customers.toString()
+    } catch (error) {
+      console.error('Failed to load daily users:', error)
+      this.dailyUsersCount = 'Error' // ✅ Fixed this
+    }
+
+    // Force scroll to top immediately
     window.scrollTo(0, 0)
-  })
+    
+    await this.fetchCustomers()
+    
+    // Ensure we're at top after data loads
+    this.$nextTick(() => {
+      window.scrollTo(0, 0)
+    })
   }
+  
 }
 </script>
 
@@ -613,6 +704,26 @@ export default {
   margin: 0 auto;
   background-color: #f8fafc;
   min-height: 100vh;
+}
+
+/* KPI Cards Container */
+.kpi-cards-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.kpi-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.kpi-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
 }
 
 .page-header {
@@ -1061,6 +1172,12 @@ input[type="checkbox"] {
     padding: 1rem;
   }
   
+  .kpi-cards-container {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
   .table-container {
     overflow-x: auto;
   }
@@ -1081,6 +1198,11 @@ input[type="checkbox"] {
 }
 
 @media (max-width: 768px) {
+  .kpi-cards-container {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
   .page-header {
     flex-direction: column;
     gap: 1rem;
@@ -1129,6 +1251,28 @@ input[type="checkbox"] {
   }
 }
 
+@media (max-width: 640px) {
+  .kpi-cards-container {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .page-header {
+    gap: 0.75rem;
+  }
+
+  .header-actions {
+    grid-template-columns: repeat(2, 1fr);
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .btn {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+  }
+}
+
 @media (max-width: 480px) {
   .search-container {
     flex-direction: column;
@@ -1144,5 +1288,13 @@ input[type="checkbox"] {
   .search-input::placeholder {
     font-size: 0.875rem;
   }
-}
-</style>
+
+  .kpi-cards-container {
+    gap: 0.5rem;
+  }
+
+  .header-actions {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+}</style>
