@@ -4,29 +4,29 @@
     <div class="kpi-cards-container">
       <KpiCard
         title="Active Users"
-        value="₱78,452.23"
-        subtitle="From the last month"
-        change="+24%"
+        :value="activeUsersCount"
+        subtitle="Total Active Users"
+        change=""
         change-type="positive"
-        variant="profit"
+        variant=""
         class="kpi-card"
       />
       <KpiCard
         title="Monthly New Users"
-        value="1,247"
-        subtitle="Active customers"
-        change="+12%"
+        :value="monthlyUsersCount"
+        subtitle="This month's new users"
+        change=""
         change-type="positive"
-        variant="customers"
+        variant=""
         class="kpi-card"
       />
       <KpiCard
         title="Daily Customer Logins"
-        value="₱985.50"
-        subtitle="Last 30 days"
-        change="-3%"
-        change-type="negative"
-        variant="order"
+        :value="dailyUsersCount"
+        subtitle="Last 24 hours"
+        change=""
+        change-type="positive"
+        variant=""
         class="kpi-card"
       />
     </div>
@@ -188,6 +188,17 @@
         
         <form @submit.prevent="saveCustomer" class="customer-form">
           <div class="form-group">
+            <label for="username">Username:</label>
+            <input 
+              id="username"
+              v-model="customerForm.username" 
+              type="text" 
+              required 
+              :disabled="formLoading"
+            />
+          </div>
+          
+          <div class="form-group">
             <label for="full_name">Full Name:</label>
             <input 
               id="full_name"
@@ -323,6 +334,8 @@
 <script>
 import apiService from '../services/api.js'
 import KpiCard from '../components/dashboard/KpiCard.vue'
+import CustomerApiService from '../services/apiCustomers.js'
+
 
 export default {
   name: 'CustomersPage',
@@ -347,8 +360,14 @@ export default {
       formError: null,
       selectedCustomer: null,
       
+      //KPI CARDS
+      activeUsersCount: 'Loading...',
+      monthlyUsersCount: 'Loading...',
+      dailyUsersCount: 'Loading...',
+
       // Customer form data
       customerForm: {
+        username: '',
         full_name: '',
         email: '',
         phone: '',
@@ -498,6 +517,7 @@ export default {
     showAddCustomerModal() {
       this.isEditMode = false
       this.customerForm = {
+        username: '',
         full_name: '',
         email: '',
         phone: '',
@@ -516,6 +536,7 @@ export default {
       this.isEditMode = true
       this.selectedCustomer = customer
       this.customerForm = {
+        username: customer.username || '',
         full_name: customer.full_name || '',
         email: customer.email || '',
         phone: customer.phone || '',
@@ -629,6 +650,39 @@ export default {
   async mounted() {
     console.log('Customers component mounted')
     
+    // Handle Active Users
+    try {
+      const result = await CustomerApiService.ActiveUser()
+      console.log('Active API response:', result)
+      console.log('Active API response stringified:', JSON.stringify(result))
+      this.activeUsersCount = result.active_customers.toString()
+    } catch (error) {
+      console.error('Failed to load active users:', error)
+      this.activeUsersCount = 'Error'
+    }
+
+    // Handle Monthly Users  
+    try {
+      const monthlyResult = await CustomerApiService.MonthlyUser()
+      console.log('Monthly API response:', monthlyResult)
+      console.log('Monthly API response stringified:', JSON.stringify(monthlyResult))
+      this.monthlyUsersCount = monthlyResult.monthly_customers.toString()
+    } catch (error) {
+      console.error('Failed to load monthly users:', error)
+      this.monthlyUsersCount = 'Error'
+    }
+
+    // Handle Daily Users
+    try {
+      const dailyResult = await CustomerApiService.DailyUser()
+      console.log('Daily API response:', dailyResult)
+      console.log('Daily API response stringified:', JSON.stringify(dailyResult))
+      this.dailyUsersCount = dailyResult.daily_customers.toString()
+    } catch (error) {
+      console.error('Failed to load daily users:', error)
+      this.dailyUsersCount = 'Error' // ✅ Fixed this
+    }
+
     // Force scroll to top immediately
     window.scrollTo(0, 0)
     
@@ -639,6 +693,7 @@ export default {
       window.scrollTo(0, 0)
     })
   }
+  
 }
 </script>
 

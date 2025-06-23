@@ -9,6 +9,11 @@ import MainLayout from '../layouts/MainLayout.vue'
 import Dashboard from '../pages/Dashboard.vue'
 import Accounts from '../pages/Accounts.vue'
 import Customers from '../pages/Customers.vue'
+import Products from '@/pages/inventory/Products.vue'
+import ProductBulkEntry from '@/pages/inventory/ProductBulkEntry.vue'
+import ProductDetails from '@/pages/inventory/ProductDetails.vue'
+import SalesByItem from '@/pages/reports/SalesByItem.vue'
+import SalesByCategory from '@/pages/reports/SalesByCategory.vue'
 
 // Auth guard function
 function requireAuth(to, from, next) {
