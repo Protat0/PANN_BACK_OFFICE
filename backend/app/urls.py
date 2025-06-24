@@ -1,14 +1,44 @@
 from django.urls import path
-from .views import (
+
+from .kpi_views.session_views import (
+    # Session management views
+    SessionLogsView,
+    SystemStatusView,
+    SessionManagementView,
+    ActiveSessionsView,
+    UserSessionsView,
+    SessionStatisticsView,
+)
+
+from .kpi_views.user_views import (
     HealthCheckView, 
     UserListView, 
     UserDetailView, 
     UserByEmailView, 
     UserByUsernameView,
+)
+
+from .kpi_views.customer_views import (
     CustomerListView,
     CustomerDetailView,
-    
-    # Product views
+
+    #Customer KPI Views
+    ActiveCustomerKPIView,
+    MonthlyCustomerKPIView,
+    DailyCustomerKPIView,
+)
+
+from .kpi_views.authentication_views import (
+    # Authentication views
+    LoginView,
+    LogoutView,
+    RefreshTokenView,
+    CurrentUserView,
+    VerifyTokenView,
+)
+
+from .kpi_views.product_views import (
+   # Product views
     ProductListView,
     ProductDetailView,
     ProductBySkuView,
@@ -40,22 +70,22 @@ from .views import (
     ProductExportView,
     BulkCreateProductsView,
     ImportTemplateView,
-    
-    # Authentication views
-    LoginView,
-    LogoutView,
-    RefreshTokenView,
-    CurrentUserView,
-    VerifyTokenView,
-    
-    # Session management views
-    SessionLogsView,
-    SystemStatusView,
-    SessionManagementView,
-    ActiveSessionsView,
-    UserSessionsView,
-    SessionStatisticsView,
-    APIDocumentationView
+)
+
+from .kpi_views.category_views import (
+    CategoryDetailView,
+    CategoryKPIView,
+    CategorySubcategoryView,
+
+)
+
+from .kpi_views.saleslog_views import (
+    SalesLogView,
+    SalesLogStatsView
+)
+
+from .views import (
+    APIDocumentationView,
 )
 
 urlpatterns = [
@@ -126,6 +156,23 @@ urlpatterns = [
     path('sessions/active/', ActiveSessionsView.as_view(), name='active-sessions'),
     path('sessions/user/<str:user_id>/', UserSessionsView.as_view(), name='user-sessions'),
     path('sessions/statistics/', SessionStatisticsView.as_view(), name='session-statistics'),
+
+    # Customer KPI Views
+    path('customerkpi/', ActiveCustomerKPIView.as_view(), name="get-active-users"), #Gets Active Users
+    path('customerkpimonthly/', MonthlyCustomerKPIView.as_view(), name="get-monthly-users"),
+     path('customerkpidaily/', DailyCustomerKPIView.as_view(), name="get-daily-users"),
+
+    # Category endpoints
+    path('category/', CategoryKPIView.as_view(), name="category-operations"),  # GET all categories, POST create category
+    path('category/<str:category_id>/', CategoryDetailView.as_view(), name="category-detail"),  # GET, PUT, DELETE specific category
+    path('category/<str:category_id>/subcategories/', CategorySubcategoryView.as_view(), name="category-subcategories"),  # Manage subcategories
+
+    # Sales Log CRUD Operations
+    path('invoices/', SalesLogView.as_view(), name='invoice-list-create'),
+    path('invoices/<str:invoice_id>/', SalesLogView.as_view(), name='invoice-detail'),
+    
+    # Sales Log Statistics
+    path('invoices/stats/', SalesLogStatsView.as_view(), name='invoice-stats'),
 
     # API Documentation
     path('docs/', APIDocumentationView.as_view(), name='api-documentation'),

@@ -22,10 +22,8 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     'api',
-    # 'inventory',  # You'll add these as your POS grows
-    # 'sales',
-    # 'customers',
-    # 'reports',
+    'notifications',
+    'reports',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

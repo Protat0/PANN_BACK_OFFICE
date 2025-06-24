@@ -1,202 +1,213 @@
 <template>
-  <div v-if="show" class="modal-overlay" @click="handleOverlayClick">
-    <div class="modal-content" @click.stop>
-      <div class="modal-header">
-        <div class="header-info">
-          <h2>Column Visibility</h2>
-          <p class="header-subtitle">Customize which columns are visible in your table</p>
+  <div v-if="show" class="modal fade show d-block" tabindex="-1" @click="handleOverlayClick">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header bg-light">
+          <div>
+            <h5 class="modal-title text-primary-dark fw-semibold">Column Visibility</h5>
+            <p class="text-tertiary-medium small mb-0">Customize which columns are visible in your table</p>
+          </div>
+          <button type="button" class="btn-close" @click="$emit('close')"></button>
         </div>
-        <button class="close-btn" @click="$emit('close')">
-          ✕
-        </button>
-      </div>
 
-      <div class="modal-body">
-        <!-- Quick Actions -->
-        <div class="quick-actions">
-          <button @click="selectAll" class="btn btn-primary">
-            Show All
+        <div class="modal-body">
+          <!-- Quick Actions -->
+          <div class="d-flex gap-3 mb-4 pb-3 border-bottom">
+            <button @click="selectAll" class="btn btn-primary btn-md">
+              Show All
+            </button>
+            <button @click="selectNone" class="btn btn-secondary btn-md">
+              Hide All
+            </button>
+            <button @click="resetToDefault" class="btn btn-info btn-md">
+              Reset Default
+            </button>
+          </div>
+
+          <!-- Column Groups -->
+          <div class="column-groups">
+            <!-- Essential Columns (Always Required) -->
+            <div class="mb-4">
+              <h6 class="d-flex align-items-center gap-2 mb-3 text-tertiary-dark fw-semibold">
+                <svg class="text-primary" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                  <circle cx="12" cy="16" r="1"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                Essential Columns
+                <small class="text-tertiary-medium fw-normal ms-2">(Always visible)</small>
+              </h6>
+              <div class="row g-3">
+                <div 
+                  v-for="column in essentialColumns" 
+                  :key="column.key"
+                  class="col-12 col-md-6"
+                >
+                  <div class="card border-tertiary-medium bg-tertiary-light opacity-75">
+                    <div class="card-body p-3">
+                      <div class="form-check">
+                        <input 
+                          class="form-check-input" 
+                          type="checkbox" 
+                          :id="`col-${column.key}`"
+                          :checked="true"
+                          disabled
+                        />
+                        <label class="form-check-label d-flex flex-column" :for="`col-${column.key}`">
+                          <span class="fw-semibold text-tertiary-dark">{{ column.name }}</span>
+                          <small class="text-tertiary-medium">{{ column.description }}</small>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Basic Information -->
+            <div class="mb-4">
+              <h6 class="d-flex align-items-center gap-2 mb-3 text-tertiary-dark fw-semibold">
+                <svg class="text-primary" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14,2 14,8 20,8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                  <polyline points="10,9 9,9 8,9"/>
+                </svg>
+                Basic Information
+              </h6>
+              <div class="row g-3">
+                <div 
+                  v-for="column in basicColumns" 
+                  :key="column.key"
+                  class="col-12 col-md-6"
+                >
+                  <div class="card column-card" :class="{ 'border-primary bg-primary-light': visibleColumns[column.key] }">
+                    <div class="card-body p-3">
+                      <div class="form-check">
+                        <input 
+                          class="form-check-input" 
+                          type="checkbox" 
+                          :id="`col-${column.key}`"
+                          v-model="visibleColumns[column.key]"
+                          @change="updateColumnVisibility"
+                        />
+                        <label class="form-check-label d-flex flex-column" :for="`col-${column.key}`">
+                          <span class="fw-semibold text-tertiary-dark">{{ column.name }}</span>
+                          <small class="text-tertiary-medium">{{ column.description }}</small>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Financial Information -->
+            <div class="mb-4">
+              <h6 class="d-flex align-items-center gap-2 mb-3 text-tertiary-dark fw-semibold">
+                <svg class="text-primary" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="1" x2="12" y2="23"/>
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+                Financial Information
+              </h6>
+              <div class="row g-3">
+                <div 
+                  v-for="column in financialColumns" 
+                  :key="column.key"
+                  class="col-12 col-md-6"
+                >
+                  <div class="card column-card" :class="{ 'border-primary bg-primary-light': visibleColumns[column.key] }">
+                    <div class="card-body p-3">
+                      <div class="form-check">
+                        <input 
+                          class="form-check-input" 
+                          type="checkbox" 
+                          :id="`col-${column.key}`"
+                          v-model="visibleColumns[column.key]"
+                          @change="updateColumnVisibility"
+                        />
+                        <label class="form-check-label d-flex flex-column" :for="`col-${column.key}`">
+                          <span class="fw-semibold text-tertiary-dark">{{ column.name }}</span>
+                          <small class="text-tertiary-medium">{{ column.description }}</small>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Status & Dates -->
+            <div class="mb-4">
+              <h6 class="d-flex align-items-center gap-2 mb-3 text-tertiary-dark fw-semibold">
+                <svg class="text-primary" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                Status & Dates
+              </h6>
+              <div class="row g-3">
+                <div 
+                  v-for="column in statusColumns" 
+                  :key="column.key"
+                  class="col-12 col-md-6"
+                >
+                  <div class="card column-card" :class="{ 'border-primary bg-primary-light': visibleColumns[column.key] }">
+                    <div class="card-body p-3">
+                      <div class="form-check">
+                        <input 
+                          class="form-check-input" 
+                          type="checkbox" 
+                          :id="`col-${column.key}`"
+                          v-model="visibleColumns[column.key]"
+                          @change="updateColumnVisibility"
+                        />
+                        <label class="form-check-label d-flex flex-column" :for="`col-${column.key}`">
+                          <span class="fw-semibold text-tertiary-dark">{{ column.name }}</span>
+                          <small class="text-tertiary-medium">{{ column.description }}</small>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Summary -->
+          <div class="mt-4 pt-4 border-top">
+            <div class="card border-primary bg-primary-light">
+              <div class="card-body">
+                <h6 class="card-title text-primary-dark fw-semibold">Current Selection</h6>
+                <p class="text-primary-dark small mb-3">
+                  <strong>{{ visibleColumnCount }}</strong> of {{ totalColumns }} columns visible
+                </p>
+                <div class="d-flex flex-wrap gap-2">
+                  <span 
+                    v-for="columnKey in visibleColumnKeys" 
+                    :key="columnKey"
+                    class="badge bg-primary"
+                  >
+                    {{ getColumnName(columnKey) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer bg-light">
+          <button @click="cancelChanges" class="btn btn-secondary btn-md">
+            Cancel
           </button>
-          <button @click="selectNone" class="btn btn-secondary">
-            Hide All
-          </button>
-          <button @click="resetToDefault" class="btn btn-info">
-            Reset Default
+          <button @click="applyChanges" class="btn btn-primary btn-md">
+            Apply Changes
           </button>
         </div>
-
-        <!-- Column Groups -->
-        <div class="column-groups">
-          <!-- Essential Columns (Always Required) -->
-          <div class="column-group">
-            <h3 class="group-title">
-              <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                <circle cx="12" cy="16" r="1"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-              </svg>
-              Essential Columns
-              <small>(Always visible)</small>
-            </h3>
-            <div class="columns-grid">
-              <div 
-                v-for="column in essentialColumns" 
-                :key="column.key"
-                class="column-item essential"
-              >
-                <div class="column-checkbox">
-                  <input 
-                    type="checkbox" 
-                    :id="`col-${column.key}`"
-                    :checked="true"
-                    disabled
-                  />
-                  <label :for="`col-${column.key}`" class="column-label">
-                    <div class="column-info">
-                      <span class="column-name">{{ column.name }}</span>
-                      <span class="column-description">{{ column.description }}</span>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Basic Information -->
-          <div class="column-group">
-            <h3 class="group-title">
-              <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14,2 14,8 20,8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
-                <polyline points="10,9 9,9 8,9"/>
-              </svg>
-              Basic Information
-            </h3>
-            <div class="columns-grid">
-              <div 
-                v-for="column in basicColumns" 
-                :key="column.key"
-                class="column-item"
-                :class="{ active: visibleColumns[column.key] }"
-              >
-                <div class="column-checkbox">
-                  <input 
-                    type="checkbox" 
-                    :id="`col-${column.key}`"
-                    v-model="visibleColumns[column.key]"
-                    @change="updateColumnVisibility"
-                  />
-                  <label :for="`col-${column.key}`" class="column-label">
-                    <div class="column-info">
-                      <span class="column-name">{{ column.name }}</span>
-                      <span class="column-description">{{ column.description }}</span>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Financial Information -->
-          <div class="column-group">
-            <h3 class="group-title">
-              <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="12" y1="1" x2="12" y2="23"/>
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-              </svg>
-              Financial Information
-            </h3>
-            <div class="columns-grid">
-              <div 
-                v-for="column in financialColumns" 
-                :key="column.key"
-                class="column-item"
-                :class="{ active: visibleColumns[column.key] }"
-              >
-                <div class="column-checkbox">
-                  <input 
-                    type="checkbox" 
-                    :id="`col-${column.key}`"
-                    v-model="visibleColumns[column.key]"
-                    @change="updateColumnVisibility"
-                  />
-                  <label :for="`col-${column.key}`" class="column-label">
-                    <div class="column-info">
-                      <span class="column-name">{{ column.name }}</span>
-                      <span class="column-description">{{ column.description }}</span>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Status & Dates -->
-          <div class="column-group">
-            <h3 class="group-title">
-              <svg class="group-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                <line x1="16" y1="2" x2="16" y2="6"/>
-                <line x1="8" y1="2" x2="8" y2="6"/>
-                <line x1="3" y1="10" x2="21" y2="10"/>
-              </svg>
-              Status & Dates
-            </h3>
-            <div class="columns-grid">
-              <div 
-                v-for="column in statusColumns" 
-                :key="column.key"
-                class="column-item"
-                :class="{ active: visibleColumns[column.key] }"
-              >
-                <div class="column-checkbox">
-                  <input 
-                    type="checkbox" 
-                    :id="`col-${column.key}`"
-                    v-model="visibleColumns[column.key]"
-                    @change="updateColumnVisibility"
-                  />
-                  <label :for="`col-${column.key}`" class="column-label">
-                    <div class="column-info">
-                      <span class="column-name">{{ column.name }}</span>
-                      <span class="column-description">{{ column.description }}</span>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Summary -->
-        <div class="summary-section">
-          <div class="summary-card">
-            <h4>Current Selection</h4>
-            <p>
-              <strong>{{ visibleColumnCount }}</strong> of {{ totalColumns }} columns visible
-            </p>
-            <div class="visible-columns-list">
-              <span 
-                v-for="columnKey in visibleColumnKeys" 
-                :key="columnKey"
-                class="column-tag"
-              >
-                {{ getColumnName(columnKey) }}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="modal-footer">
-        <button @click="cancelChanges" class="btn btn-secondary">
-          Cancel
-        </button>
-        <button @click="applyChanges" class="btn btn-primary">
-          Apply Changes
-        </button>
       </div>
     </div>
   </div>
@@ -316,6 +327,10 @@ export default {
     show(newVal) {
       if (newVal) {
         this.initializeColumns()
+        // Add Bootstrap modal backdrop
+        document.body.classList.add('modal-open')
+      } else {
+        document.body.classList.remove('modal-open')
       }
     },
     currentVisibleColumns: {
@@ -328,8 +343,10 @@ export default {
     }
   },
   methods: {
-    handleOverlayClick() {
-      this.$emit('close')
+    handleOverlayClick(e) {
+      if (e.target.classList.contains('modal')) {
+        this.$emit('close')
+      }
     },
     
     initializeColumns() {
@@ -413,23 +430,153 @@ export default {
     if (this.handleEscape) {
       document.removeEventListener('keydown', this.handleEscape)
     }
+    // Clean up modal state
+    document.body.classList.remove('modal-open')
   }
 }
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+/* Override Bootstrap modal background */
+.modal {
   background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 2000;
+}
+
+/* Custom styles for color variables */
+.text-primary-dark {
+  color: var(--primary-dark) !important;
+}
+
+.text-tertiary-medium {
+  color: var(--tertiary-medium) !important;
+}
+
+.text-tertiary-dark {
+  color: var(--tertiary-dark) !important;
+}
+
+.bg-primary-light {
+  background-color: var(--primary-light) !important;
+}
+
+.bg-tertiary-light {
+  background-color: var(--tertiary-light) !important;
+}
+
+.border-primary {
+  border-color: var(--primary) !important;
+}
+
+.border-tertiary-medium {
+  border-color: var(--tertiary-medium) !important;
+}
+
+.text-primary {
+  color: var(--primary) !important;
+}
+
+.bg-primary {
+  background-color: var(--primary) !important;
+}
+
+/* Column card hover effects */
+.column-card {
+  background-color: var(--neutral-light);
+  border: 2px solid var(--neutral);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.column-card:hover {
+  border-color: var(--primary-light);
+  background-color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(115, 146, 226, 0.1);
+}
+
+/* Custom form check styling to match design */
+.form-check {
+  padding-left: 2rem;
+}
+
+.form-check-input {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: 0.125rem;
+  border-color: var(--neutral-dark);
+}
+
+.form-check-input:checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.form-check-input:focus {
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
+}
+
+.form-check-label {
+  cursor: pointer;
+}
+
+/* Badge customization */
+.badge {
+  font-weight: 500;
+  padding: 0.375rem 0.625rem;
+}
+
+/* Modal customizations */
+.modal-dialog {
+  max-width: 800px;
+}
+
+.modal-content {
+  border: none;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.modal-header,
+.modal-footer {
+  border-color: var(--neutral);
+}
+
+.modal-header {
+  background-color: var(--neutral-light);
+}
+
+.modal-footer {
+  background-color: var(--neutral-light);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .modal-dialog {
+    margin: 0.5rem;
+  }
+  
+  .btn {
+    width: 100%;
+  }
+  
+  .modal-footer {
+    flex-direction: column-reverse;
+    gap: 0.5rem;
+  }
+  
+  .d-flex.gap-3 {
+    flex-direction: column;
+  }
+}
+
+/* Animation for modal appearance */
+.modal.show {
   animation: fadeIn 0.3s ease;
+}
+
+.modal-dialog {
+  animation: slideIn 0.3s ease;
 }
 
 @keyframes fadeIn {
@@ -437,340 +584,14 @@ export default {
   to { opacity: 1; }
 }
 
-.modal-content {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  max-width: 800px;
-  width: 95%;
-  max-height: 90vh;
-  overflow: hidden;
-  animation: slideIn 0.3s ease;
-  display: flex;
-  flex-direction: column;
-}
-
 @keyframes slideIn {
   from { 
+    transform: translate(0, -20px) scale(0.95);
     opacity: 0;
-    transform: translateY(-20px) scale(0.95);
   }
   to { 
+    transform: translate(0, 0) scale(1);
     opacity: 1;
-    transform: translateY(0) scale(1);
   }
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 1.5rem 2rem;
-  border-bottom: 1px solid var(--neutral);
-  background: var(--neutral-light);
-  border-radius: 12px 12px 0 0;
-}
-
-.header-info h2 {
-  margin: 0 0 0.5rem 0;
-  color: var(--primary-dark);
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-
-.header-subtitle {
-  margin: 0;
-  color: var(--tertiary-medium);
-  font-size: 0.875rem;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: var(--tertiary-medium);
-  padding: 0.25rem;
-  border-radius: 0.375rem;
-  transition: all 0.2s ease;
-}
-
-.close-btn:hover {
-  background-color: var(--neutral-medium);
-  color: var(--tertiary-dark);
-}
-
-.modal-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 1.5rem 2rem;
-}
-
-.quick-actions {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--neutral);
-}
-
-.column-groups {
-  margin-bottom: 2rem;
-}
-
-.column-group {
-  margin-bottom: 2rem;
-}
-
-.group-title {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin: 0 0 1rem 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--tertiary-dark);
-}
-
-.group-title small {
-  font-size: 0.75rem;
-  color: var(--tertiary-medium);
-  font-weight: 400;
-  margin-left: 0.5rem;
-}
-
-.group-icon {
-  width: 18px;
-  height: 18px;
-  color: var(--primary);
-  stroke-width: 1.5;
-}
-
-.columns-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1rem;
-}
-
-.column-item {
-  background: var(--neutral-light);
-  border: 2px solid var(--neutral);
-  border-radius: 0.75rem;
-  padding: 1rem;
-  transition: all 0.2s ease;
-  cursor: pointer;
-}
-
-.column-item:hover {
-  border-color: var(--primary-light);
-  background: white;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(115, 146, 226, 0.1);
-}
-
-.column-item.active {
-  border-color: var(--primary);
-  background: var(--primary-light);
-}
-
-.column-item.essential {
-  border-color: var(--tertiary-medium);
-  background: var(--tertiary-light);
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.column-item.essential:hover {
-  transform: none;
-  box-shadow: none;
-}
-
-.column-checkbox {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-}
-
-.column-checkbox input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--primary);
-  cursor: pointer;
-  margin-top: 0.125rem;
-}
-
-.column-checkbox input[type="checkbox"]:disabled {
-  cursor: not-allowed;
-}
-
-.column-label {
-  display: flex;
-  align-items: flex-start;
-  cursor: pointer;
-  flex: 1;
-}
-
-.column-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.column-name {
-  font-weight: 600;
-  color: var(--tertiary-dark);
-  font-size: 0.9375rem;
-}
-
-.column-description {
-  font-size: 0.8125rem;
-  color: var(--tertiary-medium);
-  line-height: 1.4;
-}
-
-.summary-section {
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--neutral);
-}
-
-.summary-card {
-  background: var(--primary-light);
-  border: 1px solid var(--primary);
-  border-radius: 0.75rem;
-  padding: 1.5rem;
-}
-
-.summary-card h4 {
-  margin: 0 0 0.5rem 0;
-  color: var(--primary-dark);
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.summary-card p {
-  margin: 0 0 1rem 0;
-  color: var(--primary-dark);
-  font-size: 0.875rem;
-}
-
-.visible-columns-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.column-tag {
-  background: var(--primary);
-  color: white;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.375rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-.modal-footer {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-  padding: 1.5rem 2rem;
-  border-top: 1px solid var(--neutral);
-  background: var(--neutral-light);
-  border-radius: 0 0 12px 12px;
-}
-
-.btn {
-  padding: 0.75rem 1.5rem;
-  border-radius: 0.5rem;
-  border: none;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.875rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.btn-primary {
-  background-color: var(--primary);
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: var(--primary-dark);
-  transform: translateY(-1px);
-}
-
-.btn-secondary {
-  background-color: var(--neutral-medium);
-  color: var(--tertiary-dark);
-  border: 1px solid var(--neutral-dark);
-}
-
-.btn-secondary:hover {
-  background-color: var(--neutral-dark);
-}
-
-.btn-info {
-  background-color: var(--info);
-  color: white;
-}
-
-.btn-info:hover {
-  background-color: var(--info-dark);
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  .modal-content {
-    margin: 1rem;
-    max-height: calc(100vh - 2rem);
-  }
-
-  .modal-header {
-    padding: 1rem 1.5rem;
-  }
-
-  .modal-body {
-    padding: 1rem 1.5rem;
-  }
-
-  .quick-actions {
-    flex-direction: column;
-  }
-
-  .columns-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .modal-footer {
-    padding: 1rem 1.5rem;
-    flex-direction: column-reverse;
-  }
-
-  .btn {
-    width: 100%;
-    justify-content: center;
-  }
-}
-
-/* Custom scrollbar */
-.modal-body::-webkit-scrollbar {
-  width: 8px;
-}
-
-.modal-body::-webkit-scrollbar-track {
-  background: var(--neutral-light);
-  border-radius: 4px;
-}
-
-.modal-body::-webkit-scrollbar-thumb {
-  background: var(--neutral-medium);
-  border-radius: 4px;
-}
-
-.modal-body::-webkit-scrollbar-thumb:hover {
-  background: var(--neutral-dark);
 }
 </style>

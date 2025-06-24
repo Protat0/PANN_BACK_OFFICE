@@ -6,9 +6,10 @@ import bcrypt
 
 class CustomerService:
     def __init__(self):
-        self.db = db_manager.get_database()  # ✅ Get database connection
-        self.customer_collection = self.db.customers  # ✅ Use cloud database
-        self.user_collection = self.db.users  # ✅ Use cloud database
+        self.db = db_manager.get_database()  
+        self.customer_collection = self.db.customers  
+        self.user_collection = self.db.users 
+        self.session_logs = self.db.session_logs
     
     def convert_object_id(self, document):
         """Convert ObjectId to string for JSON serialization"""
@@ -25,6 +26,9 @@ class CustomerService:
     def create_customer(self, customer_data):
         """Create a new customer in both users and customers collections"""
         try:
+            # Import notification service
+            from notifications.services import notification_service
+            
             # Extract user-related data
             user_data = {
                 "username": customer_data.get("username", customer_data.get("email")),
@@ -61,6 +65,29 @@ class CustomerService:
             # Insert into customers collection
             self.customer_collection.insert_one(customer_specific_data)
             
+            # Create general notification for new customer registration
+            try:
+                customer_name = customer_data.get("full_name", customer_data.get("email", "New Customer"))
+                
+                notification_service.create_notification(
+                    title="New Customer Registration",
+                    message=f"A new customer '{customer_name}' has registered in the system",
+                    priority="low",
+                    notification_type="system",
+                    metadata={
+                        "customer_id": str(user_id),
+                        "customer_email": customer_data["email"],
+                        "customer_name": customer_name,
+                        "registration_source": "customer_registration",
+                        "action_type": "customer_created"
+                    }
+                )
+                
+            except Exception as notification_error:
+                # Log the notification error but don't fail the customer creation
+                print(f"Failed to create notification for new customer: {notification_error}")
+                # You can add proper logging here instead of print
+            
             # Return the customer data
             created_customer = self.customer_collection.find_one({'_id': user_id})
             return self.convert_object_id(created_customer)
@@ -70,7 +97,7 @@ class CustomerService:
             if 'user_id' in locals():
                 self.user_collection.delete_one({'_id': user_id})
             raise Exception(f"Error creating customer: {str(e)}")
-    
+        
     def get_all_customers(self):
         """Get all customers"""
         try:
@@ -175,3 +202,73 @@ class CustomerService:
         
         except Exception as e:
             raise Exception(f"Error deleting customer: {str(e)}")
+        
+    # In CustomerService
+    def get_active_customers(self):
+        try:
+            customers = self.customer_collection.count_documents({"status": "active"})
+            return customers
+        except Exception as e:
+            # Log the actual error for debugging
+            print(f"Database error: {str(e)}")
+            raise Exception(f"Error Getting the Count: {str(e)}")
+
+    def get_monthly_users(self):
+        try:
+    
+            today = datetime.now()
+         
+            # Get the first day of the current month (June 1, 2025)
+            start_of_month = datetime(today.year, today.month, 1)
+            
+            # Get the first day of the next month (July 1, 2025)
+            if today.month == 12:
+                start_of_next_month = datetime(today.year + 1, 1, 1)
+            else:
+                start_of_next_month = datetime(today.year, today.month + 1, 1)
+            
+            print(f"Searching for customers created between {start_of_month} and {start_of_next_month}")
+            
+            # Query for documents created within this month
+            customers = self.customer_collection.count_documents({
+                "date_created": {
+                    "$gte": start_of_month,
+                    "$lt": start_of_next_month
+                }
+            })
+            
+            print(f"Found {customers} customers created this month")
+            return customers
+        
+        except Exception as e:
+            # Log the actual error for debugging
+            print(f"Database error: {str(e)}")
+            raise Exception(f"Error Getting the Count: {str(e)}")
+        
+    def get_daily_logins(self):
+        try:
+            today = datetime.now()
+            start_of_day = today.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_of_day = today.replace(hour=23, minute=59, second=59, microsecond=999999)
+            
+            # Get unique user_ids from session_logs for today
+            daily_login_user_ids = self.session_logs.distinct(
+                "user_id", 
+                {
+                    "login_time": {
+                        "$gte": start_of_day,
+                        "$lte": end_of_day
+                    }
+                }
+            )
+            
+            # Count how many of these user_ids exist in customer_collection
+            daily_logins_count = self.customer_collection.count_documents({
+                "_id": {"$in": daily_login_user_ids}
+            })
+            
+            return daily_logins_count
+            
+        except Exception as e:
+            print(f"Error getting daily logins: {e}")
+            return 0

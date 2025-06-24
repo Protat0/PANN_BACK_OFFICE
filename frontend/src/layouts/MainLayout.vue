@@ -7,11 +7,21 @@
       @logout="handleLogout"
     />
     
-    <!-- Main Content Area -->
+   <!-- Main Content Area -->
     <main class="main-content" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
       <!-- Header Bar -->
       <header class="content-header">
-        <h1>{{ currentPageTitle }}</h1>
+        <div class="header-content">
+          <h1>{{ currentPageTitle }}</h1>
+          
+          <!-- Header Right Section with Notifications -->
+          <div class="header-right">
+            <!-- Notification Bell -->
+            <NotificationBell />
+            
+         
+          </div>
+        </div>
       </header>
 
       <!-- Page Content - This will now show the routed component -->
@@ -37,11 +47,12 @@
 
 <script>
 import Sidebar from '../components/Sidebar.vue'
-
+import NotificationBell from '@/components/NotificationBell.vue'
 export default {
   name: 'MainLayout',
   components: {
-    Sidebar
+    Sidebar,
+    NotificationBell
   },
   data() {
     return {
@@ -159,11 +170,38 @@ export default {
   align-items: center; /* Center the title vertically */
 }
 
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
 .content-header h1 {
   color: var(--tertiary-dark);
   font-size: 1.875rem;
   font-weight: 600;
   margin: 0;
+  flex: 1;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.user-name {
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .page-content {
@@ -238,6 +276,10 @@ export default {
   .content-header {
     padding: 0 2rem;
   }
+  
+  .header-right {
+    gap: 0.75rem;
+  }
 }
 
 @media (max-width: 768px) {
@@ -252,6 +294,14 @@ export default {
   
   .content-header h1 {
     font-size: 1.5rem;
+  }
+  
+  .header-right {
+    gap: 0.5rem;
+  }
+  
+  .user-name {
+    display: none; /* Hide user name on smaller screens */
   }
 }
 
@@ -268,5 +318,12 @@ export default {
   .content-header h1 {
     font-size: 1.25rem;
   }
-}
-</style>
+  
+  .header-content {
+    flex-direction: row; /* Keep horizontal layout */
+  }
+  
+  .content-header h1 {
+    font-size: 1.25rem;
+  }
+}</style>

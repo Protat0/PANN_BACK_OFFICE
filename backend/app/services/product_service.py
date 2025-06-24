@@ -3,6 +3,7 @@ from bson import ObjectId
 from datetime import datetime
 from ..database import db_manager
 from ..models import Product
+from notifications.services import notification_service
 
 class ProductService:
     def __init__(self):
@@ -228,9 +229,33 @@ class ProductService:
             
             # Insert product
             result = self.product_collection.insert_one(product_data)
-            
+
             # Return created product
             created_product = self.product_collection.find_one({'_id': result.inserted_id})
+            
+             # Create general notification for new products
+            try:
+                product_name = product_data.get("product_name", product_data.get("SKU", "Unknown Product"))
+                
+                notification_service.create_notification(
+                    title="New Product Added",
+                    message=f"A new product '{product_name}' has been added to the system",
+                    priority="low",
+                    notification_type="system",
+                    metadata={
+                        "product_id": str(result.inserted_id),  # Fixed
+                        "SKU": product_data["SKU"],
+                        "product_name": product_name,  # Fixed
+                        "registration_source": "product_creation",
+                        "action_type": "product_created"
+                    }
+                )
+                
+            except Exception as notification_error:
+                # Log the notification error but don't fail the product creation
+                print(f"Failed to create notification for the new product: {notification_error}")
+                # You can add proper logging here instead of print
+
             return self.convert_object_id(created_product)
         
         except Exception as e:

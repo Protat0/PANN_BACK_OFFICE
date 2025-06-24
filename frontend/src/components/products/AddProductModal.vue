@@ -2,16 +2,16 @@
   <div v-if="show" class="modal-overlay" @click="handleOverlayClick">
     <div class="modal-content large-modal" @click.stop>
       <div class="modal-header">
-        <h2>{{ isEditMode ? 'Edit Product' : 'Add New Product' }}</h2>
-        <button class="close-btn" @click="$emit('close')" :disabled="loading">
+        <h2 class="text-tertiary-dark">{{ isEditMode ? 'Edit Product' : 'Add New Product' }}</h2>
+        <button class="btn-close" @click="closeModal" :disabled="loading" aria-label="Close">
           ✕
         </button>
       </div>
       
       <form @submit.prevent="handleSubmit" class="product-form">
         <!-- Product Image Upload Section -->
-        <div class="form-group image-upload-section">
-          <label class="image-upload-label">Product Image:</label>
+        <div class="mb-3">
+          <label class="form-label text-tertiary-dark fw-medium">Product Image:</label>
           <div class="image-upload-container">
             <div class="image-preview-area" @click="triggerFileInput" :class="{ 'has-image': imagePreview }">
               <div v-if="!imagePreview" class="upload-placeholder">
@@ -22,10 +22,10 @@
               <div v-else class="image-preview">
                 <img :src="imagePreview" :alt="form.product_name" class="preview-image" />
                 <div class="image-overlay">
-                  <button type="button" class="change-image-btn" @click.stop="triggerFileInput">
+                  <button type="button" class="btn btn-sm btn-edit" @click.stop="triggerFileInput">
                     Change Image
                   </button>
-                  <button type="button" class="remove-image-btn" @click.stop="removeImage">
+                  <button type="button" class="btn btn-sm btn-delete" @click.stop="removeImage">
                     Remove
                   </button>
                 </div>
@@ -36,15 +36,17 @@
               type="file" 
               accept="image/*" 
               @change="handleImageUpload"
-              class="hidden-file-input"
+              class="d-none"
               :disabled="loading"
             />
           </div>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="product_name">Product Name: <span class="required">*</span></label>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label for="product_name" class="form-label text-tertiary-dark fw-medium">
+              Product Name <span class="text-danger">*</span>
+            </label>
             <input 
               id="product_name"
               v-model="form.product_name" 
@@ -52,13 +54,15 @@
               required 
               :disabled="loading"
               placeholder="Enter product name"
-              class="form-input"
+              class="form-control"
             />
           </div>
 
-          <div class="form-group">
-            <label for="SKU">SKU: <span class="required">*</span></label>
-            <div class="input-with-validation">
+          <div class="col-md-6">
+            <label for="SKU" class="form-label text-tertiary-dark fw-medium">
+              SKU <span class="text-danger">*</span>
+            </label>
+            <div class="position-relative">
               <input 
                 id="SKU"
                 v-model="form.SKU" 
@@ -66,23 +70,27 @@
                 required 
                 :disabled="loading || isValidatingSku"
                 placeholder="Enter SKU"
-                class="form-input"
-                :class="{ 'error': skuError, 'validating': isValidatingSku }"
+                class="form-control"
+                :class="{ 'is-invalid': skuError }"
                 @blur="validateSKU"
               />
-              <div v-if="isValidatingSku" class="validation-spinner">
-                <div class="spinner-small"></div>
+              <div v-if="isValidatingSku" class="validation-spinner position-absolute top-50 end-0 translate-middle-y me-3">
+                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                  <span class="visually-hidden">Validating...</span>
+                </div>
               </div>
-            </div>
-            <div v-if="skuError" class="field-error">
-              {{ skuError }}
+              <div v-if="skuError" class="invalid-feedback">
+                {{ skuError }}
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="category_id">Category: <span class="required">*</span></label>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label for="category_id" class="form-label text-tertiary-dark fw-medium">
+              Category <span class="text-danger">*</span>
+            </label>
             <select 
               id="category_id"
               v-model="form.category_id" 
@@ -97,8 +105,10 @@
             </select>
           </div>
 
-          <div class="form-group">
-            <label for="unit">Unit: <span class="required">*</span></label>
+          <div class="col-md-6">
+            <label for="unit" class="form-label text-tertiary-dark fw-medium">
+              Unit <span class="text-danger">*</span>
+            </label>
             <select 
               id="unit"
               v-model="form.unit" 
@@ -117,9 +127,11 @@
           </div>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="cost_price">Cost Price (₱): <span class="required">*</span></label>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label for="cost_price" class="form-label text-tertiary-dark fw-medium">
+              Cost Price (₱) <span class="text-danger">*</span>
+            </label>
             <input 
               id="cost_price"
               v-model.number="form.cost_price" 
@@ -129,12 +141,14 @@
               required 
               :disabled="loading"
               placeholder="0.00"
-              class="form-input"
+              class="form-control"
             />
           </div>
 
-          <div class="form-group">
-            <label for="selling_price">Selling Price (₱): <span class="required">*</span></label>
+          <div class="col-md-6">
+            <label for="selling_price" class="form-label text-tertiary-dark fw-medium">
+              Selling Price (₱) <span class="text-danger">*</span>
+            </label>
             <input 
               id="selling_price"
               v-model.number="form.selling_price" 
@@ -144,14 +158,16 @@
               required 
               :disabled="loading"
               placeholder="0.00"
-              class="form-input"
+              class="form-control"
             />
           </div>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="stock">Stock Quantity: <span class="required">*</span></label>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label for="stock" class="form-label text-tertiary-dark fw-medium">
+              Stock Quantity <span class="text-danger">*</span>
+            </label>
             <input 
               id="stock"
               v-model.number="form.stock" 
@@ -160,12 +176,14 @@
               required 
               :disabled="loading"
               placeholder="0"
-              class="form-input"
+              class="form-control"
             />
           </div>
 
-          <div class="form-group">
-            <label for="low_stock_threshold">Low Stock Threshold: <span class="required">*</span></label>
+          <div class="col-md-6">
+            <label for="low_stock_threshold" class="form-label text-tertiary-dark fw-medium">
+              Low Stock Threshold <span class="text-danger">*</span>
+            </label>
             <input 
               id="low_stock_threshold"
               v-model.number="form.low_stock_threshold" 
@@ -174,25 +192,27 @@
               required 
               :disabled="loading"
               placeholder="10"
-              class="form-input"
+              class="form-control"
             />
           </div>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="expiry_date">Expiry Date:</label>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label for="expiry_date" class="form-label text-tertiary-dark fw-medium">Expiry Date:</label>
             <input 
               id="expiry_date"
               v-model="form.expiry_date" 
               type="date" 
               :disabled="loading"
-              class="form-input"
+              class="form-control"
             />
           </div>
 
-          <div class="form-group">
-            <label for="status">Status: <span class="required">*</span></label>
+          <div class="col-md-6">
+            <label for="status" class="form-label text-tertiary-dark fw-medium">
+              Status <span class="text-danger">*</span>
+            </label>
             <select 
               id="status"
               v-model="form.status" 
@@ -206,75 +226,79 @@
           </div>
         </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label for="barcode">Barcode:</label>
-            <div class="barcode-input-group">
+        <div class="row g-3 mb-3">
+          <div class="col-md-8">
+            <label for="barcode" class="form-label text-tertiary-dark fw-medium">Barcode:</label>
+            <div class="input-group">
               <input 
                 id="barcode"
                 v-model="form.barcode" 
                 type="text" 
                 :disabled="loading"
                 placeholder="Enter barcode or generate automatically"
-                class="form-input"
+                class="form-control"
               />
               <button 
                 type="button" 
                 @click="generateBarcode"
                 :disabled="loading"
-                class="btn btn-secondary"
+                class="btn btn-export"
               >
                 Generate
               </button>
             </div>
           </div>
 
-          <div class="form-group checkbox-group">
-            <label for="is_taxable" class="checkbox-label">
+          <div class="col-md-4 d-flex align-items-end">
+            <div class="form-check">
               <input 
                 id="is_taxable"
                 v-model="form.is_taxable" 
                 type="checkbox" 
                 :disabled="loading"
+                class="form-check-input"
               />
-              <span class="checkmark"></span>
-              Taxable Item
-            </label>
+              <label for="is_taxable" class="form-check-label text-tertiary-dark">
+                Taxable Item
+              </label>
+            </div>
           </div>
         </div>
 
-        <div class="form-group">
-          <label for="description">Description:</label>
+        <div class="mb-3">
+          <label for="description" class="form-label text-tertiary-dark fw-medium">Description:</label>
           <textarea 
             id="description"
             v-model="form.description" 
             :disabled="loading"
             placeholder="Enter product description (optional)"
-            class="form-textarea"
+            class="form-control"
             rows="3"
           ></textarea>
         </div>
 
-        <div v-if="error" class="form-error">
-          <span class="error-icon">⚠️</span>
+        <div v-if="error" class="alert alert-danger d-flex align-items-center mb-3" role="alert">
+          <span class="me-2">⚠️</span>
           {{ error }}
         </div>
 
-        <div class="form-actions">
+        <div class="d-flex gap-2 justify-content-end pt-3 border-top">
           <button 
             type="button" 
-            @click="$emit('close')" 
+            @click="closeModal" 
             :disabled="loading"
-            class="btn btn-secondary"
+            class="btn btn-cancel"
           >
             Cancel
           </button>
           <button 
             type="submit" 
             :disabled="loading || !isFormValid" 
-            class="btn btn-primary"
+            class="btn btn-save"
           >
-            <span v-if="loading" class="loading-spinner"></span>
+            <span v-if="loading" class="spinner-border spinner-border-sm me-2" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </span>
             {{ loading ? 'Saving...' : (isEditMode ? 'Update Product' : 'Create Product') }}
           </button>
         </div>
@@ -284,283 +308,125 @@
 </template>
 
 <script>
+import { useAddProduct } from '@/composables/ui/modals/useAddProduct'
+import { onMounted, onBeforeUnmount } from 'vue'
+
 export default {
   name: 'AddProductModal',
-  props: {
-    show: {
-      type: Boolean,
-      default: false
-    },
-    product: {
-      type: Object,
-      default: null
-    },
-    loading: {
-      type: Boolean,
-      default: false
-    },
-    error: {
-      type: String,
-      default: null
-    }
-  },
-  emits: ['close', 'submit'],
-  data() {
-    return {
-      form: {
-        product_name: '',
-        category_id: '',
-        SKU: '',
-        unit: '',
-        stock: 0,
-        low_stock_threshold: 10,
-        cost_price: 0,
-        selling_price: 0,
-        expiry_date: '',
-        status: 'active',
-        is_taxable: false,
-        barcode: '',
-        description: '',
-        image: null
-      },
-      imagePreview: null,
-      imageFile: null,
-      skuError: null,
-      isValidatingSku: false
-    }
-  },
-  computed: {
-    isEditMode() {
-      return this.product !== null
-    },
-    isFormValid() {
-      return this.form.product_name.trim() !== '' &&
-             this.form.SKU.trim() !== '' &&
-             this.form.category_id !== '' &&
-             this.form.unit !== '' &&
-             this.form.cost_price >= 0 &&
-             this.form.selling_price >= 0 &&
-             this.form.stock >= 0 &&
-             this.form.low_stock_threshold >= 0
-             !this.skuError
-    }
-  },
-  watch: {
-    show(newVal) {
-      if (newVal) {
-        this.initializeForm()
-        // Focus on first input when modal opens
-        this.$nextTick(() => {
-          const firstInput = this.$el.querySelector('#product_name')
-          if (firstInput) firstInput.focus()
-        })
-      }
-    },
-    product: {
-      handler() {
-        if (this.show) {
-          this.initializeForm()
-        }
-      },
-      deep: true
-    }
-  },
-  methods: {
-    initializeForm() {
-      if (this.isEditMode && this.product) {
-        this.form = {
-          product_name: this.product.product_name || '',
-          category_id: this.product.category_id || '',
-          SKU: this.product.SKU || '',
-          unit: this.product.unit || '',
-          stock: this.product.stock || 0,
-          low_stock_threshold: this.product.low_stock_threshold || 10,
-          cost_price: this.product.cost_price || 0,
-          selling_price: this.product.selling_price || 0,
-          expiry_date: this.product.expiry_date ? this.product.expiry_date.split('T')[0] : '',
-          status: this.product.status || 'active',
-          is_taxable: this.product.is_taxable || false,
-          barcode: this.product.barcode || '',
-          description: this.product.description || '',
-          image: null
-        }
-        
-        // Set image preview if product has an image
-        if (this.product.image_url || this.product.image) {
-          this.imagePreview = this.product.image_url || this.product.image
-        } else {
-          this.imagePreview = null
-        }
-        this.imageFile = null
-      } else {
-        this.form = {
-          product_name: '',
-          category_id: '',
-          SKU: '',
-          unit: '',
-          stock: 0,
-          low_stock_threshold: 10,
-          cost_price: 0,
-          selling_price: 0,
-          expiry_date: '',
-          status: 'active',
-          is_taxable: false,
-          barcode: '',
-          description: '',
-          image: null
-        }
-        this.imagePreview = null
-        this.imageFile = null
-        this.skuError = null
-        this.isValidatingSku = false
-      }
-    },
-
-    triggerFileInput() {
-      if (!this.loading) {
-        this.$refs.fileInput.click()
-      }
-    },
-
-    handleImageUpload(event) {
-      const file = event.target.files[0]
-      if (!file) return
-
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        alert('Please select a valid image file (PNG, JPG, JPEG)')
-        return
-      }
-
-      // Validate file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Image size should be less than 5MB')
-        return
-      }
-
-      this.imageFile = file
+  emits: ['success'],
+  
+  setup(props, { emit }) {
+    const {
+      // State
+      show,
+      loading,
+      error,
+      form,
+      imagePreview,
+      skuError,
+      isValidatingSku,
       
-      // Create preview
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        this.imagePreview = e.target.result
-      }
-      reader.readAsDataURL(file)
-    },
-
-    async validateSKU() {
-      if (!this.form.SKU || this.form.SKU.trim() === '') {
-        this.skuError = null
-        return
-      }
-
-      // Don't validate if we're editing and SKU hasn't changed
-      if (this.isEditMode && this.product && this.form.SKU === this.product.SKU) {
-        this.skuError = null
-        return
-      }
-
-      this.isValidatingSku = true
+      // Computed
+      isEditMode,
+      isFormValid,
       
-      try {
-        // You'll need to import your products API service
-        // import productsApiService from '../../services/apiProducts.js'
-        
-        const exists = await productsApiService.productExistsBySku(this.form.SKU)
-        if (exists) {
-          this.skuError = 'This SKU already exists'
-        } else {
-          this.skuError = null
-        }
-      } catch (error) {
-        console.error('Error validating SKU:', error)
-        this.skuError = null
-      } finally {
-        this.isValidatingSku = false
-      }
-    },
-
-    removeImage() {
-      this.imagePreview = null
-      this.imageFile = null
-      this.form.image = null
-      if (this.$refs.fileInput) {
-        this.$refs.fileInput.value = ''
-      }
-    },
-
-    async convertImageToBase64() {
-      if (!this.imageFile) return null
+      // Actions
+      openAddModal,
+      openEditModal,
+      closeModal,
+      submitProduct,
       
-      return new Promise((resolve) => {
-        const reader = new FileReader()
-        reader.onload = (e) => resolve(e.target.result)
-        reader.readAsDataURL(this.imageFile)
-      })
-    },
-
-    async handleSubmit() {
-      if (!this.isFormValid) return
+      // Form methods
+      validateSKU,
+      generateBarcode,
       
-      // Create a clean copy of the form data
-      const formData = { ...this.form }
+      // Image methods
+      handleImageUpload,
+      removeImage,
       
-      // Handle image upload
-      if (this.imageFile) {
-        // Convert image to base64 or handle file upload based on your backend requirements
-        const imageBase64 = await this.convertImageToBase64()
-        formData.image = imageBase64
-      } else if (this.imagePreview && this.isEditMode) {
-        // Keep existing image URL for edit mode
-        formData.image_url = this.imagePreview
-      }
-      
-      // Clean up empty strings and convert to proper types
-      if (!formData.expiry_date) {
-        delete formData.expiry_date
-      }
-      if (!formData.barcode) {
-        delete formData.barcode
-      }
-      if (!formData.description) {
-        delete formData.description
-      }
-      
-      this.$emit('submit', formData)
-    },
-
-    handleOverlayClick() {
-      if (!this.loading) {
-        this.$emit('close')
-      }
-    },
-
-    generateBarcode() {
-      // Generate a simple barcode based on SKU and timestamp
-      const timestamp = Date.now().toString().slice(-6)
-      const sku = this.form.SKU.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
-      this.form.barcode = `${sku}${timestamp}`
-    }
-  },
-  mounted() {
-    this.handleEscape = (e) => {
-      if (e.key === 'Escape' && this.show && !this.loading) {
-        this.$emit('close')
+      // Utility methods
+      setupKeyboardListeners,
+      cleanupKeyboardListeners
+    } = useAddProduct()
+    
+    // Setup keyboard listeners on mount
+    onMounted(() => {
+      setupKeyboardListeners()
+    })
+    
+    // Cleanup on unmount
+    onBeforeUnmount(() => {
+      cleanupKeyboardListeners()
+    })
+    
+    // Methods
+    const triggerFileInput = () => {
+      if (!loading.value) {
+        const fileInput = document.querySelector('input[type="file"]')
+        if (fileInput) fileInput.click()
       }
     }
     
-    document.addEventListener('keydown', this.handleEscape)
-  },
-
-  beforeUnmount() {
-    if (this.handleEscape) {
-      document.removeEventListener('keydown', this.handleEscape)
+    const handleSubmit = () => {
+      submitProduct((result, wasEdit) => {
+        const action = wasEdit ? 'updated' : 'created'
+        emit('success', {
+          message: `Product "${form.value.product_name}" ${action} successfully`,
+          product: result,
+          action
+        })
+      })
+    }
+    
+    const handleOverlayClick = () => {
+      if (!loading.value) {
+        closeModal()
+      }
+    }
+    
+    // Expose methods for parent component
+    const openAdd = () => {
+      openAddModal()
+    }
+    
+    const openEdit = (product) => {
+      openEditModal(product)
+    }
+    
+    return {
+      // State
+      show,
+      loading,
+      error,
+      form,
+      imagePreview,
+      skuError,
+      isValidatingSku,
+      
+      // Computed
+      isEditMode,
+      isFormValid,
+      
+      // Methods
+      closeModal,
+      triggerFileInput,
+      handleSubmit,
+      handleOverlayClick,
+      validateSKU,
+      generateBarcode,
+      handleImageUpload,
+      removeImage,
+      
+      // Exposed methods
+      openAdd,
+      openEdit
     }
   }
 }
 </script>
 
 <style scoped>
+/* Modal overlay and animation */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -607,17 +473,16 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem 2rem 1rem 2rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--neutral);
 }
 
 .modal-header h2 {
   margin: 0;
-  color: var(--tertiary-dark);
   font-size: 1.5rem;
   font-weight: 600;
 }
 
-.close-btn {
+.btn-close {
   background: none;
   border: none;
   font-size: 1.5rem;
@@ -628,36 +493,21 @@ export default {
   transition: all 0.2s ease;
 }
 
-.close-btn:hover:not(:disabled) {
+.btn-close:hover:not(:disabled) {
   background-color: var(--neutral-light);
   color: var(--tertiary-dark);
 }
 
-.close-btn:disabled {
+.btn-close:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 .product-form {
   padding: 1.5rem 2rem 2rem 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
 }
 
 /* Image Upload Styles */
-.image-upload-section {
-  margin-bottom: 1rem;
-}
-
-.image-upload-label {
-  font-weight: 500;
-  color: #374151;
-  font-size: 0.875rem;
-  margin-bottom: 0.5rem;
-  display: block;
-}
-
 .image-upload-container {
   width: 100%;
 }
@@ -665,7 +515,7 @@ export default {
 .image-preview-area {
   width: 200px;
   height: 200px;
-  border: 2px dashed #d1d5db;
+  border: 2px dashed var(--neutral);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -677,12 +527,12 @@ export default {
 }
 
 .image-preview-area:hover {
-  border-color: #3b82f6;
-  background-color: #f8fafc;
+  border-color: var(--primary);
+  background-color: var(--neutral-light);
 }
 
 .image-preview-area.has-image {
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--neutral);
 }
 
 .upload-placeholder {
@@ -742,199 +592,20 @@ export default {
   opacity: 1;
 }
 
-.change-image-btn,
-.remove-image-btn {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 0.375rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
+/* Custom text colors using colors.css variables */
+.text-tertiary-dark {
+  color: var(--tertiary-dark) !important;
 }
 
-.change-image-btn {
-  background-color: var(--primary);
-  color: white;
+.text-tertiary-medium {
+  color: var(--tertiary-medium) !important;
 }
 
-.change-image-btn:hover {
-  background-color: var(--primary-dark);
-}
-
-.remove-image-btn {
-  background-color: var(--error);
-  color: white;
-}
-
-.remove-image-btn:hover {
-  background-color: var(--error-dark);
-}
-
-.hidden-file-input {
-  display: none;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.form-group label {
-  font-weight: 500;
-  color: var(--tertiary-dark);
-  font-size: 0.875rem;
-}
-
-.required {
-  color: var(--error);
-}
-
-.form-input,
-.form-select,
-.form-textarea {
-  padding: 0.75rem;
-  border: 1px solid var(--neutral-medium);
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  transition: all 0.2s ease;
-  background: white;
-  color: var(--tertiary-dark);
-}
-
-.form-input:focus,
+/* Form controls focus states using colors.css */
 .form-select:focus,
-.form-textarea:focus {
-  outline: none;
+.form-control:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(115, 146, 226, 0.1);
-}
-
-.form-input:disabled,
-.form-select:disabled,
-.form-textarea:disabled {
-  background-color: var(--neutral-light);
-  cursor: not-allowed;
-  opacity: 0.7;
-}
-
-.barcode-input-group {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.barcode-input-group .form-input {
-  flex: 1;
-}
-
-.checkbox-group {
-  justify-content: center;
-  align-items: center;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  gap: 0.5rem;
-  font-weight: 400 !important;
-}
-
-.checkbox-label input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--primary);
-  cursor: pointer;
-}
-
-.form-textarea {
-  resize: vertical;
-  min-height: 80px;
-}
-
-.form-error {
-  background-color: var(--error-light);
-  border: 1px solid var(--error);
-  color: var(--error-dark);
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.error-icon {
-  font-size: 1rem;
-}
-
-.form-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--neutral);
-}
-
-.btn {
-  padding: 0.75rem 1.5rem;
-  border-radius: 0.5rem;
-  border: none;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.875rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-height: 42px;
-}
-
-.btn-primary {
-  background-color: var(--primary);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background-color: var(--primary-dark);
-  transform: translateY(-1px);
-}
-
-.btn-secondary {
-  background-color: var(--neutral-light);
-  color: var(--tertiary-dark);
-  border: 1px solid var(--neutral-medium);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background-color: var(--neutral-medium);
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none !important;
-}
-
-.loading-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid transparent;
-  border-top: 2px solid currentColor;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
+  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
 }
 
 /* Responsive Design */
@@ -954,26 +625,6 @@ export default {
 
   .product-form {
     padding: 1rem 1.5rem 1.5rem 1.5rem;
-    gap: 1rem;
-  }
-
-  .form-row {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-
-  .form-actions {
-    flex-direction: column-reverse;
-    gap: 0.75rem;
-  }
-
-  .btn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .barcode-input-group {
-    flex-direction: column;
   }
 
   .image-preview-area {
