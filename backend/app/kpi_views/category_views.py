@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import HttpResponse
-from ..services.category_service import CategoryService
+from ..services.category_service import CategoryService, CategoryDisplayService
 import logging
 
 
@@ -243,4 +243,27 @@ class CategorySubcategoryView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-
+class CategoryDataView(APIView):
+    def get(self, request):
+        """Get all categories with sales data"""
+        try:
+            print("=== CategoryDataView.get called ===")
+            print(f"Request path: {request.path}")
+            print(f"Request method: {request.method}")
+            print(f"Request GET params: {request.GET}")
+            print(f"URL kwargs: {getattr(self, 'kwargs', {})}")
+            
+            category_service = CategoryDisplayService()
+            result = category_service.get_categories_display()
+            
+            print("=== CategoryDataView.get completed successfully ===")
+            return Response(result, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"ERROR in CategoryDataView: {e}")
+            import traceback
+            print(f"TRACEBACK: {traceback.format_exc()}")
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
