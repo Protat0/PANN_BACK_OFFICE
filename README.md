@@ -145,7 +145,7 @@ After joining the Atlas project and getting credentials, create a `.env` file in
 ```env
 # Cloud Database (MongoDB Atlas) - Primary
 # Contact team lead for these credentials:
-MONGODB_URI=mongodb+srv://admin:ppuizAGbP1lKTnrX@cluster0.qumhbyz.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+MONGODB_URI=mongodb+srv://admin:QmPmu3TJfyVZxjPc@cluster0.qumhbyz.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
 MONGODB_DATABASE=pos_system
 
 # Local Database (Optional Fallback)

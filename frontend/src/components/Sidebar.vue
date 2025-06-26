@@ -4,7 +4,7 @@
     <div class="sidebar-header">
       <div class="logo">
         <img src="../assets/Logo_1.png" alt="PANN" class="logo-img" />
-        <span v-if="!isCollapsed" class="logo-text">PANNTECH</span>
+        <span v-if="!isCollapsed" class="text-blue">PANNTECH</span>
       </div>
       <div class="toggle-container">
         <button @click="toggleSidebar" class="toggle-btn">
@@ -277,11 +277,15 @@ export default {
 }
 
 .sidebar-header {
+  /* Fixed height to match main content header */
+  height: 100px;
   padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--neutral-medium);
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  justify-content: center;
+  gap: 0.75rem;
+  box-sizing: border-box;
 }
 
 .logo {
@@ -297,11 +301,11 @@ export default {
   border-radius: 8px;
 }
 
-.logo-text {
+/* .logo-text {
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--primary);
-}
+} */
 
 .toggle-container {
   display: flex;
@@ -317,11 +321,11 @@ export default {
   border: none;
   color: var(--neutral-dark);
   cursor: pointer;
-  padding: 0.625rem;
+  padding: 0.5rem;
   border-radius: 8px;
   transition: background-color 0.2s;
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -489,6 +493,12 @@ export default {
   border-top: 1px solid var(--neutral-medium);
 }
 
+.sidebar.collapsed .sidebar-footer {
+  padding: 1rem 0.75rem;
+  display: flex;
+  justify-content: center;
+}
+
 .logout-btn {
   display: flex;
   align-items: center;
@@ -508,8 +518,9 @@ export default {
 .sidebar.collapsed .logout-btn {
   padding: 0.75rem;
   justify-content: center;
+  width: 44px;
+  height: 44px;
   min-width: 44px;
-  aspect-ratio: 1;
 }
 
 .logout-btn:hover {
@@ -599,6 +610,16 @@ export default {
   
   .sidebar.open {
     transform: translateX(0);
+  }
+  
+  .sidebar-header {
+    height: 80px; /* Slightly smaller on mobile to match header */
+  }
+}
+
+@media (max-width: 480px) {
+  .sidebar-header {
+    height: 70px; /* Even smaller on very small screens */
   }
 }
 </style>

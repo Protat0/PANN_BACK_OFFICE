@@ -2,7 +2,7 @@
   <div class="accounts-page">
     <!-- Header Section -->
     <div class="page-header">
-      <h1 class="page-title"> <!-- I got lazy so im placing this to keep the buttons on the right side, but this is accounts page --></h1>
+      <h1 class="page-title">User Accounts</h1>
       <div class="header-actions">
         <button 
           class="btn btn-secondary" 
@@ -71,86 +71,85 @@
       {{ successMessage }}
     </div>
 
-    <!-- Table Container -->
-    <div v-if="!loading || users.length > 0" class="table-container">
-      <table class="accounts-table">
-        <thead>
-          <tr>
-            <th class="checkbox-column">
-              <input 
-                type="checkbox" 
-                @change="selectAll" 
-                :checked="allSelected"
-                :indeterminate="someSelected"
-              />
-            </th>
-            <th style="padding-left: 30px;">ID</th>
-            <th>Username</th>
-            <th>Full Name</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Status</th>
-            <th>Last Login</th>
-            <th>Date Created</th>
-            <th class="actions-column" style="padding-left: 50px;">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr 
-            v-for="user in filteredUsers" 
-            :key="user._id"
-            :class="{ 
-              'selected': selectedUsers.includes(user._id),
-              'inactive': user.status === 'inactive'
-            }"
-          >
-            <td class="checkbox-column">
-              <input 
-                type="checkbox" 
-                :value="user._id"
-                v-model="selectedUsers"
-              />
-            </td>
-            <td class="id-column">{{ user._id.slice(-6) }}</td>
-            <td class="username-column">{{ user.username }}</td>
-            <td class="name-column">{{ user.full_name }}</td>
-            <td class="email-column">{{ user.email }}</td>
-            <td class="role-column">
-              <span :class="['role-badge', `role-${user.role}`]">
-                {{ user.role }}
-              </span>
-            </td>
-            <td class="status-column">
-              <span :class="['status-badge', `status-${user.status}`]">
-                {{ user.status }}
-              </span>
-            </td>
-            <td class="login-column">{{ formatDate(user.last_login) }}</td>
-            <td class="date-column">{{ formatDate(user.date_created) }}</td>
-            <td class="actions-column">
-              <div class="action-buttons">
-                <button class="action-btn" @click="editUser(user)" title="Edit">
-                  ✏️
-                </button>
-                <button class="action-btn" @click="viewUser(user)" title="View">
-                  👁️
-                </button>
-                <button 
-                  class="action-btn"
-                  @click="toggleUserStatus(user)" 
-                  :title="user.status === 'active' ? 'Deactivate' : 'Activate'"
-                >
-                  {{ user.status === 'active' ? '🔒' : '🔓' }}
-                </button>
-                <button class="action-btn delete" @click="deleteUser(user)" title="Delete">
-                  🗑️
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <!-- Data Table -->
+    <DataTable v-if="!loading || users.length > 0">
+      <template #header>
+        <tr>
+          <th class="checkbox-column">
+            <input 
+              type="checkbox" 
+              @change="selectAll" 
+              :checked="allSelected"
+              :indeterminate="someSelected"
+            />
+          </th>
+          <th style="padding-left: 30px;">ID</th>
+          <th>Username</th>
+          <th>Full Name</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th>Last Login</th>
+          <th>Date Created</th>
+          <th class="actions-column" style="padding-left: 50px;">Actions</th>
+        </tr>
+      </template>
+
+      <template #body>
+        <tr 
+          v-for="user in filteredUsers" 
+          :key="user._id"
+          :class="{ 
+            'selected': selectedUsers.includes(user._id),
+            'inactive': user.status === 'inactive'
+          }"
+        >
+          <td class="checkbox-column">
+            <input 
+              type="checkbox" 
+              :value="user._id"
+              v-model="selectedUsers"
+            />
+          </td>
+          <td class="id-column">{{ user._id.slice(-6) }}</td>
+          <td class="username-column">{{ user.username }}</td>
+          <td class="name-column">{{ user.full_name }}</td>
+          <td class="email-column">{{ user.email }}</td>
+          <td class="role-column">
+            <span :class="['role-badge', `role-${user.role}`]">
+              {{ user.role }}
+            </span>
+          </td>
+          <td class="status-column">
+            <span :class="['status-badge', `status-${user.status}`]">
+              {{ user.status }}
+            </span>
+          </td>
+          <td class="login-column">{{ formatDate(user.last_login) }}</td>
+          <td class="date-column">{{ formatDate(user.date_created) }}</td>
+          <td class="actions-column">
+            <div class="action-buttons">
+              <button class="action-btn" @click="editUser(user)" title="Edit">
+                ✏️
+              </button>
+              <button class="action-btn" @click="viewUser(user)" title="View">
+                👁️
+              </button>
+              <button 
+                class="action-btn"
+                @click="toggleUserStatus(user)" 
+                :title="user.status === 'active' ? 'Deactivate' : 'Activate'"
+              >
+                {{ user.status === 'active' ? '🔒' : '🔓' }}
+              </button>
+              <button class="action-btn delete" @click="deleteUser(user)" title="Delete">
+                🗑️
+              </button>
+            </div>
+          </td>
+        </tr>
+      </template>
+    </DataTable>
 
     <!-- Empty State -->
     <div v-if="!loading && filteredUsers.length === 0 && !error" class="empty-state">
@@ -318,9 +317,13 @@
 
 <script>
 import apiService from '../services/api.js'
+import DataTable from '../components/common/TableTemplate.vue'
 
 export default {
   name: 'AccountsPage',
+  components: {
+    DataTable
+  },
   data() {
     return {
       users: [],
@@ -778,49 +781,6 @@ export default {
   text-align: center;
 }
 
-.table-container {
-  background: white;
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-}
-
-.accounts-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.accounts-table thead {
-  background-color: #4f46e5;
-  color: white;
-}
-
-.accounts-table th {
-  padding: 1rem;
-  text-align: left;
-  font-weight: 600;
-  font-size: 0.875rem;
-  letter-spacing: 0.025em;
-}
-
-.accounts-table td {
-  padding: 1rem;
-  border-bottom: 1px solid #e2e8f0;
-  font-size: 0.875rem;
-}
-
-.accounts-table tbody tr:hover {
-  background-color: #f8fafc;
-}
-
-.accounts-table tbody tr.selected {
-  background-color: #ede9fe;
-}
-
-.accounts-table tbody tr.inactive {
-  opacity: 0.6;
-}
-
 .checkbox-column {
   width: 40px;
   text-align: center;
@@ -1066,14 +1026,6 @@ input[type="checkbox"] {
   .accounts-page {
     padding: 1rem;
   }
-  
-  .table-container {
-    overflow-x: auto;
-  }
-  
-  .accounts-table {
-    min-width: 1000px;
-  }
 
   .filters-section {
     grid-template-columns: 1fr;
@@ -1099,12 +1051,6 @@ input[type="checkbox"] {
   
   .btn {
     padding: 0.5rem 1rem;
-    font-size: 0.8125rem;
-  }
-  
-  .accounts-table th,
-  .accounts-table td {
-    padding: 0.75rem 0.5rem;
     font-size: 0.8125rem;
   }
 

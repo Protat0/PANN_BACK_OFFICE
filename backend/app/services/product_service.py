@@ -1,0 +1,1005 @@
+import re 
+from bson import ObjectId
+from datetime import datetime
+from ..database import db_manager
+from ..models import Product
+from notifications.services import notification_service
+
+class ProductService:
+    def __init__(self):
+        self.db = db_manager.get_database()
+        self.product_collection = self.db.products
+        self.category_collection = self.db.categories
+        self.supplier_collection = self.db.suppliers
+        self.branch_collection = self.db.branches
+    
+    def convert_object_id(self, document):
+        """Convert ObjectId to string for JSON serialization"""
+        if document and '_id' in document:
+            document['_id'] = str(document['_id'])
+        # Convert other ObjectId fields
+        for field in ['category_id', 'supplier_id', 'branch_id']:
+            if document and field in document and isinstance(document[field], ObjectId):
+                document[field] = str(document[field])
+        return document
+    
+    def validate_foreign_keys(self, product_data):
+        """Validate that foreign key references exist"""
+        # Validate category_id
+        if 'category_id' in product_data and product_data['category_id']:
+            if ObjectId.is_valid(product_data['category_id']):
+                category = self.category_collection.find_one({'_id': ObjectId(product_data['category_id'])})
+                if not category:
+                    raise ValueError(f"Category with ID {product_data['category_id']} not found")
+        
+        # Validate supplier_id
+        if 'supplier_id' in product_data and product_data['supplier_id']:
+            if ObjectId.is_valid(product_data['supplier_id']):
+                supplier = self.supplier_collection.find_one({'_id': ObjectId(product_data['supplier_id'])})
+                if not supplier:
+                    raise ValueError(f"Supplier with ID {product_data['supplier_id']} not found")
+        
+        # Validate branch_id
+        if 'branch_id' in product_data and product_data['branch_id']:
+            if ObjectId.is_valid(product_data['branch_id']):
+                branch = self.branch_collection.find_one({'_id': ObjectId(product_data['branch_id'])})
+                if not branch:
+                    raise ValueError(f"Branch with ID {product_data['branch_id']} not found")
+    
+    def add_sync_log(self, source='cloud', status='synced', details=None):
+        """Helper method to create sync log entries"""
+        return {
+            'last_updated': datetime.utcnow(),
+            'source': source,  # 'local' or 'cloud'
+            'status': status,  # 'synced', 'pending', 'failed'
+            'details': details or {}
+        }
+    
+    def update_sync_status(self, product_id, sync_status='pending', source='cloud'):
+        """Update sync status for a product - called when data changes"""
+        try:
+            if not ObjectId.is_valid(product_id):
+                return False
+            
+            sync_log = self.add_sync_log(source=source, status=sync_status)
+            
+            result = self.product_collection.update_one(
+                {'_id': ObjectId(product_id)},
+                {'$push': {'sync_logs': sync_log}}
+            )
+            
+            return result.modified_count > 0
+        
+        except Exception as e:
+            print(f"Error updating sync status: {str(e)}")
+            return False
+    
+    def mark_as_synced(self, product_id, source='cloud'):
+        """Mark a product as successfully synced"""
+        return self.update_sync_status(product_id, sync_status='synced', source=source)
+    
+    def get_unsynced_products(self, source='local'):
+        """Get products that need to be synced from specified source"""
+        try:
+            # Find products where the latest sync log is not 'synced' for the specified source
+            # or where there's no sync log for the specified source
+            pipeline = [
+                {
+                    '$addFields': {
+                        'latest_sync': {
+                            '$arrayElemAt': [
+                                {
+                                    '$filter': {
+                                        'input': '$sync_logs',
+                                        'cond': {'$eq': ['$$this.source', source]}
+                                    }
+                                },
+                                -1  # Get the latest entry for this source
+                            ]
+                        }
+                    }
+                },
+                {
+                    '$match': {
+                        '$or': [
+                            {'latest_sync': None},  # No sync log for this source
+                            {'latest_sync.status': {'$ne': 'synced'}}  # Not synced
+                        ]
+                    }
+                }
+            ]
+            
+            products = list(self.product_collection.aggregate(pipeline))
+            return [self.convert_object_id(product) for product in products]
+        
+        except Exception as e:
+            raise Exception(f"Error getting unsynced products: {str(e)}")
+    
+    def generate_sku(self, product_name, category_id=None):
+        """Generate a unique SKU for the product"""
+        try:
+            # Get category prefix
+            category_prefix = "PROD"
+            if category_id and ObjectId.is_valid(category_id):
+                category = self.category_collection.find_one({'_id': ObjectId(category_id)})
+                if category:
+                    category_prefix = category.get('name', 'PROD')[:4].upper()
+            
+            # Get product name prefix
+            name_prefix = ''.join(product_name.split()[:2])[:4].upper()
+            
+            # Count existing products to generate sequence number (exclude deleted products)
+            count = self.product_collection.count_documents({'isDeleted': {'$ne': True}}) + 1
+            
+            # Generate SKU: CATEGORY-NAME-NUMBER
+            sku = f"{category_prefix}-{name_prefix}-{count:03d}"
+            
+            # Ensure uniqueness (check against non-deleted products)
+            while self.product_collection.find_one({'SKU': sku, 'isDeleted': {'$ne': True}}):
+                count += 1
+                sku = f"{category_prefix}-{name_prefix}-{count:03d}"
+            
+            return sku
+        except Exception as e:
+            # Fallback to simple SKU
+            count = self.product_collection.count_documents({'isDeleted': {'$ne': True}}) + 1
+            return f"PROD-{count:06d}"
+    
+    def calculate_similarity(self, str1, str2):
+        """Calculate similarity between two strings (0.0 to 1.0)"""
+        try:
+            from difflib import SequenceMatcher
+            return SequenceMatcher(None, str1, str2).ratio()
+        except ImportError:
+            # Fallback: simple character comparison
+            if str1 == str2:
+                return 1.0
+            elif str1 in str2 or str2 in str1:
+                return 0.8
+            else:
+                return 0.0
+    
+    def create_product(self, product_data):
+        """Create a new product - ENHANCED WITH DUPLICATE PREVENTION"""
+        try:
+            print(f"Creating single product: {product_data.get('product_name', 'Unknown')}")
+            
+            # Validate foreign keys
+            self.validate_foreign_keys(product_data)
+            
+            # Generate SKU if not provided
+            if not product_data.get('SKU'):
+                product_data['SKU'] = self.generate_sku(
+                    product_data.get('product_name', 'Product'),
+                    product_data.get('category_id')
+                )
+            
+            # ENHANCED DUPLICATE VALIDATION FOR SINGLE PRODUCT
+            
+            # Check if SKU already exists among non-deleted products
+            existing_product = self.product_collection.find_one({
+                'SKU': product_data['SKU'], 
+                'isDeleted': {'$ne': True}
+            })
+            if existing_product:
+                raise ValueError(f"Product with SKU '{product_data['SKU']}' already exists")
+            
+            # Check if product name already exists (case-insensitive)
+            product_name = product_data.get('product_name', '').strip()
+            if product_name:
+                existing_name = self.product_collection.find_one({
+                    'product_name': {'$regex': f'^{re.escape(product_name)}$', '$options': 'i'}, 
+                    'isDeleted': {'$ne': True}
+                })
+                if existing_name:
+                    raise ValueError(f"Product with name '{product_name}' already exists")
+            
+            # Convert string IDs to ObjectIds
+            for field in ['category_id', 'supplier_id', 'branch_id']:
+                if field in product_data and product_data[field] and ObjectId.is_valid(product_data[field]):
+                    product_data[field] = ObjectId(product_data[field])
+            
+            # Set default values
+            current_time = datetime.utcnow()
+            product_data.update({
+                'date_received': product_data.get('date_received', current_time),
+                'status': product_data.get('status', 'active'),
+                'is_taxable': product_data.get('is_taxable', True),
+                'isDeleted': False,  # Initialize as not deleted
+                'created_at': current_time,
+                'updated_at': current_time
+            })
+            
+            # Initialize sync logs - mark as needing sync since it's a new record
+            product_data['sync_logs'] = [
+                self.add_sync_log(source='cloud', status='pending', details={'action': 'created'})
+            ]
+            
+            # Ensure numeric fields are properly typed
+            numeric_fields = ['stock', 'low_stock_threshold', 'cost_price', 'selling_price']
+            for field in numeric_fields:
+                if field in product_data:
+                    try:
+                        if field in ['stock', 'low_stock_threshold']:
+                            product_data[field] = int(product_data[field])
+                        else:
+                            product_data[field] = float(product_data[field])
+                    except (ValueError, TypeError):
+                        product_data[field] = 0
+            
+            # Insert product
+            result = self.product_collection.insert_one(product_data)
+
+            # Return created product
+            created_product = self.product_collection.find_one({'_id': result.inserted_id})
+            
+             # Create general notification for new products
+            try:
+                product_name = product_data.get("product_name", product_data.get("SKU", "Unknown Product"))
+                
+                notification_service.create_notification(
+                    title="New Product Added",
+                    message=f"A new product '{product_name}' has been added to the system",
+                    priority="low",
+                    notification_type="system",
+                    metadata={
+                        "product_id": str(result.inserted_id),  # Fixed
+                        "SKU": product_data["SKU"],
+                        "product_name": product_name,  # Fixed
+                        "registration_source": "product_creation",
+                        "action_type": "product_created"
+                    }
+                )
+                
+            except Exception as notification_error:
+                # Log the notification error but don't fail the product creation
+                print(f"Failed to create notification for the new product: {notification_error}")
+                # You can add proper logging here instead of print
+
+            return self.convert_object_id(created_product)
+        
+        except Exception as e:
+            raise Exception(f"Error creating product: {str(e)}")
+    
+    def get_all_products(self, filters=None, include_deleted=False):
+        """Get all products with optional filters"""
+        try:
+            query = {}
+            
+            # By default, exclude deleted products unless specifically requested
+            if not include_deleted:
+                query['isDeleted'] = {'$ne': True}
+            
+            if filters:
+                # Category filter
+                if filters.get('category_id'):
+                    if ObjectId.is_valid(filters['category_id']):
+                        query['category_id'] = ObjectId(filters['category_id'])
+                    else:
+                        query['category_id'] = filters['category_id']
+                
+                # Status filter
+                if filters.get('status'):
+                    query['status'] = filters['status']
+                
+                # Stock level filter
+                if filters.get('stock_level'):
+                    if filters['stock_level'] == 'out_of_stock':
+                        query['stock'] = 0
+                    elif filters['stock_level'] == 'low_stock':
+                        query['$expr'] = {'$lte': ['$stock', '$low_stock_threshold']}
+                
+                # Search filter
+                if filters.get('search'):
+                    search_regex = {'$regex': filters['search'], '$options': 'i'}
+                    query['$or'] = [
+                        {'product_name': search_regex},
+                        {'SKU': search_regex},
+                        {'_id': search_regex}
+                    ]
+            
+            products = list(self.product_collection.find(query).sort('product_name', 1))
+            return [self.convert_object_id(product) for product in products]
+        
+        except Exception as e:
+            raise Exception(f"Error getting products: {str(e)}")
+    
+    def get_product_by_id(self, product_id, include_deleted=False):
+        """Get product by ID"""
+        try:
+            if not ObjectId.is_valid(product_id):
+                return None
+            
+            query = {'_id': ObjectId(product_id)}
+            
+            # By default, exclude deleted products unless specifically requested
+            if not include_deleted:
+                query['isDeleted'] = {'$ne': True}
+            
+            product = self.product_collection.find_one(query)
+            return self.convert_object_id(product) if product else None
+        
+        except Exception as e:
+            raise Exception(f"Error getting product: {str(e)}")
+    
+    def get_product_by_sku(self, sku, include_deleted=False):
+        """Get product by SKU"""
+        try:
+            query = {'SKU': sku}
+            
+            # By default, exclude deleted products unless specifically requested
+            if not include_deleted:
+                query['isDeleted'] = {'$ne': True}
+            
+            product = self.product_collection.find_one(query)
+            return self.convert_object_id(product) if product else None
+        
+        except Exception as e:
+            raise Exception(f"Error getting product by SKU: {str(e)}")
+    
+    def update_product(self, product_id, product_data):
+        """Update product"""
+        try:
+            if not ObjectId.is_valid(product_id):
+                return None
+            
+            # Check if product exists and is not deleted
+            existing_product = self.get_product_by_id(product_id, include_deleted=False)
+            if not existing_product:
+                raise Exception(f"Product with ID {product_id} not found or is deleted")
+            
+            # Validate foreign keys if they're being updated
+            self.validate_foreign_keys(product_data)
+            
+            # Convert string IDs to ObjectIds
+            for field in ['category_id', 'supplier_id', 'branch_id']:
+                if field in product_data and product_data[field] and ObjectId.is_valid(product_data[field]):
+                    product_data[field] = ObjectId(product_data[field])
+            
+            # Ensure numeric fields are properly typed
+            numeric_fields = ['stock', 'low_stock_threshold', 'cost_price', 'selling_price']
+            for field in numeric_fields:
+                if field in product_data:
+                    try:
+                        if field in ['stock', 'low_stock_threshold']:
+                            product_data[field] = int(product_data[field])
+                        else:
+                            product_data[field] = float(product_data[field])
+                    except (ValueError, TypeError):
+                        pass  # Keep original value if conversion fails
+            
+            # Add updated timestamp
+            product_data['updated_at'] = datetime.utcnow()
+            
+            # Update product (only non-deleted products)
+            result = self.product_collection.update_one(
+                {'_id': ObjectId(product_id), 'isDeleted': {'$ne': True}}, 
+                {'$set': product_data}
+            )
+            
+            if result.modified_count > 0:
+                # Mark as needing sync since data was updated
+                self.update_sync_status(product_id, sync_status='pending', source='cloud')
+                
+                updated_product = self.product_collection.find_one({'_id': ObjectId(product_id)})
+                return self.convert_object_id(updated_product)
+            return None
+        
+        except Exception as e:
+            raise Exception(f"Error updating product: {str(e)}")
+    
+    def update_stock(self, product_id, stock_data):
+        """Update product stock with various operation types"""
+        try:
+            if not ObjectId.is_valid(product_id):
+                return None
+            
+            # Get current product to access current stock (only non-deleted)
+            current_product = self.product_collection.find_one({
+                '_id': ObjectId(product_id),
+                'isDeleted': {'$ne': True}
+            })
+            if not current_product:
+                raise Exception(f"Product with ID {product_id} not found or is deleted")
+            
+            current_stock = current_product.get('stock', 0)
+            
+            # Extract operation details
+            operation_type = stock_data.get('operation_type', 'set')
+            quantity = int(stock_data.get('quantity', 0))
+            reason = stock_data.get('reason', 'Manual adjustment')
+            
+            # Calculate new stock based on operation type
+            if operation_type == 'add':
+                new_stock = current_stock + quantity
+            elif operation_type == 'remove':
+                new_stock = max(0, current_stock - quantity)  # Don't allow negative stock
+            elif operation_type == 'set':
+                new_stock = quantity
+            else:
+                raise ValueError(f"Invalid operation type: {operation_type}")
+            
+            # Validate new stock
+            if new_stock < 0:
+                raise ValueError("Stock cannot be negative")
+            
+            # Create stock history entry (separate from sync logs)
+            current_time = datetime.utcnow()
+            stock_history_entry = {
+                'timestamp': current_time,
+                'operation': operation_type,
+                'quantity': quantity,
+                'previous_stock': current_stock,
+                'new_stock': new_stock,
+                'reason': reason,
+                'performed_by': 'system'  # This could be user ID in the future
+            }
+            
+            # Update the product (only non-deleted products)
+            update_data = {
+                'stock': new_stock,
+                'updated_at': current_time
+            }
+            
+            result = self.product_collection.update_one(
+                {'_id': ObjectId(product_id), 'isDeleted': {'$ne': True}}, 
+                {
+                    '$set': update_data,
+                    '$push': {'stock_history': stock_history_entry}
+                }
+            )
+            
+            if result.modified_count > 0:
+                # Mark as needing sync since stock was updated
+                self.update_sync_status(product_id, sync_status='pending', source='cloud')
+                
+                updated_product = self.product_collection.find_one({'_id': ObjectId(product_id)})
+                return self.convert_object_id(updated_product)
+            return None
+        
+        except Exception as e:
+            raise Exception(f"Error updating stock: {str(e)}")
+        
+    def bulk_update_stock(self, stock_updates):
+        """Update multiple products' stock in batch"""
+        try:
+            results = []
+            for update in stock_updates:
+                product_id = update.get('product_id')
+                stock_data = {
+                    'operation_type': update.get('operation_type', 'set'),
+                    'quantity': update.get('quantity', 0),
+                    'reason': update.get('reason', 'Bulk update')
+                }
+                
+                result = self.update_stock(product_id, stock_data)
+                results.append({
+                    'product_id': product_id,
+                    'success': result is not None,
+                    'result': result
+                })
+            
+            return results
+        
+        except Exception as e:
+            raise Exception(f"Error in bulk stock update: {str(e)}")
+        
+    def adjust_stock_for_sale(self, product_id, quantity_sold):
+        """Reduce stock when a sale is made"""
+        try:
+            stock_data = {
+                'operation_type': 'remove',
+                'quantity': quantity_sold,
+                'reason': 'Sale transaction'    
+            }
+            return self.update_stock(product_id, stock_data)
+    
+        except Exception as e:
+            raise Exception(f"Error adjusting stock for sale: {str(e)}")
+    
+    def restock_product(self, product_id, quantity_received, supplier_info=None):
+        """Add stock when receiving new inventory"""
+        try:
+            reason = f"Restock from supplier"
+            if supplier_info:
+                reason += f" - {supplier_info.get('name', 'Unknown')}"
+            
+            stock_data = {
+                'operation_type': 'add',
+                'quantity': quantity_received,
+                'reason': reason
+            }
+            return self.update_stock(product_id, stock_data)
+        
+        except Exception as e:
+            raise Exception(f"Error restocking product: {str(e)}")
+
+    def delete_product(self, product_id, hard_delete=False):
+        """Soft delete or hard delete a product"""
+        try:
+            if not ObjectId.is_valid(product_id):
+                return False
+            
+            if hard_delete:
+                # Hard delete - permanently remove from database
+                result = self.product_collection.delete_one({'_id': ObjectId(product_id)})
+                return result.deleted_count > 0
+            else:
+                # Soft delete - mark as deleted with timestamp and reason
+                current_time = datetime.utcnow()
+                
+                # Create deletion log entry
+                deletion_log = {
+                    'deleted_at': current_time,
+                    'deleted_by': 'system',  # This could be user ID in the future
+                    'reason': 'Manual deletion'
+                }
+                
+                # Update product to mark as deleted
+                result = self.product_collection.update_one(
+                    {'_id': ObjectId(product_id), 'isDeleted': {'$ne': True}},
+                    {
+                        '$set': {
+                            'isDeleted': True,
+                            'updated_at': current_time,
+                            'deletion_log': deletion_log
+                        }
+                    }
+                )
+                
+                if result.modified_count > 0:
+                    # Mark as needing sync since product was deleted
+                    self.update_sync_status(product_id, sync_status='pending_deletion', source='cloud')
+                    return True
+                
+                return False
+        
+        except Exception as e:
+            raise Exception(f"Error deleting product: {str(e)}")
+    
+    def restore_product(self, product_id):
+        """Restore a soft-deleted product"""
+        try:
+            if not ObjectId.is_valid(product_id):
+                return False
+            
+            current_time = datetime.utcnow()
+            
+            # Create restoration log entry
+            restoration_log = {
+                'restored_at': current_time,
+                'restored_by': 'system',  # This could be user ID in the future
+                'reason': 'Manual restoration'
+            }
+            
+            # Update product to restore it
+            result = self.product_collection.update_one(
+                {'_id': ObjectId(product_id), 'isDeleted': True},
+                {
+                    '$set': {
+                        'isDeleted': False,
+                        'updated_at': current_time,
+                        'restoration_log': restoration_log
+                    },
+                    '$unset': {
+                        'deletion_log': 1  # Remove deletion log when restoring
+                    }
+                }
+            )
+            
+            if result.modified_count > 0:
+                # Mark as needing sync since product was restored
+                self.update_sync_status(product_id, sync_status='pending', source='cloud')
+                return True
+            
+            return False
+        
+        except Exception as e:
+            raise Exception(f"Error restoring product: {str(e)}")
+    
+    def get_deleted_products(self):
+        """Get all soft-deleted products"""
+        try:
+            products = list(self.product_collection.find({'isDeleted': True}).sort('deletion_log.deleted_at', -1))
+            return [self.convert_object_id(product) for product in products]
+        
+        except Exception as e:
+            raise Exception(f"Error getting deleted products: {str(e)}")
+    
+    def get_low_stock_products(self, branch_id=None):
+        """Get products with low stock (excluding deleted)"""
+        try:
+            query = {
+                '$expr': {'$lte': ['$stock', '$low_stock_threshold']},
+                'isDeleted': {'$ne': True}
+            }
+            
+            if branch_id and ObjectId.is_valid(branch_id):
+                query['branch_id'] = ObjectId(branch_id)
+            
+            products = list(self.product_collection.find(query))
+            return [self.convert_object_id(product) for product in products]
+        
+        except Exception as e:
+            raise Exception(f"Error getting low stock products: {str(e)}")
+    
+    def get_products_by_category(self, category_id):
+        """Get products by category (excluding deleted)"""
+        try:
+            if not ObjectId.is_valid(category_id):
+                return []
+            
+            products = list(self.product_collection.find({
+                'category_id': ObjectId(category_id),
+                'isDeleted': {'$ne': True}
+            }))
+            return [self.convert_object_id(product) for product in products]
+        
+        except Exception as e:
+            raise Exception(f"Error getting products by category: {str(e)}")
+    
+    def get_expiring_products(self, days_ahead=30):
+        """Get products expiring within specified days (excluding deleted)"""
+        try:
+            from datetime import timedelta
+            
+            future_date = datetime.utcnow() + timedelta(days=days_ahead)
+            
+            query = {
+                'expiry_date': {
+                    '$lte': future_date,
+                    '$gte': datetime.utcnow()
+                },
+                'isDeleted': {'$ne': True}
+            }
+            
+            products = list(self.product_collection.find(query).sort('expiry_date', 1))
+            return [self.convert_object_id(product) for product in products]
+        
+        except Exception as e:
+            raise Exception(f"Error getting expiring products: {str(e)}")
+
+    # Sync-related methods for future local/cloud synchronization
+    
+    def prepare_for_sync_to_local(self):
+        """Get all products that need to be synced to local database"""
+        return self.get_unsynced_products(source='cloud')
+    
+    def prepare_for_sync_to_cloud(self):
+        """Get all products that need to be synced to cloud database"""
+        return self.get_unsynced_products(source='local')
+    
+    def sync_from_local(self, local_products):
+        """Sync products from local database to cloud"""
+        try:
+            sync_results = []
+            
+            for product_data in local_products:
+                try:
+                    product_id = product_data.get('_id')
+                    
+                    if product_id:
+                        # Update existing product
+                        result = self.update_product(product_id, product_data)
+                        if result:
+                            self.mark_as_synced(product_id, source='local')
+                            sync_results.append({'product_id': product_id, 'status': 'updated'})
+                    else:
+                        # Create new product
+                        result = self.create_product(product_data)
+                        if result:
+                            self.mark_as_synced(result['_id'], source='local')
+                            sync_results.append({'product_id': result['_id'], 'status': 'created'})
+                            
+                except Exception as e:
+                    sync_results.append({'product_id': product_data.get('_id'), 'status': 'error', 'error': str(e)})
+            
+            return sync_results
+        
+        except Exception as e:
+            raise Exception(f"Error syncing from local: {str(e)}")
+    
+    def sync_to_local(self):
+        """Prepare cloud products for sync to local database"""
+        try:
+            # Get all products that need to be synced
+            products_to_sync = self.prepare_for_sync_to_local()
+            
+            # Mark them as synced once they're prepared for sync
+            for product in products_to_sync:
+                self.mark_as_synced(product['_id'], source='cloud')
+            
+            return products_to_sync
+        
+        except Exception as e:
+            raise Exception(f"Error preparing sync to local: {str(e)}")
+        
+    def bulk_create_products(self, products_data):
+        """Create multiple products in batch with validation - ENHANCED DUPLICATE PREVENTION"""
+        try:
+            print("=== BULK CREATE SERVICE DEBUG START ===")
+            print(f"Processing {len(products_data)} products")
+            
+            validated_products = []
+            errors = []
+            seen_skus = set()  # Track SKUs in current batch
+            seen_names = set()  # Track product names in current batch
+            
+            for i, product_data in enumerate(products_data):
+                try:
+                    print(f"Processing product {i+1}: {product_data.get('product_name', 'Unknown')}")
+                    
+                    # Validate foreign keys
+                    self.validate_foreign_keys(product_data)
+                    
+                    # Generate SKU if not provided
+                    if not product_data.get('SKU'):
+                        product_data['SKU'] = self.generate_sku(
+                            product_data.get('product_name', 'Product'),
+                            product_data.get('category_id')
+                        )
+                        print(f"Generated SKU: {product_data['SKU']}")
+                    
+                    # ENHANCED DUPLICATE VALIDATION
+                    
+                    # 1. Check for duplicate SKUs in current batch
+                    if product_data['SKU'] in seen_skus:
+                        raise ValueError(f"Duplicate SKU in current batch: {product_data['SKU']}")
+                    
+                    # 2. Check for duplicate SKUs in database
+                    existing_sku = self.product_collection.find_one({
+                        'SKU': product_data['SKU'], 
+                        'isDeleted': {'$ne': True}
+                    })
+                    if existing_sku:
+                        raise ValueError(f"Product with SKU '{product_data['SKU']}' already exists in database")
+                    
+                    # 3. Check for duplicate product names in current batch
+                    product_name_lower = product_data.get('product_name', '').strip().lower()
+                    if product_name_lower in seen_names:
+                        raise ValueError(f"Duplicate product name in current batch: {product_data.get('product_name')}")
+                    
+                    # 4. Check for duplicate product names in database (case-insensitive)
+                    if product_name_lower:
+                        existing_name = self.product_collection.find_one({
+                            'product_name': {'$regex': f'^{re.escape(product_data.get("product_name", ""))}$', '$options': 'i'}, 
+                            'isDeleted': {'$ne': True}
+                        })
+                        if existing_name:
+                            raise ValueError(f"Product with name '{product_data.get('product_name')}' already exists in database")
+                    
+                    # 5. Check for similar product names (optional - helps prevent near-duplicates)
+                    if product_name_lower:
+                        # Look for very similar names (90% similarity)
+                        similar_products = list(self.product_collection.find({
+                            'isDeleted': {'$ne': True}
+                        }, {'product_name': 1}))
+                        
+                        for similar_product in similar_products:
+                            existing_name = similar_product.get('product_name', '').strip().lower()
+                            if self.calculate_similarity(product_name_lower, existing_name) > 0.9:
+                                raise ValueError(f"Very similar product already exists: '{similar_product.get('product_name')}' vs '{product_data.get('product_name')}'")
+                    
+                    # Track this product's identifiers
+                    seen_skus.add(product_data['SKU'])
+                    seen_names.add(product_name_lower)
+                    
+                    # Convert string IDs to ObjectIds
+                    for field in ['category_id', 'supplier_id', 'branch_id']:
+                        if field in product_data and product_data[field] and ObjectId.is_valid(product_data[field]):
+                            product_data[field] = ObjectId(product_data[field])
+                    
+                    # Set default values
+                    current_time = datetime.utcnow()
+                    product_data.update({
+                        'date_received': product_data.get('date_received', current_time),
+                        'status': product_data.get('status', 'active'),
+                        'is_taxable': product_data.get('is_taxable', True),
+                        'isDeleted': False,
+                        'created_at': current_time,
+                        'updated_at': current_time,
+                        'sync_logs': [self.add_sync_log(source='cloud', status='pending', details={'action': 'bulk_created'})]
+                    })
+                    
+                    # Ensure numeric fields are properly typed
+                    numeric_fields = ['stock', 'low_stock_threshold', 'cost_price', 'selling_price']
+                    for field in numeric_fields:
+                        if field in product_data:
+                            try:
+                                if field in ['stock', 'low_stock_threshold']:
+                                    product_data[field] = int(product_data[field])
+                                else:
+                                    product_data[field] = float(product_data[field])
+                            except (ValueError, TypeError):
+                                product_data[field] = 0
+                    
+                    validated_products.append(product_data)
+                    print(f"✅ Product {i+1} validated successfully")
+                    
+                except Exception as e:
+                    print(f"❌ Product {i+1} validation failed: {str(e)}")
+                    errors.append({
+                        'index': i,
+                        'data': product_data,
+                        'error': str(e)
+                    })
+            
+            # Perform bulk insert for validated products
+            results = {
+                'successful': [],
+                'failed': errors,
+                'total_processed': len(products_data),
+                'total_successful': 0,
+                'total_failed': len(errors)
+            }
+            
+            if validated_products:
+                print(f"Inserting {len(validated_products)} validated products...")
+                
+                # Use MongoDB's insert_many for better performance
+                insert_result = self.product_collection.insert_many(validated_products, ordered=False)
+                
+                # Get inserted products
+                inserted_products = list(self.product_collection.find({
+                    '_id': {'$in': insert_result.inserted_ids}
+                }))
+                
+                results['successful'] = [self.convert_object_id(product) for product in inserted_products]
+                results['total_successful'] = len(inserted_products)
+                
+                print(f"✅ Successfully inserted {len(inserted_products)} products")
+            
+            print("=== BULK CREATE SERVICE DEBUG END ===")
+            return results
+            
+        except Exception as e:
+            print(f"❌ Bulk create service error: {str(e)}")
+            raise Exception(f"Error in bulk product creation: {str(e)}")
+
+        
+    def parse_import_file(self, file_path, file_type='csv'):
+        """Parse CSV or Excel file for product import"""
+        try:
+            import pandas as pd
+            
+            # Read file based on type
+            if file_type.lower() == 'csv':
+                df = pd.read_csv(file_path)
+            elif file_type.lower() in ['xlsx', 'xls']:
+                df = pd.read_excel(file_path)
+            else:
+                raise ValueError(f"Unsupported file type: {file_type}")
+            
+            # Define expected columns and their mappings
+            column_mapping = {
+                'product_name': ['product_name', 'name', 'product', 'item_name'],
+                'SKU': ['sku', 'SKU', 'product_code', 'code'],
+                'category_id': ['category_id', 'category', 'category_name'],
+                'supplier_id': ['supplier_id', 'supplier', 'supplier_name'],
+                'stock': ['stock', 'quantity', 'qty', 'current_stock'],
+                'low_stock_threshold': ['low_stock_threshold', 'min_stock', 'reorder_level'],
+                'cost_price': ['cost_price', 'cost', 'purchase_price'],
+                'selling_price': ['selling_price', 'price', 'sale_price'],
+                'unit': ['unit', 'unit_of_measure', 'uom'],
+                'expiry_date': ['expiry_date', 'expiration_date', 'exp_date'],
+                'status': ['status', 'active', 'enabled']
+            }
+            
+            # Normalize column names and map to expected fields
+            products_data = []
+            for _, row in df.iterrows():
+                product_data = {}
+                
+                for expected_field, possible_columns in column_mapping.items():
+                    value = None
+                    for col in possible_columns:
+                        if col in df.columns:
+                            value = row[col]
+                            if pd.notna(value):  # Check if not NaN
+                                break
+                    
+                    if value is not None and pd.notna(value):
+                        # Handle category/supplier name to ID conversion
+                        if expected_field == 'category_id' and not ObjectId.is_valid(str(value)):
+                            # Look up category by name
+                            category = self.category_collection.find_one({'name': {'$regex': f'^{value}$', '$options': 'i'}})
+                            product_data[expected_field] = str(category['_id']) if category else None
+                        elif expected_field == 'supplier_id' and not ObjectId.is_valid(str(value)):
+                            # Look up supplier by name
+                            supplier = self.supplier_collection.find_one({'name': {'$regex': f'^{value}$', '$options': 'i'}})
+                            product_data[expected_field] = str(supplier['_id']) if supplier else None
+                        else:
+                            product_data[expected_field] = value
+                
+                # Only add if required fields are present
+                if product_data.get('product_name'):
+                    products_data.append(product_data)
+            
+            return {
+                'products_data': products_data,
+                'total_rows': len(df),
+                'valid_products': len(products_data),
+                'columns_found': list(df.columns)
+            }
+            
+        except Exception as e:
+            raise Exception(f"Error parsing import file: {str(e)}")
+        
+    def import_products_from_file(self, file_path, file_type='csv', validate_only=False):
+        """Import products from CSV or Excel file"""
+        try:
+            # Parse the file
+            parse_result = self.parse_import_file(file_path, file_type)
+            
+            if validate_only:
+                # Only validate, don't create products
+                validation_errors = []
+                for i, product_data in enumerate(parse_result['products_data']):
+                    try:
+                        self.validate_foreign_keys(product_data)
+                    except Exception as e:
+                        validation_errors.append({
+                            'row': i + 2,  # +2 for header and 0-based index
+                            'error': str(e),
+                            'data': product_data
+                        })
+                
+                return {
+                    'validation_only': True,
+                    'total_rows': parse_result['total_rows'],
+                    'valid_products': parse_result['valid_products'],
+                    'validation_errors': validation_errors,
+                    'columns_found': parse_result['columns_found']
+                }
+            
+            # Create products in bulk
+            bulk_result = self.bulk_create_products(parse_result['products_data'])
+            
+            return {
+                'import_completed': True,
+                'file_info': {
+                    'total_rows': parse_result['total_rows'],
+                    'valid_products': parse_result['valid_products'],
+                    'columns_found': parse_result['columns_found']
+                },
+                'bulk_result': bulk_result
+            }
+            
+        except Exception as e:
+            raise Exception(f"Error importing products from file: {str(e)}")
+        
+    def generate_import_template(self, file_type='csv'):
+        """Generate a template file for product import"""
+        try:
+            import pandas as pd
+            
+            # Define template columns
+            template_data = {
+                'product_name': ['Sample Noodle 1', 'Sample Drink 1'],
+                'SKU': ['NOOD-SAMP-001', 'DRIN-SAMP-001'],
+                'category_id': ['category_name_or_id', 'category_name_or_id'],
+                'supplier_id': ['supplier_name_or_id', 'supplier_name_or_id'],
+                'stock': [100, 50],
+                'low_stock_threshold': [10, 5],
+                'cost_price': [15.00, 25.00],
+                'selling_price': [20.00, 30.00],
+                'unit': ['piece', 'bottle'],
+                'expiry_date': ['2025-12-31', '2025-06-30'],
+                'status': ['active', 'active']
+            }
+            
+            df = pd.DataFrame(template_data)
+            
+            if file_type.lower() == 'csv':
+                template_path = 'product_import_template.csv'
+                df.to_csv(template_path, index=False)
+            elif file_type.lower() == 'xlsx':
+                template_path = 'product_import_template.xlsx'
+                df.to_excel(template_path, index=False)
+            else:
+                raise ValueError(f"Unsupported template type: {file_type}")
+            
+            return template_path
+            
+        except Exception as e:
+            raise Exception(f"Error generating import template: {str(e)}")
