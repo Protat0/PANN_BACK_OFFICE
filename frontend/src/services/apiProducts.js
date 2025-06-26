@@ -1,4 +1,4 @@
-// services/apiProducts.js - UPDATED VERSION
+// services/apiProducts.js - UPDATED VERSION WITH ENHANCED CSV TEMPLATE
 import { api } from './api.js';
 
 class ProductsApiService {
@@ -255,6 +255,136 @@ class ProductsApiService {
       return this.handleResponse(response);
     } catch (error) {
       this.handleError(error);
+    }
+  }
+
+  // TEMPLATE DOWNLOAD METHODS - UPDATED TO USE CSV PRIMARILY
+
+  /**
+   * Download import template for client-side generation - SIMPLIFIED VERSION
+   * @param {string} fileType - Template format ('csv' or 'xlsx')
+   * @returns {void} Downloads template file directly
+   */
+  downloadImportTemplateClient(fileType = 'csv') {
+    try {
+      console.log('Generating client-side import template:', fileType);
+      
+      // Define template headers matching backend expectations
+      const templateHeaders = [
+        'product_name',
+        'SKU', 
+        'category',
+        'supplier',
+        'stock',
+        'low_stock_threshold',
+        'cost_price',
+        'selling_price',
+        'tax_percentage',
+        'unit',
+        'expiry_date'
+      ];
+
+      if (fileType.toLowerCase() === 'csv') {
+        this._downloadSimpleCSVTemplate(templateHeaders);
+      } else if (fileType.toLowerCase() === 'xlsx') {
+        this._downloadSimpleExcelTemplate(templateHeaders);
+      } else {
+        throw new Error(`Unsupported file type: ${fileType}`);
+      }
+      
+      console.log('Template download initiated successfully');
+    } catch (error) {
+      console.error('Error downloading template:', error);
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Simple CSV template without sample data
+   * @param {Array<string>} headers - Column headers
+   * @private
+   */
+  _downloadSimpleCSVTemplate(headers) {
+    try {
+      // Create simple CSV content with just headers and empty rows
+      const csvRows = [
+        // Headers row
+        headers.join(','),
+        
+        // Empty rows for user input (no defaults)
+        ...Array(20).fill().map(() => 
+          headers.map(() => '').join(',')
+        )
+      ];
+
+      // Join all rows
+      const csvContent = csvRows.join('\n');
+
+      // Create and download the file with UTF-8 BOM for Excel compatibility
+      const BOM = '\uFEFF';
+      const blob = new Blob([BOM + csvContent], { 
+        type: 'text/csv;charset=utf-8;' 
+      });
+      
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'product_import_template.csv');
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      console.log('Simple CSV template downloaded successfully');
+    } catch (error) {
+      console.error('Error creating simple CSV template:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Simple Excel template
+   * @param {Array<string>} headers - Column headers
+   * @private
+   */
+  _downloadSimpleExcelTemplate(headers) {
+    try {
+      if (typeof window !== 'undefined' && window.XLSX) {
+        const worksheetData = [
+          headers,
+          ...Array(20).fill().map(() => new Array(headers.length).fill(''))
+        ];
+        
+        const worksheet = window.XLSX.utils.aoa_to_sheet(worksheetData);
+        
+        // Set column widths
+        worksheet['!cols'] = [
+          { wch: 25 }, // product_name
+          { wch: 15 }, // SKU
+          { wch: 12 }, // category
+          { wch: 15 }, // supplier
+          { wch: 8 },  // stock
+          { wch: 18 }, // low_stock_threshold
+          { wch: 12 }, // cost_price
+          { wch: 12 }, // selling_price
+          { wch: 15 }, // tax_percentage
+          { wch: 8 },  // unit
+          { wch: 12 }  // expiry_date
+        ];
+        
+        const workbook = window.XLSX.utils.book_new();
+        window.XLSX.utils.book_append_sheet(workbook, worksheet, 'Products');
+        
+        window.XLSX.writeFile(workbook, 'product_import_template.xlsx');
+        
+      } else {
+        // Fallback to CSV if XLSX not available
+        this._downloadSimpleCSVTemplate(headers);
+      }
+    } catch (error) {
+      console.error('Excel template creation failed, using CSV:', error);
+      this._downloadSimpleCSVTemplate(headers);
     }
   }
 

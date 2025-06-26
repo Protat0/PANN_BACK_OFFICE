@@ -410,6 +410,12 @@
       @close="closeColumnFilter"
       @apply="applyColumnFilter"
     />
+
+    <ImportModal
+      ref="importModal"
+      @import-completed="handleImportSuccess"
+      @import-failed="handleImportError"
+    />
   </div>
 </template>
 
@@ -422,6 +428,7 @@ import ReportsModal from '../../components/products/ReportsModal.vue'
 import ColumnFilterModal from '../../components/products/ColumnFilterModal.vue'
 import DataTable from '@/components/common/TableTemplate.vue'
 import CardTemplate from '@/components/common/CardTemplate.vue'
+import ImportModal from '../../components/products/ImportModal.vue'
 import { 
   Plus, 
   Download, 
@@ -446,6 +453,7 @@ export default {
     StockUpdateModal,
     ViewProductModal,
     ColumnFilterModal,
+    ImportModal,
     ReportsModal,
     DataTable,
     CardTemplate,
@@ -510,6 +518,8 @@ export default {
   },
   async mounted() {
     console.log('Products component mounted')
+    console.log('Bootstrap available:', typeof bootstrap !== 'undefined')
+    console.log('Bootstrap Modal:', bootstrap?.Modal)
     this.loadColumnVisibility()
     await this.fetchProducts()
     
@@ -553,8 +563,44 @@ export default {
     
     handleImport(event) {
       event.stopPropagation()
-      console.log('Show import modal')
+      console.log('🔍 Import button clicked')
+      
+      // Check if the modal element exists
+      const importModalElement = document.getElementById('importModal')
+      console.log('🔍 Modal element found:', importModalElement)
+      
+      if (importModalElement) {
+        console.log('🔍 Creating Bootstrap modal...')
+        try {
+          const modal = new bootstrap.Modal(importModalElement)
+          console.log('🔍 Modal created:', modal)
+          modal.show()
+          console.log('✅ Modal.show() called')
+        } catch (error) {
+          console.error('❌ Error creating/showing modal:', error)
+        }
+      } else {
+        console.error('❌ Modal element #importModal not found in DOM')
+      }
+      
       this.closeAddDropdown()
+    },
+
+    handleImportSuccess(result) {
+      this.successMessage = `Import completed! ${result.totalSuccessful || 0} products imported successfully.`
+      this.fetchProducts() // Refresh the product list
+      
+      setTimeout(() => {
+        this.successMessage = null
+      }, 5000)
+    },
+
+    handleImportError(error) {
+      this.error = `Import failed: ${error.message || 'An unexpected error occurred'}`
+      
+      setTimeout(() => {
+        this.error = null
+      }, 5000)
     },
 
     async fetchProducts() {
