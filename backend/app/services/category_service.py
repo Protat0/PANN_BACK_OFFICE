@@ -36,7 +36,7 @@ class CategoryService:
                 notification_service.create_notification(
                     title="New Category Created",
                     message=f"A new Category called '{category_name}' has been added to the system",
-                    priority="medium",
+                    priority="high",
                     notification_type="system",
                     metadata={
                         "category_id": str(category_result.inserted_id),
@@ -195,3 +195,108 @@ class CategoryService:
             return [self.convert_object_id(category) for category in categories]
         except Exception as e:
             raise Exception(f"Error searching categories: {str(e)}")
+
+class CategoryDisplayService:
+    def __init__(self):
+        self.db = db_manager.get_database()  
+        self.category_collection = self.db.category
+        self.sales_collection = self.db.sales_log
+
+    def get_categories_display(self):
+        """Get categories with sales data"""
+        try:
+            print("=== Starting get_categories_display ===")
+            
+            # Define projection and fetch invoices
+            projection = {
+                "_id": 1,
+                "item_list.item_name": 1,
+                "customer_id": 1,
+                "transaction_date": 1,
+                "payment_method": 1,
+                "sales_type": 1,
+                "total_amount": 1,
+                "item_list.quantity": 1,
+                "item_list.unit_price": 1, 
+            }
+            
+            print("About to fetch invoices...")
+            # Fetch invoices - THIS IS WHERE THE ERROR MIGHT BE
+            invoices = list(self.sales_collection.find({}, projection))
+            print(f"Fetched {len(invoices)} invoices successfully")
+
+            # Create a lookup dictionary for faster searching
+            item_sales_lookup = {}
+            print("Building item sales lookup...")
+
+            # Build the lookup dictionary from invoices
+            for invoice in invoices:
+                print(f"Processing invoice ID: {invoice.get('_id')}")
+                for item in invoice.get('item_list', []):
+                    item_name = item['item_name']
+                    if item_name not in item_sales_lookup:
+                        item_sales_lookup[item_name] = {'quantity': 0, 'total_sales': 0}
+                    
+                    item_total = item['quantity'] * item['unit_price']
+                    item_sales_lookup[item_name]['quantity'] += item['quantity']
+                    item_sales_lookup[item_name]['total_sales'] += item_total
+
+            print("About to fetch categories...")
+            # Now process categories using the lookup - THIS COULD ALSO BE THE ERROR
+            categories = list(self.category_collection.find({}))
+            print(f"Fetched {len(categories)} categories successfully")
+            
+            # Create result structure
+            categories_with_sales = []
+
+            for category in categories:
+                print(f"Processing category: {category.get('category_name')}")
+                category_name = category['category_name']
+                category_total_sales = 0
+                category_total_quantity = 0
+                subcategories_data = []
+                
+                for subcategory in category.get('sub_categories', []):
+                    subcategory_name = subcategory['name']
+                    
+                    # Get data from lookup (much faster)
+                    if subcategory_name in item_sales_lookup:
+                        subcategory_data = item_sales_lookup[subcategory_name]
+                        subcategory_total_quantity = subcategory_data['quantity']
+                        subcategory_total_sales = subcategory_data['total_sales']
+                    else:
+                        subcategory_total_quantity = 0
+                        subcategory_total_sales = 0
+                    
+                    category_total_sales += subcategory_total_sales
+                    category_total_quantity += subcategory_total_quantity
+                    
+                    # Add subcategory data to list
+                    subcategories_data.append({
+                        'name': subcategory_name,
+                        'quantity_sold': subcategory_total_quantity,
+                        'total_sales': subcategory_total_sales
+                    })
+                
+                # Add category data to result
+                categories_with_sales.append({
+                    '_id': str(category['_id']),  # Convert ObjectId to string
+                    'category_name': category_name,
+                    'description': category.get('description', ''),
+                    'status': category.get('status', ''),
+                    'date_created': category.get('date_created'),
+                    'last_updated': category.get('last_updated'),
+                    'total_quantity_sold': category_total_quantity,
+                    'total_sales': category_total_sales,
+                    'subcategories': subcategories_data
+                })
+
+            print(f"Returning {len(categories_with_sales)} categories with sales data")
+            return categories_with_sales
+            
+        except Exception as e:
+            print(f"ERROR in get_categories_display: {e}")
+            print(f"ERROR type: {type(e)}")
+            import traceback
+            print(f"TRACEBACK: {traceback.format_exc()}")
+            raise Exception(f"Error getting categories: {str(e)}")

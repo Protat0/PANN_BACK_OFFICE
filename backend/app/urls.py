@@ -76,16 +76,27 @@ from .kpi_views.category_views import (
     CategoryDetailView,
     CategoryKPIView,
     CategorySubcategoryView,
+    CategoryDataView,
 
 )
 
 from .kpi_views.saleslog_views import (
     SalesLogView,
-    SalesLogStatsView
+    SalesLogStatsView,
+    SalesItemHistoryView,
+    SalesTopItemView,
+    SalesTopItemChartView,
+)
+
+from .kpi_views.sales_bulk_views import (
+    SalesLogBulkImportView,
+    SalesLogTemplateView,
+    SalesLogExportView,
 )
 
 from .views import (
     APIDocumentationView,
+    
 )
 
 urlpatterns = [
@@ -163,16 +174,26 @@ urlpatterns = [
      path('customerkpidaily/', DailyCustomerKPIView.as_view(), name="get-daily-users"),
 
     # Category endpoints
-    path('category/', CategoryKPIView.as_view(), name="category-operations"),  # GET all categories, POST create category
+    path('category/', CategoryKPIView.as_view(), name="category-operations"), # GET all categories, POST create category
+    path('category/dataview/', CategoryDataView.as_view(), name="category-dataview"),  # DataView
     path('category/<str:category_id>/', CategoryDetailView.as_view(), name="category-detail"),  # GET, PUT, DELETE specific category
     path('category/<str:category_id>/subcategories/', CategorySubcategoryView.as_view(), name="category-subcategories"),  # Manage subcategories
+  
 
-    # Sales Log CRUD Operations
+   # Bulk import and template endpoints (MUST be first)
+    path('invoices/bulk-import/', SalesLogBulkImportView.as_view(), name='invoice-bulk-import'),
+    path('invoices/export/', SalesLogExportView.as_view(), name='invoice-export'),
+   # path('invoices/template/', SalesLogTemplateView.as_view(), name='invoice-template'), this is debugging
+    path('invoices/stats/', SalesLogStatsView.as_view(), name='invoice-stats'),
+    
+    # Generic CRUD operations (MUST be last)
     path('invoices/', SalesLogView.as_view(), name='invoice-list-create'),
     path('invoices/<str:invoice_id>/', SalesLogView.as_view(), name='invoice-detail'),
-    
-    # Sales Log Statistics
-    path('invoices/stats/', SalesLogStatsView.as_view(), name='invoice-stats'),
+
+    #Sales item Transaction History
+    path('reports/item-history/', SalesItemHistoryView.as_view(), name='sales_item_history'),
+    path('reports/top-item/', SalesTopItemView.as_view(), name='sales_top_item'),
+    path('reports/top-chart-item/', SalesTopItemChartView.as_view(), name='sales_chart_top_item'),
 
     # API Documentation
     path('docs/', APIDocumentationView.as_view(), name='api-documentation'),
