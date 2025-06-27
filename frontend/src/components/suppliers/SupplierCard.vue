@@ -1,0 +1,192 @@
+<template>
+  <div class="card h-100 supplier-card" :class="{ 'card-selected': isSelected }">
+    <div class="card-body d-flex flex-column">
+      <!-- Supplier Header with Checkbox -->
+      <div class="d-flex justify-content-between align-items-start mb-3">
+        <div class="d-flex align-items-center">
+          <input 
+            type="checkbox" 
+            class="form-check-input me-3"
+            :value="supplier.id"
+            :checked="isSelected"
+            @change="$emit('toggle-select', supplier.id)"
+          />
+          <div class="supplier-icon me-3">
+            <i class="bi bi-building"></i>
+          </div>
+          <h5 class="card-title mb-0 supplier-name">{{ supplier.name }}</h5>
+        </div>
+        <div class="dropdown">
+          <button 
+            class="btn btn-link p-0 text-muted"
+            type="button"
+            :id="`dropdownMenuButton${supplier.id}`"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+          >
+            <i class="bi bi-three-dots-vertical"></i>
+          </button>
+          <ul class="dropdown-menu" :aria-labelledby="`dropdownMenuButton${supplier.id}`">
+            <li>
+              <a class="dropdown-item" href="#" @click.prevent="$emit('edit', supplier)">
+                <i class="bi bi-pencil me-2"></i>Edit
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="#" @click.prevent="$emit('view', supplier)">
+                <i class="bi bi-eye me-2"></i>View Details
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="#" @click.prevent="$emit('create-order', supplier)">
+                <i class="bi bi-plus me-2"></i>New Order
+              </a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <a class="dropdown-item text-danger" href="#" @click.prevent="$emit('delete', supplier)">
+                <i class="bi bi-trash me-2"></i>Delete
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Supplier Info -->
+      <div class="mb-3">
+        <div class="supplier-contact mb-2">
+          <i class="bi bi-envelope text-muted me-2"></i>
+          <span class="text-muted">{{ supplier.email || 'No email' }}</span>
+        </div>
+        <div class="supplier-contact mb-2">
+          <i class="bi bi-telephone text-muted me-2"></i>
+          <span class="text-muted">{{ supplier.phone || 'No phone' }}</span>
+        </div>
+        <div class="supplier-contact">
+          <i class="bi bi-geo-alt text-muted me-2"></i>
+          <span class="text-muted">{{ getShortAddress(supplier.address) }}</span>
+        </div>
+      </div>
+
+      <!-- Purchase Orders Info -->
+      <div class="mb-3 mt-auto">
+        <p class="text-muted mb-1 purchase-orders-label">Purchase Orders</p>
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="purchase-orders-count">{{ supplier.purchaseOrders }}</span>
+          <span :class="['badge', 'rounded-pill', getStatusBadgeClass(supplier.status)]">
+            {{ formatStatus(supplier.status) }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="d-flex gap-2 mt-2">
+        <button 
+          class="btn btn-outline-primary btn-sm flex-fill"
+          @click="$emit('view', supplier)"
+        >
+          <i class="bi bi-eye me-1"></i>
+          View
+        </button>
+        <button 
+          class="btn btn-outline-success btn-sm flex-fill"
+          @click="$emit('create-order', supplier)"
+        >
+          <i class="bi bi-plus me-1"></i>
+          Order
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'SupplierCard',
+  emits: ['toggle-select', 'edit', 'view', 'create-order', 'delete'],
+  props: {
+    supplier: {
+      type: Object,
+      required: true
+    },
+    isSelected: {
+      type: Boolean,
+      default: false
+    }
+  },
+  methods: {
+    getStatusBadgeClass(status) {
+      const classes = {
+        active: 'text-bg-success',
+        inactive: 'text-bg-danger',
+        pending: 'text-bg-warning'
+      }
+      return classes[status] || 'text-bg-secondary'
+    },
+
+    formatStatus(status) {
+      return status.charAt(0).toUpperCase() + status.slice(1)
+    },
+
+    getShortAddress(address) {
+      if (!address) return 'No address'
+      return address.length > 50 ? address.substring(0, 50) + '...' : address
+    }
+  }
+}
+</script>
+
+<style scoped>
+/* Supplier card styling */
+.supplier-card {
+  border: 1px solid var(--neutral-medium);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  background-color: white;
+}
+
+.supplier-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.supplier-card.card-selected {
+  border-color: var(--primary);
+  background-color: var(--primary-light);
+}
+
+.supplier-icon {
+  width: 40px;
+  height: 40px;
+  background-color: var(--primary-light);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+}
+
+.supplier-name {
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.supplier-contact {
+  display: flex;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.purchase-orders-label {
+  font-size: 0.9rem;
+  color: var(--tertiary-dark);
+  margin-bottom: 0.25rem;
+}
+
+.purchase-orders-count {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+</style>

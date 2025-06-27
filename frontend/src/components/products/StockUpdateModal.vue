@@ -166,7 +166,7 @@
 </template>
 
 <script>
-import { useStockUpdate } from '@/composables/ui/modals/useStockUpdate'
+import { useStockUpdate } from '@/composables/ui/products/useStockUpdate'
 import { onMounted, onBeforeUnmount } from 'vue'
 
 export default {

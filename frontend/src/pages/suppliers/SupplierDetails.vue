@@ -15,7 +15,63 @@
           <p class="text-muted mb-0">View and manage supplier information</p>
         </div>
       </div>
-      <div class="header-actions d-flex gap-2">
+      <div class="header-actions d-flex gap-2" v-if="!loading && supplier">
+        <!-- Quick Actions Dropdown -->
+        <div class="dropdown">
+          <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+            <Zap :size="16" class="me-1" />
+            Quick Actions
+          </button>
+          <ul class="dropdown-menu dropdown-menu-modern">
+            <li>
+              <a class="dropdown-item" href="#" @click.prevent="createOrder">
+                <Plus :size="16" class="me-2" />
+                Create Purchase Order
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="#" @click.prevent="viewPaymentHistory">
+                <CreditCard :size="16" class="me-2" />
+                Payment History
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="#" @click.prevent="viewDocuments">
+                <FileText :size="16" class="me-2" />
+                View Documents
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="#" @click.prevent="scheduleVisit">
+                <Calendar :size="16" class="me-2" />
+                Schedule Visit
+              </a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <a class="dropdown-item" href="#" @click.prevent="callSupplier" :class="{ disabled: !supplier?.phone }">
+                <PhoneCall :size="16" class="me-2" />
+                Call Supplier
+                <small v-if="supplier?.phone" class="text-muted ms-auto">{{ supplier.phone }}</small>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="#" @click.prevent="emailSupplier" :class="{ disabled: !supplier?.email }">
+                <Mail :size="16" class="me-2" />
+                Email Supplier
+                <small v-if="supplier?.email" class="text-muted ms-auto">{{ supplier.email }}</small>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="#" @click.prevent="openMaps" :class="{ disabled: !supplier?.address }">
+                <Navigation :size="16" class="me-2" />
+                View on Map
+                <small v-if="!supplier?.address" class="text-muted ms-auto">(No address)</small>
+              </a>
+            </li>
+          </ul>
+        </div>
+        
         <button class="btn btn-primary" @click="editSupplier">
           <Edit :size="16" class="me-1" />
           Edit
@@ -202,39 +258,9 @@
               <div class="progress" style="height: 6px;">
                 <div 
                   class="progress-bar bg-success" 
-                  :style="{ width: ((supplier.rating || 4.5) / 5 * 100) + '%' }"
-                ></div>
+                  :style="{ width: ((supplier.rating || 4.5) / 5 * 100) + '%' }">
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Quick Actions Card -->
-        <div class="card quick-actions-card">
-          <div class="card-header">
-            <h5 class="card-title mb-0">
-              <Zap :size="18" class="me-2" />
-              Quick Actions
-            </h5>
-          </div>
-          <div class="card-body">
-            <div class="d-grid gap-2">
-              <button class="btn btn-outline-primary btn-sm" @click="createOrder">
-                <Plus :size="16" class="me-2" />
-                Create Purchase Order
-              </button>
-              <button class="btn btn-outline-info btn-sm" @click="viewPaymentHistory">
-                <CreditCard :size="16" class="me-2" />
-                Payment History
-              </button>
-              <button class="btn btn-outline-success btn-sm" @click="viewDocuments">
-                <FileText :size="16" class="me-2" />
-                View Documents
-              </button>
-              <button class="btn btn-outline-warning btn-sm" @click="scheduleVisit">
-                <Calendar :size="16" class="me-2" />
-                Schedule Visit
-              </button>
             </div>
           </div>
         </div>
@@ -251,7 +277,7 @@
                 Purchase Orders
                 <span class="badge bg-secondary ms-2">{{ filteredOrders.length }}</span>
               </h5>
-              <div class="d-flex gap-2 align-items-center">
+              <div class="d-flex gap-2 align-items-center" v-if="orders.length > 0">
                 <select class="form-select form-select-sm" v-model="orderStatusFilter" @change="filterOrders" style="width: auto;">
                   <option value="all">All Orders</option>
                   <option value="pending">Pending</option>
@@ -276,7 +302,7 @@
             </div>
           </div>
           <div class="card-body p-0">
-            <div class="table-responsive">
+            <div class="table-responsive" v-if="orders.length > 0">
               <table class="table table-hover orders-table mb-0">
                 <thead class="table-light">
                   <tr>
@@ -357,26 +383,21 @@
                       </div>
                     </td>
                   </tr>
-                  <!-- Empty State -->
-                  <tr v-if="filteredOrders.length === 0">
-                    <td colspan="8" class="text-center text-muted py-5">
-                      <Package :size="48" class="text-muted mb-3" />
-                      <div>
-                        <h6 class="text-muted">No purchase orders found</h6>
-                        <p class="mb-3">
-                          {{ orderStatusFilter === 'all' 
-                            ? 'This supplier has no purchase orders yet.' 
-                            : `No ${orderStatusFilter} orders found.` }}
-                        </p>
-                        <button class="btn btn-primary btn-sm" @click="createOrder">
-                          <Plus :size="16" class="me-1" />
-                          Create First Order
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
                 </tbody>
               </table>
+            </div>
+            
+            <!-- Empty State -->
+            <div v-if="orders.length === 0" class="text-center text-muted py-5">
+              <Package :size="48" class="text-muted mb-3" />
+              <div>
+                <h6 class="text-muted">No purchase orders found</h6>
+                <p class="mb-3">This supplier has no purchase orders yet.</p>
+                <button class="btn btn-primary btn-sm" @click="createOrder">
+                  <Plus :size="16" class="me-1" />
+                  Create First Order
+                </button>
+              </div>
             </div>
             
             <!-- Bulk Actions Bar -->
@@ -400,7 +421,7 @@
             </h5>
           </div>
           <div class="card-body">
-            <div class="timeline">
+            <div class="timeline" v-if="recentActivity.length > 0">
               <div v-for="activity in recentActivity" :key="activity.id" class="timeline-item">
                 <div class="timeline-marker" :class="getActivityMarkerClass(activity.type)">
                   <component :is="getActivityIcon(activity.type)" :size="14" />
@@ -414,12 +435,12 @@
                   <small class="text-muted">by {{ activity.user }}</small>
                 </div>
               </div>
-              
-              <!-- Empty Timeline State -->
-              <div v-if="recentActivity.length === 0" class="text-center py-4">
-                <Clock :size="32" class="text-muted mb-2" />
-                <p class="text-muted">No recent activity</p>
-              </div>
+            </div>
+            
+            <!-- Empty Timeline State -->
+            <div v-if="recentActivity.length === 0" class="text-center py-4">
+              <Clock :size="32" class="text-muted mb-2" />
+              <p class="text-muted">No recent activity</p>
             </div>
           </div>
         </div>
@@ -458,6 +479,22 @@
         </div>
       </div>
     </div>
+
+    <!-- Show message if no supplier found -->
+    <div v-if="!loading && !error && !supplier" class="alert alert-warning text-center">
+      <h5>Supplier Not Found</h5>
+      <p>No supplier found with ID: {{ supplierId }}</p>
+      <button class="btn btn-primary" @click="goBack">Go Back to Suppliers</button>
+    </div>
+
+    <!-- Create Order Modal - Fixed for Options API -->
+    <CreateOrderModal
+      v-if="showCreateOrderModal"
+      :show="showCreateOrderModal"
+      :supplier="selectedSupplier"
+      @close="closeCreateOrderModal"
+      @save="handleOrderSave"
+    />
 
     <!-- Edit Supplier Modal -->
     <div v-if="showEditModal" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
@@ -613,10 +650,6 @@ import {
   Clock,
   BarChart3,
   ShoppingCart,
-  Eye,
-  Trash2,
-  Package,
-  FileText,
   MoreVertical,
   Star,
   Copy,
@@ -625,10 +658,15 @@ import {
   Navigation,
   Zap,
   CreditCard,
+  FileText,
+  Trash2,
+  Package,
+  Eye,
   Filter,
   AlertTriangle,
   Activity
 } from 'lucide-vue-next'
+import CreateOrderModal from '@/components/suppliers/CreateOrderModal.vue'
 
 export default {
   name: 'SupplierDetails',
@@ -647,10 +685,6 @@ export default {
     Clock,
     BarChart3,
     ShoppingCart,
-    Eye,
-    Trash2,
-    Package,
-    FileText,
     MoreVertical,
     Star,
     Copy,
@@ -659,9 +693,14 @@ export default {
     Navigation,
     Zap,
     CreditCard,
+    FileText,
+    Trash2,
+    Package,
+    Eye,
     Filter,
     AlertTriangle,
-    Activity
+    Activity,
+    CreateOrderModal
   },
   props: {
     supplierId: {
@@ -684,6 +723,10 @@ export default {
       selectedOrders: [],
       selectAllOrders: false,
       
+      // Create Order Modal state - Options API style
+      showCreateOrderModal: false,
+      selectedSupplier: null,
+      
       // Edit modal state
       showEditModal: false,
       showDeleteModal: false,
@@ -704,11 +747,14 @@ export default {
     }
   },
   async mounted() {
+    console.log('SupplierDetails mounted with ID:', this.supplierId)
+    console.log('Route params:', this.$route.params)
     await this.fetchSupplierDetails()
   },
   watch: {
     supplierId: {
-      handler() {
+      handler(newId, oldId) {
+        console.log('Supplier ID changed from', oldId, 'to', newId)
         this.fetchSupplierDetails()
       },
       immediate: false
@@ -716,110 +762,190 @@ export default {
   },
   methods: {
     async fetchSupplierDetails() {
+      console.log('fetchSupplierDetails called with ID:', this.supplierId)
       this.loading = true
       this.error = null
       
       try {
-        // Mock data - replace with actual API call
-        const mockSupplier = {
-          id: this.supplierId,
-          name: 'John Doe Supplies',
-          contactPerson: 'John Doe',
-          email: 'john@johndoesupplies.com',
-          phone: '+63 912 345 6789',
-          address: '123 Supply Street, Business District, Manila, Philippines',
-          purchaseOrders: 4,
-          status: 'active',
-          type: 'food',
-          rating: 4.5,
-          isFavorite: false,
-          notes: 'Reliable supplier with consistent quality. Preferred delivery schedule: Tuesdays and Fridays. Payment terms: Net 30 days.',
-          createdAt: '2024-01-15',
-          updatedAt: '2024-12-10'
-        }
-        
-        const mockOrders = [
-          {
-            id: 'PO-001',
-            date: '2024-12-10',
-            quantity: 12,
-            total: 3600.00,
-            expectedDate: '2024-12-25',
-            status: 'Received',
-            description: 'Rice and cooking oil'
-          },
-          {
-            id: 'PO-002',
-            date: '2024-11-15',
-            quantity: 25,
-            total: 7500.00,
-            expectedDate: '2024-12-01',
-            status: 'Pending',
-            description: 'Fresh vegetables and fruits'
-          },
-          {
-            id: 'PO-003',
-            date: '2024-10-05',
-            quantity: 13,
-            total: 3900.00,
-            expectedDate: '2024-10-20',
-            status: 'Cancelled',
-            description: 'Meat products'
-          },
-          {
-            id: 'PO-004',
-            date: '2024-09-11',
-            quantity: 30,
-            total: 9000.00,
-            expectedDate: '2024-09-27',
-            status: 'Received',
-            description: 'Dairy products and beverages'
-          }
-        ]
-
-        const mockActivity = [
+        const mockSuppliers = [
           {
             id: 1,
-            type: 'order_created',
-            title: 'New Purchase Order Created',
-            description: 'PO-002 created for ₱7,500.00',
-            user: 'Admin User',
-            date: '2024-11-15T10:30:00Z'
+            name: 'John Doe Supplies',
+            contactPerson: 'John Doe',
+            email: 'john@johndoesupplies.com',
+            phone: '+63 912 345 6789',
+            address: '123 Supply Street, Business District, Manila, Philippines',
+            purchaseOrders: 4,
+            status: 'active',
+            type: 'food',
+            rating: 4.5,
+            isFavorite: false,
+            notes: 'Reliable supplier with consistent quality.',
+            createdAt: '2024-01-15',
+            updatedAt: '2024-12-10'
           },
           {
             id: 2,
-            type: 'order_received',
-            title: 'Order Received',
-            description: 'PO-001 marked as received',
-            user: 'Warehouse Manager',
-            date: '2024-12-10T14:20:00Z'
+            name: 'Bravo Warehouse',
+            contactPerson: 'Maria Santos',
+            email: 'contact@bravowarehouse.com',
+            phone: '+63 917 888 9999',
+            address: '456 Warehouse Ave, Industrial Park, Quezon City, Philippines',
+            purchaseOrders: 5,
+            status: 'active',
+            type: 'packaging',
+            rating: 4.2,
+            isFavorite: true,
+            notes: 'Good packaging supplier. Fast delivery times.',
+            createdAt: '2024-02-01',
+            updatedAt: '2024-12-08'
           },
           {
             id: 3,
-            type: 'supplier_updated',
-            title: 'Supplier Information Updated',
-            description: 'Contact details updated',
-            user: 'Admin User',
-            date: '2024-12-10T09:15:00Z'
+            name: 'San Juan Groups',
+            contactPerson: 'Carlos Rivera',
+            email: 'info@sanjuangroups.ph',
+            phone: '+63 922 111 2222',
+            address: '789 Corporate Blvd, Makati City, Philippines',
+            purchaseOrders: 12,
+            status: 'active',
+            type: 'equipment',
+            rating: 4.8,
+            isFavorite: false,
+            notes: 'Premium equipment supplier.',
+            createdAt: '2024-01-10',
+            updatedAt: '2024-12-05'
           },
           {
             id: 4,
-            type: 'payment_processed',
-            title: 'Payment Processed',
-            description: 'Payment of ₱3,600.00 processed for PO-001',
-            user: 'Finance Team',
-            date: '2024-12-11T11:45:00Z'
+            name: 'Bagatayam Inc.',
+            contactPerson: 'Ana Lopez',
+            email: 'sales@bagatayam.com',
+            phone: '+63 933 444 5555',
+            address: '321 Trading St, Pasig City, Philippines',
+            purchaseOrders: 8,
+            status: 'active',
+            type: 'services',
+            rating: 4.0,
+            isFavorite: false,
+            notes: 'Service provider for maintenance.',
+            createdAt: '2024-03-05',
+            updatedAt: '2024-12-01'
           }
         ]
+        
+        const currentSupplierId = this.supplierId || this.$route.params.supplierId
+        console.log('Looking for supplier with ID:', currentSupplierId, 'Type:', typeof currentSupplierId)
+        
+        const foundSupplier = mockSuppliers.find(s => {
+          console.log('Comparing supplier ID', s.id, 'with', currentSupplierId)
+          return s.id === parseInt(currentSupplierId) || s.id.toString() === currentSupplierId.toString()
+        })
+        
+        console.log('Found supplier:', foundSupplier)
+        
+        if (!foundSupplier) {
+          throw new Error(`Supplier with ID ${currentSupplierId} not found`)
+        }
+        
+        // Detailed mock data only for first supplier (ID: 1)
+        let mockOrders = []
+        let mockActivity = []
+        
+        if (foundSupplier.id === 1) {
+          // Detailed orders data for John Doe Supplies
+          mockOrders = [
+            {
+              id: 'PO-001',
+              date: '2024-12-10',
+              quantity: 12,
+              total: 3600.00,
+              expectedDate: '2024-12-25',
+              status: 'Received',
+              description: 'Rice and cooking oil'
+            },
+            {
+              id: 'PO-002',
+              date: '2024-11-15',
+              quantity: 25,
+              total: 7500.00,
+              expectedDate: '2024-12-01',
+              status: 'Pending',
+              description: 'Fresh vegetables and fruits'
+            },
+            {
+              id: 'PO-003',
+              date: '2024-10-05',
+              quantity: 13,
+              total: 3900.00,
+              expectedDate: '2024-10-20',
+              status: 'Cancelled',
+              description: 'Meat products'
+            },
+            {
+              id: 'PO-004',
+              date: '2024-09-11',
+              quantity: 30,
+              total: 9000.00,
+              expectedDate: '2024-09-27',
+              status: 'Received',
+              description: 'Dairy products and beverages'
+            }
+          ]
+
+          // Detailed activity data for John Doe Supplies
+          mockActivity = [
+            {
+              id: 1,
+              type: 'order_created',
+              title: 'New Purchase Order Created',
+              description: 'PO-002 created for ₱7,500.00',
+              user: 'Admin User',
+              date: '2024-11-15T10:30:00Z'
+            },
+            {
+              id: 2,
+              type: 'order_received',
+              title: 'Order Received',
+              description: 'PO-001 marked as received',
+              user: 'Warehouse Manager',
+              date: '2024-12-10T14:20:00Z'
+            },
+            {
+              id: 3,
+              type: 'supplier_updated',
+              title: 'Supplier Information Updated',
+              description: 'Contact details updated',
+              user: 'Admin User',
+              date: '2024-12-10T09:15:00Z'
+            },
+            {
+              id: 4,
+              type: 'payment_processed',
+              title: 'Payment Processed',
+              description: 'Payment of ₱3,600.00 processed for PO-001',
+              user: 'Finance Team',
+              date: '2024-12-11T11:45:00Z'
+            }
+          ]
+        } else {
+          // Empty arrays for other suppliers (no detailed data)
+          mockOrders = []
+          mockActivity = []
+        }
         
         // Simulate API delay
         await new Promise(resolve => setTimeout(resolve, 500))
         
-        this.supplier = mockSupplier
+        this.supplier = foundSupplier
         this.orders = mockOrders
         this.recentActivity = mockActivity
-        this.editableNotes = mockSupplier.notes
-        this.filterOrders()
+        this.editableNotes = foundSupplier.notes
+        this.filteredOrders = [...mockOrders]
+        
+        console.log('Supplier loaded successfully:', this.supplier.name)
+        console.log('Orders loaded:', this.orders.length)
+        console.log('Activities loaded:', this.recentActivity.length)
         
       } catch (error) {
         console.error('Error fetching supplier details:', error)
@@ -829,6 +955,172 @@ export default {
       }
     },
 
+    // Create Order Modal methods - Options API style
+    openCreateOrderModal(supplier) {
+      this.selectedSupplier = supplier
+      this.showCreateOrderModal = true
+    },
+
+    closeCreateOrderModal() {
+      this.showCreateOrderModal = false
+      this.selectedSupplier = null
+    },
+
+    handleOrderSave(orderData) {
+      // Handle order save logic here
+      console.log('Order saved:', orderData)
+      this.closeCreateOrderModal()
+      this.successMessage = 'Order created successfully!'
+      
+      setTimeout(() => {
+        this.successMessage = null
+      }, 3000)
+    },
+
+    goBack() {
+      this.$router.push({ name: 'Suppliers' })
+    },
+
+    // Quick action methods
+    createOrder() {
+      this.openCreateOrderModal(this.supplier)
+    },
+
+    viewPaymentHistory() {
+      alert('Payment history - Coming soon!')
+    },
+
+    viewDocuments() {
+      alert('View documents - Coming soon!')
+    },
+
+    scheduleVisit() {
+      alert('Schedule visit - Coming soon!')
+    },
+
+    callSupplier() {
+      if (this.supplier?.phone) {
+        window.open(`tel:${this.supplier.phone}`)
+      }
+    },
+
+    emailSupplier() {
+      if (this.supplier?.email) {
+        window.open(`mailto:${this.supplier.email}`)
+      }
+    },
+
+    openMaps() {
+      if (this.supplier?.address) {
+        const encodedAddress = encodeURIComponent(this.supplier.address)
+        window.open(`https://maps.google.com/maps?q=${encodedAddress}`, '_blank')
+      }
+    },
+
+    editSupplier() {
+      this.editForm = {
+        name: this.supplier.name || '',
+        contactPerson: this.supplier.contactPerson || '',
+        email: this.supplier.email || '',
+        phone: this.supplier.phone || '',
+        address: this.supplier.address || '',
+        type: this.supplier.type || '',
+        status: this.supplier.status || 'active',
+        notes: this.supplier.notes || ''
+      }
+      this.showEditModal = true
+    },
+
+    closeEditModal() {
+      this.showEditModal = false
+      this.editForm = {
+        name: '',
+        contactPerson: '',
+        email: '',
+        phone: '',
+        address: '',
+        type: '',
+        status: 'active',
+        notes: ''
+      }
+    },
+
+    async saveSupplier() {
+      this.saving = true
+      
+      try {
+        // Mock save - replace with actual API call
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        // Update local supplier data
+        this.supplier = {
+          ...this.supplier,
+          ...this.editForm,
+          updatedAt: new Date().toISOString()
+        }
+        
+        this.closeEditModal()
+        this.successMessage = 'Supplier updated successfully!'
+        
+        setTimeout(() => {
+          this.successMessage = null
+        }, 3000)
+        
+      } catch (error) {
+        console.error('Error updating supplier:', error)
+        this.error = `Failed to update supplier: ${error.message}`
+      } finally {
+        this.saving = false
+      }
+    },
+
+    exportSupplierData(format) {
+      alert(`Export as ${format} - Coming soon!`)
+    },
+
+    exportSupplierReport() {
+      alert('Export full report - Coming soon!')
+    },
+
+    toggleFavorite() {
+      this.supplier.isFavorite = !this.supplier.isFavorite
+      this.successMessage = `Supplier ${this.supplier.isFavorite ? 'added to' : 'removed from'} favorites`
+      setTimeout(() => {
+        this.successMessage = null
+      }, 2000)
+    },
+
+    duplicateSupplier() {
+      alert('Duplicate supplier functionality - Coming soon!')
+    },
+
+    deleteSupplier() {
+      this.showDeleteModal = true
+    },
+
+    async confirmDeleteSupplier() {
+      this.deleting = true
+      
+      try {
+        // Mock delete - replace with actual API call
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        this.showDeleteModal = false
+        this.successMessage = 'Supplier deleted successfully'
+        
+        setTimeout(() => {
+          this.goBack()
+        }, 1500)
+        
+      } catch (error) {
+        console.error('Error deleting supplier:', error)
+        this.error = `Failed to delete supplier: ${error.message}`
+      } finally {
+        this.deleting = false
+      }
+    },
+
+    // Order management methods
     filterOrders() {
       if (this.orderStatusFilter === 'all') {
         this.filteredOrders = [...this.orders]
@@ -924,175 +1216,7 @@ export default {
       return classes[type] || 'bg-secondary'
     },
 
-    goBack() {
-      this.$router.push({ name: 'Suppliers' })
-    },
-
-    editSupplier() {
-      this.editForm = {
-        name: this.supplier.name || '',
-        contactPerson: this.supplier.contactPerson || '',
-        email: this.supplier.email || '',
-        phone: this.supplier.phone || '',
-        address: this.supplier.address || '',
-        type: this.supplier.type || '',
-        status: this.supplier.status || 'active',
-        notes: this.supplier.notes || ''
-      }
-      this.showEditModal = true
-    },
-
-    closeEditModal() {
-      this.showEditModal = false
-      this.editForm = {
-        name: '',
-        contactPerson: '',
-        email: '',
-        phone: '',
-        address: '',
-        type: '',
-        status: 'active',
-        notes: ''
-      }
-    },
-
-    async saveSupplier() {
-      this.saving = true
-      
-      try {
-        // Mock save - replace with actual API call
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        // Update local supplier data
-        this.supplier = {
-          ...this.supplier,
-          ...this.editForm,
-          updatedAt: new Date().toISOString()
-        }
-        
-        this.closeEditModal()
-        this.successMessage = 'Supplier updated successfully!'
-        
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
-        
-      } catch (error) {
-        console.error('Error updating supplier:', error)
-        this.error = `Failed to update supplier: ${error.message}`
-      } finally {
-        this.saving = false
-      }
-    },
-
-    deleteSupplier() {
-      this.showDeleteModal = true
-    },
-
-    async confirmDeleteSupplier() {
-      this.deleting = true
-      
-      try {
-        // Mock delete - replace with actual API call
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        this.showDeleteModal = false
-        this.successMessage = 'Supplier deleted successfully'
-        
-        setTimeout(() => {
-          this.goBack()
-        }, 1500)
-        
-      } catch (error) {
-        console.error('Error deleting supplier:', error)
-        this.error = `Failed to delete supplier: ${error.message}`
-      } finally {
-        this.deleting = false
-      }
-    },
-
-    toggleFavorite() {
-      this.supplier.isFavorite = !this.supplier.isFavorite
-      this.successMessage = `Supplier ${this.supplier.isFavorite ? 'added to' : 'removed from'} favorites`
-      setTimeout(() => {
-        this.successMessage = null
-      }, 2000)
-    },
-
-    duplicateSupplier() {
-      alert(`Duplicate supplier functionality - Coming soon!`)
-    },
-
-    callSupplier() {
-      if (this.supplier.phone) {
-        window.open(`tel:${this.supplier.phone}`)
-      }
-    },
-
-    emailSupplier() {
-      if (this.supplier.email) {
-        window.open(`mailto:${this.supplier.email}`)
-      }
-    },
-
-    openMaps() {
-      if (this.supplier.address) {
-        const encodedAddress = encodeURIComponent(this.supplier.address)
-        window.open(`https://maps.google.com/maps?q=${encodedAddress}`, '_blank')
-      }
-    },
-
-    createOrder() {
-      // Navigate to order creation or show modal
-      alert(`Create order for ${this.supplier.name} - Coming soon!`)
-    },
-
-    viewPaymentHistory() {
-      alert('Payment history - Coming soon!')
-    },
-
-    viewDocuments() {
-      alert('View documents - Coming soon!')
-    },
-
-    scheduleVisit() {
-      alert('Schedule visit - Coming soon!')
-    },
-
-    exportSupplierData(format = 'csv') {
-      const supplierData = [{
-        'Supplier Name': this.supplier.name,
-        'Contact Person': this.supplier.contactPerson || '',
-        'Email': this.supplier.email || '',
-        'Phone': this.supplier.phone || '',
-        'Address': this.supplier.address || '',
-        'Type': this.getSupplierTypeLabel(this.supplier.type),
-        'Status': this.supplier.status,
-        'Rating': this.supplier.rating || 0,
-        'Purchase Orders': this.supplier.purchaseOrders || 0,
-        'Total Spent': this.getTotalSpent(),
-        'Created Date': this.formatDate(this.supplier.createdAt),
-        'Last Updated': this.formatDate(this.supplier.updatedAt)
-      }]
-
-      const csvContent = [
-        Object.keys(supplierData[0]).join(','),
-        ...supplierData.map(row => Object.values(row).map(value => `"${value}"`).join(','))
-      ].join('\n')
-
-      const blob = new Blob([csvContent], { type: 'text/csv' })
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `supplier_${this.supplier.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.${format}`
-      a.click()
-      window.URL.revokeObjectURL(url)
-    },
-
-    exportSupplierReport() {
-      alert('Export full report - Coming soon!')
-    },
-
+    // Order action methods
     viewOrder(order) {
       alert(`View order ${order.id} - Coming soon!`)
     },
@@ -1121,6 +1245,7 @@ export default {
       alert(`Track order ${order.id} - Coming soon!`)
     },
 
+    // Bulk operations
     bulkExportOrders() {
       alert(`Export ${this.selectedOrders.length} selected orders - Coming soon!`)
     },
@@ -1143,6 +1268,7 @@ export default {
       }
     },
 
+    // Notes management
     toggleNotesEdit() {
       if (this.editingNotes) {
         this.saveNotes()
@@ -1166,6 +1292,17 @@ export default {
       this.editingNotes = false
     },
 
+    getOrderStatusClass(status) {
+      const classes = {
+        'Received': 'bg-success',
+        'Pending': 'bg-warning',
+        'Cancelled': 'bg-danger',
+        'Active': 'bg-primary'
+      }
+      return classes[status] || 'bg-secondary'
+    },
+
+    // Utility methods
     getSupplierTypeLabel(type) {
       const labels = {
         'food': 'Food & Beverages',
@@ -1226,22 +1363,14 @@ export default {
 
     formatStatus(status) {
       return status.charAt(0).toUpperCase() + status.slice(1)
-    },
-
-    getOrderStatusClass(status) {
-      const classes = {
-        'Received': 'bg-success',
-        'Pending': 'bg-warning',
-        'Cancelled': 'bg-danger',
-        'Active': 'bg-primary'
-      }
-      return classes[status] || 'bg-secondary'
     }
   }
 }
 </script>
 
 <style scoped>
+@import '@/assets/styles/colors.css';
+
 .supplier-details-page {
   background-color: var(--neutral-light);
   min-height: 100vh;
@@ -1259,6 +1388,34 @@ export default {
 .header-actions {
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.dropdown-menu-modern {
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--neutral-medium);
+  padding: 0.75rem 0;
+  min-width: 280px;
+}
+
+.dropdown-menu-modern .dropdown-item {
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  color: var(--tertiary-dark);
+  transition: all 0.2s ease;
+}
+
+.dropdown-menu-modern .dropdown-item:hover {
+  background-color: var(--neutral-light);
+  color: var(--primary);
+  transform: translateX(2px);
+}
+
+.dropdown-menu-modern .dropdown-item.disabled {
+  color: var(--neutral-medium);
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .supplier-info-card {
@@ -1316,41 +1473,16 @@ export default {
   align-items: center;
 }
 
-.address-text {
-  line-height: 1.4;
-}
-
-.stats-card, .quick-actions-card, .orders-card, .activity-card, .notes-card {
+.stats-card {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   border: none;
   border-radius: 12px;
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.stat-item {
-  text-align: center;
-  padding: 1rem;
-  background: var(--neutral-light);
-  border-radius: 8px;
-}
-
-.stat-number {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 0.25rem;
-}
-
-.stat-label {
-  font-size: 0.75rem;
-  color: var(--tertiary-medium);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.orders-card, .activity-card, .notes-card {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: none;
+  border-radius: 12px;
 }
 
 .orders-table {
@@ -1470,7 +1602,33 @@ export default {
   margin-left: 4px;
 }
 
-/* Color classes */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 1rem;
+  background: var(--neutral-light);
+  border-radius: 8px;
+}
+
+.stat-number {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--tertiary-medium);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .text-primary-dark {
   color: var(--primary-dark) !important;
 }
@@ -1494,17 +1652,9 @@ export default {
     gap: 0.5rem;
   }
   
-  .action-buttons {
-    flex-direction: column;
-  }
-  
-  .timeline-item {
-    flex-direction: column;
-  }
-  
-  .timeline-marker {
-    margin-bottom: 0.5rem;
-    align-self: flex-start;
+  .dropdown-menu-modern {
+    width: 100%;
+    min-width: unset;
   }
 }
 </style>
