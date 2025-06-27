@@ -365,7 +365,6 @@
                           class="btn btn-outline-info btn-sm" 
                           @click="editOrder(order)" 
                           title="Edit Order"
-                          :disabled="order.status === 'Received' || order.status === 'Cancelled'"
                         >
                           <Edit :size="14" />
                         </button>
@@ -494,6 +493,17 @@
       :supplier="selectedSupplier"
       @close="closeCreateOrderModal"
       @save="handleOrderSave"
+    />
+
+    <!-- Order Details Modal -->
+    <OrderDetailsModal
+      :show="showOrderDetailsModal"
+      :order="selectedOrderForView"
+      :can-edit="selectedOrderForView && selectedOrderForView.status !== 'Received' && selectedOrderForView.status !== 'Cancelled'"
+      :initial-mode="orderModalMode"
+      @close="closeOrderDetailsModal"
+      @save="handleOrderUpdate"
+      @edit-mode-changed="handleOrderEditModeChanged"
     />
 
     <!-- Edit Supplier Modal -->
@@ -667,6 +677,7 @@ import {
   Activity
 } from 'lucide-vue-next'
 import CreateOrderModal from '@/components/suppliers/CreateOrderModal.vue'
+import OrderDetailsModal from '@/components/suppliers/OrderDetailsModal.vue'
 
 export default {
   name: 'SupplierDetails',
@@ -700,7 +711,8 @@ export default {
     Filter,
     AlertTriangle,
     Activity,
-    CreateOrderModal
+    CreateOrderModal,
+    OrderDetailsModal
   },
   props: {
     supplierId: {
@@ -726,6 +738,11 @@ export default {
       // Create Order Modal state - Options API style
       showCreateOrderModal: false,
       selectedSupplier: null,
+
+      // Order details modal state
+      showOrderDetailsModal: false,
+      selectedOrderForView: null,
+      orderModalMode: 'view',
       
       // Edit modal state
       showEditModal: false,
@@ -1218,11 +1235,21 @@ export default {
 
     // Order action methods
     viewOrder(order) {
-      alert(`View order ${order.id} - Coming soon!`)
+      this.selectedOrderForView = order
+      this.orderModalMode = 'view'
+      this.showOrderDetailsModal = true
     },
 
     editOrder(order) {
-      alert(`Edit order ${order.id} - Coming soon!`)
+      this.selectedOrderForView = order
+      this.orderModalMode = 'edit'
+      this.showOrderDetailsModal = true
+    },
+
+    closeOrderDetailsModal() {
+      this.showOrderDetailsModal = false
+      this.selectedOrderForView = null
+      this.orderModalMode = 'view'
     },
 
     deleteOrder(order) {
@@ -1243,6 +1270,27 @@ export default {
 
     trackOrder(order) {
       alert(`Track order ${order.id} - Coming soon!`)
+    },
+
+    handleOrderUpdate(updatedOrder) {
+      // Find and update the order in the orders array
+      const index = this.orders.findIndex(o => o.id === updatedOrder.id)
+      if (index !== -1) {
+        this.orders[index] = updatedOrder
+        this.filterOrders() // Refresh filtered orders
+        
+        this.successMessage = `Order ${updatedOrder.id} updated successfully`
+        setTimeout(() => {
+          this.successMessage = null
+        }, 3000)
+      }
+      
+      this.closeOrderDetailsModal()
+    },
+
+    handleOrderEditModeChanged(isEditMode) {
+      // Optional: You can track edit mode state if needed
+      console.log('Order edit mode changed:', isEditMode)
     },
 
     // Bulk operations
