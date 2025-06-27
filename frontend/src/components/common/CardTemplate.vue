@@ -49,7 +49,7 @@ export default {
     size: {
       type: String,
       default: 'md',
-      validator: (value) => ['sm', 'md', 'lg', 'xl', 'xxl'].includes(value)
+      validator: (value) => ['mini', 'xs', 'compact', 'sm', 'md', 'lg', 'xl', 'xxl'].includes(value)
     },
     
     // Border color variants
@@ -170,7 +170,13 @@ export default {
       const classes = ['card-title', 'text-tertiary-dark', 'mb-2']
       
       // Size-based title classes
-      if (this.size === 'sm') {
+      if (this.size === 'mini') {
+        classes.push('small', 'fw-semibold')
+      } else if (this.size === 'xs') {
+        classes.push('small', 'fw-semibold')
+      } else if (this.size === 'compact') {
+        classes.push('h6', 'mb-1')
+      } else if (this.size === 'sm') {
         classes.push('h6')
       } else if (this.size === 'lg') {
         classes.push('h5')
@@ -192,7 +198,13 @@ export default {
       classes.push(`text-${this.valueColor}`)
       
       // Size-based value classes
-      if (this.size === 'sm') {
+      if (this.size === 'mini') {
+        classes.push('h6', 'mb-0')
+      } else if (this.size === 'xs') {
+        classes.push('h5', 'mb-0')
+      } else if (this.size === 'compact') {
+        classes.push('h4', 'mb-1')
+      } else if (this.size === 'sm') {
         classes.push('h6')
       } else if (this.size === 'lg') {
         classes.push('h1')
@@ -253,6 +265,17 @@ export default {
 /* ==========================================================================
    SIZE VARIANTS
    ========================================================================== */
+.card-mini .card-body {
+  padding: 0.5rem 0.75rem;
+}
+
+.card-xs .card-body {
+  padding: 0.625rem 0.875rem;
+}
+
+.card-compact .card-body {
+  padding: 0.75rem 1rem;
+}
 
 .card-sm .card-body {
   padding: 0.75rem;
@@ -272,6 +295,61 @@ export default {
 
 .card-xxl .card-body {
   padding: 2.5rem;
+}
+
+/* ==========================================================================
+   COMPACT SIZE TYPOGRAPHY ADJUSTMENTS
+   ========================================================================== */
+
+.card-mini .card-title {
+  font-size: 0.75rem;
+  line-height: 1.2;
+  margin-bottom: 0.25rem !important;
+}
+
+.card-mini .card-value {
+  font-size: 1rem;
+  line-height: 1.1;
+  margin-bottom: 0 !important;
+}
+
+.card-mini .card-subtitle {
+  font-size: 0.6875rem;
+  margin-bottom: 0 !important;
+}
+
+.card-xs .card-title {
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  margin-bottom: 0.375rem !important;
+}
+
+.card-xs .card-value {
+  font-size: 1.125rem;
+  line-height: 1.1;
+  margin-bottom: 0 !important;
+}
+
+.card-xs .card-subtitle {
+  font-size: 0.75rem;
+  margin-bottom: 0 !important;
+}
+
+.card-compact .card-title {
+  font-size: 0.875rem;
+  line-height: 1.3;
+  margin-bottom: 0.5rem !important;
+}
+
+.card-compact .card-value {
+  font-size: 1.5rem;
+  line-height: 1.1;
+  margin-bottom: 0.25rem !important;
+}
+
+.card-compact .card-subtitle {
+  font-size: 0.8125rem;
+  margin-bottom: 0 !important;
 }
 
 /* ==========================================================================
@@ -440,6 +518,18 @@ export default {
   
   .card-sm .card-body {
     padding: 0.75rem;
+  }
+
+    .card-mini .card-body {
+    padding: 0.375rem 0.5rem;
+  }
+  
+  .card-xs .card-body {
+    padding: 0.5rem 0.625rem;
+  }
+  
+  .card-compact .card-body {
+    padding: 0.625rem 0.75rem;
   }
 }
 
