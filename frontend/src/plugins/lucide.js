@@ -20,7 +20,9 @@ import {
   X,
   Search,
   Filter,
-  Settings
+  Settings,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-vue-next'
 
 export default {
@@ -47,5 +49,7 @@ export default {
     app.component('Settings', Settings)
     app.component('Check', Check)
     app.component('CheckCircle', CheckCircle)
+    app.component('ChevronLeft', ChevronLeft)
+    app.component('ChevronRight', ChevronRight)
   }
 }
