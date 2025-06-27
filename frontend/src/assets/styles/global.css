@@ -1,0 +1,94 @@
+/* Global background styles */
+html,
+body {
+  background-color: var(--bg-primary);
+  transition: background-color 0.3s ease;
+}
+
+/* App container */
+#app {
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+}
+
+/* Common background utility classes */
+.bg-app-primary {
+  background-color: var(--bg-primary) !important;
+}
+
+.bg-app-secondary {
+  background-color: var(--bg-secondary) !important;
+}
+
+.bg-app-muted {
+  background-color: var(--bg-muted) !important;
+}
+
+.bg-app-dark {
+  background-color: var(--bg-dark) !important;
+}
+
+.bg-app-light {
+  background-color: var(--bg-light) !important;
+}
+
+/* Page wrapper */
+.page-wrapper {
+  background-color: var(--bg-primary);
+  min-height: 100vh;
+}
+
+/* Content area */
+.content-area {
+  background-color: var(--bg-secondary);
+}
+
+/* Card overrides to use app colors */
+.card {
+  background-color: var(--bg-secondary);
+  border-color: var(--neutral-medium);
+}
+
+/* Modal overrides */
+.modal-content {
+  background-color: var(--bg-secondary);
+}
+
+/* Dropdown overrides */
+.dropdown-menu {
+  background-color: var(--bg-secondary);
+  border-color: var(--neutral-medium);
+}
+
+/* Offcanvas overrides */
+.offcanvas {
+  background-color: var(--bg-secondary);
+}
+
+/* Navbar overrides */
+.navbar {
+  background-color: var(--bg-secondary) !important;
+}
+
+/* Sidebar overrides */
+.sidebar {
+  background-color: var(--bg-secondary);
+}
+
+/* Table overrides */
+.table {
+  --bs-table-bg: var(--bg-secondary);
+}
+
+/* Form control overrides */
+.form-control,
+.form-select {
+  background-color: var(--bg-secondary);
+  border-color: var(--neutral-medium);
+}
+
+.form-control:focus,
+.form-select:focus {
+  background-color: var(--bg-secondary);
+  border-color: var(--primary);
+}

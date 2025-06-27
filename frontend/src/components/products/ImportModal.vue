@@ -5,6 +5,8 @@
     tabindex="-1" 
     aria-labelledby="importModalLabel" 
     aria-hidden="true"
+    @hidden.bs.modal="onModalHidden"
+    @shown.bs.modal="onModalShown"
   >
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
@@ -146,7 +148,7 @@
               <ul class="mb-0 mt-2">
                 <li>Total processed: {{ importResults.totalProcessed || 0 }}</li>
                 <li>Successfully imported: {{ importResults.totalSuccessful || 0 }}</li>
-                <li v-if="importResults.totalFailed > 0">Failed: {{ importResults.totalFailed }}</li>
+                <li v-if="importResults.totalFailed && importResults.totalFailed > 0">Failed: {{ importResults.totalFailed }}</li>
               </ul>
             </div>
 
@@ -154,6 +156,11 @@
             <div v-if="!importResults.success" class="alert alert-danger border-0" style="background-color: var(--error-light); color: var(--error-dark);">
               <AlertTriangle :size="16" class="me-2" />
               <strong>Import failed:</strong> {{ importResults.error }}
+              <ul v-if="importResults.totalProcessed > 0" class="mb-0 mt-2">
+                <li>Total processed: {{ importResults.totalProcessed || 0 }}</li>
+                <li>Successfully imported: {{ importResults.totalSuccessful || 0 }}</li>
+                <li>Failed: {{ importResults.totalFailed || 0 }}</li>
+              </ul>
             </div>
 
             <!-- Validation Results -->
@@ -204,7 +211,7 @@
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import productsApiService from '@/services/apiProducts.js'
 
 export default {
@@ -221,6 +228,7 @@ export default {
     const uploadStatus = ref('')
     const importResults = ref(null)
     const fileInput = ref(null)
+    const lastImportWasSuccessful = ref(false)
 
     // Methods
     const downloadTemplate = async (fileType) => {
@@ -258,6 +266,10 @@ export default {
       importResults.value = null
       uploadProgress.value = 0
       uploadStatus.value = ''
+      isUploading.value = false
+      isDownloading.value = false
+      lastImportWasSuccessful.value = false
+      
       if (fileInput.value) {
         fileInput.value.value = ''
       }
@@ -288,14 +300,44 @@ export default {
 
         clearInterval(progressInterval)
         uploadProgress.value = 100
-        uploadStatus.value = 'Import completed!'
 
-        importResults.value = {
-          success: true,
-          ...result
+        // Check if import was actually successful
+        const isActuallySuccessful = result && (
+          (result.total_successful > 0 && result.total_failed === 0) ||
+          (result.success === true) ||
+          (result.results && result.results.total_successful > 0 && result.results.total_failed === 0)
+        )
+
+        if (isActuallySuccessful) {
+          uploadStatus.value = 'Import completed!'
+          importResults.value = {
+            success: true,
+            totalProcessed: result.total_processed || result.results?.total_processed || 0,
+            totalSuccessful: result.total_successful || result.results?.total_successful || 0,
+            totalFailed: result.total_failed || result.results?.total_failed || 0,
+            validationErrors: result.validation_errors || result.results?.validation_errors || []
+          }
+
+          // Track successful import
+          lastImportWasSuccessful.value = true
+          emit('import-completed', result)
+        } else {
+          // Import had errors or failures
+          uploadStatus.value = 'Import completed with issues'
+          uploadProgress.value = 0
+          
+          importResults.value = {
+            success: false,
+            error: result.error || 'Import validation failed',
+            totalProcessed: result.total_processed || result.results?.total_processed || 0,
+            totalSuccessful: result.total_successful || result.results?.total_successful || 0,
+            totalFailed: result.total_failed || result.results?.total_failed || 0,
+            validationErrors: result.validation_errors || result.results?.validation_errors || []
+          }
+
+          lastImportWasSuccessful.value = false
+          emit('import-failed', { message: result.error || 'Import validation failed', details: result })
         }
-
-        emit('import-completed', result)
 
       } catch (error) {
         uploadProgress.value = 0
@@ -306,6 +348,7 @@ export default {
           error: error.message || 'An unexpected error occurred'
         }
 
+        lastImportWasSuccessful.value = false
         emit('import-failed', error)
       } finally {
         isUploading.value = false
@@ -325,6 +368,37 @@ export default {
       }
     }
 
+    // Modal event handlers
+    const onModalShown = () => {
+      // Reset form when modal is opened if last import was successful
+      if (lastImportWasSuccessful.value) {
+        resetForm()
+      }
+    }
+
+    const onModalHidden = () => {
+      // Optional: You can also reset on close if you prefer
+      // resetForm()
+    }
+
+    // Bootstrap modal event listeners setup
+    let modalElement = null
+
+    onMounted(() => {
+      modalElement = document.getElementById('importModal')
+      if (modalElement) {
+        modalElement.addEventListener('shown.bs.modal', onModalShown)
+        modalElement.addEventListener('hidden.bs.modal', onModalHidden)
+      }
+    })
+
+    onUnmounted(() => {
+      if (modalElement) {
+        modalElement.removeEventListener('shown.bs.modal', onModalShown)
+        modalElement.removeEventListener('hidden.bs.modal', onModalHidden)
+      }
+    })
+
     return {
       // State
       selectedFile,
@@ -342,7 +416,9 @@ export default {
       onFileSelected,
       formatFileSize,
       resetForm,
-      handleImport
+      handleImport,
+      onModalShown,
+      onModalHidden
     }
   }
 }
