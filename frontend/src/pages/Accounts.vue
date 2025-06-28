@@ -317,7 +317,7 @@
 
 <script>
 import apiService from '../services/api.js'
-import DataTable from '../components/TableTemplate.vue'
+import DataTable from '../components/common/TableTemplate.vue'
 
 export default {
   name: 'AccountsPage',
