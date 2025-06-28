@@ -14,6 +14,7 @@ import ProductBulkEntry from '@/pages/inventory/ProductBulkEntry.vue'
 import ProductDetails from '@/pages/inventory/ProductDetails.vue'
 import SalesByItem from '@/pages/reports/SalesByItem.vue'
 import SalesByCategory from '@/pages/reports/SalesByCategory.vue'
+import Logs from '@/pages/Logs.vue'
 
 // Auth guard function
 function requireAuth(to, from, next) {
@@ -106,7 +107,12 @@ const router = createRouter({
           path: 'about',
           name: 'about',
           component: () => import('../views/AboutView.vue')
-        }
+        },
+        {
+          path: 'logs',
+          name: 'Logs',
+          component: Logs
+        },
       ]
     },
     // Catch all route - redirect to login

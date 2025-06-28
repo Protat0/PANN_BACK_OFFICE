@@ -8,6 +8,7 @@ from .kpi_views.session_views import (
     ActiveSessionsView,
     UserSessionsView,
     SessionStatisticsView,
+    SessionDisplayView,
 )
 
 from .kpi_views.user_views import (
@@ -161,6 +162,7 @@ urlpatterns = [
     
     # Session logs endpoint
     path('session-logs/', SessionLogsView.as_view(), name='session-logs'),
+    path('session-logs/display/', SessionDisplayView.as_view(), name='session-logs-display'), #Data View
 
     # Session management endpoints
     path('sessions/', SessionManagementView.as_view(), name='session-management'),

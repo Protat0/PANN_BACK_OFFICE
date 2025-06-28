@@ -400,8 +400,28 @@ export default {
       console.log("=== Processing Category Data ===");
       console.log("Processing", categoryData.length, "categories");
       
-      // 1. Process for Top Categories List (top 5)
-      this.topItems = categoryData.slice(0, 5).map((category, index) => {
+     // 1. Process for Top Categories List (top 5) - SORTED BY HIGHEST SALES
+    this.topItems = categoryData
+      .sort((a, b) => {
+        // Get sales amount for category A
+        const salesA = a.total_sales || 
+                      a.total_net_sales || 
+                      a.total_amount || 
+                      a.revenue || 
+                      a.sales || 0;
+        
+        // Get sales amount for category B
+        const salesB = b.total_sales || 
+                      b.total_net_sales || 
+                      b.total_amount || 
+                      b.revenue || 
+                      b.sales || 0;
+        
+        // Sort in descending order (highest first)
+        return salesB - salesA;
+      })
+      .slice(0, 5) // Take top 5 after sorting
+      .map((category, index) => {
         console.log(`Processing top category ${index}:`, category);
         
         return {
@@ -431,27 +451,26 @@ export default {
         console.log(`Processing table category ${index}:`, category);
         
         // Calculate product count from subcategories
-        const productCount = category.subcategories ? category.subcategories.length : 0;
+        const productCount = category.subcategories ? category.subcategories.reduce((total, sub) => total + (sub.product_count || 0), 0) : 0;
         
-        return {
-          id: category._id || category.id || index,
-          name: category.category_name || category.name || `Category ${index + 1}`,
-          category_name: category.category_name || category.name,
-          description: category.description || 'No description available',
-          sub_categories: category.subcategories || category.sub_categories || [],
-          total_items_sold: category.total_quantity_sold || 
-                           category.total_items_sold || 
-                           category.items_sold || 
-                           category.quantity || 0,
-          total_net_sales: category.total_sales || 
-                          category.total_net_sales || 
-                          category.total_amount || 
-                          category.net_sales || 
-                          category.revenue || 0,
-          product_count: productCount
-        };
-      });
-      
+         return {
+            id: category._id || category.id || index,
+            name: category.category_name || category.name || `Category ${index + 1}`,
+            category_name: category.category_name || category.name,
+            description: category.description || 'No description available',
+            sub_categories: category.subcategories || category.sub_categories || [],
+            total_items_sold: category.total_quantity_sold || 
+                            category.total_items_sold || 
+                            category.items_sold || 
+                            category.quantity || 0,
+            total_net_sales: category.total_sales || 
+                            category.total_net_sales || 
+                            category.total_amount || 
+                            category.net_sales || 
+                            category.revenue || 0,
+            product_count: productCount // Now correctly sums subcategory product counts
+          };
+        });
       console.log("✅ Category table processed:", this.categories.length, "categories");
       
       // Log a sample category for debugging

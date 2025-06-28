@@ -203,9 +203,10 @@ class CategoryDisplayService:
         self.sales_collection = self.db.sales_log
 
     def get_categories_display(self):
-        """Get categories with sales data"""
+        """Get categories with sales data - FIXED for nested products structure"""
         try:
-            print("=== Starting get_categories_display ===")
+           #Lines with this symbol (##) are for debugging
+           ## print("=== Starting get_categories_display ===")
             
             # Define projection and fetch invoices
             projection = {
@@ -220,54 +221,60 @@ class CategoryDisplayService:
                 "item_list.unit_price": 1, 
             }
             
-            print("About to fetch invoices...")
-            # Fetch invoices - THIS IS WHERE THE ERROR MIGHT BE
+           ## print("About to fetch invoices...")
             invoices = list(self.sales_collection.find({}, projection))
-            print(f"Fetched {len(invoices)} invoices successfully")
+           ## print(f"Fetched {len(invoices)} invoices successfully")
 
             # Create a lookup dictionary for faster searching
             item_sales_lookup = {}
-            print("Building item sales lookup...")
+           ## print("Building item sales lookup...")
 
             # Build the lookup dictionary from invoices
             for invoice in invoices:
-                print(f"Processing invoice ID: {invoice.get('_id')}")
                 for item in invoice.get('item_list', []):
                     item_name = item['item_name']
                     if item_name not in item_sales_lookup:
                         item_sales_lookup[item_name] = {'quantity': 0, 'total_sales': 0}
                     
-                    item_total = item['quantity'] * item['unit_price']
+                    item_total = round(item['quantity'] * item['unit_price'], 2)
                     item_sales_lookup[item_name]['quantity'] += item['quantity']
                     item_sales_lookup[item_name]['total_sales'] += item_total
 
-            print("About to fetch categories...")
-            # Now process categories using the lookup - THIS COULD ALSO BE THE ERROR
+           ## print("About to fetch categories...")
             categories = list(self.category_collection.find({}))
-            print(f"Fetched {len(categories)} categories successfully")
+           ## print(f"Fetched {len(categories)} categories successfully")
             
             # Create result structure
             categories_with_sales = []
 
             for category in categories:
-                print(f"Processing category: {category.get('category_name')}")
+              ##  print(f"Processing category: {category.get('category_name')}")
                 category_name = category['category_name']
                 category_total_sales = 0
                 category_total_quantity = 0
                 subcategories_data = []
                 
+                # FIXED: Handle nested sub_categories with products
                 for subcategory in category.get('sub_categories', []):
                     subcategory_name = subcategory['name']
+                    subcategory_total_quantity = 0
+                    subcategory_total_sales = 0
                     
-                    # Get data from lookup (much faster)
-                    if subcategory_name in item_sales_lookup:
-                        subcategory_data = item_sales_lookup[subcategory_name]
-                        subcategory_total_quantity = subcategory_data['quantity']
-                        subcategory_total_sales = subcategory_data['total_sales']
-                    else:
-                        subcategory_total_quantity = 0
-                        subcategory_total_sales = 0
+                    # NEW: Process products within each subcategory
+                    products_in_subcategory = subcategory.get('products', [])
+                  ##  print(f"  Processing subcategory '{subcategory_name}' with {len(products_in_subcategory)} products")
                     
+                    for product_name in products_in_subcategory:
+                        # Get sales data for each individual product
+                        if product_name in item_sales_lookup:
+                            product_data = item_sales_lookup[product_name]
+                            subcategory_total_quantity += product_data['quantity']
+                            subcategory_total_sales += product_data['total_sales']
+                          ##  print(f"    Product '{product_name}': {product_data['quantity']} sold, ₱{product_data['total_sales']}")
+                        else:
+                           print(f"    Product '{product_name}': No sales data found")
+                    
+                    # Add subcategory totals to category totals
                     category_total_sales += subcategory_total_sales
                     category_total_quantity += subcategory_total_quantity
                     
@@ -275,8 +282,11 @@ class CategoryDisplayService:
                     subcategories_data.append({
                         'name': subcategory_name,
                         'quantity_sold': subcategory_total_quantity,
-                        'total_sales': subcategory_total_sales
+                        'total_sales': subcategory_total_sales,
+                        'product_count': len(products_in_subcategory)  # NEW: Add product count
                     })
+                    
+                    ## print(f"  Subcategory '{subcategory_name}' totals: {subcategory_total_quantity} sold, ₱{subcategory_total_sales}")
                 
                 # Add category data to result
                 categories_with_sales.append({
@@ -288,10 +298,13 @@ class CategoryDisplayService:
                     'last_updated': category.get('last_updated'),
                     'total_quantity_sold': category_total_quantity,
                     'total_sales': category_total_sales,
-                    'subcategories': subcategories_data
+                    'subcategories': subcategories_data,
+                    'subcategory_count': len(subcategories_data)  # NEW: Add subcategory count
                 })
+                
+                ## print(f"Category '{category_name}' totals: {category_total_quantity} sold, ₱{category_total_sales}")
 
-            print(f"Returning {len(categories_with_sales)} categories with sales data")
+            ## print(f"Returning {len(categories_with_sales)} categories with sales data")
             return categories_with_sales
             
         except Exception as e:
@@ -300,3 +313,125 @@ class CategoryDisplayService:
             import traceback
             print(f"TRACEBACK: {traceback.format_exc()}")
             raise Exception(f"Error getting categories: {str(e)}")
+
+    def get_categories_display_with_date_filter(self, start_date=None, end_date=None, frequency='monthly'):
+        """Get categories with sales data filtered by date range"""
+        try:
+            print(f"=== Starting get_categories_display with date filter: {start_date} to {end_date} ===")
+            
+            # Build date filter query
+            date_filter = {}
+            if start_date or end_date:
+                date_filter["transaction_date"] = {}
+                if start_date:
+                    from datetime import datetime, time
+                    if isinstance(start_date, str):
+                        from django.utils.dateparse import parse_date
+                        start_date = parse_date(start_date)
+                    if start_date:
+                        start_datetime = datetime.combine(start_date, time.min)
+                        date_filter["transaction_date"]["$gte"] = start_datetime
+                if end_date:
+                    if isinstance(end_date, str):
+                        from django.utils.dateparse import parse_date
+                        end_date = parse_date(end_date)
+                    if end_date:
+                        end_datetime = datetime.combine(end_date, time.max)
+                        date_filter["transaction_date"]["$lte"] = end_datetime
+            
+            # Apply the filter to the query
+            query_filter = date_filter if date_filter else {}
+            print(f"MongoDB Query Filter: {query_filter}")
+            
+            # Define projection and fetch filtered invoices
+            projection = {
+                "_id": 1,
+                "item_list.item_name": 1,
+                "customer_id": 1,
+                "transaction_date": 1,
+                "payment_method": 1,
+                "sales_type": 1,
+                "total_amount": 1,
+                "item_list.quantity": 1,
+                "item_list.unit_price": 1, 
+            }
+            
+            invoices = list(self.sales_collection.find(query_filter, projection))
+            print(f"Fetched {len(invoices)} invoices for date range")
+
+            # Rest of the logic is the same as get_categories_display()
+            # Create a lookup dictionary for faster searching
+            item_sales_lookup = {}
+
+            # Build the lookup dictionary from filtered invoices
+            for invoice in invoices:
+                for item in invoice.get('item_list', []):
+                    item_name = item['item_name']
+                    if item_name not in item_sales_lookup:
+                        item_sales_lookup[item_name] = {'quantity': 0, 'total_sales': 0}
+                    
+                    item_total = item['quantity'] * item['unit_price']
+                    item_sales_lookup[item_name]['quantity'] += item['quantity']
+                    item_sales_lookup[item_name]['total_sales'] += item_total
+
+            # Process categories (same logic as above)
+            categories = list(self.category_collection.find({}))
+            categories_with_sales = []
+
+            for category in categories:
+                category_name = category['category_name']
+                category_total_sales = 0
+                category_total_quantity = 0
+                subcategories_data = []
+                
+                for subcategory in category.get('sub_categories', []):
+                    subcategory_name = subcategory['name']
+                    subcategory_total_quantity = 0
+                    subcategory_total_sales = 0
+                    
+                    products_in_subcategory = subcategory.get('products', [])
+                    
+                    for product_name in products_in_subcategory:
+                        if product_name in item_sales_lookup:
+                            product_data = item_sales_lookup[product_name]
+                            subcategory_total_quantity += product_data['quantity']
+                            subcategory_total_sales += product_data['total_sales']
+                    
+                    category_total_sales += subcategory_total_sales
+                    category_total_quantity += subcategory_total_quantity
+                    
+                    subcategories_data.append({
+                        'name': subcategory_name,
+                        'quantity_sold': subcategory_total_quantity,
+                        'total_sales': subcategory_total_sales,
+                        'product_count': len(products_in_subcategory)
+                    })
+                
+                categories_with_sales.append({
+                    '_id': str(category['_id']),
+                    'category_name': category_name,
+                    'description': category.get('description', ''),
+                    'status': category.get('status', ''),
+                    'date_created': category.get('date_created'),
+                    'last_updated': category.get('last_updated'),
+                    'total_quantity_sold': category_total_quantity,
+                    'total_sales': category_total_sales,
+                    'subcategories': subcategories_data,
+                    'subcategory_count': len(subcategories_data),
+                    'date_filter_applied': bool(start_date or end_date),
+                    'frequency': frequency
+                })
+
+            return {
+                'categories': categories_with_sales,
+                'total_categories': len(categories_with_sales),
+                'date_filter_applied': bool(start_date or end_date),
+                'frequency': frequency,
+                'total_invoices': len(invoices)
+            }
+            
+        except Exception as e:
+            print(f"ERROR in get_categories_display_with_date_filter: {e}")
+            import traceback
+            print(f"TRACEBACK: {traceback.format_exc()}")
+            raise Exception(f"Error getting categories with date filter: {str(e)}")

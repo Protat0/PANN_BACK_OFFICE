@@ -69,7 +69,7 @@ export default {
         '/products': 'Products',
         '/products/bulk': 'Add Products (Bulk)',
         '/categories': 'Categories',
-        '/logs': 'Inventory Logs',
+        '/logs': 'System Logs',
         '/suppliers': 'Suppliers',
         '/promotions': 'Promotions',
         '/sales-by-item': 'Sales by Item',
