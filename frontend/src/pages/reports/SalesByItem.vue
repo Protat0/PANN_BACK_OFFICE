@@ -130,13 +130,15 @@
               <td class="actions-column">
                 <div class="action-buttons">
                   <button 
-                    class="action-btn" 
-                    @click.stop="viewTransaction(transaction)" 
-                    title="View Details"
-                    :disabled="showTransactionModal || showImportProgressModal"
-                  >
-                    👁️
-                  </button>
+                  class="btn btn-outline-primary btn-icon-only btn-xs" 
+                  @click="viewTransaction(transaction)"
+                  data-bs-toggle="tooltip"
+                  title="View Details"
+                  :disabled="showTransactionModal || showImportProgressModal"
+                  
+                >
+                  <Eye :size="14" />
+                </button>
                 </div>
               </td>
             </tr>
@@ -372,7 +374,7 @@
         
         <div class="modal-footer">
           <button class="btn btn-secondary" @click="closeTransactionModal">Close</button>
-          <button class="btn btn-primary" @click="editTransaction(selectedTransactionData)">Edit Transaction</button>
+          <!--<button class="btn btn-primary" @click="editTransaction(selectedTransactionData)">Edit Transaction</button> This is placed for just in case--> 
         </div>
       </div>
     </div>
@@ -1421,9 +1423,9 @@ export default {
 }
 
 .table thead th {
-  background-color: #f8fafc;
+  background-color: #567cdc;
   font-weight: 600;
-  color: #374151;
+  color: white;
   border-bottom: 2px solid #e5e7eb;
   padding: 12px;
 }

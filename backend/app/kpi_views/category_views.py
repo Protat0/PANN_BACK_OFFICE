@@ -247,16 +247,17 @@ class CategoryDataView(APIView):
     def get(self, request):
         """Get all categories with sales data"""
         try:
-            print("=== CategoryDataView.get called ===")
-            print(f"Request path: {request.path}")
-            print(f"Request method: {request.method}")
-            print(f"Request GET params: {request.GET}")
-            print(f"URL kwargs: {getattr(self, 'kwargs', {})}")
+            #Lines with this symbol (#) are for debugging
+          #  print("=== CategoryDataView.get called ===")
+          #  print(f"Request path: {request.path}")
+          #  print(f"Request method: {request.method}")
+          #  print(f"Request GET params: {request.GET}")
+          #  print(f"URL kwargs: {getattr(self, 'kwargs', {})}")
             
             category_service = CategoryDisplayService()
             result = category_service.get_categories_display()
             
-            print("=== CategoryDataView.get completed successfully ===")
+          #  print("=== CategoryDataView.get completed successfully ===")
             return Response(result, status=status.HTTP_200_OK)
             
         except Exception as e:

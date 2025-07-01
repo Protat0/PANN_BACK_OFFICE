@@ -83,3 +83,47 @@ class SessionLogService:
         except Exception as e:
            
             raise Exception(f"Error logging logout: {str(e)}")
+        
+class SessionDisplay:
+    def __init__(self):
+        self.db = db_manager.get_database()  # ✅ Get database connection
+        self.collection = self.db.session_logs  # ✅ Use cloud database
+    
+    def convert_object_id(self, document):
+        if document and '_id' in document:
+            document['_id'] = str(document['_id'])
+        return document
+    
+    def get_session_logs(self):
+        """Simplified version with minimal processing"""
+        try:
+            session_logs = list(self.collection.find().sort("login_time", -1))
+            
+            formatted_logs = []
+            for i, log in enumerate(session_logs):
+                log = self.convert_object_id(log)
+                
+                formatted_log = {
+                    "log_id": f"SES-{i+1:04d}",
+                    "user_id": log.get('username', 'Unknown'),
+                    "ref_id": log.get('_id', '')[:12],
+                    "event_type": "Session",
+                    "amount_qty": f"{log.get('session_duration', 0)}s",
+                    "status": log.get('status', 'Unknown').title(),
+                    "timestamp": str(log.get('login_time', '')),
+                    "remarks": f"Branch {log.get('branch_id', 'N/A')}"
+                }
+                
+                formatted_logs.append(formatted_log)
+            
+            return {
+                'success': True,
+                'data': formatted_logs
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'data': []
+            }

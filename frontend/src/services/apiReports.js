@@ -1,13 +1,13 @@
-// services/apiSales.js - Updated Sales API Service for CSV-only import
+// services/apiSales.js - Organized Sales API Service
 import { api } from './api.js';
 
 class SalesAPIService {
   // ====================================================================
-  // HELPER METHODS
+  // CORE HELPER METHODS
   // ====================================================================
 
   /**
-   * Handle responses consistently with your existing pattern
+   * Handle responses consistently with existing pattern
    * @param {Object} response - API response object
    * @returns {Object} Response data
    */
@@ -16,7 +16,7 @@ class SalesAPIService {
   }
 
   /**
-   * Handle errors consistently with your existing pattern
+   * Handle errors consistently with existing pattern
    * @param {Object} error - Error object
    * @throws {Error} Formatted error message
    */
@@ -41,9 +41,7 @@ class SalesAPIService {
     try {
       console.log("This API call is getting all sales invoices");
       const response = await api.get('/invoices/', { params });
-      
       return this.handleResponse(response);
-      
     } catch (error) {
       console.error("Error fetching invoices:", error);
       this.handleError(error);
@@ -59,9 +57,7 @@ class SalesAPIService {
     try {
       console.log(`Getting invoice details for ID: ${invoiceId}`);
       const response = await api.get(`/invoices/${invoiceId}/`);
-      
       return this.handleResponse(response);
-      
     } catch (error) {
       console.error("Error fetching invoice:", error);
       this.handleError(error);
@@ -77,9 +73,7 @@ class SalesAPIService {
     try {
       console.log("Creating new invoice");
       const response = await api.post('/invoices/', invoiceData);
-      
       return this.handleResponse(response);
-      
     } catch (error) {
       console.error("Error creating invoice:", error);
       this.handleError(error);
@@ -96,9 +90,7 @@ class SalesAPIService {
     try {
       console.log(`Updating invoice: ${invoiceId}`);
       const response = await api.put(`/invoices/${invoiceId}/`, updateData);
-      
       return this.handleResponse(response);
-      
     } catch (error) {
       console.error("Error updating invoice:", error);
       this.handleError(error);
@@ -114,11 +106,174 @@ class SalesAPIService {
     try {
       console.log(`Deleting invoice: ${invoiceId}`);
       const response = await api.delete(`/invoices/${invoiceId}/`);
-      
       return this.handleResponse(response);
-      
     } catch (error) {
       console.error("Error deleting invoice:", error);
+      this.handleError(error);
+    }
+  }
+
+  // ====================================================================
+  // REPORTS & ANALYTICS - TOP ITEMS
+  // ====================================================================
+
+  /**
+   * Get top selling items
+   * @param {Object} params - Query parameters (limit, etc.)
+   * @returns {Promise<Object>} Top items data
+   */
+  async getTopItems(params = {}) {
+    try {
+      console.log("Getting top items");
+      
+      const queryParams = {
+        limit: params.limit || 5,
+        ...params
+      };
+      
+      const response = await api.get('reports/top-item/', { 
+        params: queryParams 
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching top items:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get top Chart selling items with date filtering
+   * @param {Object} params - Query parameters (limit, start_date, end_date, frequency, etc.)
+   * @returns {Promise<Object>} Top items data with enhanced information
+   */
+  async getTopChartItems(params = {}) {
+    try {
+      console.log("Getting top chart items with date filtering");
+      
+      const queryParams = {
+        limit: params.limit || 10,
+        ...params
+      };
+      
+      const response = await api.get('reports/top-chart-item/', { 
+        params: queryParams 
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching top chart items:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get sales item history with pagination
+   * @param {Object} params - Query parameters (page, page_size)
+   * @returns {Promise<Object>} Item history data with pagination
+   */
+  async getSalesItemHistory(params = {}) {
+    try {
+      console.log("Getting sales item history");
+      
+      const queryParams = {
+        page: params.page || 1,
+        page_size: params.page_size || 10,
+        ...params
+      };
+      
+      const response = await api.get('reports/item-history/', { params: queryParams });
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error("Error fetching sales item history:", error);
+      this.handleError(error);
+    }
+  }
+
+  // ====================================================================
+  // SALES STATISTICS AND REPORTS
+  // ====================================================================
+
+  /**
+   * Get sales statistics
+   * @param {Object} params - Query parameters (start_date, end_date, sales_type, etc.)
+   * @returns {Promise<Object>} Sales statistics
+   */
+  async getSalesStatistics(params = {}) {
+    try {
+      console.log("Getting sales statistics");
+      const response = await api.get('/invoices/stats/', { params });
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error("Error fetching sales statistics:", error);
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Get top selling items (alternative endpoint)
+   * @param {Object} params - Query parameters (limit, date_range, etc.)
+   * @returns {Promise<Object>} Top selling items data
+   */
+  async getTopSellingItems(params = {}) {
+    try {
+      console.log("Getting top selling items");
+      const response = await api.get('/invoices/top-items/', { params });
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error("Error fetching top selling items:", error);
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Get sales chart data for different frequencies
+   * @param {Object} params - Query parameters (frequency: daily/weekly/monthly/yearly, date_range, etc.)
+   * @returns {Promise<Object>} Chart data
+   */
+  async getSalesChartData(params = {}) {
+    try {
+      console.log("Getting sales chart data");
+      const response = await api.get('/invoices/chart-data/', { params });
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error("Error fetching sales chart data:", error);
+      this.handleError(error);
+    }
+  }
+
+  // ====================================================================
+  // SALES BREAKDOWN ANALYTICS
+  // ====================================================================
+
+  /**
+   * Get sales by payment method breakdown
+   * @param {Object} params - Query parameters (date_range, etc.)
+   * @returns {Promise<Object>} Payment method breakdown
+   */
+  async getSalesByPaymentMethod(params = {}) {
+    try {
+      console.log("Getting sales by payment method");
+      const response = await api.get('/invoices/by-payment-method/', { params });
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error("Error fetching sales by payment method:", error);
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Get sales by type breakdown (dine-in, takeout, delivery)
+   * @param {Object} params - Query parameters (date_range, etc.)
+   * @returns {Promise<Object>} Sales type breakdown
+   */
+  async getSalesByType(params = {}) {
+    try {
+      console.log("Getting sales by type");
+      const response = await api.get('/invoices/by-sales-type/', { params });
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error("Error fetching sales by type:", error);
       this.handleError(error);
     }
   }
@@ -128,7 +283,7 @@ class SalesAPIService {
   // ====================================================================
 
   /**
-   * Bulk import sales transactions from CSV file (Updated for your Django endpoint)
+   * Bulk import sales transactions from CSV file
    * @param {File} file - CSV file to upload
    * @param {Function} onProgress - Optional progress callback
    * @returns {Promise<Object>} Import results
@@ -157,7 +312,7 @@ class SalesAPIService {
       
       console.log("Sending CSV to endpoint: /invoices/bulk-import/");
       
-      // Make the API call to your Django endpoint
+      // Make the API call
       const response = await api.post('/invoices/bulk-import/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -175,7 +330,6 @@ class SalesAPIService {
       console.log("Import summary:", response.data?.summary);
       
       return this.handleResponse(response);
-      
     } catch (error) {
       console.error("Error in CSV bulk import:", error);
       console.error("Error details:", {
@@ -212,7 +366,6 @@ class SalesAPIService {
     try {
       console.log("Downloading CSV template...");
       
-      // Note: You'll need to add this endpoint to your Django URLs if it doesn't exist
       const response = await api.get('/invoices/template/', {
         responseType: 'blob',
         timeout: 60000,
@@ -234,7 +387,6 @@ class SalesAPIService {
       
       console.log("CSV template downloaded successfully");
       return true;
-      
     } catch (error) {
       console.error("Error downloading CSV template:", error);
       
@@ -247,18 +399,15 @@ class SalesAPIService {
   }
 
   /**
-   * Get import status/history (if you want to track import jobs)
+   * Get import status/history
    * @param {Object} params - Query parameters
    * @returns {Promise<Object>} Import history
    */
   async getImportHistory(params = {}) {
     try {
       console.log("Getting import history...");
-      
       const response = await api.get('/invoices/import-history/', { params });
-      
       return this.handleResponse(response);
-      
     } catch (error) {
       console.error("Error fetching import history:", error);
       this.handleError(error);
@@ -304,107 +453,8 @@ class SalesAPIService {
       
       console.log("Sales transactions exported successfully");
       return true;
-      
     } catch (error) {
       console.error("Error exporting transactions:", error);
-      this.handleError(error);
-    }
-  }
-
-  // ====================================================================
-  // SALES STATISTICS AND REPORTS
-  // ====================================================================
-
-  /**
-   * Get sales statistics
-   * @param {Object} params - Query parameters (start_date, end_date, sales_type, etc.)
-   * @returns {Promise<Object>} Sales statistics
-   */
-  async getSalesStatistics(params = {}) {
-    try {
-      console.log("Getting sales statistics");
-      const response = await api.get('/invoices/stats/', { params });
-      
-      return this.handleResponse(response);
-      
-    } catch (error) {
-      console.error("Error fetching sales statistics:", error);
-      this.handleError(error);
-    }
-  }
-
-  /**
-   * Get top selling items
-   * @param {Object} params - Query parameters (limit, date_range, etc.)
-   * @returns {Promise<Object>} Top selling items data
-   */
-  async getTopSellingItems(params = {}) {
-    try {
-      console.log("Getting top selling items");
-      const response = await api.get('/invoices/top-items/', { params });
-      
-      return this.handleResponse(response);
-      
-    } catch (error) {
-      console.error("Error fetching top selling items:", error);
-      this.handleError(error);
-    }
-  }
-
-  /**
-   * Get sales chart data for different frequencies
-   * @param {Object} params - Query parameters (frequency: daily/weekly/monthly/yearly, date_range, etc.)
-   * @returns {Promise<Object>} Chart data
-   */
-  async getSalesChartData(params = {}) {
-    try {
-      console.log("Getting sales chart data");
-      const response = await api.get('/invoices/chart-data/', { params });
-      
-      return this.handleResponse(response);
-      
-    } catch (error) {
-      console.error("Error fetching sales chart data:", error);
-      this.handleError(error);
-    }
-  }
-
-  // ====================================================================
-  // SALES BREAKDOWN ANALYTICS
-  // ====================================================================
-
-  /**
-   * Get sales by payment method breakdown
-   * @param {Object} params - Query parameters (date_range, etc.)
-   * @returns {Promise<Object>} Payment method breakdown
-   */
-  async getSalesByPaymentMethod(params = {}) {
-    try {
-      console.log("Getting sales by payment method");
-      const response = await api.get('/invoices/by-payment-method/', { params });
-      
-      return this.handleResponse(response);
-      
-    } catch (error) {
-      console.error("Error fetching sales by payment method:", error);
-      this.handleError(error);
-    }
-  }
-
-  /**
-   * Get sales by type breakdown (dine-in, takeout, delivery)
-   * @param {Object} params - Query parameters (date_range, etc.)
-   * @returns {Promise<Object>} Sales type breakdown
-   */
-  async getSalesByType(params = {}) {
-    try {
-      console.log("Getting sales by type");
-      const response = await api.get('/invoices/by-sales-type/', { params });
-      
-      return this.handleResponse(response);
-      
-    } catch (error) {
-      console.error("Error fetching sales by type:", error);
       this.handleError(error);
     }
   }
@@ -472,91 +522,6 @@ class SalesAPIService {
     } catch (error) {
       console.error('Error triggering download:', error);
       return false;
-    }
-  }
-
-  // ====================================================================
-  // SALES ITEM HISTORY
-  // ====================================================================
-
-  /**
-   * Get sales item history with pagination
-   * @param {Object} params - Query parameters (page, page_size)
-   * @returns {Promise<Object>} Item history data with pagination
-   */
-  async getSalesItemHistory(params = {}) {
-    try {
-      console.log("Getting sales item history");
-      
-      const queryParams = {
-        page: params.page || 1,
-        page_size: params.page_size || 10,
-        ...params
-      };
-      
-      const response = await api.get('reports/item-history/', { params: queryParams });
-      
-      return this.handleResponse(response);
-      
-    } catch (error) {
-      console.error("Error fetching sales item history:", error);
-      this.handleError(error);
-    }
-  }
-
-  // ====================================================================
-  // TOP ITEMS REPORTS
-  // ====================================================================
-
-  /**
-   * Get top selling items
-   * @param {Object} params - Query parameters (limit, etc.)
-   * @returns {Promise<Object>} Top items data
-   */
-  async getTopItems(params = {}) {
-    try {
-      console.log("Getting top items");
-      
-      const queryParams = {
-        limit: params.limit || 5,
-        ...params
-      };
-      
-      const response = await api.get('reports/top-item/', { 
-        params: queryParams 
-      });
-      
-      return response.data;
-      
-    } catch (error) {
-      console.error("Error fetching top items:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get top Chart selling items with date filtering
-   * @param {Object} params - Query parameters (limit, start_date, end_date, frequency, etc.)
-   * @returns {Promise<Object>} Top items data with enhanced information
-   */
-  async getTopChartItems(params = {}) {
-    try {
-      console.log("Getting top chart items with date filtering");
-      
-      const queryParams = {
-        limit: params.limit || 10,
-        ...params
-      };
-      
-      const response = await api.get('reports/top-chart-item/', { 
-        params: queryParams 
-      });
-      
-      return response.data;
-      
-    } catch (error) {
-      console.error("Error fetching top chart items:", error);
-      throw error;
     }
   }
 }
