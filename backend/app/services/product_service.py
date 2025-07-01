@@ -382,6 +382,28 @@ class ProductService:
                 self.update_sync_status(product_id, sync_status='pending', source='cloud')
                 
                 updated_product = self.product_collection.find_one({'_id': ObjectId(product_id)})
+                
+                # Create notification for product update
+                try:
+                    product_name = updated_product.get("product_name", updated_product.get("SKU", "Unknown Product"))
+                    
+                    notification_service.create_notification(
+                        title="Product Updated",
+                        message=f"Product '{product_name}' has been updated",
+                        priority="low",
+                        notification_type="system",
+                        metadata={
+                            "product_id": str(product_id),
+                            "SKU": updated_product.get("SKU"),
+                            "product_name": product_name,
+                            "update_source": "product_update",
+                            "action_type": "product_updated",
+                            "updated_fields": list(product_data.keys())
+                        }
+                    )
+                except Exception as notification_error:
+                    print(f"Failed to create notification for updated product: {notification_error}")
+                
                 return self.convert_object_id(updated_product)
             return None
         
@@ -449,13 +471,65 @@ class ProductService:
                 }
             )
             
-        
-
             if result.modified_count > 0:
                 # Mark as needing sync since stock was updated
                 self.update_sync_status(product_id, sync_status='pending', source='cloud')
                 
                 updated_product = self.product_collection.find_one({'_id': ObjectId(product_id)})
+                
+                # Create notification for stock update
+                try:
+                    product_name = updated_product.get("product_name", updated_product.get("SKU", "Unknown Product"))
+                    low_stock_threshold = updated_product.get('low_stock_threshold', 0)
+                    
+                    # Determine priority based on stock level
+                    priority = "low"
+                    notification_type = "system"
+                    
+                    if new_stock <= low_stock_threshold and new_stock > 0:
+                        priority = "medium"
+                        notification_type = "alert"
+                    elif new_stock == 0:
+                        priority = "high"
+                        notification_type = "alert"
+                    
+                    # Create message based on operation type
+                    if operation_type == 'add':
+                        message = f"Stock added to '{product_name}': +{quantity} units (Total: {new_stock})"
+                    elif operation_type == 'remove':
+                        message = f"Stock removed from '{product_name}': -{quantity} units (Total: {new_stock})"
+                    elif operation_type == 'set':
+                        message = f"Stock set for '{product_name}': {new_stock} units"
+                    
+                    # Add warning if stock is low or out
+                    if new_stock == 0:
+                        message += " - OUT OF STOCK!"
+                    elif new_stock <= low_stock_threshold:
+                        message += " - LOW STOCK WARNING!"
+                    
+                    notification_service.create_notification(
+                        title="Stock Updated",
+                        message=message,
+                        priority=priority,
+                        notification_type=notification_type,
+                        metadata={
+                            "product_id": str(product_id),
+                            "SKU": updated_product.get("SKU"),
+                            "product_name": product_name,
+                            "stock_source": "stock_update",
+                            "action_type": "stock_updated",
+                            "operation_type": operation_type,
+                            "quantity_changed": quantity,
+                            "previous_stock": current_stock,
+                            "new_stock": new_stock,
+                            "reason": reason,
+                            "is_low_stock": new_stock <= low_stock_threshold,
+                            "is_out_of_stock": new_stock == 0
+                        }
+                    )
+                except Exception as notification_error:
+                    print(f"Failed to create notification for stock update: {notification_error}")
+                
                 return self.convert_object_id(updated_product)
             return None
         
@@ -480,6 +554,49 @@ class ProductService:
                     'success': result is not None,
                     'result': result
                 })
+            
+            # Create bulk update notification
+            try:
+                successful_updates = [r for r in results if r['success']]
+                failed_updates = [r for r in results if not r['success']]
+                
+                total_updates = len(stock_updates)
+                successful_count = len(successful_updates)
+                failed_count = len(failed_updates)
+                
+                # Determine priority based on success rate
+                if failed_count == 0:
+                    priority = "low"
+                    notification_type = "system"
+                elif failed_count < successful_count:
+                    priority = "medium"
+                    notification_type = "alert"
+                else:
+                    priority = "high"
+                    notification_type = "alert"
+                
+                # Create summary message
+                if failed_count == 0:
+                    message = f"Bulk stock update completed successfully: {successful_count} products updated"
+                else:
+                    message = f"Bulk stock update completed: {successful_count} successful, {failed_count} failed out of {total_updates} total"
+                
+                notification_service.create_notification(
+                    title="Bulk Stock Update Completed",
+                    message=message,
+                    priority=priority,
+                    notification_type=notification_type,
+                    metadata={
+                        "bulk_update_source": "bulk_stock_update",
+                        "action_type": "bulk_stock_updated",
+                        "total_products": total_updates,
+                        "successful_updates": successful_count,
+                        "failed_updates": failed_count,
+                        "success_rate": round((successful_count / total_updates) * 100, 2) if total_updates > 0 else 0
+                    }
+                )
+            except Exception as notification_error:
+                print(f"Failed to create notification for bulk stock update: {notification_error}")
             
             return results
         
@@ -522,10 +639,41 @@ class ProductService:
             if not ObjectId.is_valid(product_id):
                 return False
             
+            # Get product details before deletion for notification
+            product_to_delete = self.product_collection.find_one({'_id': ObjectId(product_id)})
+            if not product_to_delete:
+                return False
+            
             if hard_delete:
                 # Hard delete - permanently remove from database
                 result = self.product_collection.delete_one({'_id': ObjectId(product_id)})
-                return result.deleted_count > 0
+                
+                if result.deleted_count > 0:
+                    # Create notification for hard deletion
+                    try:
+                        product_name = product_to_delete.get("product_name", product_to_delete.get("SKU", "Unknown Product"))
+                        
+                        notification_service.create_notification(
+                            title="Product Permanently Deleted",
+                            message=f"Product '{product_name}' has been permanently removed from the system",
+                            priority="high",
+                            notification_type="alert",
+                            metadata={
+                                "product_id": str(product_id),
+                                "SKU": product_to_delete.get("SKU"),
+                                "product_name": product_name,
+                                "deletion_source": "product_hard_delete",
+                                "action_type": "product_hard_deleted",
+                                "deletion_type": "permanent",
+                                "deleted_at": datetime.utcnow().isoformat(),
+                                "stock_at_deletion": product_to_delete.get("stock", 0)
+                            }
+                        )
+                    except Exception as notification_error:
+                        print(f"Failed to create notification for hard deleted product: {notification_error}")
+                    
+                    return True
+                return False
             else:
                 # Soft delete - mark as deleted with timestamp and reason
                 current_time = datetime.utcnow()
@@ -552,6 +700,33 @@ class ProductService:
                 if result.modified_count > 0:
                     # Mark as needing sync since product was deleted
                     self.update_sync_status(product_id, sync_status='pending_deletion', source='cloud')
+                    
+                    # Create notification for soft deletion
+                    try:
+                        product_name = product_to_delete.get("product_name", product_to_delete.get("SKU", "Unknown Product"))
+                        
+                        notification_service.create_notification(
+                            title="Product Deleted",
+                            message=f"Product '{product_name}' has been moved to trash and can be restored if needed",
+                            priority="medium",
+                            notification_type="system",
+                            metadata={
+                                "product_id": str(product_id),
+                                "SKU": product_to_delete.get("SKU"),
+                                "product_name": product_name,
+                                "deletion_source": "product_soft_delete",
+                                "action_type": "product_soft_deleted",
+                                "deletion_type": "soft",
+                                "deleted_at": current_time.isoformat(),
+                                "deleted_by": deletion_log["deleted_by"],
+                                "deletion_reason": deletion_log["reason"],
+                                "stock_at_deletion": product_to_delete.get("stock", 0),
+                                "can_be_restored": True
+                            }
+                        )
+                    except Exception as notification_error:
+                        print(f"Failed to create notification for soft deleted product: {notification_error}")
+                    
                     return True
                 
                 return False
@@ -592,6 +767,30 @@ class ProductService:
             if result.modified_count > 0:
                 # Mark as needing sync since product was restored
                 self.update_sync_status(product_id, sync_status='pending', source='cloud')
+                
+                # Create notification for product restoration
+                try:
+                    restored_product = self.product_collection.find_one({'_id': ObjectId(product_id)})
+                    product_name = restored_product.get("product_name", restored_product.get("SKU", "Unknown Product"))
+                    
+                    notification_service.create_notification(
+                        title="Product Restored",
+                        message=f"Product '{product_name}' has been successfully restored from trash",
+                        priority="low",
+                        notification_type="system",
+                        metadata={
+                            "product_id": str(product_id),
+                            "SKU": restored_product.get("SKU"),
+                            "product_name": product_name,
+                            "restoration_source": "product_restore",
+                            "action_type": "product_restored",
+                            "restored_at": current_time.isoformat(),
+                            "restored_by": restoration_log["restored_by"]
+                        }
+                    )
+                except Exception as notification_error:
+                    print(f"Failed to create notification for restored product: {notification_error}")
+                
                 return True
             
             return False
@@ -849,6 +1048,46 @@ class ProductService:
                 results['successful'] = [self.convert_object_id(product) for product in inserted_products]
                 results['total_successful'] = len(inserted_products)
                 
+                # Create bulk creation notification
+                try:
+                    total_processed = len(products_data)
+                    successful_count = len(inserted_products)
+                    failed_count = len(errors)
+                    
+                    # Determine priority based on success rate
+                    if failed_count == 0:
+                        priority = "low"
+                        notification_type = "system"
+                    elif failed_count < successful_count:
+                        priority = "medium"
+                        notification_type = "alert"
+                    else:
+                        priority = "high"
+                        notification_type = "alert"
+                    
+                    # Create summary message
+                    if failed_count == 0:
+                        message = f"Bulk product creation completed successfully: {successful_count} products created"
+                    else:
+                        message = f"Bulk product creation completed: {successful_count} successful, {failed_count} failed out of {total_processed} total"
+                    
+                    notification_service.create_notification(
+                        title="Bulk Product Creation Completed",
+                        message=message,
+                        priority=priority,
+                        notification_type=notification_type,
+                        metadata={
+                            "bulk_creation_source": "bulk_product_create",
+                            "action_type": "bulk_products_created",
+                            "total_products": total_processed,
+                            "successful_creations": successful_count,
+                            "failed_creations": failed_count,
+                            "success_rate": round((successful_count / total_processed) * 100, 2) if total_processed > 0 else 0
+                        }
+                    )
+                except Exception as notification_error:
+                    print(f"Failed to create notification for bulk product creation: {notification_error}")
+                
                 print(f"✅ Successfully inserted {len(inserted_products)} products")
             
             print("=== BULK CREATE SERVICE DEBUG END ===")
@@ -957,6 +1196,51 @@ class ProductService:
             # Create products in bulk
             bulk_result = self.bulk_create_products(parse_result['products_data'])
             
+            # Create import completion notification
+            try:
+                total_rows = parse_result['total_rows']
+                valid_products = parse_result['valid_products']
+                successful_imports = bulk_result['total_successful']
+                failed_imports = bulk_result['total_failed']
+                
+                # Determine priority based on success rate
+                if failed_imports == 0 and valid_products > 0:
+                    priority = "low"
+                    notification_type = "system"
+                elif failed_imports < successful_imports:
+                    priority = "medium"
+                    notification_type = "alert"
+                else:
+                    priority = "high"
+                    notification_type = "alert"
+                
+                # Create summary message
+                if failed_imports == 0 and valid_products > 0:
+                    message = f"Product import completed successfully: {successful_imports} products imported from {total_rows} rows"
+                elif valid_products == 0:
+                    message = f"Product import failed: No valid products found in {total_rows} rows"
+                else:
+                    message = f"Product import completed: {successful_imports} successful, {failed_imports} failed from {valid_products} valid products"
+                
+                notification_service.create_notification(
+                    title="Product Import Completed",
+                    message=message,
+                    priority=priority,
+                    notification_type=notification_type,
+                    metadata={
+                        "import_source": "file_import",
+                        "action_type": "products_imported",
+                        "file_type": file_type,
+                        "total_rows": total_rows,
+                        "valid_products": valid_products,
+                        "successful_imports": successful_imports,
+                        "failed_imports": failed_imports,
+                        "import_success_rate": round((successful_imports / valid_products) * 100, 2) if valid_products > 0 else 0
+                    }
+                )
+            except Exception as notification_error:
+                print(f"Failed to create notification for product import: {notification_error}")
+            
             return {
                 'import_completed': True,
                 'file_info': {
@@ -969,7 +1253,7 @@ class ProductService:
             
         except Exception as e:
             raise Exception(f"Error importing products from file: {str(e)}")
-        
+            
     def generate_import_template(self, file_type='csv'):
         """Generate a template file for product import"""
         try:
