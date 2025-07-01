@@ -1,28 +1,36 @@
 <template>
   <div class="customers-page">
+    <!-- Page Title -->
+    <div class="mb-3">
+      <h1 class="h3 fw-semibold text-primary-dark mb-0">Customer Management</h1>
+    </div>
+
     <!-- KPI Cards Row -->
     <div class="kpi-cards-container">
-      <KpiCard
+      <CardTemplate
         title="Active Users"
         :value="activeUsersCount"
+        border-color="info"
         subtitle="Total Active Users"
         change=""
         change-type="positive"
         variant=""
         class="kpi-card"
       />
-      <KpiCard
+      <CardTemplate
         title="Monthly New Users"
         :value="monthlyUsersCount"
+        border-color="success"
         subtitle="This month's new users"
         change=""
         change-type="positive"
         variant=""
         class="kpi-card"
       />
-      <KpiCard
+      <CardTemplate
         title="Daily Customer Logins"
         :value="dailyUsersCount"
+        border-color="danger"
         subtitle="Last 24 hours"
         change=""
         change-type="positive"
@@ -64,7 +72,7 @@
       <!-- Action Buttons -->
       <div class="header-actions">
         <button 
-          class="btn btn-secondary" 
+          class="btn btn-danger" 
           @click="deleteSelected" 
           :disabled="selectedCustomers.length === 0 || loading"
         >
@@ -73,11 +81,12 @@
         <button class="btn btn-success" @click="showAddCustomerModal">
           Add Customer
         </button>
-        <button class="btn btn-primary" @click="exportData">
-          Export
+        <button class="btn btn-primary" @click="exportData" :disabled="loading || exporting">
+            <i class="bi bi-download"></i> {{ exporting ? 'Exporting...' : 'Export' }}
         </button>
-        <button class="btn btn-info" @click="refreshData" :disabled="loading">
-          {{ loading ? 'Loading...' : 'Refresh' }}
+        <button class="btn btn-warning" @click="refreshData" :disabled="loading">
+          <i class="bi bi-arrow-clockwise" :class="{ 'spinning': loading }"></i>
+          {{ loading ? 'Refreshing...' : 'Refresh' }}
         </button>
       </div>
     </div>
@@ -115,7 +124,7 @@
             <th>Name</th>
             <th>Email</th>
             <th>Phone</th>
-            <th>Delivery Address</th>
+            <th>Address</th>
             <th>Loyalty Points</th>
             <th>Date Created</th>
             <th class="actions-column">Actions</th>
@@ -153,14 +162,32 @@
             <td class="date-column">{{ formatDate(customer.date_created) }}</td>
             <td class="actions-column">
               <div class="action-buttons">
-                <button class="action-btn" @click="editCustomer(customer)" title="Edit">
-                  ✏️
+                <button 
+                  class="btn btn-outline-secondary btn-icon-only btn-xs" 
+                  @click="editCustomer(customer)"
+                  data-bs-toggle="tooltip"
+                  title="Edit"
+                  :disabled="loading"
+                >
+                  <Edit :size="14" />
                 </button>
-                <button class="action-btn" @click="viewCustomer(customer)" title="View">
-                  👁️
+                <button 
+                  class="btn btn-outline-primary btn-icon-only btn-xs" 
+                  @click="viewCustomer(customer)"
+                  data-bs-toggle="tooltip"
+                  title="View"
+                  :disabled="loading"
+                >
+                  <Eye :size="14" />
                 </button>
-                <button class="action-btn delete" @click="deleteCustomer(customer)" title="Delete">
-                  🗑️
+                <button 
+                  class="btn btn-outline-danger btn-icon-only btn-xs" 
+                  @click="deleteCustomer(customer)"
+                  data-bs-toggle="tooltip"
+                  title="Delete"
+                  :disabled="loading"
+                >
+                  <Trash2 :size="14" />
                 </button>
               </div>
             </td>
@@ -333,14 +360,19 @@
 
 <script>
 import apiService from '../services/api.js'
-import KpiCard from '../components/dashboard/KpiCard.vue'
 import CustomerApiService from '../services/apiCustomers.js'
-
+import CardTemplate from '@/components/common/CardTemplate.vue'
+import { Edit, Eye, Trash2, Lock, Unlock } from 'lucide-vue-next'
 
 export default {
   name: 'CustomersPage',
   components: {
-    KpiCard,
+    CardTemplate,
+    Edit,
+    Eye,
+    Trash2,
+    Lock,
+    Unlock
   },
   data() {
     return {
@@ -351,6 +383,7 @@ export default {
       error: null,
       successMessage: null,
       searchQuery: '',
+      exporting: false,
       
       // Modal states
       showModal: false,
@@ -360,7 +393,7 @@ export default {
       formError: null,
       selectedCustomer: null,
       
-      //KPI CARDS
+      // KPI Cards
       activeUsersCount: 'Loading...',
       monthlyUsersCount: 'Loading...',
       dailyUsersCount: 'Loading...',
@@ -421,9 +454,9 @@ export default {
         const address = this.formatAddress(customer.delivery_address).toLowerCase()
         
         return fullName.includes(query) ||
-               email.includes(query) ||
-               phone.includes(query) ||
-               address.includes(query)
+              email.includes(query) ||
+              phone.includes(query) ||
+              address.includes(query)
       })
 
       // Clear selections when searching
@@ -444,9 +477,96 @@ export default {
     },
 
     async refreshData() {
+      console.log('=== COMPREHENSIVE CUSTOMER DATA REFRESH INITIATED ===')
+      
+      // Clear any existing messages
       this.successMessage = null
-      await this.fetchCustomers()
-      this.handleSearch() // Reapply search after refresh
+      this.error = null
+      
+      // Preserve current customer selections and search state
+      const currentSelections = [...this.selectedCustomers]
+      const currentSearch = this.searchQuery
+      
+      try {
+        // Set loading state
+        this.loading = true
+        
+        // 1. Refresh KPI Cards Data
+        console.log('Refreshing KPI data...')
+        await this.loadKPIData()
+        
+        // 2. Refresh Customer Table Data
+        console.log('Refreshing customer data...')
+        await this.fetchCustomers()
+        
+        // 3. Restore user state
+        this.selectedCustomers = currentSelections.filter(customerId => 
+          this.customers.some(customer => 
+            (customer._id === customerId) || (customer.customer_id === customerId)
+          )
+        )
+        
+        // Restore search and reapply search filter
+        this.searchQuery = currentSearch
+        this.handleSearch()
+        
+        // 4. Show success message
+        this.successMessage = `Data refreshed successfully! ${this.customers.length} customers and KPI metrics updated.`
+        
+        console.log('✅ Comprehensive refresh completed successfully')
+        
+        // Auto-clear success message
+        setTimeout(() => {
+          this.successMessage = null
+        }, 3000)
+        
+      } catch (error) {
+        console.error('❌ Comprehensive refresh failed:', error)
+        this.error = `Refresh failed: ${error.message || 'An unexpected error occurred'}`
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async loadKPIData() {
+      try {
+        // Load all KPI data in parallel for better performance
+        const [activeResult, monthlyResult, dailyResult] = await Promise.allSettled([
+          CustomerApiService.ActiveUser(),
+          CustomerApiService.MonthlyUser(),
+          CustomerApiService.DailyUser()
+        ])
+        
+        // Handle Active Users
+        if (activeResult.status === 'fulfilled') {
+          this.activeUsersCount = activeResult.value.active_customers?.toString() || '0'
+        } else {
+          console.error('Failed to load active users:', activeResult.reason)
+          this.activeUsersCount = 'Error'
+        }
+        
+        // Handle Monthly Users
+        if (monthlyResult.status === 'fulfilled') {
+          this.monthlyUsersCount = monthlyResult.value.monthly_customers?.toString() || '0'
+        } else {
+          console.error('Failed to load monthly users:', monthlyResult.reason)
+          this.monthlyUsersCount = 'Error'
+        }
+        
+        // Handle Daily Users
+        if (dailyResult.status === 'fulfilled') {
+          this.dailyUsersCount = dailyResult.value.daily_customers?.toString() || '0'
+        } else {
+          console.error('Failed to load daily users:', dailyResult.reason)
+          this.dailyUsersCount = 'Error'
+        }
+        
+      } catch (error) {
+        console.error('❌ Error loading KPI data:', error)
+        this.activeUsersCount = 'Error'
+        this.monthlyUsersCount = 'Error'
+        this.dailyUsersCount = 'Error'
+      }
     },
 
     selectAll(event) {
@@ -490,7 +610,6 @@ export default {
 
       this.loading = false
       
-      // Clear success message after 3 seconds
       setTimeout(() => {
         this.successMessage = null
       }, 3000)
@@ -575,12 +694,10 @@ export default {
 
       try {
         if (this.isEditMode) {
-          // Update existing customer
           const customerId = this.selectedCustomer._id || this.selectedCustomer.customer_id
           await apiService.updateCustomer(customerId, this.customerForm)
           this.successMessage = `Customer "${this.customerForm.full_name}" updated successfully`
         } else {
-          // Create new customer
           await apiService.createCustomer(this.customerForm)
           this.successMessage = `Customer "${this.customerForm.full_name}" created successfully`
         }
@@ -600,28 +717,33 @@ export default {
     },
 
     exportData() {
-      // Export filtered customers to CSV
-      const headers = ['ID', 'Name', 'Email', 'Phone', 'Address', 'Loyalty Points', 'Date Created']
-      const csvContent = [
-        headers.join(','),
-        ...this.filteredCustomers.map(customer => [
-          customer.customer_id || customer._id,
-          customer.full_name,
-          customer.email,
-          customer.phone || '',
-          this.formatAddress(customer.delivery_address),
-          customer.loyalty_points || 0,
-          this.formatDate(customer.date_created)
-        ].join(','))
-      ].join('\n')
+      this.exporting = true
+      
+      try {
+        const headers = ['ID', 'Name', 'Email', 'Phone', 'Address', 'Loyalty Points', 'Date Created']
+        const csvContent = [
+          headers.join(','),
+          ...this.filteredCustomers.map(customer => [
+            customer.customer_id || customer._id,
+            customer.full_name,
+            customer.email,
+            customer.phone || '',
+            this.formatAddress(customer.delivery_address),
+            customer.loyalty_points || 0,
+            this.formatDate(customer.date_created)
+          ].join(','))
+        ].join('\n')
 
-      const blob = new Blob([csvContent], { type: 'text/csv' })
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `customers_${new Date().toISOString().split('T')[0]}.csv`
-      a.click()
-      window.URL.revokeObjectURL(url)
+        const blob = new Blob([csvContent], { type: 'text/csv' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `customers_${new Date().toISOString().split('T')[0]}.csv`
+        a.click()
+        window.URL.revokeObjectURL(url)
+      } finally {
+        this.exporting = false
+      }
     },
 
     formatAddress(address) {
@@ -650,50 +772,19 @@ export default {
   async mounted() {
     console.log('Customers component mounted')
     
-    // Handle Active Users
-    try {
-      const result = await CustomerApiService.ActiveUser()
-      console.log('Active API response:', result)
-      console.log('Active API response stringified:', JSON.stringify(result))
-      this.activeUsersCount = result.active_customers.toString()
-    } catch (error) {
-      console.error('Failed to load active users:', error)
-      this.activeUsersCount = 'Error'
-    }
-
-    // Handle Monthly Users  
-    try {
-      const monthlyResult = await CustomerApiService.MonthlyUser()
-      console.log('Monthly API response:', monthlyResult)
-      console.log('Monthly API response stringified:', JSON.stringify(monthlyResult))
-      this.monthlyUsersCount = monthlyResult.monthly_customers.toString()
-    } catch (error) {
-      console.error('Failed to load monthly users:', error)
-      this.monthlyUsersCount = 'Error'
-    }
-
-    // Handle Daily Users
-    try {
-      const dailyResult = await CustomerApiService.DailyUser()
-      console.log('Daily API response:', dailyResult)
-      console.log('Daily API response stringified:', JSON.stringify(dailyResult))
-      this.dailyUsersCount = dailyResult.daily_customers.toString()
-    } catch (error) {
-      console.error('Failed to load daily users:', error)
-      this.dailyUsersCount = 'Error' // ✅ Fixed this
-    }
-
-    // Force scroll to top immediately
+    // Load KPI data and customer data in parallel
+    await Promise.all([
+      this.loadKPIData(),
+      this.fetchCustomers()
+    ])
+    
+    // Force scroll to top
     window.scrollTo(0, 0)
     
-    await this.fetchCustomers()
-    
-    // Ensure we're at top after data loads
     this.$nextTick(() => {
       window.scrollTo(0, 0)
     })
   }
-  
 }
 </script>
 
@@ -815,6 +906,7 @@ export default {
   flex-shrink: 0;
 }
 
+/* Enhanced button styles */
 .btn {
   padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
@@ -823,7 +915,15 @@ export default {
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .btn-primary {
@@ -853,18 +953,32 @@ export default {
   background-color: #059669;
 }
 
-.btn-info {
-  background-color: #06b6d4;
+.btn-warning {
+  background-color: #f59e0b;
   color: white;
 }
 
-.btn-info:hover:not(:disabled) {
-  background-color: #0891b2;
+.btn-warning:hover:not(:disabled) {
+  background-color: #d97706;
 }
 
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.btn-danger {
+  background-color: #ef4444;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #dc2626;
+}
+
+/* Spinning icon animation */
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .loading-state, .error-state {
@@ -899,11 +1013,11 @@ export default {
 .customers-table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed; /* KEY: This forces columns to respect width settings */
+  table-layout: fixed;
 }
 
 .customers-table thead {
-  background-color: #4f46e5;
+  background-color: #567cdc;
   color: white;
 }
 
@@ -929,16 +1043,14 @@ export default {
   background-color: #ede9fe;
 }
 
-/* Define exact column widths */
-.customers-table th.checkbox-column,
-.customers-table td.checkbox-column {
+/* Column width definitions */
+.checkbox-column {
   width: 40px;
   text-align: center;
 }
 
-.customers-table th.id-column,
-.customers-table td.id-column {
-  width: 60px;
+.id-column {
+  width: 80px;
   font-weight: 500;
   color: #6366f1;
   font-family: monospace;
@@ -949,77 +1061,122 @@ export default {
   white-space: nowrap;
 }
 
-.customers-table th.name-column,
-.customers-table td.name-column {
-  width: 18%;
+.name-column {
+  width: 150px;
+  max-width: 150px;
   font-weight: 500;
   color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.customers-table th.email-column,
-.customers-table td.email-column {
-  width: 20%;
-  color: #64748b;
-}
-
-.customers-table th.phone-column,
-.customers-table td.phone-column {
-  width: 12%;
-  color: #64748b;
-}
-
-.customers-table th.address-column,
-.customers-table td.address-column {
-  width: 20%;
+.email-column {
+  width: 180px;
+  max-width: 180px;
   color: #64748b;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.customers-table th.points-column,
-.customers-table td.points-column {
-  width: 80px;
-  font-weight: 500;
-  text-align: center;
-  color: black;
+.phone-column {
+  width: 120px;
+  max-width: 120px;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.customers-table th.date-column,
-.customers-table td.date-column {
+.address-column {
+  width: 200px;
+  max-width: 200px;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.points-column {
   width: 100px;
+  font-weight: 500;
+  text-align: center;
+  color: #1e293b;
+}
+
+.date-column {
+  width: 120px;
   color: #64748b;
   font-size: 0.8125rem;
 }
 
-.customers-table th.actions-column,
-.customers-table td.actions-column {
-  width: 120px;
+.actions-column {
+  width: 140px;
   text-align: center;
+  vertical-align: middle;
+}
+
+/* Action Button Styles */
+.btn-xs {
+  padding: 0.25rem 0.4rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  border-radius: 0.375rem;
+}
+
+.btn-icon-only {
+  padding: 0.35rem;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid;
+}
+
+.btn-outline-secondary {
+  color: #6b7280;
+  border-color: #d1d5db;
+  background-color: transparent;
+}
+
+.btn-outline-secondary:hover:not(:disabled) {
+  color: #374151;
+  background-color: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.btn-outline-primary {
+  color: #3b82f6;
+  border-color: #93c5fd;
+  background-color: transparent;
+}
+
+.btn-outline-primary:hover:not(:disabled) {
+  color: #ffffff;
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.btn-outline-danger {
+  color: #ef4444;
+  border-color: #fca5a5;
+  background-color: transparent;
+}
+
+.btn-outline-danger:hover:not(:disabled) {
+  color: #ffffff;
+  background-color: #ef4444;
+  border-color: #ef4444;
 }
 
 .action-buttons {
   display: flex;
-  gap: 0.25rem;
+  gap: 0.375rem;
   justify-content: center;
-}
-
-.action-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 0.25rem;
-  transition: all 0.2s ease;
-  font-size: 1rem;
-}
-
-.action-btn:hover {
-  background-color: #e2e8f0;
-}
-
-.action-btn.delete:hover {
-  background-color: #fee2e2;
+  align-items: center;
 }
 
 .empty-state {
@@ -1150,7 +1307,7 @@ export default {
 .detail-row {
   display: flex;
   gap: 1rem;
-  color: black;
+  color: #1e293b;
 }
 
 .detail-row strong {
@@ -1224,10 +1381,6 @@ input[type="checkbox"] {
     padding: 0.75rem 0.5rem;
     font-size: 0.8125rem;
   }
-  
-  .address-column {
-    max-width: 150px;
-  }
 
   .form-row {
     grid-template-columns: 1fr;
@@ -1272,29 +1425,4 @@ input[type="checkbox"] {
     padding: 0.5rem 0.75rem;
   }
 }
-
-@media (max-width: 480px) {
-  .search-container {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.5rem;
-  }
-
-  .search-icon {
-    align-self: flex-start;
-    margin-right: 0;
-  }
-
-  .search-input::placeholder {
-    font-size: 0.875rem;
-  }
-
-  .kpi-cards-container {
-    gap: 0.5rem;
-  }
-
-  .header-actions {
-    grid-template-columns: 1fr;
-    gap: 0.5rem;
-  }
-}</style>
+</style>

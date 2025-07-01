@@ -1,7 +1,6 @@
-// services/apiProducts.js - UPDATED VERSION
 import { api } from './api.js';
 
-class SessionLogsAPI {
+class NotificationsAPI {
   // Helper method to handle responses
   handleResponse(response) {
     return response.data;
@@ -38,23 +37,11 @@ class SessionLogsAPI {
     }
   }
 
-  async SearchLogs(params = {}) {
-    try {
-        console.log("This API will fetch specific Log");
-        const response = await api.get('/session-logs/display/');
-        
-        // Return the data from the response
-        return response.data;
-        
-    } catch (error) {
-        console.error("Error fetching active users:", error);
-        throw error; // Re-throw so calling code can handle it
-    }
-  }
+
 
 }
 
 // Create and export singleton instance
-const apiLogs = new SessionLogsAPI();
+const apiNotifications = new NotificationsAPI();
 
-export default apiLogs;
+export default apiNotifications;

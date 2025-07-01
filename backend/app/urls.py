@@ -193,9 +193,9 @@ urlpatterns = [
     path('invoices/<str:invoice_id>/', SalesLogView.as_view(), name='invoice-detail'),
 
     #Sales item Transaction History
-    path('reports/item-history/', SalesItemHistoryView.as_view(), name='sales_item_history'),
-    path('reports/top-item/', SalesTopItemView.as_view(), name='sales_top_item'),
-    path('reports/top-chart-item/', SalesTopItemChartView.as_view(), name='sales_chart_top_item'),
+    path('reports/top-item/', SalesTopItemView.as_view(), name='top-items'),
+    path('reports/top-chart-item/', SalesTopItemChartView.as_view(), name='top-chart-items'), 
+    path('reports/item-history/', SalesItemHistoryView.as_view(), name='item-history'),
 
     # API Documentation
     path('docs/', APIDocumentationView.as_view(), name='api-documentation'),

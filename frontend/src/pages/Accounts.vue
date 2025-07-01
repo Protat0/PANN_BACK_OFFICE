@@ -2,10 +2,10 @@
   <div class="accounts-page">
     <!-- Header Section -->
     <div class="page-header">
-      <h1 class="page-title">User Accounts</h1>
+      <h1 class="page-title">User Management</h1>
       <div class="header-actions">
         <button 
-          class="btn btn-secondary" 
+          class="btn btn-danger" 
           @click="deleteSelected" 
           :disabled="selectedUsers.length === 0 || loading"
         >
@@ -14,20 +14,21 @@
         <button class="btn btn-success" @click="showAddUserModal">
           Add User
         </button>
-        <button class="btn btn-primary" @click="exportData">
-          Export
+        <button class="btn btn-primary" @click="exportData" :disabled="loading || exporting">
+          <i class="bi bi-download"></i> {{ exporting ? 'Exporting...' : 'Export' }}
         </button>
-        <button class="btn btn-info" @click="refreshData" :disabled="loading">
-          {{ loading ? 'Loading...' : 'Refresh' }}
+        <button class="btn btn-warning" @click="refreshData" :disabled="loading">
+          <i class="bi bi-arrow-clockwise" :class="{ 'spinning': loading }"></i>
+          {{ loading ? 'Refreshing...' : 'Refresh' }}
         </button>
       </div>
     </div>
 
-    <!-- Filters -->
+    <!-- Filters Section -->
     <div class="filters-section">
       <div class="filter-group">
         <label for="roleFilter">Filter by Role:</label>
-        <select id="roleFilter" v-model="roleFilter" @change="applyFilters">
+        <select id="roleFilter" v-model="roleFilter" @change="applyFilters" :disabled="loading">
           <option value="all">All Roles</option>
           <option value="admin">Admin</option>
           <option value="employee">Employee</option>
@@ -36,7 +37,7 @@
       
       <div class="filter-group">
         <label for="statusFilter">Filter by Status:</label>
-        <select id="statusFilter" v-model="statusFilter" @change="applyFilters">
+        <select id="statusFilter" v-model="statusFilter" @change="applyFilters" :disabled="loading">
           <option value="all">All Status</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
@@ -51,24 +52,45 @@
           @input="applyFilters"
           type="text" 
           placeholder="Search by name, email, or username..."
+          :disabled="loading"
         />
       </div>
     </div>
 
     <!-- Loading State -->
     <div v-if="loading && users.length === 0" class="loading-state">
+      <div class="spinner-border text-primary"></div>
       <p>Loading user accounts...</p>
     </div>
 
     <!-- Error State -->
     <div v-if="error" class="error-state">
-      <p>{{ error }}</p>
-      <button class="btn btn-primary" @click="refreshData">Try Again</button>
+      <div class="alert alert-danger text-center" role="alert">
+        <i class="bi bi-exclamation-triangle"></i>
+        <p class="mb-3">{{ error }}</p>
+        <button class="btn btn-primary" @click="refreshData" :disabled="loading">
+          <i class="bi bi-arrow-clockwise"></i>
+          {{ loading ? 'Retrying...' : 'Try Again' }}
+        </button>
+      </div>
     </div>
 
     <!-- Success Message -->
     <div v-if="successMessage" class="success-message">
-      {{ successMessage }}
+      <div class="alert alert-success text-center" role="alert">
+        <i class="bi bi-check-circle"></i>
+        {{ successMessage }}
+      </div>
+    </div>
+
+    <!-- Refresh Progress Indicator -->
+    <div v-if="loading && users.length > 0" class="refresh-indicator">
+      <div class="alert alert-info d-flex align-items-center" role="alert">
+        <div class="spinner-border spinner-border-sm me-2" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        Refreshing user data... {{ refreshProgress }}
+      </div>
     </div>
 
     <!-- Data Table -->
@@ -81,17 +103,18 @@
               @change="selectAll" 
               :checked="allSelected"
               :indeterminate="someSelected"
+              :disabled="loading"
             />
           </th>
-          <th style="padding-left: 30px;">ID</th>
+          <th>ID</th>
           <th>Username</th>
           <th>Full Name</th>
           <th>Email</th>
           <th>Role</th>
           <th>Status</th>
           <th>Last Login</th>
-          <th>Date Created</th>
-          <th class="actions-column" style="padding-left: 50px;">Actions</th>
+          <th>Created on</th>
+          <th class="actions-column">Actions</th>
         </tr>
       </template>
 
@@ -101,7 +124,8 @@
           :key="user._id"
           :class="{ 
             'selected': selectedUsers.includes(user._id),
-            'inactive': user.status === 'inactive'
+            'inactive': user.status === 'inactive',
+            'refreshing': loading
           }"
         >
           <td class="checkbox-column">
@@ -109,12 +133,13 @@
               type="checkbox" 
               :value="user._id"
               v-model="selectedUsers"
+              :disabled="loading"
             />
           </td>
           <td class="id-column">{{ user._id.slice(-6) }}</td>
           <td class="username-column">{{ user.username }}</td>
-          <td class="name-column">{{ user.full_name }}</td>
-          <td class="email-column">{{ user.email }}</td>
+          <td class="name-column" :title="user.full_name">{{ user.full_name }}</td>
+          <td class="email-column" :title="user.email">{{ user.email }}</td>
           <td class="role-column">
             <span :class="['role-badge', `role-${user.role}`]">
               {{ user.role }}
@@ -129,21 +154,43 @@
           <td class="date-column">{{ formatDate(user.date_created) }}</td>
           <td class="actions-column">
             <div class="action-buttons">
-              <button class="action-btn" @click="editUser(user)" title="Edit">
-                ✏️
-              </button>
-              <button class="action-btn" @click="viewUser(user)" title="View">
-                👁️
+              <button 
+                class="btn btn-outline-secondary btn-icon-only btn-xs" 
+                @click="editUser(user)"
+                data-bs-toggle="tooltip"
+                title="Edit"
+                :disabled="loading"
+              >
+                <Edit :size="14" />
               </button>
               <button 
-                class="action-btn"
-                @click="toggleUserStatus(user)" 
-                :title="user.status === 'active' ? 'Deactivate' : 'Activate'"
+                class="btn btn-outline-primary btn-icon-only btn-xs" 
+                @click="viewUser(user)"
+                data-bs-toggle="tooltip"
+                title="View"
+                :disabled="loading"
               >
-                {{ user.status === 'active' ? '🔒' : '🔓' }}
+                <Eye :size="14" />
               </button>
-              <button class="action-btn delete" @click="deleteUser(user)" title="Delete">
-                🗑️
+              <button 
+                class="btn btn-icon-only btn-xs"
+                @click="toggleUserStatus(user)"
+                data-bs-toggle="tooltip"
+                :title="user.status === 'active' ? 'Deactivate' : 'Activate'"
+                :class="user.status === 'active' ? 'btn-outline-warning' : 'btn-outline-success'"
+                :disabled="loading"
+              >
+                <Lock v-if="user.status === 'active'" :size="14" />
+                <Unlock v-else :size="14" />
+              </button>
+              <button 
+                class="btn btn-outline-danger btn-icon-only btn-xs" 
+                @click="deleteUser(user)"
+                data-bs-toggle="tooltip"
+                title="Delete"
+                :disabled="loading"
+              >
+                <Trash2 :size="14" />
               </button>
             </div>
           </td>
@@ -153,13 +200,28 @@
 
     <!-- Empty State -->
     <div v-if="!loading && filteredUsers.length === 0 && !error" class="empty-state">
-      <p>{{ users.length === 0 ? 'No user accounts found' : 'No users match the current filters' }}</p>
-      <button v-if="users.length === 0" class="btn btn-primary" @click="showAddUserModal">
-        Add First User
-      </button>
-      <button v-else class="btn btn-secondary" @click="clearFilters">
-        Clear Filters
-      </button>
+      <div class="card">
+        <div class="card-body text-center py-5">
+          <i class="bi bi-people" style="font-size: 3rem; color: #6b7280;"></i>
+          <p class="mt-3 mb-3">
+            {{ users.length === 0 ? 'No user accounts found' : 'No users match the current filters' }}
+          </p>
+          <button v-if="users.length === 0" class="btn btn-primary" @click="showAddUserModal">
+            <i class="bi bi-person-plus"></i>
+            Add First User
+          </button>
+          <div v-else class="d-flex gap-2 justify-content-center">
+            <button class="btn btn-secondary" @click="clearFilters">
+              <i class="bi bi-funnel"></i>
+              Clear Filters
+            </button>
+            <button class="btn btn-info" @click="refreshData">
+              <i class="bi bi-arrow-clockwise"></i>
+              Refresh Data
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- User Modal (Add/Edit) -->
@@ -318,11 +380,17 @@
 <script>
 import apiService from '../services/api.js'
 import DataTable from '../components/common/TableTemplate.vue'
+import { Edit, Eye, Lock, Unlock, Trash2 } from 'lucide-vue-next'
 
 export default {
   name: 'AccountsPage',
   components: {
-    DataTable
+    DataTable,
+    Edit,
+    Eye,
+    Lock,
+    Unlock,
+    Trash2
   },
   data() {
     return {
@@ -330,8 +398,14 @@ export default {
       filteredUsers: [],
       selectedUsers: [],
       loading: false,
+      exporting: false,
       error: null,
       successMessage: null,
+      
+      // Enhanced refresh tracking
+      lastRefresh: null,
+      refreshProgress: '',
+      refreshStartTime: null,
       
       // Filters
       roleFilter: 'all',
@@ -366,31 +440,152 @@ export default {
     }
   },
   methods: {
+    // ================================================================
+    // DATA FETCHING
+    // ================================================================
     async fetchUsers() {
       this.loading = true
       this.error = null
+      this.refreshStartTime = Date.now()
       
       try {
-        console.log('Fetching users from API...')
+        console.log('=== Fetching Users from API ===')
+        this.refreshProgress = 'Connecting to server...'
+        
+        // Simulate progress updates
+        const progressInterval = setInterval(() => {
+          if (!this.loading) {
+            clearInterval(progressInterval)
+            return
+          }
+          
+          const elapsed = Date.now() - this.refreshStartTime
+          if (elapsed < 1000) {
+            this.refreshProgress = 'Fetching user data...'
+          } else if (elapsed < 2000) {
+            this.refreshProgress = 'Processing user roles...'
+          } else {
+            this.refreshProgress = 'Finalizing data...'
+          }
+        }, 500)
+        
         const data = await apiService.getUsers()
+        
+        // Clear progress interval
+        clearInterval(progressInterval)
+        
+        console.log('Raw API Response:', data)
         
         // Filter for admin and employee roles only
         this.users = data.filter(user => 
           user.role === 'admin' || user.role === 'employee'
         )
         
+        console.log('Filtered Users:', this.users)
+        console.log('Total Users Loaded:', this.users.length)
+        
+        // Apply current filters to maintain user's view
         this.applyFilters()
-        console.log('Users loaded:', this.users)
+        
+        // Update last refresh timestamp
+        this.lastRefresh = new Date()
+        
+        // Clear any existing errors
+        this.error = null
+        
+        console.log('✅ Users successfully loaded and filtered')
+        
       } catch (error) {
-        console.error('Error fetching users:', error)
-        this.error = `Failed to load user accounts: ${error.message}`
+        console.error('❌ Error fetching users:', error)
+        this.error = `Failed to load user accounts: ${error.message || 'Unknown error occurred'}`
+        
+        // Provide more specific error messages
+        if (error.name === 'NetworkError' || error.message.includes('fetch')) {
+          this.error = 'Network connection failed. Please check your internet connection and try again.'
+        } else if (error.status === 401) {
+          this.error = 'Authentication failed. Please log in again.'
+        } else if (error.status === 403) {
+          this.error = 'Access denied. You do not have permission to view user accounts.'
+        } else if (error.status === 500) {
+          this.error = 'Server error occurred. Please try again later.'
+        }
+        
       } finally {
         this.loading = false
+        this.refreshProgress = ''
       }
     },
 
+    async refreshData() {
+      console.log('=== COMPREHENSIVE DATA REFRESH INITIATED ===')
+      
+      // Clear any existing messages
+      this.successMessage = null
+      this.error = null
+      
+      // Preserve current user selections and filters
+      const currentSelections = [...this.selectedUsers]
+      const currentFilters = {
+        role: this.roleFilter,
+        status: this.statusFilter,
+        search: this.searchFilter
+      }
+      
+      console.log('Preserving current state:', {
+        selections: currentSelections,
+        filters: currentFilters
+      })
+      
+      try {
+        // Fetch fresh user data
+        await this.fetchUsers()
+        
+        // Restore user selections (only valid ones)
+        this.selectedUsers = currentSelections.filter(userId => 
+          this.users.some(user => user._id === userId)
+        )
+        
+        // Restore filters
+        this.roleFilter = currentFilters.role
+        this.statusFilter = currentFilters.status
+        this.searchFilter = currentFilters.search
+        
+        // Reapply filters
+        this.applyFilters()
+        
+        // Show success message
+        this.successMessage = `User data refreshed successfully. ${this.users.length} accounts loaded.`
+        
+        console.log('✅ Comprehensive refresh completed successfully')
+        console.log('Final state:', {
+          totalUsers: this.users.length,
+          filteredUsers: this.filteredUsers.length,
+          selectedUsers: this.selectedUsers.length
+        })
+        
+        // Auto-clear success message
+        setTimeout(() => {
+          this.successMessage = null
+        }, 3000)
+        
+      } catch (error) {
+        console.error('❌ Comprehensive refresh failed:', error)
+        // Error is already handled in fetchUsers()
+      }
+    },
+
+    // ================================================================
+    // FILTER METHODS
+    // ================================================================
     applyFilters() {
+      console.log('Applying filters:', {
+        role: this.roleFilter,
+        status: this.statusFilter,
+        search: this.searchFilter
+      })
+      
       let filtered = [...this.users]
+      const originalCount = filtered.length
 
       // Role filter
       if (this.roleFilter !== 'all') {
@@ -413,20 +608,27 @@ export default {
       }
 
       this.filteredUsers = filtered
+      
+      console.log(`Filters applied: ${originalCount} → ${filtered.length} users`)
     },
 
     clearFilters() {
+      console.log('Clearing all filters')
       this.roleFilter = 'all'
       this.statusFilter = 'all'
       this.searchFilter = ''
       this.applyFilters()
+      
+      // Show feedback
+      this.successMessage = 'Filters cleared successfully'
+      setTimeout(() => {
+        this.successMessage = null
+      }, 2000)
     },
 
-    async refreshData() {
-      this.successMessage = null
-      await this.fetchUsers()
-    },
-
+    // ================================================================
+    // SELECTION METHODS
+    // ================================================================
     selectAll(event) {
       if (event.target.checked) {
         this.selectedUsers = this.filteredUsers.map(user => user._id)
@@ -435,6 +637,9 @@ export default {
       }
     },
 
+    // ================================================================
+    // CRUD OPERATIONS
+    // ================================================================
     async deleteSelected() {
       if (this.selectedUsers.length === 0) return
       
@@ -461,14 +666,13 @@ export default {
           this.successMessage += ` (${errorCount} failed)`
         }
         this.selectedUsers = []
-        await this.fetchUsers()
+        await this.refreshData()
       } else {
         this.error = 'Failed to delete user accounts'
       }
 
       this.loading = false
       
-      // Clear success message after 3 seconds
       setTimeout(() => {
         this.successMessage = null
       }, 3000)
@@ -481,7 +685,7 @@ export default {
       try {
         await apiService.deleteUser(user._id)
         this.successMessage = `User account "${user.username}" deleted successfully`
-        await this.fetchUsers()
+        await this.refreshData()
         
         setTimeout(() => {
           this.successMessage = null
@@ -502,7 +706,7 @@ export default {
       try {
         await apiService.updateUser(user._id, { status: newStatus })
         this.successMessage = `User "${user.username}" ${action}d successfully`
-        await this.fetchUsers()
+        await this.refreshData()
         
         setTimeout(() => {
           this.successMessage = null
@@ -513,6 +717,9 @@ export default {
       }
     },
 
+    // ================================================================
+    // MODAL METHODS
+    // ================================================================
     showAddUserModal() {
       this.isEditMode = false
       this.userForm = {
@@ -583,7 +790,7 @@ export default {
         }
 
         this.closeModal()
-        await this.fetchUsers()
+        await this.refreshData()
         
         setTimeout(() => {
           this.successMessage = null
@@ -596,30 +803,38 @@ export default {
       }
     },
 
+    // ================================================================
+    // UTILITY METHODS
+    // ================================================================
     exportData() {
-      // Export users to CSV
-      const headers = ['ID', 'Username', 'Full Name', 'Email', 'Role', 'Status', 'Last Login', 'Date Created']
-      const csvContent = [
-        headers.join(','),
-        ...this.filteredUsers.map(user => [
-          user._id.slice(-6),
-          user.username,
-          user.full_name,
-          user.email,
-          user.role,
-          user.status,
-          this.formatDate(user.last_login),
-          this.formatDate(user.date_created)
-        ].join(','))
-      ].join('\n')
+      this.exporting = true
+      
+      try {
+        const headers = ['ID', 'Username', 'Full Name', 'Email', 'Role', 'Status', 'Last Login', 'Date Created']
+        const csvContent = [
+          headers.join(','),
+          ...this.filteredUsers.map(user => [
+            user._id.slice(-6),
+            user.username,
+            user.full_name,
+            user.email,
+            user.role,
+            user.status,
+            this.formatDate(user.last_login),
+            this.formatDate(user.date_created)
+          ].join(','))
+        ].join('\n')
 
-      const blob = new Blob([csvContent], { type: 'text/csv' })
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `user_accounts_${new Date().toISOString().split('T')[0]}.csv`
-      a.click()
-      window.URL.revokeObjectURL(url)
+        const blob = new Blob([csvContent], { type: 'text/csv' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `user_accounts_${new Date().toISOString().split('T')[0]}.csv`
+        a.click()
+        window.URL.revokeObjectURL(url)
+      } finally {
+        this.exporting = false
+      }
     },
 
     formatDate(dateString) {
@@ -636,7 +851,7 @@ export default {
   },
 
   async mounted() {
-    console.log('Accounts component mounted')
+    console.log('=== Accounts component mounted ===')
     await this.fetchUsers()
   }
 }
@@ -670,44 +885,17 @@ export default {
   gap: 0.75rem;
 }
 
-.filters-section {
-  background: white;
-  padding: 1.5rem;
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  margin-bottom: 1.5rem;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
+.email-column {
+  width: 160px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #64748b;
 }
 
-.filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
 
-.filter-group label {
-  font-weight: 500;
-  color: #374151;
-  font-size: 0.875rem;
-}
-
-.filter-group select,
-.filter-group input {
-  padding: 0.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-}
-
-.filter-group select:focus,
-.filter-group input:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
+/* Enhanced button styles */
 .btn {
   padding: 0.5rem 1.25rem;
   border-radius: 0.5rem;
@@ -716,6 +904,15 @@ export default {
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .btn-primary {
@@ -745,6 +942,24 @@ export default {
   background-color: #059669;
 }
 
+.btn-warning {
+  background-color: #f59e0b;
+  color: white;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background-color: #d97706;
+}
+
+.btn-danger {
+  background-color: #ef4444;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #dc2626;
+}
+
 .btn-info {
   background-color: #06b6d4;
   color: white;
@@ -754,9 +969,54 @@ export default {
   background-color: #0891b2;
 }
 
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+/* Spinning icon animation */
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Enhanced filters section */
+.filters-section {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  margin-bottom: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  align-items: end;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.filter-group label {
+  font-weight: 500;
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.filter-group select,
+.filter-group input {
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+}
+
+.filter-group select:focus,
+.filter-group input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .loading-state, .error-state {
@@ -781,6 +1041,11 @@ export default {
   text-align: center;
 }
 
+.refresh-indicator {
+  margin-bottom: 1rem;
+}
+
+/* Column width definitions */
 .checkbox-column {
   width: 40px;
   text-align: center;
@@ -794,16 +1059,29 @@ export default {
 }
 
 .username-column {
+  max-width: 100px;
   font-weight: 500;
   color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .name-column {
+  width: 100px;
+  max-width: 120px;
   color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .email-column {
+  width: 100px;
   color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .role-column, .status-column {
@@ -846,32 +1124,94 @@ export default {
 }
 
 .actions-column {
-  width: 140px;
+  width: 160px;
   text-align: center;
+  vertical-align: middle;
+}
+
+/* Action Button Styles */
+.btn-xs {
+  padding: 0.25rem 0.4rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  border-radius: 0.375rem;
+}
+
+.btn-icon-only {
+  padding: 0.35rem;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid;
+}
+
+.btn-outline-secondary {
+  color: #6b7280;
+  border-color: #d1d5db;
+  background-color: transparent;
+}
+
+.btn-outline-secondary:hover:not(:disabled) {
+  color: #374151;
+  background-color: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.btn-outline-primary {
+  color: #3b82f6;
+  border-color: #93c5fd;
+  background-color: transparent;
+}
+
+.btn-outline-primary:hover:not(:disabled) {
+  color: #ffffff;
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.btn-outline-success {
+  color: #10b981;
+  border-color: #86efac;
+  background-color: transparent;
+}
+
+.btn-outline-success:hover:not(:disabled) {
+  color: #ffffff;
+  background-color: #10b981;
+  border-color: #10b981;
+}
+
+.btn-outline-warning {
+  color: #f59e0b;
+  border-color: #fcd34d;
+  background-color: transparent;
+}
+
+.btn-outline-warning:hover:not(:disabled) {
+  color: #ffffff;
+  background-color: #f59e0b;
+  border-color: #f59e0b;
+}
+
+.btn-outline-danger {
+  color: #ef4444;
+  border-color: #fca5a5;
+  background-color: transparent;
+}
+
+.btn-outline-danger:hover:not(:disabled) {
+  color: #ffffff;
+  background-color: #ef4444;
+  border-color: #ef4444;
 }
 
 .action-buttons {
   display: flex;
-  gap: 0.25rem;
   justify-content: center;
-}
-
-.action-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 0.25rem;
-  transition: all 0.2s ease;
-  font-size: 1rem;
-}
-
-.action-btn:hover {
-  background-color: #e2e8f0;
-}
-
-.action-btn.delete:hover {
-  background-color: #fee2e2;
+  align-items: center;
 }
 
 .empty-state {
@@ -1064,6 +1404,19 @@ input[type="checkbox"] {
 
   .filters-section {
     padding: 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .header-actions {
+    grid-template-columns: repeat(2, 1fr);
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .btn {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
   }
 }
 </style>

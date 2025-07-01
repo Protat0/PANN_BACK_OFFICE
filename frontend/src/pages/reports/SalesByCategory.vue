@@ -63,15 +63,9 @@
       <div class="transaction-header">
         <div class="header-left">
           <h1>Category Analysis</h1>
-          <div v-if="dateRangeDisplay" class="date-range-info">
-            <small class="text-muted">
-              <i class="bi bi-bar-chart"></i> 
-              Chart Period: {{ dateRangeDisplay }} ({{ selectedFrequency }})
-            </small>
-          </div>
         </div>
         <div class="header-actions">
-          <button class="btn btn-primary" @click="refreshData" :disabled="loading">
+          <button class="btn btn-warning" style="color:white" @click="refreshData" :disabled="loading">
             <i class="bi bi-arrow-clockwise"></i> {{ loading ? 'Loading...' : 'Refresh' }}
           </button>
         </div>
@@ -1055,9 +1049,9 @@ export default {
 }
 
 .table thead th {
-  background-color: #f8fafc;
+  background-color: #567cdc;
   font-weight: 600;
-  color: #374151;
+  color: white;
   border-bottom: 2px solid #e5e7eb;
   padding: 12px;
 }

@@ -449,6 +449,8 @@ class ProductService:
                 }
             )
             
+        
+
             if result.modified_count > 0:
                 # Mark as needing sync since stock was updated
                 self.update_sync_status(product_id, sync_status='pending', source='cloud')

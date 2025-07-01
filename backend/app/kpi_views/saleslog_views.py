@@ -373,6 +373,9 @@ class SalesTopItemChartView(APIView):
             end_date = request.GET.get('end_date', None)
             frequency = request.GET.get('frequency', 'monthly')
             
+            # Debug logging
+            print(f"Chart API called with: limit={limit}, start_date={start_date}, end_date={end_date}, frequency={frequency}")
+            
             # Parse dates if provided
             start_date_obj = None
             end_date_obj = None
@@ -396,10 +399,10 @@ class SalesTopItemChartView(APIView):
                     }, status=status.HTTP_400_BAD_REQUEST)
             
             # Initialize your Report class
-            report = SalesTopItem()  # Create an instance
+            report = SalesTopItem()
             
-            # Call the method with date filtering
-            result = report.fetch_all_top_item_with_date_filter(
+            # ✅ FIXED: Use the correct method name
+            result = report.fetch_all_top_item(
                 start_date=start_date_obj,
                 end_date=end_date_obj,
                 frequency=frequency
@@ -410,21 +413,23 @@ class SalesTopItemChartView(APIView):
             if limit and limit > 0:
                 items = items[:limit]
             
+            print(f"Returning {len(items)} items after date filtering")  # Debug log
+            
             # Return proper Response format
             return Response({
                 'success': True,
                 'data': items,
                 'total_invoices': result.get('total_invoices', 0),
                 'showing_top': len(items),
-                'date_range': {
+                'date_filter_applied': result.get('date_filter_applied', False),
+                'frequency': frequency,
+                'date_range': result.get('date_range', {
                     'start_date': start_date,
-                    'end_date': end_date,
-                    'frequency': frequency
-                }
+                    'end_date': end_date
+                })
             }, status=status.HTTP_200_OK)
             
         except ValueError as e:
-            # Handle invalid limit parameter
             return Response({
                 'success': False,
                 'message': 'Invalid limit parameter. Must be a valid integer.',
@@ -432,6 +437,7 @@ class SalesTopItemChartView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
             
         except Exception as e:
+            print(f"Error in SalesTopItemChartView: {str(e)}")  # Debug log
             return Response({
                 'success': False,
                 'message': f'Error retrieving top items: {str(e)}',
