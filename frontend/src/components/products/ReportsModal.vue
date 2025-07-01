@@ -295,7 +295,7 @@
 </template>
 
 <script>
-import { useReportsModal } from '@/composables/ui/modals/useReportsModal'
+import { useReportsModal } from '@/composables/ui/products/useReportsModal'
 
 export default {
   name: 'ReportsModal',

@@ -12,6 +12,8 @@ import Customers from '../pages/Customers.vue'
 import Products from '@/pages/inventory/Products.vue'
 import ProductBulkEntry from '@/pages/inventory/ProductBulkEntry.vue'
 import ProductDetails from '@/pages/inventory/ProductDetails.vue'
+import Categories from '@/pages/inventory/Categories.vue'
+import CategoryDetails from '@/pages/inventory/CategoryDetails.vue'
 import SalesByItem from '@/pages/reports/SalesByItem.vue'
 import SalesByCategory from '@/pages/reports/SalesByCategory.vue'
 import Logs from '@/pages/Logs.vue'
@@ -87,6 +89,16 @@ const router = createRouter({
           name: 'ProductDetails',
           component: ProductDetails,
           props: true // This passes the route params as props to the component
+        },
+        {
+          path: 'categories',
+          name: 'Categories',
+          component: Categories
+        },
+        {
+          path: 'categorydetails', // To be changed to category/:id when backend is integrated
+          name: 'Category Details',
+          component: CategoryDetails
         },
         {
           path: 'home',

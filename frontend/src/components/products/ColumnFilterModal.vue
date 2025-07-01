@@ -254,11 +254,6 @@ export default {
       // Basic information columns
       basicColumns: [
         {
-          key: 'id',
-          name: 'Product ID',
-          description: 'Unique product identifier'
-        },
-        {
           key: 'sku',
           name: 'SKU',
           description: 'Stock keeping unit code'
