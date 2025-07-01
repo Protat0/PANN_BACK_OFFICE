@@ -248,7 +248,7 @@
 </template>
 
 <script>
-import { useViewProduct } from '@/composables/ui/modals/useViewProduct'
+import { useViewProduct } from '@/composables/ui/products/useViewProduct'
 import { onMounted, onBeforeUnmount } from 'vue'
 import { Edit, Package, Lock, Unlock, BarChart3 } from 'lucide-vue-next'
 

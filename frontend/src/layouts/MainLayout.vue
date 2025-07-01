@@ -5,6 +5,7 @@
       @menu-changed="handleMenuChange"
       @show-profile="handleShowProfile"
       @logout="handleLogout"
+      @sidebar-toggled="handleSidebarToggle"
     />
     
    <!-- Main Content Area -->
@@ -18,8 +19,6 @@
           <div class="header-right">
             <!-- Notification Bell -->
             <NotificationBell />
-            
-         
           </div>
         </div>
       </header>
@@ -46,8 +45,9 @@
 </template>
 
 <script>
-import Sidebar from '../components/Sidebar.vue'
+import Sidebar from './Sidebar.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
+
 export default {
   name: 'MainLayout',
   components: {
@@ -69,6 +69,7 @@ export default {
         '/products': 'Products',
         '/products/bulk': 'Add Products (Bulk)',
         '/categories': 'Categories',
+        '/categorydetails': 'Category Details',
         '/logs': 'Inventory Logs',
         '/suppliers': 'Suppliers',
         '/promotions': 'Promotions',
@@ -101,6 +102,9 @@ export default {
     closeProfileModal() {
       this.showProfileModal = false
     },
+    handleSidebarToggle(collapsed) {
+      this.sidebarCollapsed = collapsed
+    },
     async handleLogout() {
       console.log('User logging out')
       
@@ -129,6 +133,13 @@ export default {
       }
     }
   },
+  mounted() {
+    // Load sidebar state from localStorage
+    const savedState = localStorage.getItem('sidebar-collapsed')
+    if (savedState !== null) {
+      this.sidebarCollapsed = JSON.parse(savedState)
+    }
+  },
   beforeRouteEnter(to, from, next) {
     // Check if user is authenticated before entering any protected route
     const token = localStorage.getItem('authToken')
@@ -143,31 +154,35 @@ export default {
 
 <style scoped>
 .app-layout {
-  display: flex;
   min-height: 100vh;
   width: 100vw;
   margin: 0;
   padding: 0;
+  background-color: var(--neutral-light);
 }
 
 .main-content {
-  flex: 1;
+  margin-left: 280px; /* Default sidebar width */
+  transition: margin-left 0.3s ease;
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
   min-width: 0;
-  transition: all 0.3s ease;
+}
+
+.main-content.sidebar-collapsed {
+  margin-left: 80px; /* Collapsed sidebar width */
 }
 
 .content-header {
   background: white;
-  /* Match sidebar header height: logo + toggle section + padding */
-  height: 100px; /* This matches the sidebar header total height */
+  height: 100px; /* Match sidebar header height */
   padding: 0 2.5rem;
   border-bottom: 1px solid var(--neutral-medium);
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   flex-shrink: 0;
   display: flex;
-  align-items: center; /* Center the title vertically */
+  align-items: center;
 }
 
 .header-content {
@@ -191,19 +206,6 @@ export default {
   gap: 1rem;
 }
 
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.user-name {
-  color: #6b7280;
-  font-size: 0.875rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
 .page-content {
   flex: 1;
   padding: 2.5rem;
@@ -211,7 +213,7 @@ export default {
   overflow-x: hidden;
   width: 100%;
   min-width: 0;
-  background-color: #f9fafb;
+  background-color: var(--neutral-light);
 }
 
 /* Modal styles */
@@ -283,13 +285,21 @@ export default {
 }
 
 @media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
+  }
+  
+  .main-content.sidebar-collapsed {
+    margin-left: 0;
+  }
+  
   .page-content {
     padding: 1.5rem;
   }
   
   .content-header {
     padding: 0 1.5rem;
-    height: 80px; /* Slightly smaller on mobile */
+    height: 80px;
   }
   
   .content-header h1 {
@@ -298,10 +308,6 @@ export default {
   
   .header-right {
     gap: 0.5rem;
-  }
-  
-  .user-name {
-    display: none; /* Hide user name on smaller screens */
   }
 }
 
@@ -312,18 +318,11 @@ export default {
   
   .content-header {
     padding: 0 1rem;
-    height: 70px; /* Even smaller on very small screens */
+    height: 70px;
   }
   
   .content-header h1 {
     font-size: 1.25rem;
   }
-  
-  .header-content {
-    flex-direction: row; /* Keep horizontal layout */
-  }
-  
-  .content-header h1 {
-    font-size: 1.25rem;
-  }
-}</style>
+}
+</style>

@@ -1,51 +1,9 @@
-async exportData() {
-      try {
-        const blob = await productsApiService.exportProducts({
-          format: 'csv',
-          filters: {
-            category: this.categoryFilter !== 'all' ? this.categoryFilter : undefined,
-            stock: this.stockFilter !== 'all' ? this.stockFilter : undefined,
-            search: this.searchFilter || undefined
-          }
-        })
-        
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `products_${new Date().toISOString().split('T')[0]}.csv`
-        a.click()
-        window.URL.revokeObjectURL(url)
-      } catch (error) {
-        console.error('API export failed, falling back to client-side export:', error)
-        
-        const headers = ['ID', 'Name', 'Category', 'Price', 'Cost', 'Margin', 'Stock']
-        const csvContent = [
-          headers.join(','),
-          ...this.filteredProducts.map(product => [
-            product._id.slice(-6),
-            `"${product.product_name}"`,
-            this.getCategoryName(product.category_id),
-            product.selling_price,
-            product.cost_price,
-            this.calculateMargin(product.cost_price, product.selling_price),
-            product.stock
-          ].join(','))
-        ].join('\n')
-
-        const blob = new Blob([csvContent], { type: 'text/csv' })
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `products_${new Date().toISOString().split('T')[0]}.csv`
-        a.click()
-        window.URL.revokeObjectURL(url)
-      }
-    },<template>
+<template>
   <div class="container-fluid pt-2 pb-4 products-page">
-    <!-- Page Title -->
+    <!-- Page Title
     <div class="mb-3">
       <h1 class="h3 fw-semibold text-primary-dark mb-0">Product Management</h1>
-    </div>
+    </div> -->
 
     <!-- Reports Section -->
     <div class="row mb-3" v-if="!loading">
@@ -170,7 +128,10 @@ async exportData() {
               </div>
             </div>
 
-            <button class="btn btn-outline-secondary btn-sm" @click="handleImport">IMPORT</button>
+            <button class="btn btn-outline-secondary btn-sm" @click="toggleColumnFilter">
+              <Settings :size="14" class="me-1" />
+              COLUMNS
+            </button>
             <button 
               class="btn btn-outline-secondary btn-sm"
               @click="exportData"
@@ -260,123 +221,203 @@ async exportData() {
 
     <!-- Data Table - Separate Section -->
     <DataTable
-      v-if="!loading || products.length > 0"
-      :total-items="filteredProducts.length"
-      :current-page="currentPage"
-      :items-per-page="itemsPerPage"
-      @page-changed="handlePageChange"
-    >
-        <template #header>
-          <tr>
-            <th style="width: 40px;">
-              <input 
-                type="checkbox" 
-                class="form-check-input" 
-                @change="selectAll" 
-                :checked="allSelected"
-                :indeterminate="someSelected"
-              />
-            </th>
-            <th>
-              Item name
-              <ChevronUp :size="14" class="ms-1" />
-            </th>
-            <th style="width: 120px;">Category</th>
-            <th style="width: 100px;">Price</th>
-            <th style="width: 100px;">Cost</th>
-            <th style="width: 80px;">Margin</th>
-            <th style="width: 100px;">In stock</th>
-            <th style="width: 160px;">Actions</th>
-          </tr>
-        </template>
+  v-if="!loading || products.length > 0"
+  :total-items="filteredProducts.length"
+  :current-page="currentPage"
+  :items-per-page="itemsPerPage"
+  @page-changed="handlePageChange"
+>
+  <template #header>
+    <tr>
+      <!-- Checkbox Column (Always visible) -->
+      <th style="width: 40px;">
+        <input 
+          type="checkbox" 
+          class="form-check-input" 
+          @change="selectAll" 
+          :checked="allSelected"
+          :indeterminate="someSelected"
+        />
+      </th>
+      
+      <!-- Product Name Column (Always visible) -->
+      <th>
+        Item name
+        <ChevronUp :size="14" class="ms-1" />
+      </th>
+      
+      <!-- SKU Column -->
+      <th v-if="isColumnVisible('sku')" style="width: 100px;">
+        SKU
+      </th>
+      
+      <!-- Category Column -->
+      <th v-if="isColumnVisible('category')" style="width: 120px;">
+        Category
+      </th>
+      
+      <!-- Selling Price Column -->
+      <th v-if="isColumnVisible('sellingPrice')" style="width: 100px;">
+        Price
+      </th>
+      
+      <!-- Cost Price Column -->
+      <th v-if="isColumnVisible('costPrice')" style="width: 100px;">
+        Cost
+      </th>
+      
+      <!-- Margin Column (Always visible - calculated field) -->
+      <th style="width: 80px;">
+        Margin
+      </th>
+      
+      <!-- Stock Column -->
+      <th v-if="isColumnVisible('stock')" style="width: 100px;">
+        In stock
+      </th>
+      
+      <!-- Status Column -->
+      <th v-if="isColumnVisible('status')" style="width: 80px;">
+        Status
+      </th>
+      
+      <!-- Expiry Date Column -->
+      <th v-if="isColumnVisible('expiryDate')" style="width: 110px;">
+        Expiry Date
+      </th>
+      
+      <!-- Actions Column (Always visible) -->
+      <th style="width: 160px;">
+        Actions
+      </th>
+    </tr>
+  </template>
 
-        <template #body>
-          <tr 
-            v-for="product in paginatedProducts"
-            :key="product._id"
-            :class="getRowClass(product)"
+  <template #body>
+    <tr 
+      v-for="product in paginatedProducts"
+      :key="product._id"
+      :class="getRowClass(product)"
+    >
+      <!-- Checkbox Column -->
+      <td>
+        <input 
+          type="checkbox" 
+          class="form-check-input"
+          :value="product._id"
+          v-model="selectedProducts"
+        />
+      </td>
+      
+      <!-- Product Name Column -->
+      <td>
+        <div :class="['fw-medium', getProductNameClass(product)]">
+          {{ product.product_name }}
+        </div>
+      </td>
+      
+      <!-- SKU Column -->
+      <td v-if="isColumnVisible('sku')" class="text-center">
+        <code class="text-tertiary-dark bg-neutral-light px-2 py-1 rounded">
+          {{ product.SKU || '—' }}
+        </code>
+      </td>
+      
+      <!-- Category Column -->
+      <td v-if="isColumnVisible('category')">
+        <span :class="['badge', 'rounded-pill', getCategoryBadgeClass(product.category_id)]">
+          {{ getCategoryName(product.category_id) }}
+        </span>
+      </td>
+      
+      <!-- Selling Price Column -->
+      <td v-if="isColumnVisible('sellingPrice')" class="text-end fw-medium">
+        ₱{{ formatPrice(product.selling_price) }}
+      </td>
+      
+      <!-- Cost Price Column -->
+      <td v-if="isColumnVisible('costPrice')" class="text-end fw-medium">
+        ₱{{ formatPrice(product.cost_price) }}
+      </td>
+      
+      <!-- Margin Column -->
+      <td class="text-center fw-medium">
+        <span :class="getMarginClass(product.cost_price, product.selling_price)">
+          {{ calculateMargin(product.cost_price, product.selling_price) }}%
+        </span>
+      </td>
+      
+      <!-- Stock Column -->
+      <td v-if="isColumnVisible('stock')" class="text-end">
+        <span :class="getStockDisplayClass(product)">
+          {{ product.stock || '—' }}
+        </span>
+      </td>
+      
+      <!-- Status Column -->
+      <td v-if="isColumnVisible('status')" class="text-center">
+        <span :class="getStatusBadgeClass(product.status)">
+          {{ getStatusText(product.status) }}
+        </span>
+      </td>
+      
+      <!-- Expiry Date Column -->
+      <td v-if="isColumnVisible('expiryDate')" class="text-center">
+        <small :class="getExpiryDateClass(product.expiry_date)">
+          {{ formatExpiryDate(product.expiry_date) }}
+        </small>
+      </td>
+      
+      <!-- Actions Column -->
+      <td>
+        <div class="d-flex gap-1 justify-content-center">
+          <button 
+            class="btn btn-outline-secondary btn-icon-only btn-xs" 
+            @click="editProduct(product)"
+            data-bs-toggle="tooltip"
+            title="Edit Product"
           >
-            <td>
-              <input 
-                type="checkbox" 
-                class="form-check-input"
-                :value="product._id"
-                v-model="selectedProducts"
-              />
-            </td>
-            <td>
-              <div :class="['fw-medium', getProductNameClass(product)]">
-                {{ product.product_name }}
-              </div>
-            </td>
-            <td>
-              <span :class="['badge', 'rounded-pill', getCategoryBadgeClass(product.category_id)]">
-                {{ getCategoryName(product.category_id) }}
-              </span>
-            </td>
-            <td class="text-end fw-medium">
-              ₱{{ formatPrice(product.selling_price) }}
-            </td>
-            <td class="text-end fw-medium">
-              ₱{{ formatPrice(product.cost_price) }}
-            </td>
-            <td class="text-center fw-medium">
-              {{ calculateMargin(product.cost_price, product.selling_price) }}%
-            </td>
-            <td class="text-end">
-              <span :class="getStockDisplayClass(product)">
-                {{ product.stock || '—' }}
-              </span>
-            </td>
-            <td>
-              <div class="d-flex gap-1 justify-content-center">
-                <button 
-                  class="btn btn-outline-secondary btn-icon-only btn-xs" 
-                  @click="editProduct(product)"
-                  data-bs-toggle="tooltip"
-                  title="Edit Product"
-                >
-                  <Edit :size="12" />
-                </button>
-                <button 
-                  class="btn btn-outline-primary btn-icon-only btn-xs" 
-                  @click="viewProduct(product)"
-                  data-bs-toggle="tooltip"
-                  title="View Details"
-                >
-                  <Eye :size="12" />
-                </button>
-                <button 
-                  class="btn btn-outline-info btn-icon-only btn-xs" 
-                  @click="restockProduct(product)"
-                  data-bs-toggle="tooltip"
-                  title="Update Stock"
-                >
-                  <Package :size="12" />
-                </button>
-                <button 
-                  class="btn btn-outline-success btn-icon-only btn-xs"
-                  @click="toggleProductStatus(product)"
-                  data-bs-toggle="tooltip"
-                  :title="product.status === 'active' ? 'Deactivate Product' : 'Activate Product'"
-                  :class="{ 'btn-outline-warning': product.status !== 'active' }"
-                >
-                  <Lock v-if="product.status === 'active'" :size="12" />
-                  <Unlock v-else :size="12" />
-                </button>
-                <button 
-                  class="btn btn-outline-danger btn-icon-only btn-xs" 
-                  @click="deleteProduct(product)"
-                  data-bs-toggle="tooltip"
-                  title="Delete Product"
-                >
-                  <Trash2 :size="12" />
-                </button>
-              </div>
-            </td>
-          </tr>
-        </template>
-    </DataTable>
+            <Edit :size="12" />
+          </button>
+          <button 
+            class="btn btn-outline-primary btn-icon-only btn-xs" 
+            @click="viewProduct(product)"
+            data-bs-toggle="tooltip"
+            title="View Details"
+          >
+            <Eye :size="12" />
+          </button>
+          <button 
+            class="btn btn-outline-info btn-icon-only btn-xs" 
+            @click="restockProduct(product)"
+            data-bs-toggle="tooltip"
+            title="Update Stock"
+          >
+            <Package :size="12" />
+          </button>
+          <button 
+            class="btn btn-outline-success btn-icon-only btn-xs"
+            @click="toggleProductStatus(product)"
+            data-bs-toggle="tooltip"
+            :title="product.status === 'active' ? 'Deactivate Product' : 'Activate Product'"
+            :class="{ 'btn-outline-warning': product.status !== 'active' }"
+          >
+            <Lock v-if="product.status === 'active'" :size="12" />
+            <Unlock v-else :size="12" />
+          </button>
+          <button 
+            class="btn btn-outline-danger btn-icon-only btn-xs" 
+            @click="deleteProduct(product)"
+            data-bs-toggle="tooltip"
+            title="Delete Product"
+          >
+            <Trash2 :size="12" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  </template>
+</DataTable>
 
     <!-- Empty State -->
     <div v-if="!loading && filteredProducts.length === 0 && !error" class="text-center py-5">
@@ -437,6 +478,13 @@ async exportData() {
       @import-completed="handleImportSuccess"
       @import-failed="handleImportError"
     />
+
+    <ColumnFilterModal
+      :show="showColumnFilter"
+      :current-visible-columns="visibleColumns"
+      @close="showColumnFilter = false"
+      @apply="handleColumnChanges"
+    />
   </div>
 </template>
 
@@ -449,6 +497,7 @@ import ReportsModal from '../../components/products/ReportsModal.vue'
 import DataTable from '@/components/common/TableTemplate.vue'
 import CardTemplate from '@/components/common/CardTemplate.vue'
 import ImportModal from '../../components/products/ImportModal.vue'
+import ColumnFilterModal from '@/components/products/ColumnFilterModal.vue'
 import { 
   Plus, 
   Search,
@@ -461,7 +510,8 @@ import {
   Edit,
   Eye,
   Lock,
-  Unlock
+  Unlock,
+  Settings
 } from 'lucide-vue-next'
 
 export default {
@@ -470,6 +520,7 @@ export default {
     AddProductModal,
     StockUpdateModal,
     ViewProductModal,
+    ColumnFilterModal,
     ImportModal,
     ReportsModal,
     DataTable,
@@ -485,7 +536,8 @@ export default {
     Edit,
     Eye,
     Lock,
-    Unlock
+    Unlock,
+    Settings
   },
   data() {
     return {
@@ -501,10 +553,21 @@ export default {
       // UI State
       showAddDropdown: false,
       searchMode: false,
+      showColumnFilter: false,
       
       // Report data
       lowStockCount: 0,
       expiringCount: 0,
+
+      visibleColumns: {
+        sku: true,
+        category: true,
+        stock: true,
+        costPrice: false,
+        sellingPrice: true,
+        status: true,
+        expiryDate: false
+      },
       
       // Filters
       categoryFilter: 'all',
@@ -540,6 +603,118 @@ export default {
   },
 
   methods: {
+
+    async exportData() {
+      try {
+        const blob = await productsApiService.exportProducts({
+          format: 'csv',
+          filters: {
+            category: this.categoryFilter !== 'all' ? this.categoryFilter : undefined,
+            stock: this.stockFilter !== 'all' ? this.stockFilter : undefined,
+            search: this.searchFilter || undefined
+          }
+        })
+        
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `products_${new Date().toISOString().split('T')[0]}.csv`
+        a.click()
+        window.URL.revokeObjectURL(url)
+      } catch (error) {
+        console.error('API export failed, falling back to client-side export:', error)
+        
+        const headers = ['Name', 'SKU', 'Category', 'Price', 'Cost', 'Margin', 'Stock']
+        const csvContent = [
+          headers.join(','),
+          ...this.filteredProducts.map(product => [
+            `"${product.product_name}"`,
+            product.SKU || '',
+            this.getCategoryName(product.category_id),
+            product.selling_price,
+            product.cost_price,
+            this.calculateMargin(product.cost_price, product.selling_price),
+            product.stock
+          ].join(','))
+        ].join('\n')
+
+        const blob = new Blob([csvContent], { type: 'text/csv' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `products_${new Date().toISOString().split('T')[0]}.csv`
+        a.click()
+        window.URL.revokeObjectURL(url)
+      }
+    },
+
+    isColumnVisible(columnKey) {
+      return this.visibleColumns[columnKey]
+    },
+
+    // Margin styling based on percentage
+    getMarginClass(costPrice, sellingPrice) {
+      const margin = this.calculateMargin(costPrice, sellingPrice)
+      if (margin < 10) return 'text-danger'
+      if (margin < 20) return 'text-warning'
+      return 'text-success'
+    },
+
+    // Status badge styling
+    getStatusBadgeClass(status) {
+      const baseClasses = 'badge rounded-pill'
+      if (status === 'active') return `${baseClasses} text-bg-success`
+      return `${baseClasses} text-bg-secondary`
+    },
+
+    // Status text display
+    getStatusText(status) {
+      return status === 'active' ? 'Active' : 'Inactive'
+    },
+
+    // Expiry date formatting
+    formatExpiryDate(expiryDate) {
+      if (!expiryDate) return '—'
+      try {
+        const date = new Date(expiryDate)
+        return date.toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric', 
+          year: 'numeric' 
+        })
+      } catch (error) {
+        return '—'
+      }
+    },
+
+    // Expiry date styling based on how close to expiration
+    getExpiryDateClass(expiryDate) {
+      if (!expiryDate) return 'text-tertiary-medium'
+      
+      try {
+        const expiry = new Date(expiryDate)
+        const today = new Date()
+        const diffDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24))
+        
+        if (diffDays < 0) return 'text-danger fw-bold' // Expired
+        if (diffDays <= 7) return 'text-danger' // Expires within a week
+        if (diffDays <= 30) return 'text-warning' // Expires within a month
+        return 'text-tertiary-medium' // Safe
+      } catch (error) {
+        return 'text-tertiary-medium'
+      }
+    },
+
+    toggleColumnFilter() {
+      this.showColumnFilter = true
+    },
+
+    handleColumnChanges(newColumnSettings) {
+      this.visibleColumns = { ...newColumnSettings }
+      console.log('Column visibility updated:', this.visibleColumns)
+      // You can add logic here to actually hide/show columns in your table
+    },
+
     handleClickOutside(event) {
       if (this.$refs.addDropdown && !this.$refs.addDropdown.contains(event.target)) {
         this.showAddDropdown = false

@@ -308,7 +308,7 @@
 </template>
 
 <script>
-import { useAddProduct } from '@/composables/ui/modals/useAddProduct'
+import { useAddProduct } from '@/composables/ui/products/useAddProduct'
 import { onMounted, onBeforeUnmount } from 'vue'
 
 export default {
