@@ -181,6 +181,7 @@
 </template>
 
 <script>
+import categoryApiService from '@/services/apiCategory' // Import your API service
 import { 
   Package,
   Plus,
@@ -200,6 +201,7 @@ export default {
     return {
       isEditMode: false,
       editingCategoryId: null,
+      isLoading: false, // Add loading state
       formData: {
         category_name: '',
         description: '',
@@ -217,7 +219,8 @@ export default {
   methods: {
     addSubCategory() {
       this.formData.sub_categories.push({
-        name: ''
+        name: '',
+        products: [] // Add empty products array for each subcategory
       })
     },
     
@@ -243,38 +246,72 @@ export default {
       }
     },
     
-    handleSubmit() {
-      if (!this.isFormValid) return
+    async handleSubmit() {
+      if (!this.isFormValid || this.isLoading) return
       
-      // Prepare the data structure based on the collection
-      const categoryData = {
-        category_name: this.formData.category_name,
-        description: this.formData.description,
-        status: this.formData.status,
-        last_updated: new Date().toISOString(),
-        sub_categories: this.formData.sub_categories.filter(sub => sub.name.trim() !== '')
+      this.isLoading = true
+      
+      try {
+        // Prepare the data structure for your API
+        const categoryData = {
+          category_name: this.formData.category_name.trim(),
+          description: this.formData.description.trim(),
+          status: this.formData.status,
+          sub_categories: this.formData.sub_categories
+            .filter(sub => sub.name.trim() !== '') // Remove empty subcategories
+            .map(sub => ({
+              name: sub.name.trim(),
+              products: [] // Initialize with empty products array
+            }))
+        }
+        
+        console.log(`${this.isEditMode ? 'Update' : 'Create'} category data:`, categoryData)
+        
+        if (this.isEditMode) {
+          // TODO: Implement update API call when available
+          console.log('Updating category with ID:', this.editingCategoryId)
+          
+          // Example for future update implementation:
+          // const updatedCategory = await categoryApiService.UpdateCategoryData({
+          //   id: this.editingCategoryId,
+          //   ...categoryData
+          // })
+          
+          // Emit event to parent component
+          this.$emit('category-updated', { 
+            id: this.editingCategoryId, 
+            ...categoryData 
+          })
+          
+          alert('Category updated successfully!')
+          
+        } else {
+          // Create new category using your API
+          const newCategory = await categoryApiService.AddCategoryData(categoryData)
+          
+          console.log('Category created successfully:', newCategory)
+          
+          // Emit event to parent component with the new category data
+          this.$emit('category-added', newCategory)
+          
+          // Show success message
+          alert(`Category "${categoryData.category_name}" created successfully!`)
+        }
+        
+        // Reset form and close modal
+        this.resetForm()
+        this.closeModal()
+        
+      } catch (error) {
+        console.error(`Error ${this.isEditMode ? 'updating' : 'creating'} category:`, error)
+        
+        // Show user-friendly error message
+        const action = this.isEditMode ? 'update' : 'create'
+        alert(`Failed to ${action} category. Please try again.\n\nError: ${error.message || 'Unknown error'}`)
+        
+      } finally {
+        this.isLoading = false
       }
-      
-      // Add date_created only for new categories
-      if (!this.isEditMode) {
-        categoryData.date_created = new Date().toISOString()
-      }
-      
-      console.log(`${this.isEditMode ? 'Update' : 'Create'} category data:`, categoryData)
-      
-      if (this.isEditMode) {
-        // TODO: Integrate with update API
-        // Example: await categoriesApi.updateCategory(this.editingCategoryId, categoryData)
-        console.log('Updating category with ID:', this.editingCategoryId)
-        alert('Category updated successfully!')
-      } else {
-        // TODO: Integrate with create API
-        // Example: await categoriesApi.createCategory(categoryData)
-        alert('Category created successfully!')
-      }
-      
-      this.resetForm()
-      this.closeModal()
     },
     
     // Method to open modal in add mode
@@ -338,6 +375,7 @@ export default {
     resetForm() {
       this.isEditMode = false
       this.editingCategoryId = null
+      this.isLoading = false
       this.formData = {
         category_name: '',
         description: '',

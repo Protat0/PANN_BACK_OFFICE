@@ -69,13 +69,12 @@ export default {
         '/products': 'Products',
         '/products/bulk': 'Add Products (Bulk)',
         '/categories': 'Categories',
-
         '/categorydetails': 'Category Details',
         '/logs': 'System Logs',
         '/suppliers': 'Suppliers',
         '/promotions': 'Promotions',
-        '/sales-by-item': 'Sales by Item',
-        '/sales-by-category': 'Sales by Category'
+        '/salesbyitem': 'SalesByItem',
+        '/salesbycategory': 'SalesByCategory'
       }
       
       // Handle dynamic product detail routes

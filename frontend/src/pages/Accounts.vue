@@ -886,8 +886,7 @@ export default {
 }
 
 .email-column {
-  width: 160px;
-  max-width: 160px;
+  max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

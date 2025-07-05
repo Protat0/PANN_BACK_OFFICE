@@ -96,9 +96,10 @@ const router = createRouter({
           component: Categories
         },
         {
-          path: 'categorydetails', // To be changed to category/:id when backend is integrated
+          path: 'category/:id', // Change this line
           name: 'Category Details',
-          component: CategoryDetails
+          component: CategoryDetails,
+          props: true
         },
         {
           path: 'home',
@@ -106,12 +107,12 @@ const router = createRouter({
           component: HomeView
         },
         {
-          path: 'sales-by-item',
+          path: 'salesbyitem',
           name: 'SalesByItem',
           component: SalesByItem
         },
         {
-          path: 'sales-by-category',
+          path: 'salesbycategory',
           name: 'SalesByCategory',
           component: SalesByCategory
         },

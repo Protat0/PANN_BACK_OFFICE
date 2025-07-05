@@ -78,7 +78,8 @@ from .kpi_views.category_views import (
     CategoryKPIView,
     CategorySubcategoryView,
     CategoryDataView,
-
+    CategoryExportView,      
+    CategoryExportStatsView, 
 )
 
 from .kpi_views.saleslog_views import (
@@ -176,12 +177,13 @@ urlpatterns = [
      path('customerkpidaily/', DailyCustomerKPIView.as_view(), name="get-daily-users"),
 
     # Category endpoints
-    path('category/', CategoryKPIView.as_view(), name="category-operations"), # GET all categories, POST create category
-    path('category/dataview/', CategoryDataView.as_view(), name="category-dataview"),  # DataView
-    path('category/<str:category_id>/', CategoryDetailView.as_view(), name="category-detail"),  # GET, PUT, DELETE specific category
-    path('category/<str:category_id>/subcategories/', CategorySubcategoryView.as_view(), name="category-subcategories"),  # Manage subcategories
-  
-
+    path('category/', CategoryKPIView.as_view(), name="category-operations"),
+    path('category/dataview/', CategoryDataView.as_view(), name="category-dataview"),
+    path('category/export/', CategoryExportView.as_view(), name='export_categories'),  
+    path('category/export/stats/', CategoryExportStatsView.as_view(), name='export_categories_stats'),  
+    path('category/<str:category_id>/', CategoryDetailView.as_view(), name="category-detail"),
+    path('category/<str:category_id>/subcategories/', CategorySubcategoryView.as_view(), name="category-subcategories"),
+    
    # Bulk import and template endpoints (MUST be first)
     path('invoices/bulk-import/', SalesLogBulkImportView.as_view(), name='invoice-bulk-import'),
     path('invoices/export/', SalesLogExportView.as_view(), name='invoice-export'),

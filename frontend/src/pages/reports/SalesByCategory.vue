@@ -882,7 +882,7 @@ export default {
 
 .LCL1 h1 {
   color: black;
-  font-size: 30px;
+  font-size: 29px;
   font-weight: bold;
 }
 

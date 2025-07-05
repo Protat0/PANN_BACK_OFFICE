@@ -174,13 +174,13 @@
           <!-- Reports Submenu -->
           <ul class="nav-submenu" v-if="showReportsSubmenu && !isCollapsed">
             <li class="nav-subitem">
-              <router-link to="/reports/sales-by-items" class="nav-sublink">
+              <router-link to="/salesbyitem" class="nav-sublink">
                 <TrendingUp :size="16" class="nav-subicon" />
                 Sales By Items
               </router-link>
             </li>
             <li class="nav-subitem">
-              <router-link to="/reports/sales-by-categories" class="nav-sublink">
+              <router-link to="/salesbycategory" class="nav-sublink">
                 <PieChart :size="16" class="nav-subicon" />
                 Sales By Categories
               </router-link>

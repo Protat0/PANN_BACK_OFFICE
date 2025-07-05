@@ -1,5 +1,6 @@
 from bson import ObjectId
 from datetime import datetime
+
 from ..database import db_manager 
 from ..models import Category
 import bcrypt
@@ -594,3 +595,298 @@ class CategoryDisplayService:
             import traceback
             print(f"TRACEBACK: {traceback.format_exc()}")
             raise Exception(f"Error getting categories with date filter: {str(e)}")
+    
+    # ================================================================
+    # EXPORT OPERATIONS
+    # ================================================================
+
+    def export_categories_csv(self, include_sales_data=True, date_filter=None):
+        """Export categories to CSV format with optional sales data"""
+        try:
+            import csv
+            from io import StringIO
+            
+            # Get categories data
+            if include_sales_data:
+                # Use the display service for enriched data
+                if date_filter:
+                    result = self.get_categories_display_with_date_filter(
+                        start_date=date_filter.get('start_date'),
+                        end_date=date_filter.get('end_date'),
+                        frequency=date_filter.get('frequency', 'monthly')
+                    )
+                    categories = result.get('categories', [])
+                else:
+                    categories = self.get_categories_display()
+            else:
+                # Basic category data only - need to get from CategoryService
+                from .category_service import CategoryService
+                category_service = CategoryService()
+                categories = category_service.get_all_categories()
+            
+            # Create CSV content
+            output = StringIO()
+            writer = csv.writer(output)
+            
+            # Define headers
+            if include_sales_data:
+                headers = [
+                    'ID',
+                    'Category Name', 
+                    'Description', 
+                    'Status', 
+                    'Sub-Categories Count', 
+                    'Sub-Categories', 
+                    'Total Products',
+                    'Total Quantity Sold',
+                    'Total Sales (₱)',
+                    'Date Created', 
+                    'Last Updated'
+                ]
+            else:
+                headers = [
+                    'ID',
+                    'Category Name', 
+                    'Description', 
+                    'Status', 
+                    'Sub-Categories Count', 
+                    'Sub-Categories', 
+                    'Total Products',
+                    'Date Created', 
+                    'Last Updated'
+                ]
+            
+            writer.writerow(headers)
+            
+            # Write category data
+            for category in categories:
+                # Calculate sub-categories info
+                sub_categories = category.get('sub_categories', []) or category.get('subcategories', [])
+                sub_categories_count = len(sub_categories)
+                
+                # Format sub-categories names
+                if sub_categories_count > 0:
+                    sub_category_names = '; '.join([sub.get('name', 'Unknown') for sub in sub_categories])
+                else:
+                    sub_category_names = 'None'
+                
+                # Calculate total products
+                total_products = 0
+                if include_sales_data and 'subcategories' in category:
+                    # From display service data
+                    total_products = sum(sub.get('product_count', 0) for sub in category.get('subcategories', []))
+                elif 'sub_categories' in category:
+                    # From basic category data
+                    total_products = sum(len(sub.get('products', [])) for sub in category.get('sub_categories', []))
+                
+                # Format dates
+                date_created = self._format_export_date(category.get('date_created'))
+                last_updated = self._format_export_date(category.get('last_updated'))
+                
+                # Build row data
+                if include_sales_data:
+                    row = [
+                        category.get('_id', '')[-6:] if category.get('_id') else 'N/A',  # Last 6 chars of ID
+                        category.get('category_name', ''),
+                        category.get('description', ''),
+                        category.get('status', 'active'),
+                        sub_categories_count,
+                        sub_category_names,
+                        total_products,
+                        category.get('total_quantity_sold', 0),
+                        f"{category.get('total_sales', 0):.2f}",
+                        date_created,
+                        last_updated
+                    ]
+                else:
+                    row = [
+                        category.get('_id', '')[-6:] if category.get('_id') else 'N/A',
+                        category.get('category_name', ''),
+                        category.get('description', ''),
+                        category.get('status', 'active'),
+                        sub_categories_count,
+                        sub_category_names,
+                        total_products,
+                        date_created,
+                        last_updated
+                    ]
+                
+                writer.writerow(row)
+            
+            # Get CSV content
+            csv_content = output.getvalue()
+            output.close()
+            
+            return {
+                'content': csv_content,
+                'filename': f"categories_export_{datetime.now().strftime('%Y-%m-%d')}.csv",
+                'content_type': 'text/csv',
+                'total_records': len(categories)
+            }
+            
+        except Exception as e:
+            raise Exception(f"Error exporting categories to CSV: {str(e)}")
+
+    def export_categories_json(self, include_sales_data=True, date_filter=None):
+        """Export categories to JSON format with optional sales data"""
+        try:
+            import json
+            
+            # Get categories data (same logic as CSV export)
+            if include_sales_data:
+                if date_filter:
+                    result = self.get_categories_display_with_date_filter(
+                        start_date=date_filter.get('start_date'),
+                        end_date=date_filter.get('end_date'),
+                        frequency=date_filter.get('frequency', 'monthly')
+                    )
+                    categories = result.get('categories', [])
+                    export_metadata = {
+                        'total_categories': result.get('total_categories', 0),
+                        'date_filter_applied': result.get('date_filter_applied', False),
+                        'frequency': result.get('frequency', 'monthly'),
+                        'total_invoices': result.get('total_invoices', 0)
+                    }
+                else:
+                    categories = self.get_categories_display()
+                    export_metadata = {
+                        'total_categories': len(categories),
+                        'date_filter_applied': False
+                    }
+            else:
+                from .category_service import CategoryService
+                category_service = CategoryService()
+                categories = category_service.get_all_categories()
+                export_metadata = {
+                    'total_categories': len(categories),
+                    'date_filter_applied': False
+                }
+            
+            # Prepare export data
+            export_data = {
+                'export_info': {
+                    'exported_at': datetime.now().isoformat(),
+                    'format': 'json',
+                    'include_sales_data': include_sales_data,
+                    **export_metadata
+                },
+                'categories': categories
+            }
+            
+            # Convert to JSON
+            json_content = json.dumps(export_data, indent=2, default=str)
+            
+            return {
+                'content': json_content,
+                'filename': f"categories_export_{datetime.now().strftime('%Y-%m-%d')}.json",
+                'content_type': 'application/json',
+                'total_records': len(categories)
+            }
+            
+        except Exception as e:
+            raise Exception(f"Error exporting categories to JSON: {str(e)}")
+
+    def _format_export_date(self, date_value):
+        """Helper method to format dates for export"""
+        if not date_value:
+            return 'N/A'
+        
+        try:
+            if isinstance(date_value, str):
+                # Try to parse string date
+                try:
+                    date_obj = datetime.fromisoformat(date_value.replace('Z', '+00:00'))
+                except:
+                    return date_value  # Return as-is if parsing fails
+            elif isinstance(date_value, datetime):
+                date_obj = date_value
+            else:
+                return 'Invalid Date'
+            
+            # Format as: "27-Jun-2025 09:00 AM"
+            return date_obj.strftime('%d-%b-%Y %I:%M %p')
+            
+        except Exception:
+            return 'Invalid Date'
+
+    # ================================================================
+    # EXPORT UTILITY METHODS
+    # ================================================================
+
+    def get_export_stats(self):
+        """Get statistics for export operations"""
+        try:
+            total_categories = self.category_collection.count_documents({})
+            active_categories = self.category_collection.count_documents({'status': 'active'})
+            inactive_categories = self.category_collection.count_documents({'status': 'inactive'})
+            
+            # Count total subcategories and products
+            pipeline = [
+                {
+                    '$project': {
+                        'subcategory_count': {'$size': {'$ifNull': ['$sub_categories', []]}},
+                        'product_count': {
+                            '$sum': {
+                                '$map': {
+                                    'input': {'$ifNull': ['$sub_categories', []]},
+                                    'as': 'sub',
+                                    'in': {'$size': {'$ifNull': ['$$sub.products', []]}}
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    '$group': {
+                        '_id': None,
+                        'total_subcategories': {'$sum': '$subcategory_count'},
+                        'total_products': {'$sum': '$product_count'}
+                    }
+                }
+            ]
+            
+            stats_result = list(self.category_collection.aggregate(pipeline))
+            stats = stats_result[0] if stats_result else {'total_subcategories': 0, 'total_products': 0}
+            
+            return {
+                'total_categories': total_categories,
+                'active_categories': active_categories,
+                'inactive_categories': inactive_categories,
+                'total_subcategories': stats['total_subcategories'],
+                'total_products': stats['total_products'],
+                'last_updated': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            raise Exception(f"Error getting export stats: {str(e)}")
+
+    def validate_export_params(self, format_type, include_sales_data, date_filter):
+        """Validate export parameters"""
+        try:
+            # Validate format
+            valid_formats = ['csv', 'json']
+            if format_type not in valid_formats:
+                raise ValueError(f"Invalid format. Must be one of: {', '.join(valid_formats)}")
+            
+            # Validate include_sales_data
+            if not isinstance(include_sales_data, bool):
+                raise ValueError("include_sales_data must be a boolean")
+            
+            # Validate date_filter if provided
+            if date_filter:
+                if not isinstance(date_filter, dict):
+                    raise ValueError("date_filter must be a dictionary")
+                
+                # Check date format if dates are provided
+                for date_key in ['start_date', 'end_date']:
+                    if date_key in date_filter and date_filter[date_key]:
+                        try:
+                            if isinstance(date_filter[date_key], str):
+                                datetime.fromisoformat(date_filter[date_key])
+                        except ValueError:
+                            raise ValueError(f"Invalid {date_key} format. Use ISO format (YYYY-MM-DD)")
+            
+            return True
+            
+        except Exception as e:
+            raise Exception(f"Export parameter validation failed: {str(e)}")

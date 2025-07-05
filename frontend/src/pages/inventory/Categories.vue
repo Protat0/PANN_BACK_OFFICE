@@ -12,19 +12,28 @@
           <!-- Left Side: Main Actions (Always visible when no selection) -->
           <div v-if="selectedCategories.length === 0" class="d-flex gap-2">
             <!-- Add Category Button -->
-            <button 
+           <button 
               class="btn btn-success btn-sm btn-with-icon-sm"
               @click="handleAddCategory"
+              :disabled="isCreatingCategory"
             >
-              <Plus :size="14" />
-              ADD CATEGORY
+              <!-- Show spinner when creating category -->
+              <div v-if="isCreatingCategory" class="spinner-border spinner-border-sm me-2" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <Plus v-else :size="14" />
+              {{ isCreatingCategory ? 'CREATING...' : 'ADD CATEGORY' }}
             </button>
 
             <button 
               class="btn btn-outline-secondary btn-sm"
-              @click="exportData"
+              @click="exportData" :disabled="exporting || categories.length === 0"
             >
-              EXPORT
+              
+              <div v-if="exporting" class="spinner-border spinner-border-sm me-2" role="status">
+                <span class="visually-hidden">Exporting...</span>
+              </div>
+              {{ exporting ? 'EXPORTING...' : 'EXPORT' }}
             </button>
           </div>
 
@@ -105,34 +114,59 @@
       </div>
     </div>
 
+    <!-- Loading State -->
+    <div v-if="loading" class="text-center py-4">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading categories...</span>
+      </div>
+      <p class="mt-2 text-muted">Loading categories...</p>
+    </div>
+
+    <!-- Error State -->
+    <div v-if="error" class="alert alert-danger" role="alert">
+      <strong>Error:</strong> {{ error }}
+      <button @click="fetchCategories" class="btn btn-sm btn-outline-danger ms-2">
+        Retry
+      </button>
+    </div>
+
     <!-- Category Cards Section -->
-    <div class="row g-3 mb-4">
-      <!-- Noodles Category -->
-      <div class="col-6 col-md-3">
+    <div v-if="!loading && !error" class="row g-3 mb-4">
+      <div 
+        v-for="category in filteredCategories" 
+        :key="category.id || category.name"
+        class="col-6 col-md-3"
+      >
         <CardTemplate
           size="compact"
-          border-color="secondary"
+          :border-color="getCategoryBorderColor(category, categories.indexOf(category))"
           border-position="start"
-          title="Noodles"
-          subtitle="Main category for all noodle products"
+          :title="category.category_name"
+          :subtitle="category.description || category.subtitle || `${category.name} products`"
           shadow="sm"
           clickable
-          @click="viewCategory('noodles')"
+          @click="viewCategory(category)"
         >
           <template #content>
             <div class="d-flex justify-content-between align-items-center mb-2">
               <div>
-                <div class="text-primary fw-bold h5 mb-1">{{ categoryCounts.noodles || 0 }}</div>
+                <div class="text-primary fw-bold h5 mb-1">
+                  {{ category.subcategories ? category.subcategories.reduce((total, sub) => total + (sub.product_count || 0), 0) : 0 }}
+                </div>
                 <small class="text-tertiary-medium">Products</small>
               </div>
-              <div class="category-icon bg-secondary-light rounded-circle p-2">
-                <Package :size="20" class="text-secondary" />
+              <div :class="getCategoryIconClass(category, categories.indexOf(category))">
+                <component 
+                  :is="getCategoryIcon(category, categories.indexOf(category))" 
+                  :size="20" 
+                  :class="getCategoryIconColor(category, categories.indexOf(category))"
+                />
               </div>
             </div>
             <div class="d-flex gap-1 mt-2">
               <button 
                 class="btn btn-view btn-sm btn-with-icon-sm"
-                @click.stop="viewCategory('noodles')"
+                @click.stop="viewCategory(category)"
                 data-bs-toggle="tooltip"
                 title="View Category Details"
               >
@@ -141,145 +175,7 @@
               </button>
               <button 
                 class="btn btn-delete btn-sm btn-with-icon-sm"
-                @click.stop="deleteCategory('noodles')"
-                data-bs-toggle="tooltip"
-                title="Delete Category"
-              >
-                <Trash2 :size="14" />
-                Delete
-              </button>
-            </div>
-          </template>
-        </CardTemplate>
-      </div>
-
-      <!-- Drinks Category -->
-      <div class="col-6 col-md-3">
-        <CardTemplate
-          size="compact"
-          border-color="primary"
-          border-position="start"
-          title="Drinks"
-          subtitle="Beverages and drink products"
-          shadow="sm"
-          clickable
-          @click="viewCategory('drinks')"
-        >
-          <template #content>
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <div>
-                <div class="text-primary fw-bold h5 mb-1">{{ categoryCounts.drinks || 0 }}</div>
-                <small class="text-tertiary-medium">Products</small>
-              </div>
-              <div class="category-icon bg-primary-light rounded-circle p-2">
-                <Coffee :size="20" class="text-primary" />
-              </div>
-            </div>
-            <div class="d-flex gap-1 mt-2">
-              <button 
-                class="btn btn-view btn-sm btn-with-icon-sm"
-                @click.stop="viewCategory('drinks')"
-                data-bs-toggle="tooltip"
-                title="View Category Details"
-              >
-                <Eye :size="14" />
-                View
-              </button>
-              <button 
-                class="btn btn-delete btn-sm btn-with-icon-sm"
-                @click.stop="deleteCategory('drinks')"
-                data-bs-toggle="tooltip"
-                title="Delete Category"
-              >
-                <Trash2 :size="14" />
-                Delete
-              </button>
-            </div>
-          </template>
-        </CardTemplate>
-      </div>
-
-      <!-- Toppings Category -->
-      <div class="col-6 col-md-3">
-        <CardTemplate
-          size="compact"
-          border-color="info"
-          border-position="start"
-          title="Toppings"
-          subtitle="Additional toppings and extras"
-          shadow="sm"
-          clickable
-          @click="viewCategory('toppings')"
-        >
-          <template #content>
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <div>
-                <div class="text-primary fw-bold h5 mb-1">{{ categoryCounts.toppings || 0 }}</div>
-                <small class="text-tertiary-medium">Products</small>
-              </div>
-              <div class="category-icon bg-info-light rounded-circle p-2">
-                <Star :size="20" class="text-info" />
-              </div>
-            </div>
-            <div class="d-flex gap-1 mt-2">
-              <button 
-                class="btn btn-view btn-sm btn-with-icon-sm"
-                @click.stop="viewCategory('toppings')"
-                data-bs-toggle="tooltip"
-                title="View Category Details"
-              >
-                <Eye :size="14" />
-                View
-              </button>
-              <button 
-                class="btn btn-delete btn-sm btn-with-icon-sm"
-                @click.stop="deleteCategory('toppings')"
-                data-bs-toggle="tooltip"
-                title="Delete Category"
-              >
-                <Trash2 :size="14" />
-                Delete
-              </button>
-            </div>
-          </template>
-        </CardTemplate>
-      </div>
-
-      <!-- Snacks Category -->
-      <div class="col-6 col-md-3">
-        <CardTemplate
-          size="compact"
-          border-color="success"
-          border-position="start"
-          title="Snacks"
-          subtitle="Chips, crackers and side items"
-          shadow="sm"
-          clickable
-          @click="viewCategory('snacks')"
-        >
-          <template #content>
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <div>
-                <div class="text-primary fw-bold h5 mb-1">{{ categoryCounts.snacks || 0 }}</div>
-                <small class="text-tertiary-medium">Products</small>
-              </div>
-              <div class="category-icon bg-success-light rounded-circle p-2">
-                <Zap :size="20" class="text-success" />
-              </div>
-            </div>
-            <div class="d-flex gap-1 mt-2">
-              <button 
-                class="btn btn-view btn-sm btn-with-icon-sm"
-                @click.stop="viewCategory('snacks')"
-                data-bs-toggle="tooltip"
-                title="View Category Details"
-              >
-                <Eye :size="14" />
-                View
-              </button>
-              <button 
-                class="btn btn-delete btn-sm btn-with-icon-sm"
-                @click.stop="deleteCategory('snacks')"
+                @click.stop="deleteCategory(category)"
                 data-bs-toggle="tooltip"
                 title="Delete Category"
               >
@@ -292,14 +188,32 @@
       </div>
     </div>
 
+    <!-- Empty State -->
+    <div v-if="!loading && !error && filteredCategories.length === 0" class="text-center py-5">
+      <Package :size="64" class="text-muted mb-3" />
+      <h5 class="text-muted">No categories found</h5>
+      <p class="text-muted mb-3">
+        {{ categories.length === 0 ? 'Get started by creating your first category.' : 'Try adjusting your search or filters.' }}
+      </p>
+      <button 
+        v-if="categories.length === 0"
+        class="btn btn-success"
+        @click="handleAddCategory"
+      >
+        <Plus :size="16" class="me-1" />
+        Add First Category
+      </button>
+    </div>
+
     <!-- Add Category Modal -->
-    <AddCategoryModal ref="addCategoryModal" />
+    <AddCategoryModal ref="addCategoryModal" @category-added="onCategoryAdded" />
   </div>
 </template>
 
 <script>
 import CardTemplate from '@/components/common/CardTemplate.vue'
 import AddCategoryModal from '@/components/categories/AddCategoryModal.vue'
+import categoryApiService from '@/services/apiCategory' // Adjust path as needed
 import { 
   Plus, 
   Search,
@@ -310,8 +224,12 @@ import {
   Eye,
   Coffee,
   Star,
-  Zap
+  Zap,
+  Utensils,
+  ShoppingBag,
+  Grid3x3
 } from 'lucide-vue-next'
+
 
 export default {
   name: 'Categories',
@@ -327,7 +245,10 @@ export default {
     Eye,
     Coffee,
     Star,
-    Zap
+    Zap,
+    Utensils,
+    ShoppingBag,
+    Grid3x3
   },
   data() {
     return {
@@ -335,32 +256,190 @@ export default {
       
       // UI State
       searchMode: false,
+      loading: false,
+      error: null,
+      isCreatingCategory: false,
+      exporting: false, // Add this line
       
       // Filters
       statusFilter: 'all',
       typeFilter: 'all',
       searchFilter: '',
       
-      // Category data
-      categoryCounts: {
-        noodles: 15,
-        drinks: 8,
-        toppings: 12,
-        snacks: 6
-      }
+      // API Data
+      categories: []
     }
   },
-  methods: {
-    handleAddCategory() {
-      console.log('Add Category button clicked')
+  computed: {
+    filteredCategories() {
+      let filtered = [...this.categories]
       
-      // Call the modal's openAddMode method
-      if (this.$refs.addCategoryModal) {
-        this.$refs.addCategoryModal.openAddMode()
-      } else {
-        console.error('AddCategoryModal ref not found')
+      // Apply search filter
+      if (this.searchFilter.trim()) {
+        const searchTerm = this.searchFilter.toLowerCase().trim()
+        filtered = filtered.filter(category => 
+          (category.name || '').toLowerCase().includes(searchTerm) ||
+          (category.description || '').toLowerCase().includes(searchTerm)
+        )
+      }
+      
+      // Apply status filter
+      if (this.statusFilter !== 'all') {
+        filtered = filtered.filter(category => {
+          if (this.statusFilter === 'active') {
+            return category.status === 'active' || category.is_active === true || (!category.hasOwnProperty('status') && !category.hasOwnProperty('is_active'))
+          } else if (this.statusFilter === 'inactive') {
+            return category.status === 'inactive' || category.is_active === false
+          }
+          return true
+        })
+      }
+      
+      // Apply type filter
+      if (this.typeFilter !== 'all') {
+        filtered = filtered.filter(category => {
+          if (this.typeFilter === 'parent') {
+            return !category.parent_id || category.type === 'parent'
+          } else if (this.typeFilter === 'subcategory') {
+            return category.parent_id || category.type === 'subcategory'
+          }
+          return true
+        })
+      }
+      
+      return filtered
+    }
+  },
+  async mounted() {
+    await this.fetchCategories()
+  },
+  methods: {
+    async fetchCategories() {
+      this.loading = true
+      this.error = null
+      
+      try {
+        const response = await categoryApiService.CategoryData()
+        console.log('Categories fetched:', response)
+        
+        // Handle different response structures
+        if (response.data && Array.isArray(response.data)) {
+          this.categories = response.data
+        } else if (Array.isArray(response)) {
+          this.categories = response
+        } else if (response.categories && Array.isArray(response.categories)) {
+          this.categories = response.categories
+        } else {
+          console.warn('Unexpected response structure:', response)
+          this.categories = []
+        }
+        
+      } catch (error) {
+        console.error('Error fetching categories:', error)
+        this.error = error.message || 'Failed to fetch categories'
+        this.categories = []
+      } finally {
+        this.loading = false
       }
     },
+
+    // Icon mapping based on category name or index
+    getCategoryIcon(category, index) {
+      const categoryName = (category.category_name || '').toLowerCase()
+      
+      // Try to match by name first
+      if (categoryName.includes('noodles') || categoryName.includes('pasta')) {
+        return 'Utensils'
+      } else if (categoryName.includes('drink') || categoryName.includes('beverage')) {
+        return 'Coffee'
+      } else if (categoryName.includes('topping') || categoryName.includes('extra')) {
+        return 'Star'
+      } else if (categoryName.includes('snack') || categoryName.includes('side')) {
+        return 'Zap'
+      } else if (categoryName.includes('food') || categoryName.includes('meal')) {
+        return 'Package'
+      } else if (categoryName.includes('bag') || categoryName.includes('shop')) {
+        return 'ShoppingBag'
+      }
+      
+      // Fallback to rotation based on index
+      const icons = ['Package', 'Coffee', 'Star', 'Zap', 'Utensils', 'ShoppingBag', 'Grid3x3']
+      return icons[index % icons.length]
+    },
+
+    getCategoryBorderColor(category, index) {
+      const categoryName = (category.name || '').toLowerCase()
+      
+      // Try to match by name first
+      if (categoryName.includes('noodle') || categoryName.includes('pasta')) {
+        return 'secondary'
+      } else if (categoryName.includes('drink') || categoryName.includes('beverage')) {
+        return 'primary'
+      } else if (categoryName.includes('topping') || categoryName.includes('extra')) {
+        return 'info'
+      } else if (categoryName.includes('snack') || categoryName.includes('side')) {
+        return 'success'
+      }
+      
+      // Fallback to rotation based on index
+      const colors = ['secondary', 'primary', 'info', 'success', 'warning', 'danger']
+      return colors[index % colors.length]
+    },
+
+    getCategoryIconClass(category, index) {
+      const borderColor = this.getCategoryBorderColor(category, index)
+      return `category-icon bg-${borderColor}-light rounded-circle p-2`
+    },
+
+    getCategoryIconColor(category, index) {
+      const borderColor = this.getCategoryBorderColor(category, index)
+      return `text-${borderColor}`
+    },
+
+     handleAddCategory() {
+        console.log('Add Category button clicked')
+        
+        // Set loading state
+        this.isCreatingCategory = true
+        
+        // Call the modal's openAddMode method
+        if (this.$refs.addCategoryModal) {
+          this.$refs.addCategoryModal.openAddMode()
+        } else {
+          console.error('AddCategoryModal ref not found')
+          this.isCreatingCategory = false
+        }
+      },
+
+      async onCategoryAdded(newCategory) {
+        try {
+          console.log('New category added:', newCategory)
+          
+          // Refresh the categories list
+          await this.fetchCategories()
+          
+          // Show success message (optional)
+          console.log(`Category "${newCategory.category_name}" added successfully!`)
+          
+        } catch (error) {
+          console.error('Error refreshing categories after add:', error)
+        } finally {
+          // Reset loading state
+          this.isCreatingCategory = false
+        }
+      },
+
+      async onCategoryUpdated(updatedCategory) {
+        try {
+          console.log('Category updated:', updatedCategory)
+          
+          // Refresh the categories list
+          await this.fetchCategories()
+          
+        } catch (error) {
+          console.error('Error refreshing categories after update:', error)
+        }
+      },
 
     toggleSearchMode() {
       this.searchMode = !this.searchMode
@@ -373,20 +452,60 @@ export default {
         })
       } else {
         this.searchFilter = ''
-        this.applyFilters()
+        // No need to call applyFilters as computed property handles it
       }
     },
 
     clearSearch() {
       this.searchFilter = ''
       this.searchMode = false
-      this.applyFilters()
     },
 
-    exportData() {
-      console.log('Export categories data')
-      // TODO: Implement category export functionality
+   async exportData() {
+      this.exporting = true
+      
+      try {
+        // Use dedicated export endpoint
+        const exportData = await categoryApiService.ExportCategoryData({
+          format: 'csv',
+          include_products: true
+        })
+        
+        // The backend returns pre-formatted CSV data
+        const blob = new Blob([exportData], { type: 'text/csv;charset=utf-8;' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `categories_export_${new Date().toISOString().split('T')[0]}.csv`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+        
+      } catch (error) {
+        console.error('Error exporting categories:', error)
+        alert('Failed to export categories. Please try again.')
+      } finally {
+        this.exporting = false
+      }
     },
+
+  // Helper method for formatting dates (add if not already present)
+  formatDate(dateString) {
+    if (!dateString) return 'N/A'
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch (error) {
+      return 'Invalid Date'
+    }
+  },
 
     deleteSelected() {
       if (this.selectedCategories.length === 0) return
@@ -399,30 +518,34 @@ export default {
     },
 
     applyFilters() {
-      console.log('Applying filters:', {
+      // Filters are now handled by computed property
+      console.log('Filters applied:', {
         status: this.statusFilter,
         type: this.typeFilter,
         search: this.searchFilter
       })
-      // TODO: Implement filter logic when categories data is available
     },
 
-    viewCategory(categoryId) {
-      console.log('View category:', categoryId)
-      // Navigate to category details page using the correct route
-      this.$router.push('/categorydetails')
-    },
-
-    deleteCategory(categoryId) {
-      const categoryNames = {
-        noodles: 'Noodles',
-        drinks: 'Drinks',
-        toppings: 'Toppings',
-        snacks: 'Snacks'
+    viewCategory(category) {
+      console.log('View category:', category)
+      
+      const categoryId = category._id || category.id || category.category_id
+      
+      if (!categoryId) {
+        console.error('No valid ID found in category object')
+        return
       }
       
-      const categoryName = categoryNames[categoryId] || categoryId
-      const productCount = this.categoryCounts[categoryId] || 0
+      console.log('Navigating with ID:', categoryId)
+      this.$router.push({
+        name: 'Category Details',
+        params: { id: categoryId } // Use params instead of query
+      })
+    },
+
+    async deleteCategory(category) {
+      const categoryName = category.name || category.title || 'this category'
+      const productCount = category.product_count || category.count || 0
       
       let confirmMessage = `Are you sure you want to delete the "${categoryName}" category?`
       
@@ -433,8 +556,24 @@ export default {
       const confirmed = confirm(confirmMessage)
       if (!confirmed) return
 
-      console.log('Delete category:', categoryId)
-      // TODO: Implement category deletion
+      try {
+        console.log('Delete category:', category)
+        // TODO: Implement category deletion API call
+        // await categoryApiService.deleteCategory(category.id)
+        
+        // For now, just remove from local array
+        const index = this.categories.findIndex(c => c.id === category._id)
+        if (index > -1) {
+          this.categories.splice(index, 1)
+        }
+        
+        // Or refresh from server
+        // await this.fetchCategories()
+        
+      } catch (error) {
+        console.error('Error deleting category:', error)
+        alert('Failed to delete category: ' + error.message)
+      }
     }
   }
 }
@@ -540,10 +679,24 @@ export default {
   background-color: var(--success-light) !important;
 }
 
+.bg-warning-light {
+  background-color: var(--warning-light) !important;
+}
+
+.bg-danger-light {
+  background-color: var(--danger-light) !important;
+}
+
 /* Ensure proper gap in category cards */
 .row.g-3 {
   --bs-gutter-x: 1rem;
   --bs-gutter-y: 1rem;
+}
+
+/* Loading and empty states */
+.spinner-border {
+  width: 2rem;
+  height: 2rem;
 }
 
 /* Responsive adjustments */

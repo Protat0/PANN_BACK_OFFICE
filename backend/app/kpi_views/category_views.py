@@ -4,7 +4,13 @@ from rest_framework import status
 from django.http import HttpResponse
 from ..services.category_service import CategoryService, CategoryDisplayService
 import logging
-
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse, HttpResponse
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
+import json
+from datetime import datetime
 
 # ================ CATEGORY VIEWS ================
 
@@ -268,3 +274,82 @@ class CategoryDataView(APIView):
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+@method_decorator(csrf_exempt, name='dispatch')
+class CategoryExportView(APIView):
+    """Export categories in CSV or JSON format"""
+    
+    def get(self, request):
+        try:
+            # Get query parameters
+            format_type = request.GET.get('format', 'csv').lower()
+            include_sales_data = request.GET.get('include_sales_data', 'true').lower() == 'true'
+            
+            print(f"Export request: format={format_type}, include_sales_data={include_sales_data}")
+            
+            # Parse date filter if provided
+            date_filter = None
+            start_date = request.GET.get('start_date')
+            end_date = request.GET.get('end_date')
+            frequency = request.GET.get('frequency', 'monthly')
+            
+            if start_date or end_date:
+                date_filter = {
+                    'start_date': start_date,
+                    'end_date': end_date,
+                    'frequency': frequency
+                }
+            
+            # Initialize service
+            category_service = CategoryDisplayService()
+            
+            # Export data based on format
+            if format_type == 'csv':
+                export_result = category_service.export_categories_csv(
+                    include_sales_data=include_sales_data,
+                    date_filter=date_filter
+                )
+            elif format_type == 'json':
+                export_result = category_service.export_categories_json(
+                    include_sales_data=include_sales_data,
+                    date_filter=date_filter
+                )
+            else:
+                return JsonResponse({
+                    'error': 'Invalid format. Use csv or json.'
+                }, status=400)
+            
+            # Return file for download
+            response = HttpResponse(
+                export_result['content'],
+                content_type=export_result['content_type']
+            )
+            response['Content-Disposition'] = f'attachment; filename="{export_result["filename"]}"'
+            return response
+            
+        except Exception as e:
+            print(f"Error in CategoryExportView: {e}")
+            return JsonResponse({
+                'error': f'Export failed: {str(e)}'
+            }, status=500)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class CategoryExportStatsView(APIView):
+    """Get export statistics for categories"""
+    
+    def get(self, request):
+        try:
+            category_service = CategoryDisplayService()
+            stats = category_service.get_export_stats()
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Export statistics retrieved successfully',
+                'data': stats
+            })
+            
+        except Exception as e:
+            print(f"Error in CategoryExportStatsView: {e}")
+            return JsonResponse({
+                'error': f'Failed to get export stats: {str(e)}'
+            }, status=500)
