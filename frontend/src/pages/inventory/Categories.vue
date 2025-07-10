@@ -1,23 +1,32 @@
 <template>
   <div class="container-fluid pt-2 pb-4 categories-page">
-    <!-- Page Title -->
-    <div class="mb-3">
-      <h1 class="h3 fw-semibold text-primary-dark mb-0">Category Management</h1>
+    <!-- Page Title and Uncategorized Link -->
+    <div class="d-flex justify-content-between align-items-start mb-3">
+      <div>
+        <h1 class="h3 fw-semibold text-primary-dark mb-0">Category Management</h1>
+      </div>
+      <div>
+        <router-link 
+          to="/uncategorized" 
+          class="btn btn-warning btn-sm btn-with-icon-sm"
+        >
+          <Package :size="14" class="me-1" />
+          Uncategorized ({{ uncategorizedCount }})
+        </router-link>
+      </div>
     </div>
 
     <!-- Action Bar and Filters -->
     <div class="action-bar-container mb-3">
       <div class="action-bar-controls">
         <div class="action-row">
-          <!-- Left Side: Main Actions (Always visible when no selection) -->
+          <!-- Left Side: Main Actions -->
           <div v-if="selectedCategories.length === 0" class="d-flex gap-2">
-            <!-- Add Category Button -->
-           <button 
+            <button 
               class="btn btn-success btn-sm btn-with-icon-sm"
               @click="handleAddCategory"
               :disabled="isCreatingCategory"
             >
-              <!-- Show spinner when creating category -->
               <div v-if="isCreatingCategory" class="spinner-border spinner-border-sm me-2" role="status">
                 <span class="visually-hidden">Loading...</span>
               </div>
@@ -27,30 +36,18 @@
 
             <button 
               class="btn btn-outline-secondary btn-sm"
-              @click="exportData" :disabled="exporting || categories.length === 0"
+              @click="exportData" 
+              :disabled="exporting || categories.length === 0"
             >
-              
+              EXPORT
               <div v-if="exporting" class="spinner-border spinner-border-sm me-2" role="status">
                 <span class="visually-hidden">Exporting...</span>
               </div>
-              {{ exporting ? 'EXPORTING...' : 'EXPORT' }}
-            </button>
-          </div>
-
-          <!-- Selection Actions (Visible when items are selected) -->
-          <div v-if="selectedCategories.length > 0" class="d-flex gap-2">
-            <button 
-              class="btn btn-delete btn-sm btn-with-icon-sm"
-              @click="deleteSelected"
-            >
-              <Trash2 :size="14" />
-              DELETE
             </button>
           </div>
 
           <!-- Right Side: Filters and Search -->
           <div class="d-flex align-items-center gap-2">
-            <!-- Search Toggle -->
             <button 
               class="btn btn-secondary btn-sm"
               @click="toggleSearchMode"
@@ -60,7 +57,7 @@
               <Search :size="16" />
             </button>
 
-            <!-- Filter Dropdowns (Hidden when search is active) -->
+            <!-- Filter Dropdowns -->
             <template v-if="!searchMode">
               <div class="filter-dropdown">
                 <label class="filter-label">Status</label>
@@ -72,24 +69,12 @@
                   <option value="all">All categories</option>
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
-                </select>
-              </div>
-
-              <div class="filter-dropdown">
-                <label class="filter-label">Type</label>
-                <select 
-                  class="form-select form-select-sm" 
-                  v-model="typeFilter" 
-                  @change="applyFilters"
-                >
-                  <option value="all">All types</option>
-                  <option value="parent">Parent Categories</option>
-                  <option value="subcategory">Subcategories</option>
+                  <option value="deleted">Deleted</option>
                 </select>
               </div>
             </template>
 
-            <!-- Search Bar (Visible when search mode is active) -->
+            <!-- Search Bar -->
             <div v-if="searchMode" class="search-container">
               <div class="position-relative">
                 <input 
@@ -134,7 +119,7 @@
     <div v-if="!loading && !error" class="row g-3 mb-4">
       <div 
         v-for="category in filteredCategories" 
-        :key="category.id || category.name"
+        :key="category.id || category._id || category.name"
         class="col-6 col-md-3"
       >
         <CardTemplate
@@ -142,12 +127,21 @@
           :border-color="getCategoryBorderColor(category, categories.indexOf(category))"
           border-position="start"
           :title="category.category_name"
-          :subtitle="category.description || category.subtitle || `${category.name} products`"
+          :subtitle="getCategorySubtitle(category)"
           shadow="sm"
           clickable
           @click="viewCategory(category)"
+          :class="{ 'deleted-category': category.isDeleted }"
         >
           <template #content>
+            <!-- Deleted indicator -->
+            <div v-if="category.isDeleted" class="deleted-badge mb-2">
+              <small class="badge bg-warning text-dark">
+                <Trash2 :size="12" class="me-1" />
+                DELETED {{ formatDeletionDate(category.deleted_at) }}
+              </small>
+            </div>
+
             <div class="d-flex justify-content-between align-items-center mb-2">
               <div>
                 <div class="text-primary fw-bold h5 mb-1">
@@ -163,25 +157,54 @@
                 />
               </div>
             </div>
+
+            <!-- Action buttons -->
             <div class="d-flex gap-1 mt-2">
               <button 
+                v-if="!category.isDeleted"
                 class="btn btn-view btn-sm btn-with-icon-sm"
                 @click.stop="viewCategory(category)"
                 data-bs-toggle="tooltip"
                 title="View Category Details"
               >
                 <Eye :size="14" />
-                View
+                <span class="btn-text">View</span>
               </button>
-              <button 
-                class="btn btn-delete btn-sm btn-with-icon-sm"
-                @click.stop="deleteCategory(category)"
-                data-bs-toggle="tooltip"
-                title="Delete Category"
-              >
-                <Trash2 :size="14" />
-                Delete
-              </button>
+
+              <template v-if="!category.isDeleted">
+                <button 
+                  class="btn btn-delete btn-sm btn-with-icon-sm"
+                  @click.stop="softDeleteCategory(category)"
+                  data-bs-toggle="tooltip"
+                  title="Soft Delete Category"
+                >
+                  <Trash2 :size="14" />
+                  Delete
+                </button>
+              </template>
+              
+              <template v-else>
+                <button 
+                  class="btn btn-success btn-sm btn-with-icon-sm"
+                  @click.stop="restoreCategory(category)"
+                  data-bs-toggle="tooltip"
+                  title="Restore Category"
+                >
+                  <RotateCcw :size="14" />
+                  Restore
+                </button>
+                
+                <button 
+                  v-if="isAdmin"
+                  class="btn btn-danger btn-sm btn-with-icon-sm"
+                  @click.stop="hardDeleteCategory(category)"
+                  data-bs-toggle="tooltip"
+                  title="Permanently Delete Category"
+                >
+                  <X :size="14" />
+                  Hard Delete
+                </button>
+              </template>
             </div>
           </template>
         </CardTemplate>
@@ -193,10 +216,10 @@
       <Package :size="64" class="text-muted mb-3" />
       <h5 class="text-muted">No categories found</h5>
       <p class="text-muted mb-3">
-        {{ categories.length === 0 ? 'Get started by creating your first category.' : 'Try adjusting your search or filters.' }}
+        {{ getEmptyStateMessage() }}
       </p>
       <button 
-        v-if="categories.length === 0"
+        v-if="categories.length === 0 && !showDeleted"
         class="btn btn-success"
         @click="handleAddCategory"
       >
@@ -213,23 +236,22 @@
 <script>
 import CardTemplate from '@/components/common/CardTemplate.vue'
 import AddCategoryModal from '@/components/categories/AddCategoryModal.vue'
-import categoryApiService from '@/services/apiCategory' // Adjust path as needed
+import categoryApiService from '@/services/apiCategory'
 import { 
   Plus, 
   Search,
   X,
   Package, 
   Trash2,
-  FileText,
   Eye,
   Coffee,
   Star,
   Zap,
   Utensils,
   ShoppingBag,
-  Grid3x3
+  Grid3x3,
+  RotateCcw
 } from 'lucide-vue-next'
-
 
 export default {
   name: 'Categories',
@@ -241,44 +263,48 @@ export default {
     X,
     Package,
     Trash2,
-    FileText,
     Eye,
     Coffee,
     Star,
     Zap,
     Utensils,
     ShoppingBag,
-    Grid3x3
+    Grid3x3,
+    RotateCcw
   },
   data() {
     return {
       selectedCategories: [],
-      
-      // UI State
       searchMode: false,
       loading: false,
       error: null,
       isCreatingCategory: false,
-      exporting: false, // Add this line
-      
-      // Filters
+      exporting: false,
+      showDeleted: false,
       statusFilter: 'all',
-      typeFilter: 'all',
       searchFilter: '',
+      categories: [],
+      isAdmin: true,
       
-      // API Data
-      categories: []
+      // NEW: Uncategorized tracking
+      uncategorizedCount: 0,
+      UNCATEGORIZED_CATEGORY_ID: '686a4de143821e2b21f725c6'
     }
   },
   computed: {
     filteredCategories() {
       let filtered = [...this.categories]
       
+      // Filter out the Uncategorized category from the main view
+      filtered = filtered.filter(category => 
+        category._id !== this.UNCATEGORIZED_CATEGORY_ID
+      )
+      
       // Apply search filter
       if (this.searchFilter.trim()) {
         const searchTerm = this.searchFilter.toLowerCase().trim()
         filtered = filtered.filter(category => 
-          (category.name || '').toLowerCase().includes(searchTerm) ||
+          (category.category_name || '').toLowerCase().includes(searchTerm) ||
           (category.description || '').toLowerCase().includes(searchTerm)
         )
       }
@@ -287,24 +313,18 @@ export default {
       if (this.statusFilter !== 'all') {
         filtered = filtered.filter(category => {
           if (this.statusFilter === 'active') {
-            return category.status === 'active' || category.is_active === true || (!category.hasOwnProperty('status') && !category.hasOwnProperty('is_active'))
+            return category.status === 'active' && !category.isDeleted
           } else if (this.statusFilter === 'inactive') {
-            return category.status === 'inactive' || category.is_active === false
+            return category.status === 'inactive' && !category.isDeleted
+          } else if (this.statusFilter === 'deleted') {
+            return category.isDeleted === true
           }
           return true
         })
-      }
-      
-      // Apply type filter
-      if (this.typeFilter !== 'all') {
-        filtered = filtered.filter(category => {
-          if (this.typeFilter === 'parent') {
-            return !category.parent_id || category.type === 'parent'
-          } else if (this.typeFilter === 'subcategory') {
-            return category.parent_id || category.type === 'subcategory'
-          }
-          return true
-        })
+      } else {
+        if (this.statusFilter !== 'deleted') {
+          filtered = filtered.filter(category => !category.isDeleted)
+        }
       }
       
       return filtered
@@ -312,17 +332,19 @@ export default {
   },
   async mounted() {
     await this.fetchCategories()
+    await this.fetchUncategorizedCount()
   },
   methods: {
+    // CORE CATEGORY METHODS
     async fetchCategories() {
       this.loading = true
       this.error = null
       
       try {
-        const response = await categoryApiService.CategoryData()
+        const params = { include_deleted: true }
+        const response = await categoryApiService.CategoryData(params)
         console.log('Categories fetched:', response)
         
-        // Handle different response structures
         if (response.data && Array.isArray(response.data)) {
           this.categories = response.data
         } else if (Array.isArray(response)) {
@@ -343,187 +365,47 @@ export default {
       }
     },
 
-    // Icon mapping based on category name or index
-    getCategoryIcon(category, index) {
-      const categoryName = (category.category_name || '').toLowerCase()
-      
-      // Try to match by name first
-      if (categoryName.includes('noodles') || categoryName.includes('pasta')) {
-        return 'Utensils'
-      } else if (categoryName.includes('drink') || categoryName.includes('beverage')) {
-        return 'Coffee'
-      } else if (categoryName.includes('topping') || categoryName.includes('extra')) {
-        return 'Star'
-      } else if (categoryName.includes('snack') || categoryName.includes('side')) {
-        return 'Zap'
-      } else if (categoryName.includes('food') || categoryName.includes('meal')) {
-        return 'Package'
-      } else if (categoryName.includes('bag') || categoryName.includes('shop')) {
-        return 'ShoppingBag'
-      }
-      
-      // Fallback to rotation based on index
-      const icons = ['Package', 'Coffee', 'Star', 'Zap', 'Utensils', 'ShoppingBag', 'Grid3x3']
-      return icons[index % icons.length]
-    },
-
-    getCategoryBorderColor(category, index) {
-      const categoryName = (category.name || '').toLowerCase()
-      
-      // Try to match by name first
-      if (categoryName.includes('noodle') || categoryName.includes('pasta')) {
-        return 'secondary'
-      } else if (categoryName.includes('drink') || categoryName.includes('beverage')) {
-        return 'primary'
-      } else if (categoryName.includes('topping') || categoryName.includes('extra')) {
-        return 'info'
-      } else if (categoryName.includes('snack') || categoryName.includes('side')) {
-        return 'success'
-      }
-      
-      // Fallback to rotation based on index
-      const colors = ['secondary', 'primary', 'info', 'success', 'warning', 'danger']
-      return colors[index % colors.length]
-    },
-
-    getCategoryIconClass(category, index) {
-      const borderColor = this.getCategoryBorderColor(category, index)
-      return `category-icon bg-${borderColor}-light rounded-circle p-2`
-    },
-
-    getCategoryIconColor(category, index) {
-      const borderColor = this.getCategoryBorderColor(category, index)
-      return `text-${borderColor}`
-    },
-
-     handleAddCategory() {
-        console.log('Add Category button clicked')
-        
-        // Set loading state
-        this.isCreatingCategory = true
-        
-        // Call the modal's openAddMode method
-        if (this.$refs.addCategoryModal) {
-          this.$refs.addCategoryModal.openAddMode()
-        } else {
-          console.error('AddCategoryModal ref not found')
-          this.isCreatingCategory = false
-        }
-      },
-
-      async onCategoryAdded(newCategory) {
-        try {
-          console.log('New category added:', newCategory)
-          
-          // Refresh the categories list
-          await this.fetchCategories()
-          
-          // Show success message (optional)
-          console.log(`Category "${newCategory.category_name}" added successfully!`)
-          
-        } catch (error) {
-          console.error('Error refreshing categories after add:', error)
-        } finally {
-          // Reset loading state
-          this.isCreatingCategory = false
-        }
-      },
-
-      async onCategoryUpdated(updatedCategory) {
-        try {
-          console.log('Category updated:', updatedCategory)
-          
-          // Refresh the categories list
-          await this.fetchCategories()
-          
-        } catch (error) {
-          console.error('Error refreshing categories after update:', error)
-        }
-      },
-
-    toggleSearchMode() {
-      this.searchMode = !this.searchMode
-      
-      if (this.searchMode) {
-        this.$nextTick(() => {
-          if (this.$refs.searchInput) {
-            this.$refs.searchInput.focus()
-          }
-        })
-      } else {
-        this.searchFilter = ''
-        // No need to call applyFilters as computed property handles it
-      }
-    },
-
-    clearSearch() {
-      this.searchFilter = ''
-      this.searchMode = false
-    },
-
-   async exportData() {
-      this.exporting = true
-      
+    // NEW: Fetch uncategorized products count
+    async fetchUncategorizedCount() {
       try {
-        // Use dedicated export endpoint
-        const exportData = await categoryApiService.ExportCategoryData({
-          format: 'csv',
-          include_products: true
+        console.log('Fetching uncategorized products count...')
+        
+        const products = await categoryApiService.FindProdcategory({ 
+          id: this.UNCATEGORIZED_CATEGORY_ID 
         })
         
-        // The backend returns pre-formatted CSV data
-        const blob = new Blob([exportData], { type: 'text/csv;charset=utf-8;' })
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `categories_export_${new Date().toISOString().split('T')[0]}.csv`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        window.URL.revokeObjectURL(url)
+        this.uncategorizedCount = Array.isArray(products) ? products.length : 0
+        console.log(`Found ${this.uncategorizedCount} uncategorized products`)
         
       } catch (error) {
-        console.error('Error exporting categories:', error)
-        alert('Failed to export categories. Please try again.')
-      } finally {
-        this.exporting = false
+        console.error('Error fetching uncategorized count:', error)
+        this.uncategorizedCount = 0
       }
     },
 
-  // Helper method for formatting dates (add if not already present)
-  formatDate(dateString) {
-    if (!dateString) return 'N/A'
-    try {
-      const date = new Date(dateString)
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
-    } catch (error) {
-      return 'Invalid Date'
-    }
-  },
-
-    deleteSelected() {
-      if (this.selectedCategories.length === 0) return
+    async handleAddCategory() {
+      console.log('Add Category button clicked')
+      this.isCreatingCategory = true
       
-      const confirmed = confirm(`Are you sure you want to delete ${this.selectedCategories.length} category(ies)?`)
-      if (!confirmed) return
-
-      console.log('Delete selected categories:', this.selectedCategories)
-      // TODO: Implement bulk delete functionality
+      if (this.$refs.addCategoryModal) {
+        this.$refs.addCategoryModal.openAddMode()
+      } else {
+        console.error('AddCategoryModal ref not found')
+        this.isCreatingCategory = false
+      }
     },
 
-    applyFilters() {
-      // Filters are now handled by computed property
-      console.log('Filters applied:', {
-        status: this.statusFilter,
-        type: this.typeFilter,
-        search: this.searchFilter
-      })
+    async onCategoryAdded(newCategory) {
+      try {
+        console.log('New category added:', newCategory)
+        await this.fetchCategories()
+        await this.fetchUncategorizedCount() // Refresh uncategorized count
+        console.log(`Category "${newCategory.category_name}" added successfully!`)
+      } catch (error) {
+        console.error('Error refreshing categories after add:', error)
+      } finally {
+        this.isCreatingCategory = false
+      }
     },
 
     viewCategory(category) {
@@ -539,41 +421,261 @@ export default {
       console.log('Navigating with ID:', categoryId)
       this.$router.push({
         name: 'Category Details',
-        params: { id: categoryId } // Use params instead of query
+        params: { id: categoryId }
       })
     },
 
-    async deleteCategory(category) {
-      const categoryName = category.name || category.title || 'this category'
-      const productCount = category.product_count || category.count || 0
-      
-      let confirmMessage = `Are you sure you want to delete the "${categoryName}" category?`
-      
-      if (productCount > 0) {
-        confirmMessage += `\n\nThis category contains ${productCount} product(s). Deleting this category will also remove all products in it.`
-      }
-      
-      const confirmed = confirm(confirmMessage)
-      if (!confirmed) return
-
+    // DELETE METHODS
+    async softDeleteCategory(category) {
       try {
-        console.log('Delete category:', category)
-        // TODO: Implement category deletion API call
-        // await categoryApiService.deleteCategory(category.id)
+        const deleteInfo = await categoryApiService.GetCategoryDeleteInfo(category._id)
         
-        // For now, just remove from local array
-        const index = this.categories.findIndex(c => c.id === category._id)
-        if (index > -1) {
-          this.categories.splice(index, 1)
+        const categoryName = category.category_name || 'this category'
+        const productCount = deleteInfo.delete_info?.products_count || 0
+        const subcategoryCount = deleteInfo.delete_info?.subcategories_count || 0
+        
+        let confirmMessage = `Are you sure you want to delete "${categoryName}"?`
+        
+        if (productCount > 0 || subcategoryCount > 0) {
+          confirmMessage += `\n\nThis category contains:`
+          if (subcategoryCount > 0) confirmMessage += `\n• ${subcategoryCount} subcategory`
+          if (productCount > 0) confirmMessage += `\n• ${productCount} product(s)`
+          confirmMessage += `\n\nProducts will be moved to Uncategorized.`
         }
         
-        // Or refresh from server
-        // await this.fetchCategories()
+        const confirmed = confirm(confirmMessage)
+        if (!confirmed) return
+
+        console.log('Soft deleting category:', category)
+        
+        await categoryApiService.SoftDeleteCategory(category._id)
+        await this.fetchCategories()
+        await this.fetchUncategorizedCount() // Refresh uncategorized count
+        
+        console.log('✅ Category soft deleted successfully')
+        this.showSuccessMessage(`Category "${categoryName}" has been deleted.`)
         
       } catch (error) {
-        console.error('Error deleting category:', error)
-        alert('Failed to delete category: ' + error.message)
+        console.error('Error soft deleting category:', error)
+        this.showErrorMessage('Failed to delete category: ' + error.message)
       }
+    },
+
+    async restoreCategory(category) {
+      try {
+        const confirmed = confirm(`Are you sure you want to restore "${category.category_name}"?`)
+        if (!confirmed) return
+
+        console.log('Restoring category:', category)
+        
+        await categoryApiService.RestoreCategory(category._id)
+        await this.fetchCategories()
+        await this.fetchUncategorizedCount() // Refresh uncategorized count
+        
+        console.log('✅ Category restored successfully')
+        this.showSuccessMessage(`Category "${category.category_name}" has been restored.`)
+        
+      } catch (error) {
+        console.error('Error restoring category:', error)
+        this.showErrorMessage('Failed to restore category: ' + error.message)
+      }
+    },
+
+    async hardDeleteCategory(category) {
+      try {
+        const categoryName = category.category_name || 'this category'
+        
+        const confirmed = confirm(
+          `⚠️ PERMANENT DELETE WARNING ⚠️\n\n` +
+          `Are you sure you want to PERMANENTLY delete "${categoryName}"?\n\n` +
+          `This action:\n` +
+          `• CANNOT be undone\n` +
+          `• Will permanently remove all data\n` +
+          `• Requires admin permissions\n\n` +
+          `Type "DELETE" to confirm this permanent action.`
+        )
+        
+        if (!confirmed) return
+
+        const confirmText = prompt('Please type "DELETE" to confirm permanent deletion:')
+        if (confirmText !== 'DELETE') {
+          this.showErrorMessage('Confirmation text did not match. Operation cancelled.')
+          return
+        }
+
+        console.log('Hard deleting category:', category)
+        
+        await categoryApiService.HardDeleteCategory(category._id)
+        await this.fetchCategories()
+        await this.fetchUncategorizedCount() // Refresh uncategorized count
+        
+        console.log('✅ Category permanently deleted')
+        this.showSuccessMessage(`Category "${categoryName}" has been permanently deleted.`)
+        
+      } catch (error) {
+        console.error('Error hard deleting category:', error)
+        this.showErrorMessage('Failed to permanently delete category: ' + error.message)
+      }
+    },
+
+    // EXPORT METHODS
+    async exportData() {
+      this.exporting = true;
+      
+      try {
+          console.log('🚀 Starting category export...');
+          
+          const exportParams = {
+              format: 'csv',
+              include_sales_data: true,
+              include_deleted: this.showDeleted
+          };
+          
+          const blobData = await categoryApiService.ExportCategoryData(exportParams);
+          
+          if (!(blobData instanceof Blob)) {
+              throw new Error('Invalid response: expected file data');
+          }
+          
+          if (blobData.size === 0) {
+              throw new Error('Export file is empty. No data to export.');
+          }
+          
+          const url = window.URL.createObjectURL(blobData);
+          const link = document.createElement('a');
+          link.href = url;
+          
+          const timestamp = new Date().toISOString().split('T')[0];
+          const deletedSuffix = this.showDeleted ? '_with_deleted' : '';
+          link.download = `categories_export${deletedSuffix}_${timestamp}.csv`;
+          
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          
+          console.log('✅ Export completed successfully');
+          this.showSuccessMessage('Categories exported successfully!');
+          
+      } catch (error) {
+          console.error('❌ Export error:', error);
+          const errorMessage = error.message || 'Export failed. Please try again.';
+          this.showErrorMessage(`Export failed: ${errorMessage}`);
+      } finally {
+          this.exporting = false;
+      }
+    },
+
+    // UI UTILITY METHODS
+    toggleSearchMode() {
+      this.searchMode = !this.searchMode
+      
+      if (this.searchMode) {
+        this.$nextTick(() => {
+          if (this.$refs.searchInput) {
+            this.$refs.searchInput.focus()
+          }
+        })
+      } else {
+        this.searchFilter = ''
+      }
+    },
+
+    clearSearch() {
+      this.searchFilter = ''
+      this.searchMode = false
+    },
+
+    applyFilters() {
+      console.log('Filters applied:', {
+        status: this.statusFilter,
+        search: this.searchFilter,
+        showingDeleted: this.statusFilter === 'deleted'
+      })
+      
+      this.showDeleted = this.statusFilter === 'deleted'
+    },
+
+    // UTILITY METHODS
+    getCategorySubtitle(category) {
+      if (category.isDeleted) {
+        return `Deleted ${this.formatDeletionDate(category.deleted_at)}`
+      }
+      return category.description || category.subtitle || `${category.category_name} products`
+    },
+
+    formatDeletionDate(dateString) {
+      return categoryApiService.formatDeletionDate(dateString)
+    },
+
+    getEmptyStateMessage() {
+      if (this.statusFilter === 'deleted') {
+        return 'No deleted categories found.'
+      } else if (this.categories.length === 0) {
+        return 'Get started by creating your first category.'
+      } else {
+        return 'Try adjusting your search or filters.'
+      }
+    },
+
+    // MESSAGE METHODS
+    showSuccessMessage(message) {
+      console.log('✅ Success:', message)
+      alert(message) // Replace with better notification
+    },
+
+    showErrorMessage(message) {
+      console.error('❌ Error:', message)
+      alert(message) // Replace with better notification
+    },
+
+    // ICON AND STYLING METHODS
+    getCategoryIcon(category, index) {
+      const categoryName = (category.category_name || '').toLowerCase()
+      
+      if (categoryName.includes('noodles') || categoryName.includes('pasta')) {
+        return 'Utensils'
+      } else if (categoryName.includes('drink') || categoryName.includes('beverage')) {
+        return 'Coffee'
+      } else if (categoryName.includes('topping') || categoryName.includes('extra')) {
+        return 'Star'
+      } else if (categoryName.includes('snack') || categoryName.includes('side')) {
+        return 'Zap'
+      } else if (categoryName.includes('food') || categoryName.includes('meal')) {
+        return 'Package'
+      } else if (categoryName.includes('bag') || categoryName.includes('shop')) {
+        return 'ShoppingBag'
+      }
+      
+      const icons = ['Package', 'Coffee', 'Star', 'Zap', 'Utensils', 'ShoppingBag', 'Grid3x3']
+      return icons[index % icons.length]
+    },
+
+    getCategoryBorderColor(category, index) {
+      const categoryName = (category.category_name || '').toLowerCase()
+      
+      if (categoryName.includes('noodle') || categoryName.includes('pasta')) {
+        return 'secondary'
+      } else if (categoryName.includes('drink') || categoryName.includes('beverage')) {
+        return 'primary'
+      } else if (categoryName.includes('topping') || categoryName.includes('extra')) {
+        return 'info'
+      } else if (categoryName.includes('snack') || categoryName.includes('side')) {
+        return 'success'
+      }
+      
+      const colors = ['secondary', 'primary', 'info', 'success', 'warning', 'danger']
+      return colors[index % colors.length]
+    },
+
+    getCategoryIconClass(category, index) {
+      const borderColor = this.getCategoryBorderColor(category, index)
+      return `category-icon bg-${borderColor}-light rounded-circle p-2`
+    },
+
+    getCategoryIconColor(category, index) {
+      const borderColor = this.getCategoryBorderColor(category, index)
+      return `text-${borderColor}`
     }
   }
 }
@@ -593,7 +695,6 @@ export default {
   color: var(--tertiary-medium) !important;
 }
 
-/* Action Bar Controls */
 .action-bar-controls {
   border-bottom: 1px solid var(--neutral);
   background-color: white;
@@ -609,7 +710,6 @@ export default {
   gap: 1rem;
 }
 
-/* Filter Dropdown */
 .filter-dropdown {
   min-width: 120px;
 }
@@ -622,7 +722,6 @@ export default {
   display: block;
 }
 
-/* Search Container */
 .search-container {
   min-width: 300px;
 }
@@ -639,21 +738,18 @@ export default {
   justify-content: center;
 }
 
-/* Custom hover states for export buttons */
 .btn.btn-outline-secondary:hover {
   background-color: var(--info-light);
   border-color: var(--info);
   color: var(--info-dark);
 }
 
-/* Form controls focus states */
 .form-select:focus,
 .form-control:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
 }
 
-/* Custom category card styles */
 .category-icon {
   display: inline-flex;
   align-items: center;
@@ -662,7 +758,6 @@ export default {
   height: 44px;
 }
 
-/* Background colors for category icons */
 .bg-primary-light {
   background-color: var(--primary-light) !important;
 }
@@ -687,19 +782,25 @@ export default {
   background-color: var(--danger-light) !important;
 }
 
-/* Ensure proper gap in category cards */
 .row.g-3 {
   --bs-gutter-x: 1rem;
   --bs-gutter-y: 1rem;
 }
 
-/* Loading and empty states */
 .spinner-border {
   width: 2rem;
   height: 2rem;
 }
 
-/* Responsive adjustments */
+.deleted-category {
+  opacity: 0.85;
+  border: 2px dashed #ffc107 !important;
+}
+
+.deleted-category:hover {
+  opacity: 1;
+}
+
 @media (max-width: 768px) {
   .action-row {
     flex-direction: column;

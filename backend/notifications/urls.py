@@ -18,21 +18,19 @@ urlpatterns = [
     path('all/', views.all_notifications, name='all'),
     path('archived/', views.get_archived_notifications, name='archived'),
     path('stats/', views.notification_stats, name='stats'),
+    
+    # ================================================================
+    # CREATION ENDPOINTS
+    # ================================================================
     path('create/', views.create_notification, name='create'),
+    path('create/inventory-alert/', views.create_inventory_alert, name='inventory_alert'),
+    
+    # ================================================================
+    # LIST/FILTER ENDPOINTS
+    # ================================================================
     path('list/', views.list_notifications, name='list'),
-    path('inventory-alert/', views.create_inventory_alert, name='inventory_alert'),
-    
-    # ================================================================
-    # USER-SPECIFIC PATTERNS
-    # ================================================================
-    path('user/<int:user_id>/', views.user_notifications, name='user_notifications'),
-    
-    # ================================================================
-    # INDIVIDUAL NOTIFICATION OPERATIONS - PUT THESE LAST
-    # ================================================================
     path('<str:notification_id>/mark-read/', views.mark_notification_read, name='mark_read'),
     path('<str:notification_id>/archive/', views.archive_notification, name='archive'),
     path('<str:notification_id>/unarchive/', views.unarchive_notification, name='unarchive'),
     path('<str:notification_id>/delete/', views.delete_notification, name='delete'),
-    path('<str:notification_id>/', views.get_notification, name='detail'),
 ]

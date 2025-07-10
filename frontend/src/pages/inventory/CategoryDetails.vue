@@ -7,7 +7,7 @@
           <router-link to="/inventory" class="text-tertiary-medium">Inventory</router-link>
         </li>
         <li class="breadcrumb-item">
-          <router-link to="/inventory/categories" class="text-tertiary-medium">Categories</router-link>
+          <router-link to="/categories" class="text-tertiary-medium">Categories</router-link>
         </li>
         <li class="breadcrumb-item active text-primary" aria-current="page">Category Details</li>
       </ol>
@@ -29,25 +29,7 @@
       </button>
     </div>
 
-    <!-- Main Content (Only show when not loading and no error) -->
-    <div v-if="!loading && !error">
-      <!-- Loading State -->
-    <div v-if="loading" class="text-center py-4">
-      <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Loading category details...</span>
-      </div>
-      <p class="mt-2 text-muted">Loading category details...</p>
-    </div>
-
-    <!-- Error State -->
-    <div v-if="error" class="alert alert-danger" role="alert">
-      <strong>Error:</strong> {{ error }}
-      <button @click="retryLoad" class="btn btn-sm btn-outline-danger ms-2">
-        Retry
-      </button>
-    </div>
-
-    <!-- Main Content (Only show when not loading and no error) -->
+    <!-- Main Content -->
     <div v-if="!loading && !error">
       <!-- Page Header -->
       <div class="d-flex justify-content-between align-items-start mb-4">
@@ -62,9 +44,17 @@
             <Edit :size="14" />
             Edit
           </button>
-          <button class="btn btn-export btn-sm btn-with-icon-sm">
+          
+          <!-- Export button -->
+          <button 
+            class="btn btn-export btn-sm btn-with-icon-sm" 
+            type="button" 
+            :disabled="isExporting"
+            @click="exportFilteredProducts()"
+            :title="getExportTooltip()"
+          >
             <Download :size="14" />
-            Export
+            {{ isExporting ? 'Exporting...' : getExportButtonText() }}
           </button>
         </div>
       </div>
@@ -92,7 +82,8 @@
                 <div class="col-6">
                   <div class="mb-3">
                     <label class="form-label text-tertiary-dark fw-semibold">Total Products:</label>
-                    <p class="mb-0 text-tertiary-dark">{{ products.length }}</p>
+                    <p class="mb-0 text-tertiary-dark">{{ categoryData.sub_categories ? 
+       categoryData.sub_categories.reduce((total, sub) => total + (sub.products?.length || 0), 0) : 0  }}</p>
                   </div>
                   <div class="mb-3">
                     <label class="form-label text-tertiary-dark fw-semibold">Status:</label>
@@ -134,12 +125,18 @@
               <div class="filter-dropdown">
                 <label class="filter-label">Filter</label>
                 <select class="form-select form-select-sm" v-model="categoryFilter" @change="applyFilter">
-                  <option value="all">All Products</option>
-                  <option v-for="subCat in categoryData.sub_categories" :key="subCat.id || subCat.name" :value="subCat.id || subCat.name">
-                    {{ subCat.name }}
+                  <option value="all">All Products ({{ products.length }})</option>
+                  <option 
+                    v-for="subCat in categoryData.sub_categories" 
+                    :key="subCat.id || subCat.name" 
+                    :value="subCat.name"
+                  >
+                    {{ subCat.name }} ({{ getSubcategoryProductCount(subCat.name) }})
                   </option>
+                  <!-- REMOVED: Special "None" option - now treated as regular subcategory -->
                 </select>
               </div>
+              
               <!-- Show Add Sub Category button when no products are selected -->
               <button 
                 v-if="selectedProducts.length === 0"
@@ -149,6 +146,7 @@
                 <Plus :size="14" />
                 Add Sub Category
               </button>
+              
               <!-- Show Remove from Category button when products are selected -->
               <button 
                 v-if="selectedProducts.length > 0"
@@ -210,21 +208,19 @@
               <div class="fw-medium text-tertiary-dark">{{ product.product_name }}</div>
             </td>
             <td>
-              <!-- UPDATED: Show actual subcategory with editing capability -->
-              <select 
-                class="form-select form-select-sm"
-                :value="product.subcategory || ''"
-                @change="updateProductSubcategory(product._id, $event.target.value)"
-              >
-                <option value="">None</option>
-                <option 
-                  v-for="subCat in categoryData.sub_categories" 
-                  :key="subCat.name" 
-                  :value="subCat.name"
+               <select 
+                  class="form-select form-select-sm"
+                  :value="product.subcategory || 'None'"  
+                  @change="updateProductSubcategory(product._id, $event.target.value)"
                 >
-                  {{ subCat.name }}
-                </option>
-              </select>
+                  <option 
+                    v-for="subCat in categoryData.sub_categories" 
+                    :key="subCat.name" 
+                    :value="subCat.name"
+                  >
+                    {{ subCat.name }}
+                  </option>
+                </select>
             </td>
             <td class="text-center">
               <span :class="getStockClass(product.stock)">
@@ -241,7 +237,7 @@
                   class="btn btn-outline-danger btn-icon-only btn-xs action-btn action-btn-delete"
                   @click="removeProductFromCategory(product)"
                   data-bs-toggle="tooltip"
-                  title="Remove from Category"
+                  title="Set to None Subcategory"
                 >
                   <Trash2 :size="12" />
                 </button>
@@ -252,12 +248,15 @@
       </DataTable>
 
       <!-- Empty State -->
-      <div v-if="products.length === 0" class="text-center py-5">
+      <div v-if="filteredProducts.length === 0" class="text-center py-5">
         <div class="card">
           <div class="card-body py-5">
             <Package :size="48" class="text-tertiary-medium mb-3" />
-            <p class="text-tertiary-medium mb-3">No products found in this category</p>
-            <button class="btn btn-primary btn-with-icon">
+            <p class="text-tertiary-medium mb-3">
+              {{ categoryFilter === 'all' ? 'No products found in this category' : 
+                 `No products found in "${categoryFilter}" subcategory` }}
+            </p>
+            <button class="btn btn-primary btn-with-icon" v-if="categoryFilter === 'all'">
               <Plus :size="16" />
               Add First Product
             </button>
@@ -265,14 +264,18 @@
         </div>
       </div>
     </div>
-</div>
-    <!-- Edit Category Modal -->
+
+     <!-- Edit Category Modal -->
     <AddCategoryModal ref="editCategoryModal" @category-updated="onCategoryUpdated" />
+    
+    <!-- Add Subcategory Modal -->
+    <AddSubcategoryModal ref="addSubcategoryModal" @subcategory-added="onSubcategoryAdded" />
   </div>
 </template>
 
 <script>
 import DataTable from '@/components/common/TableTemplate.vue'
+import AddSubcategoryModal from '@/components/categories/AddSubCategoryModal.vue'
 import AddCategoryModal from '@/components/categories/AddCategoryModal.vue'
 import categoryApiService from '@/services/apiCategory'
 import { 
@@ -288,6 +291,7 @@ export default {
   components: {
     DataTable,
     AddCategoryModal,
+    AddSubcategoryModal,
     Edit,
     Download,
     Package,
@@ -302,28 +306,27 @@ export default {
       selectedProducts: [],
       loading: false,
       error: null,
-      
-      // Store the category ID from route
       categoryId: null,
-      
-      // Initialize as empty - will be populated by API
       categoryData: {},
-      
-      // Products array - will be extracted from sub_categories
-      products: []
+      products: [],
+      isExporting: false
     }
   },
   computed: {
-  // Filter products based on categoryFilter
     filteredProducts() {
       if (this.categoryFilter === 'all') {
         return this.products
+      } else {
+        // Now treat "None" as a regular subcategory, not a special case
+        return this.products.filter(product => {
+          const productSubcategory = product.subcategory || product.subcategory_id || product.subcategory_name
+          return productSubcategory === this.categoryFilter
+        })
       }
-      return this.products.filter(product => {
-        const productSubcategory = product.subcategory || product.subcategory_id || product.subcategory_name
-        return productSubcategory === this.categoryFilter
-      })
     },
+    
+    // REMOVED: productsWithoutSubcategory computed property
+    // No longer needed since all products should have a subcategory
     
     paginatedProducts() {
       const start = (this.currentPage - 1) * this.itemsPerPage
@@ -332,89 +335,68 @@ export default {
     },
 
     isAllSelected() {
-      // FIX: Use _id instead of id
       const currentPageProductIds = this.paginatedProducts.map(p => p._id)
       return currentPageProductIds.length > 0 && 
             currentPageProductIds.every(id => this.selectedProducts.includes(id))
     },
 
     isIndeterminate() {
-      // FIX: Use _id instead of id
       const currentPageProductIds = this.paginatedProducts.map(p => p._id)
       const selectedOnPage = currentPageProductIds.filter(id => this.selectedProducts.includes(id))
       return selectedOnPage.length > 0 && selectedOnPage.length < currentPageProductIds.length
     }
   },
   methods: {
-        // ==========================================
-        // API METHODS
-        // ==========================================
+    // API METHODS
+    async fetchCategoryData(categoryId) {
+      this.loading = true
+      this.error = null
+      
+      try {
+        console.log('Fetching category with ID:', categoryId)
         
-        // Fetch specific category data from API using the category ID
-      async fetchCategoryData(categoryId) {
-        this.loading = true
-        this.error = null
+        const response = await categoryApiService.FindCategoryData({ id: categoryId })
+        console.log('API Response:', response)
         
-        try {
-          console.log('Fetching category with ID:', categoryId)
-          
-          const response = await categoryApiService.FindCategoryData({ id: categoryId })
-          console.log('API Response:', response)
-          
-          // Handle the specific response structure from your API
-          if (response.category && typeof response.category === 'object') {
-            this.categoryData = response.category
-            console.log('Using response.category')
-          } else if (response.data && typeof response.data === 'object') {
-            this.categoryData = response.data
-            console.log('Using response.data')
-          } else if (response && typeof response === 'object' && !Array.isArray(response) && !response.message) {
-            // Only use response directly if it doesn't have a message field (meaning it's the actual category data)
-            this.categoryData = response
-            console.log('Using response directly')
-          } else {
-            console.warn('Unexpected response structure:', response)
-            this.categoryData = {}
-          }
-          
-          console.log('Final categoryData:', this.categoryData)
-          console.log('Category name:', this.categoryData.category_name)
-          console.log('Sub-categories:', this.categoryData.sub_categories)
-          
-          // Extract products from sub_categories
-           await this.fetchCompleteProducts(categoryId)
-          
-        } catch (error) {
-          console.error('Error fetching category data:', error)
-          this.error = error.message || 'Failed to fetch category data'
+        if (response.category && typeof response.category === 'object') {
+          this.categoryData = response.category
+        } else if (response.data && typeof response.data === 'object') {
+          this.categoryData = response.data
+        } else if (response && typeof response === 'object' && !Array.isArray(response) && !response.message) {
+          this.categoryData = response
+        } else {
+          console.warn('Unexpected response structure:', response)
           this.categoryData = {}
-          this.products = []
-        } finally {
-          this.loading = false
         }
-      },
-        async fetchCompleteProducts(categoryId) {
+        
+        await this.fetchCompleteProducts(categoryId)
+        
+      } catch (error) {
+        console.error('Error fetching category data:', error)
+        this.error = error.message || 'Failed to fetch category data'
+        this.categoryData = {}
+        this.products = []
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async fetchCompleteProducts(categoryId) {
       try {
         console.log('Fetching complete products for category:', categoryId)
         
-        // Use your FindProdcategory API method
         const completeProducts = await categoryApiService.FindProdcategory({ id: categoryId })
         console.log('Complete products fetched:', completeProducts)
         
-        // Simply assign the complete products
         this.products = completeProducts
-        
-        console.log('Final products:', this.products)
-        console.log('Total products:', this.products.length)
         
       } catch (error) {
         console.error('Error fetching complete products:', error)
-        // Fallback to empty products array
         this.products = []
         throw error
       }
     },
-    // Load all category data
+
     async loadCategoryData(categoryId) {
       if (!categoryId) {
         console.error('No category ID provided')
@@ -425,7 +407,6 @@ export default {
       await this.fetchCategoryData(categoryId)
     },
 
-    // Retry loading data
     async retryLoad() {
       const categoryId = this.$route.query.id || this.$route.params.id
       if (categoryId) {
@@ -435,7 +416,6 @@ export default {
       }
     },
 
-    // Refresh category data when updated
     onCategoryUpdated() {
       const categoryId = this.$route.query.id || this.$route.params.id
       if (categoryId) {
@@ -443,52 +423,18 @@ export default {
       }
     },
 
-    // ==========================================
-    // DATA PROCESSING METHODS
-    // ==========================================
-    
-    // Extract products from sub_categories
-    extractProductsFromSubcategories() {
-      this.products = []
-      
-      if (this.categoryData.sub_categories && Array.isArray(this.categoryData.sub_categories)) {
-        this.categoryData.sub_categories.forEach(subCategory => {
-          if (subCategory.products && Array.isArray(subCategory.products)) {
-            // Add subcategory info to each product
-            const productsWithSubcategory = subCategory.products.map(product => ({
-              ...product,
-              subcategory: subCategory.name,
-              subcategory_id: subCategory._id || subCategory.id || subCategory.name,
-              subcategory_name: subCategory.name
-            }))
-            
-            this.products.push(...productsWithSubcategory)
-          }
-        })
-      }
-      
-      console.log('Extracted products:', this.products)
-    },
-
-    // ==========================================
     // UI INTERACTION METHODS
-    // ==========================================
-    
-    // Apply filter when subcategory filter changes
     applyFilter() {
-      this.currentPage = 1 // Reset to first page when filter changes
+      this.currentPage = 1
     },
 
-    // Handle page change
     handlePageChange(page) {
       this.currentPage = page
     },
 
-    // Handle edit category button click
     handleEditCategory() {
       console.log('Edit category button clicked')
       
-      // Call the modal's openEditMode method with category data
       if (this.$refs.editCategoryModal) {
         this.$refs.editCategoryModal.openEditMode(this.categoryData)
       } else {
@@ -496,77 +442,142 @@ export default {
       }
     },
 
-    // Handle add sub-category button click
     handleAddSubCategory() {
       console.log('Add sub-category button clicked')
-      // TODO: Implement add sub-category functionality
-      // This could open a separate modal or allow inline editing
+      
+      // Check if we have category data
+      if (!this.categoryData._id) {
+        this.showErrorMessage('Category not loaded. Please refresh the page.')
+        return
+      }
+      
+      // Open the modal
+      if (this.$refs.addSubcategoryModal) {
+        this.$refs.addSubcategoryModal.openModal(
+          this.categoryData._id,
+          this.categoryData.category_name || 'Unknown Category'
+        )
+      } else {
+        console.error('AddSubcategoryModal ref not found')
+        this.showErrorMessage('Modal component not available')
+      }
     },
 
-    // ==========================================
     // PRODUCT SELECTION METHODS
-    // ==========================================
-    
-    // Toggle select all products on current page
     toggleSelectAll() {
-      const currentPageProductIds = this.paginatedProducts.map(p => p.id)
+      const currentPageProductIds = this.paginatedProducts.map(p => p._id)
       
       if (this.isAllSelected) {
-        // Deselect all products on current page
         this.selectedProducts = this.selectedProducts.filter(id => !currentPageProductIds.includes(id))
       } else {
-        // Select all products on current page
         const newSelections = currentPageProductIds.filter(id => !this.selectedProducts.includes(id))
         this.selectedProducts = [...this.selectedProducts, ...newSelections]
       }
     },
 
-    // ==========================================
     // PRODUCT MANAGEMENT METHODS
-    // ==========================================
-    
-    // Update product subcategory
-    updateProductSubcategory(productId, newSubcategory) {
-      const product = this.products.find(p => p.id === productId)
-      if (product) {
-        product.subcategory = newSubcategory || null
-        product.subcategory_id = newSubcategory || null
-        product.subcategory_name = newSubcategory || null
-        console.log(`Updated ${productId} subcategory to:`, newSubcategory || 'None')
-        // TODO: Call API to update product subcategory
-        // Example: await productsApi.updateProduct(productId, { subcategory: newSubcategory })
+    async updateProductSubcategory(productId, newSubcategory) {
+      try {
+        console.log(`Updating ${productId} subcategory to:`, newSubcategory || 'None');
+        
+        // When user selects "None", set subcategory to "None" (the actual subcategory)
+        const result = await categoryApiService.SubCatChangeTab({
+          product_id: productId,
+          new_subcategory: newSubcategory || "None", // Use "None" subcategory instead of null
+          category_id: this.categoryData._id // Keep in CURRENT category
+        });
+        
+        if (result.result.success) {
+          console.log(`✅ ${result.result.message}`);
+          
+          const product = this.products.find(p => p._id === productId);
+          if (product) {
+            // Update local product data
+            product.subcategory = newSubcategory || "None";
+            product.subcategory_name = newSubcategory || "None";
+            product.subcategory_id = newSubcategory || "None";
+            
+            console.log(`📝 Product "${product.product_name}" moved to "${newSubcategory || 'None'}" subcategory`);
+          }
+          
+        } else {
+          console.error('❌ Update failed:', result);
+          this.showErrorMessage('Failed to update subcategory');
+        }
+      } catch (error) {
+        console.error('❌ Failed to update subcategory:', error);
+        this.showErrorMessage(`Failed to update subcategory: ${error.message}`);
       }
     },
 
-    // Remove single product from category
-    removeProductFromCategory(product) {
-      const confirmed = confirm(`Are you sure you want to remove "${product.name || product.product_name}" from the "${this.categoryData.category_name}" category?\n\nThe product will become uncategorized.`)
-      if (!confirmed) return
-      
-      console.log('Remove product from category:', product.id)
-      // TODO: Implement removing product from category (make it uncategorized)
-      // Example: await productsApi.updateProduct(product.id, { category: null, subcategory: null })
-      
-      // For now, remove from local array
-      const index = this.products.findIndex(p => p.id === product.id)
-      if (index > -1) {
-        this.products.splice(index, 1)
+    async onSubcategoryAdded(eventData) {
+      try {
+        console.log('Subcategory added event received:', eventData)
+        
+        // Refresh the category data to show the new subcategory
+        await this.loadCategoryData(this.categoryData._id)
+        
+        // Log success
+        console.log(`✅ Category data refreshed after adding "${eventData.subcategory.name}"`)
+        
+      } catch (error) {
+        console.error('❌ Error refreshing data after subcategory addition:', error)
+        this.showErrorMessage('Subcategory added but failed to refresh data. Please refresh the page.')
       }
     },
 
-    // Remove selected products from category
-    removeSelectedFromCategory() {
+    async removeProductFromCategory(product) {
+      try {
+        // Updated confirmation message
+        const confirmed = confirm(
+          `Are you sure you want to remove "${product.name || product.product_name}" from the "${this.categoryData.category_name}" category?\n\n` +
+          `The product will be moved back to the "Uncategorized" category.`
+        );
+        
+        if (!confirmed) return;
+        
+        console.log('Moving product back to Uncategorized category:', product._id);
+        
+        // Use the dedicated API method for moving to uncategorized
+        const result = await categoryApiService.MoveProductToUncategorized({
+          product_id: product._id,
+          current_category_id: this.categoryData._id
+        });
+        
+        console.log('✅ Product moved to Uncategorized successfully:', result);
+        
+        // Remove from local products array since it's no longer in this category
+        const productIndex = this.products.findIndex(p => p._id === product._id);
+        if (productIndex > -1) {
+          this.products.splice(productIndex, 1);
+        }
+        
+        // Clear from selection if selected
+        this.selectedProducts = this.selectedProducts.filter(id => id !== product._id);
+        
+        this.showSuccessMessage(
+          `"${product.product_name}" has been moved to the Uncategorized category.`
+        );
+        
+      } catch (error) {
+        console.error('❌ Error moving product to Uncategorized:', error);
+        this.showErrorMessage(`Failed to move product: ${error.message}`);
+      }
+    },
+
+    async removeSelectedFromCategory() {
       if (this.selectedProducts.length === 0) return
       
       const productNames = this.selectedProducts
         .map(id => {
-          const product = this.products.find(p => p.id === id)
+          const product = this.products.find(p => p._id === id)
           return product?.name || product?.product_name
         })
         .filter(Boolean)
-        .slice(0, 3) // Show first 3 names
+        .slice(0, 3)
       
-      let confirmMessage = `Are you sure you want to remove ${this.selectedProducts.length} product(s) from the "${this.categoryData.category_name}" category?\n\nThe products will become uncategorized.`
+      let confirmMessage = `Are you sure you want to remove ${this.selectedProducts.length} product(s) from the "${this.categoryData.category_name}" category?\n\n` +
+                          `The products will be moved back to the "Uncategorized" category.`
       
       if (productNames.length > 0) {
         confirmMessage += `\n\nProducts to be removed:\n${productNames.join(', ')}`
@@ -578,26 +589,132 @@ export default {
       const confirmed = confirm(confirmMessage)
       if (!confirmed) return
       
-      console.log('Remove selected products from category:', this.selectedProducts)
-      // TODO: Implement bulk removal from category
-      
-      // For now, remove from local array
-      this.products = this.products.filter(product => !this.selectedProducts.includes(product.id))
-      
-      // Clear selection after removal
-      this.selectedProducts = []
+      try {
+        console.log('Bulk moving selected products to Uncategorized:', this.selectedProducts)
+        
+        // Use the bulk move API method
+        const result = await categoryApiService.BulkMoveProductsToUncategorized({
+          product_ids: this.selectedProducts,
+          current_category_id: this.categoryData._id
+        });
+        
+        console.log('✅ Products bulk moved to Uncategorized successfully:', result);
+        
+        // Remove all selected products from local array
+        this.products = this.products.filter(product => 
+          !this.selectedProducts.includes(product._id)
+        );
+        
+        // Clear selections
+        this.selectedProducts = []
+        
+        this.showSuccessMessage(
+          `${this.selectedProducts.length} product(s) moved to Uncategorized category successfully!`
+        );
+        
+      } catch (error) {
+        console.error('Error in bulk move to Uncategorized:', error)
+        this.showErrorMessage(`Bulk move failed: ${error.message}`)
+      }
     },
 
-    // ==========================================
+    // EXPORT METHODS
+    async exportFilteredProducts() {
+      try {
+        this.isExporting = true;
+        console.log(`🚀 Exporting filtered products (${this.filteredProducts.length} items)`);
+        
+        const csvContent = this.convertFilteredProductsToCSV();
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        const timestamp = new Date().toISOString().split('T')[0];
+        const categoryName = this.categoryData.category_name?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'category';
+        const filterText = this.categoryFilter === 'all' ? 'all' : 
+                          this.categoryFilter.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        
+        link.download = `${categoryName}_${filterText}_${timestamp}.csv`;
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        console.log('✅ Filtered products export completed!');
+        this.showSuccessMessage(`${this.filteredProducts.length} products exported successfully as CSV`);
+        
+      } catch (error) {
+        console.error('❌ Filtered export failed:', error);
+        this.showErrorMessage(`Export failed: ${error.message}`);
+      } finally {
+        this.isExporting = false;
+      }
+    },
+
+    convertFilteredProductsToCSV() {
+      if (!this.filteredProducts || this.filteredProducts.length === 0) {
+        return 'No products found with current filter settings\n';
+      }
+      
+      const headers = [
+        'Product ID',
+        'Product Name', 
+        'Category',
+        'Sub-Category',
+        'Stock',
+        'Selling Price (₱)',
+        'Supplier',
+        'Last Updated'
+      ];
+      
+      const categoryName = this.categoryData.category_name || 'Unknown';
+      const filterInfo = this.getFilterDescription();
+      const timestamp = new Date().toISOString();
+      
+      const csvComments = [
+        `# Category: ${categoryName}`,
+        `# Filter: ${filterInfo}`,
+        `# Total Products: ${this.filteredProducts.length}`,
+        `# Exported: ${timestamp}`,
+        ''
+      ];
+      
+      const rows = this.filteredProducts.map(product => [
+        product._id,
+        `"${product.product_name || 'Unknown'}"`,
+        `"${categoryName}"`,
+        `"${product.subcategory || 'None'}"`,
+        product.stock || 0,
+        product.selling_price || 0,
+        `"${product.supplier || 'N/A'}"`,
+        this.formatDate(product.updated_at || product.last_updated) || 'N/A'
+      ]);
+      
+      const csvContent = [
+        ...csvComments,
+        headers.join(','),
+        ...rows.map(row => row.join(','))
+      ].join('\n');
+      
+      return csvContent;
+    },
+
+    getFilterDescription() {
+      if (this.categoryFilter === 'all') {
+        return 'All products';
+      } else {
+        return `Products in "${this.categoryFilter}" subcategory`;
+      }
+    },
+
     // UTILITY METHODS
-    // ==========================================
-    
-    // Format price for display
     formatPrice(price) {
       return parseFloat(price || 0).toFixed(2)
     },
 
-    // Format date for display
     formatDate(dateString) {
       if (!dateString) return 'N/A'
       const date = new Date(dateString)
@@ -608,7 +725,6 @@ export default {
       })
     },
 
-    // Get status class for badge styling
     getStatusClass(status) {
       if (status === 'active') {
         return 'badge bg-success text-white'
@@ -618,20 +734,47 @@ export default {
       return 'badge bg-secondary text-white'
     },
     
-    // Get stock class for color coding
     getStockClass(stock) {
       if (stock === 0) return 'text-danger fw-bold'
       if (stock <= 15) return 'text-warning fw-semibold'
       return 'text-success fw-medium'
+    },
+
+    getSubcategoryProductCount(subcategoryName) {
+      return this.products.filter(product => {
+        const productSubcategory = product.subcategory || product.subcategory_id || product.subcategory_name
+        return productSubcategory === subcategoryName
+      }).length
+    },
+
+    showSuccessMessage(message) {
+      console.log('✅ Success:', message);
+    },
+
+    showErrorMessage(message) {
+      alert(message);
+      console.error('❌ Error:', message);
+    },
+
+    getExportButtonText() {
+      const count = this.filteredProducts.length;
+      if (this.categoryFilter === 'all') {
+        return `Export All (${count})`;
+      } else {
+        return `Export ${this.categoryFilter} (${count})`;
+      }
+    },
+
+    getExportTooltip() {
+      const filterText = this.getFilterDescription();
+      return `Export ${filterText} as CSV file`;
     }
   },
   
   async mounted() {
-    // Debug: Check what we have in the route
     console.log('Route params:', this.$route.params)
     console.log('Route query:', this.$route.query)
     
-    // Get category ID from query or params
     const categoryId = this.$route.query.id || this.$route.params.id
     
     console.log('Category ID:', categoryId)
@@ -665,25 +808,15 @@ export default {
   color: var(--tertiary-medium) !important;
 }
 
-.text-primary-dark {
-  color: var(--primary-dark) !important;
-}
-
-.bg-primary-light {
-  background-color: var(--primary-light) !important;
-}
-
 .bg-neutral-light {
   background-color: var(--neutral-light) !important;
 }
 
-/* Loading and empty states */
 .spinner-border {
   width: 2rem;
   height: 2rem;
 }
 
-/* Breadcrumb Styling */
 .breadcrumb {
   background: none;
   padding: 0;
@@ -703,7 +836,6 @@ export default {
   text-decoration: underline;
 }
 
-/* Action Bar Controls */
 .action-bar-controls {
   border-bottom: 1px solid var(--neutral);
   background-color: white;
@@ -728,7 +860,6 @@ export default {
   height: auto;
 }
 
-/* Filter Dropdown */
 .filter-dropdown {
   min-width: 120px;
 }
@@ -741,7 +872,6 @@ export default {
   display: block;
 }
 
-/* Category Image Placeholder */
 .category-image-placeholder {
   width: 100%;
   min-height: 120px;
@@ -751,7 +881,6 @@ export default {
   border: 2px dashed var(--neutral);
 }
 
-/* Card styling */
 .card {
   border: 1px solid var(--neutral);
   border-radius: 0.75rem;
@@ -761,25 +890,21 @@ export default {
   padding: 1.5rem;
 }
 
-.card-header {
-  border-bottom: 1px solid var(--neutral);
-  border-top-left-radius: 0.75rem;
-  border-top-right-radius: 0.75rem;
-}
-
-/* Badge styling for sub-categories */
 .badge {
   font-size: 0.875rem;
   font-weight: 500;
 }
 
-/* Form controls focus states */
 .form-select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
 }
 
-/* Responsive adjustments */
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   .action-row {
     flex-direction: column;
@@ -794,10 +919,5 @@ export default {
   .filter-dropdown {
     min-width: 100%;
   }
-}
-/* Loading and empty states */
-.spinner-border {
-  width: 2rem;
-  height: 2rem;
 }
 </style>

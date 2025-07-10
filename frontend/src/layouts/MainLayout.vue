@@ -73,8 +73,10 @@ export default {
         '/logs': 'System Logs',
         '/suppliers': 'Suppliers',
         '/promotions': 'Promotions',
-        '/salesbyitem': 'SalesByItem',
-        '/salesbycategory': 'SalesByCategory'
+        '/salesbyitem': 'Sales By Item',
+        '/salesbycategory': 'Sales By Category',
+        '/uncategorized': 'Uncategorized Products',
+        '/allNotifications': 'All Notifications'
       }
       
       // Handle dynamic product detail routes

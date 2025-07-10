@@ -16,7 +16,9 @@ import Categories from '@/pages/inventory/Categories.vue'
 import CategoryDetails from '@/pages/inventory/CategoryDetails.vue'
 import SalesByItem from '@/pages/reports/SalesByItem.vue'
 import SalesByCategory from '@/pages/reports/SalesByCategory.vue'
+import UncategorizedProducts from '@/components/categories/UncategorizedProducts.vue'
 import Logs from '@/pages/Logs.vue'
+import AllNotifications from '@/pages/notifications/AllNotifications.vue'
 
 // Auth guard function
 function requireAuth(to, from, next) {
@@ -125,6 +127,16 @@ const router = createRouter({
           path: 'logs',
           name: 'Logs',
           component: Logs
+        },
+        {
+          path: 'uncategorized',
+          name: 'UncategorizedProducts',
+          component: UncategorizedProducts
+        },
+        {
+          path: 'allNotifications',
+          name: 'AllNotifications',
+          component: AllNotifications
         },
       ]
     },
