@@ -224,7 +224,7 @@
       </div>
     </div>
 
-    <!-- User Modal (Add/Edit) -->
+    <!-- User Modal (Add/Edit) with Validation -->
     <div v-if="showModal" class="modal-overlay" @click="closeModal">
       <div class="modal-content" @click.stop>
         <h2>{{ isEditMode ? 'Edit User Account' : 'Add New User Account' }}</h2>
@@ -240,7 +240,13 @@
                 required 
                 :disabled="formLoading || isEditMode"
                 placeholder="Enter username"
+                :class="{ 'error': validationErrors.username }"
+                @input="validateField('username', $event.target.value)"
+                @blur="validateField('username', $event.target.value)"
               />
+              <div v-if="validationErrors.username" class="field-error">
+                {{ validationErrors.username }}
+              </div>
             </div>
 
             <div class="form-group">
@@ -252,7 +258,13 @@
                 required 
                 :disabled="formLoading"
                 placeholder="Enter email address"
+                :class="{ 'error': validationErrors.email }"
+                @input="validateField('email', $event.target.value)"
+                @blur="validateField('email', $event.target.value)"
               />
+              <div v-if="validationErrors.email" class="field-error">
+                {{ validationErrors.email }}
+              </div>
             </div>
           </div>
 
@@ -265,7 +277,13 @@
               required 
               :disabled="formLoading"
               placeholder="Enter full name"
+              :class="{ 'error': validationErrors.full_name }"
+              @input="validateField('full_name', $event.target.value)"
+              @blur="validateField('full_name', $event.target.value)"
             />
+            <div v-if="validationErrors.full_name" class="field-error">
+              {{ validationErrors.full_name }}
+            </div>
           </div>
 
           <div v-if="!isEditMode" class="form-group">
@@ -278,7 +296,13 @@
               :disabled="formLoading"
               placeholder="Enter password"
               minlength="6"
+              :class="{ 'error': validationErrors.password }"
+              @input="validateField('password', $event.target.value)"
+              @blur="validateField('password', $event.target.value)"
             />
+            <div v-if="validationErrors.password" class="field-error">
+              {{ validationErrors.password }}
+            </div>
           </div>
 
           <div class="form-row">
@@ -289,11 +313,16 @@
                 v-model="userForm.role" 
                 required 
                 :disabled="formLoading"
+                :class="{ 'error': validationErrors.role }"
+                @change="validateField('role', $event.target.value)"
               >
                 <option value="">Select Role</option>
                 <option value="admin">Admin</option>
                 <option value="employee">Employee</option>
               </select>
+              <div v-if="validationErrors.role" class="field-error">
+                {{ validationErrors.role }}
+              </div>
             </div>
 
             <div class="form-group">
@@ -310,15 +339,25 @@
             </div>
           </div>
 
+          <!-- Overall form error -->
           <div v-if="formError" class="form-error">
             {{ formError }}
+          </div>
+
+          <!-- Validation loading indicator -->
+          <div v-if="isValidating" class="validation-loading">
+            <span>Validating...</span>
           </div>
 
           <div class="form-actions">
             <button type="button" @click="closeModal" :disabled="formLoading">
               Cancel
             </button>
-            <button type="submit" :disabled="formLoading" class="btn-primary">
+            <button 
+              type="submit" 
+              :disabled="formLoading || hasValidationErrors || isValidating" 
+              class="btn-primary"
+            >
               {{ formLoading ? 'Saving...' : (isEditMode ? 'Update User' : 'Create User') }}
             </button>
           </div>
@@ -420,6 +459,10 @@ export default {
       formError: null,
       selectedUser: null,
       
+      // Validation states
+      validationErrors: {},
+      isValidating: false,
+      
       // User form data
       userForm: {
         username: '',
@@ -437,9 +480,122 @@ export default {
     },
     someSelected() {
       return this.selectedUsers.length > 0 && this.selectedUsers.length < this.filteredUsers.length
+    },
+    hasValidationErrors() {
+      return Object.keys(this.validationErrors).length > 0
     }
   },
   methods: {
+    // ============ VALIDATION METHODS ============
+    checkEmailDuplicate(email, excludeId = null) {
+      if (!email) return false
+      
+      return this.users.some(user => {
+        const userId = user._id
+        const isDifferentUser = excludeId ? userId !== excludeId : true
+        return user.email && 
+               user.email.toLowerCase() === email.toLowerCase() && 
+               isDifferentUser
+      })
+    },
+
+    checkUsernameDuplicate(username, excludeId = null) {
+      if (!username) return false
+      
+      return this.users.some(user => {
+        const userId = user._id
+        const isDifferentUser = excludeId ? userId !== excludeId : true
+        return user.username && 
+               user.username.toLowerCase() === username.toLowerCase() && 
+               isDifferentUser
+      })
+    },
+
+    validateField(fieldName, value) {
+      const errors = { ...this.validationErrors }
+      const excludeId = this.isEditMode ? this.selectedUser._id : null
+
+      switch (fieldName) {
+        case 'email':
+          if (!value) {
+            errors.email = 'Email is required'
+          } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+            errors.email = 'Please enter a valid email address'
+          } else if (this.checkEmailDuplicate(value, excludeId)) {
+            errors.email = 'This email is already registered'
+          } else {
+            delete errors.email
+          }
+          break
+
+        case 'username':
+          if (!value) {
+            errors.username = 'Username is required'
+          } else if (value.length < 3) {
+            errors.username = 'Username must be at least 3 characters long'
+          } else if (!/^[a-zA-Z0-9_]+$/.test(value)) {
+            errors.username = 'Username can only contain letters, numbers, and underscores'
+          } else if (this.checkUsernameDuplicate(value, excludeId)) {
+            errors.username = 'This username is already taken'
+          } else {
+            delete errors.username
+          }
+          break
+
+        case 'full_name':
+          if (!value) {
+            errors.full_name = 'Full name is required'
+          } else if (value.length < 2) {
+            errors.full_name = 'Full name must be at least 2 characters long'
+          } else {
+            delete errors.full_name
+          }
+          break
+
+        case 'password':
+          if (!this.isEditMode) { // Only validate password for new users
+            if (!value) {
+              errors.password = 'Password is required'
+            } else if (value.length < 6) {
+              errors.password = 'Password must be at least 6 characters long'
+            } else {
+              delete errors.password
+            }
+          }
+          break
+
+        case 'role':
+          if (!value) {
+            errors.role = 'Role is required'
+          } else {
+            delete errors.role
+          }
+          break
+      }
+
+      this.validationErrors = errors
+      return !errors[fieldName]
+    },
+
+    validateForm() {
+      this.validationErrors = {}
+      
+      const fieldsToValidate = ['email', 'username', 'full_name', 'role']
+      if (!this.isEditMode) {
+        fieldsToValidate.push('password')
+      }
+      
+      for (const field of fieldsToValidate) {
+        this.validateField(field, this.userForm[field])
+      }
+
+      return Object.keys(this.validationErrors).length === 0
+    },
+
+    clearValidation() {
+      this.validationErrors = {}
+    },
+
     // ================================================================
     // DATA FETCHING
     // ================================================================
@@ -731,6 +887,7 @@ export default {
         status: 'active'
       }
       this.formError = null
+      this.clearValidation()
       this.showModal = true
     },
 
@@ -746,6 +903,7 @@ export default {
         status: user.status || 'active'
       }
       this.formError = null
+      this.clearValidation()
       this.showViewModal = false
       this.showModal = true
     },
@@ -760,6 +918,7 @@ export default {
       this.isEditMode = false
       this.selectedUser = null
       this.formError = null
+      this.clearValidation()
     },
 
     closeViewModal() {
@@ -772,6 +931,16 @@ export default {
       this.formError = null
 
       try {
+        // Validate form before saving
+        const isValid = this.validateForm()
+        
+        if (!isValid) {
+          const errorMessages = Object.values(this.validationErrors)
+          this.formError = errorMessages.join(', ')
+          this.formLoading = false
+          return
+        }
+
         if (this.isEditMode) {
           // Update existing user (exclude password and username from updates)
           const updateData = {
@@ -893,7 +1062,6 @@ export default {
   color: #64748b;
 }
 
-
 /* Enhanced button styles */
 .btn {
   padding: 0.5rem 1.25rem;
@@ -1009,6 +1177,7 @@ export default {
   border: 1px solid #d1d5db;
   border-radius: 0.375rem;
   font-size: 0.875rem;
+  transition: all 0.2s ease;
 }
 
 .filter-group select:focus,
@@ -1281,6 +1450,7 @@ export default {
   border: 1px solid #d1d5db;
   border-radius: 0.375rem;
   font-size: 0.875rem;
+  transition: all 0.2s ease;
 }
 
 .form-group input:focus,
@@ -1296,6 +1466,53 @@ export default {
   cursor: not-allowed;
 }
 
+/* Validation Styles */
+.form-group input.error,
+.form-group select.error {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.form-group input.error:focus,
+.form-group select.error:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+.field-error {
+  color: #ef4444;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.field-error::before {
+  content: "⚠";
+  font-size: 0.875rem;
+}
+
+.validation-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin: 0.5rem 0;
+}
+
+.validation-loading::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e5e7eb;
+  border-top: 2px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
 .form-error {
   background-color: #fef2f2;
   border: 1px solid #fecaca;
@@ -1303,6 +1520,15 @@ export default {
   padding: 0.75rem;
   border-radius: 0.375rem;
   font-size: 0.875rem;
+  margin: 0.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.form-error::before {
+  content: "❌";
+  font-size: 1rem;
 }
 
 .form-actions {
@@ -1321,10 +1547,23 @@ export default {
   transition: all 0.2s ease;
 }
 
+.form-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: #e5e7eb;
+  color: #9ca3af;
+}
+
 .form-actions button.btn-primary {
   background-color: #3b82f6;
   color: white;
   border-color: #3b82f6;
+}
+
+.form-actions button.btn-primary:disabled {
+  background-color: #e5e7eb;
+  color: #9ca3af;
+  border-color: #e5e7eb;
 }
 
 .form-actions button:hover:not(:disabled) {
@@ -1403,6 +1642,19 @@ input[type="checkbox"] {
 
   .filters-section {
     padding: 1rem;
+  }
+
+  .field-error {
+    font-size: 0.7rem;
+  }
+  
+  .validation-loading {
+    font-size: 0.8125rem;
+  }
+  
+  .form-error {
+    font-size: 0.8125rem;
+    padding: 0.5rem;
   }
 }
 

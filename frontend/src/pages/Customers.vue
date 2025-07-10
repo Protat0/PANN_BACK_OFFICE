@@ -208,7 +208,7 @@
       </button>
     </div>
 
-    <!-- Customer Modal (Add/Edit) -->
+    <!-- Customer Modal (Add/Edit) with Validation -->
     <div v-if="showModal" class="modal-overlay" @click="closeModal">
       <div class="modal-content" @click.stop>
         <h2>{{ isEditMode ? 'Edit Customer' : 'Add New Customer' }}</h2>
@@ -222,7 +222,13 @@
               type="text" 
               required 
               :disabled="formLoading"
+              :class="{ 'error': validationErrors.username }"
+              @input="validateField('username', $event.target.value)"
+              @blur="validateField('username', $event.target.value)"
             />
+            <div v-if="validationErrors.username" class="field-error">
+              {{ validationErrors.username }}
+            </div>
           </div>
           
           <div class="form-group">
@@ -233,7 +239,13 @@
               type="text" 
               required 
               :disabled="formLoading"
+              :class="{ 'error': validationErrors.full_name }"
+              @input="validateField('full_name', $event.target.value)"
+              @blur="validateField('full_name', $event.target.value)"
             />
+            <div v-if="validationErrors.full_name" class="field-error">
+              {{ validationErrors.full_name }}
+            </div>
           </div>
 
           <div class="form-group">
@@ -244,7 +256,13 @@
               type="email" 
               required 
               :disabled="formLoading"
+              :class="{ 'error': validationErrors.email }"
+              @input="validateField('email', $event.target.value)"
+              @blur="validateField('email', $event.target.value)"
             />
+            <div v-if="validationErrors.email" class="field-error">
+              {{ validationErrors.email }}
+            </div>
           </div>
 
           <div class="form-group">
@@ -254,7 +272,13 @@
               v-model="customerForm.phone" 
               type="tel" 
               :disabled="formLoading"
+              :class="{ 'error': validationErrors.phone }"
+              @input="validateField('phone', $event.target.value)"
+              @blur="validateField('phone', $event.target.value)"
             />
+            <div v-if="validationErrors.phone" class="field-error">
+              {{ validationErrors.phone }}
+            </div>
           </div>
 
           <div class="form-group">
@@ -297,18 +321,34 @@
               type="number" 
               min="0"
               :disabled="formLoading"
+              :class="{ 'error': validationErrors.loyalty_points }"
+              @input="validateField('loyalty_points', $event.target.value)"
+              @blur="validateField('loyalty_points', $event.target.value)"
             />
+            <div v-if="validationErrors.loyalty_points" class="field-error">
+              {{ validationErrors.loyalty_points }}
+            </div>
           </div>
 
+          <!-- Overall form error -->
           <div v-if="formError" class="form-error">
             {{ formError }}
+          </div>
+
+          <!-- Validation loading indicator -->
+          <div v-if="isValidating" class="validation-loading">
+            <span>Validating...</span>
           </div>
 
           <div class="form-actions">
             <button type="button" @click="closeModal" :disabled="formLoading">
               Cancel
             </button>
-            <button type="submit" :disabled="formLoading" class="btn-primary">
+            <button 
+              type="submit" 
+              :disabled="formLoading || hasValidationErrors || isValidating" 
+              class="btn-primary"
+            >
               {{ formLoading ? 'Saving...' : (isEditMode ? 'Update' : 'Create') }}
             </button>
           </div>
@@ -398,6 +438,10 @@ export default {
       monthlyUsersCount: 'Loading...',
       dailyUsersCount: 'Loading...',
 
+      // Validation states
+      validationErrors: {},
+      isValidating: false,
+
       // Customer form data
       customerForm: {
         username: '',
@@ -419,9 +463,117 @@ export default {
     },
     someSelected() {
       return this.selectedCustomers.length > 0 && this.selectedCustomers.length < this.filteredCustomers.length
+    },
+    hasValidationErrors() {
+      return Object.keys(this.validationErrors).length > 0
     }
   },
   methods: {
+    // ============ VALIDATION METHODS ============
+    checkEmailDuplicate(email, excludeId = null) {
+      if (!email) return false
+      
+      return this.customers.some(customer => {
+        const customerId = customer._id || customer.customer_id
+        const isDifferentCustomer = excludeId ? customerId !== excludeId : true
+        return customer.email && 
+               customer.email.toLowerCase() === email.toLowerCase() && 
+               isDifferentCustomer
+      })
+    },
+
+    checkUsernameDuplicate(username, excludeId = null) {
+      if (!username) return false
+      
+      return this.customers.some(customer => {
+        const customerId = customer._id || customer.customer_id
+        const isDifferentCustomer = excludeId ? customerId !== excludeId : true
+        return customer.username && 
+               customer.username.toLowerCase() === username.toLowerCase() && 
+               isDifferentCustomer
+      })
+    },
+
+    validateField(fieldName, value) {
+      const errors = { ...this.validationErrors }
+      const excludeId = this.isEditMode ? 
+        (this.selectedCustomer._id || this.selectedCustomer.customer_id) : null
+
+      switch (fieldName) {
+        case 'email':
+          if (!value) {
+            errors.email = 'Email is required'
+          } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+            errors.email = 'Please enter a valid email address'
+          } else if (this.checkEmailDuplicate(value, excludeId)) {
+            errors.email = 'This email is already registered'
+          } else {
+            delete errors.email
+          }
+          break
+
+        case 'username':
+          if (!value) {
+            errors.username = 'Username is required'
+          } else if (value.length < 3) {
+            errors.username = 'Username must be at least 3 characters long'
+          } else if (!/^[a-zA-Z0-9_]+$/.test(value)) {
+            errors.username = 'Username can only contain letters, numbers, and underscores'
+          } else if (this.checkUsernameDuplicate(value, excludeId)) {
+            errors.username = 'This username is already taken'
+          } else {
+            delete errors.username
+          }
+          break
+
+        case 'full_name':
+          if (!value) {
+            errors.full_name = 'Full name is required'
+          } else if (value.length < 2) {
+            errors.full_name = 'Full name must be at least 2 characters long'
+          } else {
+            delete errors.full_name
+          }
+          break
+
+        case 'phone':
+          if (value && !/^[\+]?[\d\s\-\(\)]+$/.test(value)) {
+            errors.phone = 'Please enter a valid phone number'
+          } else {
+            delete errors.phone
+          }
+          break
+
+        case 'loyalty_points':
+          if (value !== undefined && value !== null && value < 0) {
+            errors.loyalty_points = 'Loyalty points cannot be negative'
+          } else {
+            delete errors.loyalty_points
+          }
+          break
+      }
+
+      this.validationErrors = errors
+      return !errors[fieldName]
+    },
+
+    validateForm() {
+      this.validationErrors = {}
+      
+      const fieldsToValidate = ['email', 'username', 'full_name', 'phone', 'loyalty_points']
+      
+      for (const field of fieldsToValidate) {
+        this.validateField(field, this.customerForm[field])
+      }
+
+      return Object.keys(this.validationErrors).length === 0
+    },
+
+    clearValidation() {
+      this.validationErrors = {}
+    },
+
+    // ============ EXISTING METHODS ============
     async fetchCustomers() {
       this.loading = true
       this.error = null
@@ -539,7 +691,15 @@ export default {
         
         // Handle Active Users
         if (activeResult.status === 'fulfilled') {
-          this.activeUsersCount = activeResult.value.active_customers?.toString() || '0'
+          const activeCustomers = activeResult.value.active_customers || []
+          if (Array.isArray(activeCustomers)) {
+            // Filter for customers only
+            const customerUsers = activeCustomers.filter(user => user.role === 'customer')
+            this.activeUsersCount = customerUsers.length.toString()
+          } else {
+            // If it's already a count, use it directly
+            this.activeUsersCount = activeCustomers.toString() || '0'
+          }
         } else {
           console.error('Failed to load active users:', activeResult.reason)
           this.activeUsersCount = 'Error'
@@ -547,7 +707,15 @@ export default {
         
         // Handle Monthly Users
         if (monthlyResult.status === 'fulfilled') {
-          this.monthlyUsersCount = monthlyResult.value.monthly_customers?.toString() || '0'
+          const monthlyCustomers = monthlyResult.value.monthly_customers || []
+          if (Array.isArray(monthlyCustomers)) {
+            // Filter for customers only
+            const customerUsers = monthlyCustomers.filter(user => user.role === 'customer')
+            this.monthlyUsersCount = customerUsers.length.toString()
+          } else {
+            // If it's already a count, use it directly
+            this.monthlyUsersCount = monthlyCustomers.toString() || '0'
+          }
         } else {
           console.error('Failed to load monthly users:', monthlyResult.reason)
           this.monthlyUsersCount = 'Error'
@@ -555,7 +723,15 @@ export default {
         
         // Handle Daily Users
         if (dailyResult.status === 'fulfilled') {
-          this.dailyUsersCount = dailyResult.value.daily_customers?.toString() || '0'
+          const dailyCustomers = dailyResult.value.daily_customers || []
+          if (Array.isArray(dailyCustomers)) {
+            // Filter for customers only
+            const customerUsers = dailyCustomers.filter(user => user.role === 'customer')
+            this.dailyUsersCount = customerUsers.length.toString()
+          } else {
+            // If it's already a count, use it directly
+            this.dailyUsersCount = dailyCustomers.toString() || '0'
+          }
         } else {
           console.error('Failed to load daily users:', dailyResult.reason)
           this.dailyUsersCount = 'Error'
@@ -648,6 +824,7 @@ export default {
         loyalty_points: 0
       }
       this.formError = null
+      this.clearValidation()
       this.showModal = true
     },
 
@@ -667,6 +844,7 @@ export default {
         loyalty_points: customer.loyalty_points || 0
       }
       this.formError = null
+      this.clearValidation()
       this.showViewModal = false
       this.showModal = true
     },
@@ -681,6 +859,7 @@ export default {
       this.isEditMode = false
       this.selectedCustomer = null
       this.formError = null
+      this.clearValidation()
     },
 
     closeViewModal() {
@@ -693,6 +872,17 @@ export default {
       this.formError = null
 
       try {
+        // Validate form before saving
+        const isValid = this.validateForm()
+        
+        if (!isValid) {
+          const errorMessages = Object.values(this.validationErrors)
+          this.formError = errorMessages.join(', ')
+          this.formLoading = false
+          return
+        }
+
+        // Proceed with saving if validation passes
         if (this.isEditMode) {
           const customerId = this.selectedCustomer._id || this.selectedCustomer.customer_id
           await apiService.updateCustomer(customerId, this.customerForm)
@@ -1246,6 +1436,7 @@ export default {
   border: 1px solid #d1d5db;
   border-radius: 0.375rem;
   font-size: 0.875rem;
+  transition: all 0.2s ease;
 }
 
 .form-group input:focus {
@@ -1259,6 +1450,51 @@ export default {
   cursor: not-allowed;
 }
 
+/* Validation Styles */
+.form-group input.error {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.form-group input.error:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+.field-error {
+  color: #ef4444;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.field-error::before {
+  content: "⚠";
+  font-size: 0.875rem;
+}
+
+.validation-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin: 0.5rem 0;
+}
+
+.validation-loading::before {
+  content: "";
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e5e7eb;
+  border-top: 2px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
 .form-error {
   background-color: #fef2f2;
   border: 1px solid #fecaca;
@@ -1266,6 +1502,15 @@ export default {
   padding: 0.75rem;
   border-radius: 0.375rem;
   font-size: 0.875rem;
+  margin: 0.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.form-error::before {
+  content: "❌";
+  font-size: 1rem;
 }
 
 .form-actions {
@@ -1284,10 +1529,23 @@ export default {
   transition: all 0.2s ease;
 }
 
+.form-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: #e5e7eb;
+  color: #9ca3af;
+}
+
 .form-actions button.btn-primary {
   background-color: #3b82f6;
   color: white;
   border-color: #3b82f6;
+}
+
+.form-actions button.btn-primary:disabled {
+  background-color: #e5e7eb;
+  color: #9ca3af;
+  border-color: #e5e7eb;
 }
 
 .form-actions button:hover:not(:disabled) {
@@ -1401,6 +1659,19 @@ input[type="checkbox"] {
   .search-results-info {
     text-align: center;
     padding-left: 0;
+  }
+
+  .field-error {
+    font-size: 0.7rem;
+  }
+  
+  .validation-loading {
+    font-size: 0.8125rem;
+  }
+  
+  .form-error {
+    font-size: 0.8125rem;
+    padding: 0.5rem;
   }
 }
 

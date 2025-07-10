@@ -1100,6 +1100,52 @@ export default {
   cursor: not-allowed;
 }
 
+.notification-item.archived {
+  opacity: 0.8;
+  background-color: #fafafa;
+  border-left: 3px solid #f59e0b;
+}
+
+.notification-item.archived:hover {
+  background-color: #f3f4f6;
+}
+
+.notification-item.archived.unread {
+  background-color: #f0f9ff;
+}
+
+.notification-item.archived.unread:hover {
+  background-color: #e0f2fe;
+}
+
+.archived-badge {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  color: #f59e0b;
+}
+
+.unarchive-btn {
+  color: #f59e0b;
+  border-color: #f59e0b;
+}
+
+.unarchive-btn:hover:not(:disabled) {
+  color: white;
+  background: #f59e0b;
+  transform: scale(1.05);
+}
+
+.delete-btn {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+.delete-btn:hover:not(:disabled) {
+  color: white;
+  background: #dc2626;
+  transform: scale(1.05);
+}
+
 @media (max-width: 768px) {
   .allNotifications-page {
     padding: 1rem;
