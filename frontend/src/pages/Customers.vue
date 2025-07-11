@@ -1,8 +1,7 @@
 <template>
   <div class="customers-page">
-    <!-- Page Title -->
-    <div class="mb-3">
-      <h1 class="h3 fw-semibold text-primary-dark mb-0">Customer Management</h1>
+    <div class="page-header">
+      <h1 class="page-title">Customer Management</h1>
     </div>
 
     <!-- KPI Cards Row -->
@@ -40,71 +39,107 @@
     </div>
 
     <!-- Header Section -->
-    <div class="page-header">
-      <!-- Search Bar -->
-      <div class="search-section">
-        <div class="search-container">
-          <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
-            <path d="21 21l-4.35-4.35" stroke="currentColor" stroke-width="2"/>
-          </svg>
-          <input 
-            v-model="searchQuery"
-            @input="handleSearch"
-            type="text" 
-            class="search-input"
-            placeholder="Search customers by name, email, phone, or address..."
-          />
+    <div class="search-section-wrapper">
+      <!-- Search Bar and Action Buttons in same row -->
+      <div class="search-and-actions-row">
+        <!-- Search Bar -->
+        <div class="search-section">
+          <div class="search-container">
+            <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
+              <path d="21 21l-4.35-4.35" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            <input 
+              v-model="searchQuery"
+              @input="handleSearch"
+              type="text" 
+              class="search-input"
+              placeholder="Search customers by name, email, phone, or address..."
+            />
+            <button 
+              v-if="searchQuery" 
+              @click="clearSearch" 
+              class="clear-search-btn"
+              title="Clear search"
+            >
+              ✕
+            </button>
+          </div>
+          <div v-if="searchQuery" class="search-results-info">
+            Showing {{ filteredCustomers.length }} of {{ customers.length }} customers
+          </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="action-buttons-group">
+          <div class="auto-refresh-status">
+          <i class="bi bi-arrow-repeat text-success" :class="{ 'spinning': loading }"></i>
+          <span class="status-text">
+            <span v-if="autoRefreshEnabled">Updates in {{ countdown }}s</span>
+            <span v-else>Auto-refresh disabled</span>
+          </span>
+          
+          <!-- Toggle button -->
           <button 
-            v-if="searchQuery" 
-            @click="clearSearch" 
-            class="clear-search-btn"
-            title="Clear search"
+            class="btn btn-sm"
+            :class="autoRefreshEnabled ? 'btn-outline-secondary' : 'btn-outline-success'"
+            @click="toggleAutoRefresh"
           >
-            ✕
+            {{ autoRefreshEnabled ? 'Disable' : 'Enable' }}
           </button>
         </div>
-        <div v-if="searchQuery" class="search-results-info">
-          Showing {{ filteredCustomers.length }} of {{ customers.length }} customers
+
+          <button 
+            class="btn btn-danger" 
+            @click="deleteSelected" 
+            :disabled="selectedCustomers.length === 0 || loading"
+          >
+            Delete Selected ({{ selectedCustomers.length }})
+          </button>
+          <button class="btn btn-success" @click="showAddCustomerModal">
+            Add Customer
+          </button>
+          <button class="btn btn-primary" @click="exportData" :disabled="loading || exporting">
+              <i class="bi bi-download"></i> {{ exporting ? 'Exporting...' : 'Export' }}
+          </button>
         </div>
       </div>
-      
-      <!-- Action Buttons -->
-      <div class="header-actions">
-        <button 
-          class="btn btn-danger" 
-          @click="deleteSelected" 
-          :disabled="selectedCustomers.length === 0 || loading"
-        >
-          Delete Selected ({{ selectedCustomers.length }})
-        </button>
-        <button class="btn btn-success" @click="showAddCustomerModal">
-          Add Customer
-        </button>
-        <button class="btn btn-primary" @click="exportData" :disabled="loading || exporting">
-            <i class="bi bi-download"></i> {{ exporting ? 'Exporting...' : 'Export' }}
-        </button>
-        <button class="btn btn-warning" @click="refreshData" :disabled="loading">
-          <i class="bi bi-arrow-clockwise" :class="{ 'spinning': loading }"></i>
-          {{ loading ? 'Refreshing...' : 'Refresh' }}
-        </button>
+    </div>
+
+    <!-- Refresh Progress Indicator -->
+    <div v-if="loading && customers.length > 0" class="refresh-indicator">
+      <div class="alert alert-info d-flex align-items-center" role="alert">
+        <div class="spinner-border spinner-border-sm me-2" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        Refreshing customer data... {{ refreshProgress }}
       </div>
     </div>
 
     <!-- Loading State -->
     <div v-if="loading && customers.length === 0" class="loading-state">
+      <div class="spinner-border text-primary"></div>
       <p>Loading customers...</p>
     </div>
 
     <!-- Error State -->
     <div v-if="error" class="error-state">
-      <p>{{ error }}</p>
-      <button class="btn btn-primary" @click="refreshData">Try Again</button>
+      <div class="alert alert-danger text-center" role="alert">
+        <i class="bi bi-exclamation-triangle"></i>
+        <p class="mb-3">{{ error }}</p>
+        <button class="btn btn-primary" @click="refreshData" :disabled="loading">
+          <i class="bi bi-arrow-clockwise"></i>
+          {{ loading ? 'Retrying...' : 'Try Again' }}
+        </button>
+      </div>
     </div>
 
     <!-- Success Message -->
     <div v-if="successMessage" class="success-message">
-      {{ successMessage }}
+      <div class="alert alert-success text-center" role="alert">
+        <i class="bi bi-check-circle"></i>
+        {{ successMessage }}
+      </div>
     </div>
 
     <!-- Table Container -->
@@ -134,7 +169,10 @@
           <tr 
             v-for="customer in filteredCustomers" 
             :key="customer._id || customer.customer_id"
-            :class="{ 'selected': selectedCustomers.includes(customer._id || customer.customer_id) }"
+            :class="{ 
+              'selected': selectedCustomers.includes(customer._id || customer.customer_id),
+              'refreshing': loading 
+            }"
           >
             <td class="checkbox-column">
               <input 
@@ -198,14 +236,30 @@
 
     <!-- Empty State -->
     <div v-if="!loading && filteredCustomers.length === 0 && !error" class="empty-state">
-      <p v-if="searchQuery">No customers found matching "{{ searchQuery }}"</p>
-      <p v-else>No customers found</p>
-      <button v-if="!searchQuery" class="btn btn-primary" @click="showAddCustomerModal">
-        Add First Customer
-      </button>
-      <button v-else class="btn btn-secondary" @click="clearSearch">
-        Clear Search
-      </button>
+      <div class="card">
+        <div class="card-body text-center py-5">
+          <i class="bi bi-people" style="font-size: 3rem; color: #6b7280;"></i>
+          <p class="mt-3 mb-3">
+            <span v-if="searchQuery">No customers found matching "{{ searchQuery }}"</span>
+            <span v-else-if="customers.length === 0">No customers found</span>
+            <span v-else>All customers are currently hidden by filters</span>
+          </p>
+          <div class="d-flex gap-2 justify-content-center">
+            <button v-if="!searchQuery && customers.length === 0" class="btn btn-primary" @click="showAddCustomerModal">
+              <i class="bi bi-person-plus"></i>
+              Add First Customer
+            </button>
+            <button v-if="searchQuery" class="btn btn-secondary" @click="clearSearch">
+              <i class="bi bi-funnel"></i>
+              Clear Search
+            </button>
+            <button class="btn btn-info" @click="refreshData">
+              <i class="bi bi-arrow-clockwise"></i>
+              Refresh Data
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Customer Modal (Add/Edit) with Validation -->
@@ -404,6 +458,107 @@ import CustomerApiService from '../services/apiCustomers.js'
 import CardTemplate from '@/components/common/CardTemplate.vue'
 import { Edit, Eye, Trash2, Lock, Unlock } from 'lucide-vue-next'
 
+// ============ ADVANCED CACHING SYSTEM ============
+class CustomerCache {
+  constructor() {
+    this.customers = new Map()
+    this.kpiData = new Map()
+    this.metadata = {
+      lastUpdate: null,
+      hitCount: 0,
+      missCount: 0,
+      enabled: true
+    }
+    this.ttl = 5 * 60 * 1000 // 5 minutes cache TTL
+  }
+
+  // Check if cache entry is still valid
+  isValid(timestamp) {
+    return timestamp && (Date.now() - timestamp < this.ttl)
+  }
+
+  // Get customers from cache
+  getCustomers() {
+    const cached = this.customers.get('all')
+    if (cached && this.isValid(cached.timestamp)) {
+      this.metadata.hitCount++
+      console.log('🎯 Cache HIT: Customers loaded from cache')
+      return cached.data
+    }
+    this.metadata.missCount++
+    console.log('❌ Cache MISS: Customers not in cache or expired')
+    return null
+  }
+
+  // Store customers in cache
+  setCustomers(data) {
+    this.customers.set('all', {
+      data: data,
+      timestamp: Date.now()
+    })
+    this.metadata.lastUpdate = Date.now()
+    console.log('💾 Cache SET: Customers cached successfully')
+  }
+
+  // Get KPI data from cache
+  getKPI(type) {
+    const cached = this.kpiData.get(type)
+    if (cached && this.isValid(cached.timestamp)) {
+      this.metadata.hitCount++
+      console.log(`🎯 Cache HIT: ${type} KPI loaded from cache`)
+      return cached.data
+    }
+    this.metadata.missCount++
+    console.log(`❌ Cache MISS: ${type} KPI not in cache or expired`)
+    return null
+  }
+
+  // Store KPI data in cache
+  setKPI(type, data) {
+    this.kpiData.set(type, {
+      data: data,
+      timestamp: Date.now()
+    })
+    console.log(`💾 Cache SET: ${type} KPI cached successfully`)
+  }
+
+  // Get cache statistics
+  getStats() {
+    const total = this.metadata.hitCount + this.metadata.missCount
+    const hitRate = total > 0 ? Math.round((this.metadata.hitCount / total) * 100) : 0
+    
+    return {
+      enabled: this.metadata.enabled,
+      hitRate: hitRate,
+      lastUpdate: this.metadata.lastUpdate,
+      size: this.customers.size + this.kpiData.size,
+      hitCount: this.metadata.hitCount,
+      missCount: this.metadata.missCount
+    }
+  }
+
+  // Clear all cache
+  clear() {
+    this.customers.clear()
+    this.kpiData.clear()
+    this.metadata.hitCount = 0
+    this.metadata.missCount = 0
+    this.metadata.lastUpdate = null
+    console.log('🗑️ Cache CLEARED: All cached data removed')
+  }
+
+  // Disable cache
+  disable() {
+    this.metadata.enabled = false
+    this.clear()
+  }
+
+  // Enable cache
+  enable() {
+    this.metadata.enabled = true
+  }
+}
+
 export default {
   name: 'CustomersPage',
   components: {
@@ -424,6 +579,35 @@ export default {
       successMessage: null,
       searchQuery: '',
       exporting: false,
+      
+      // Enhanced refresh tracking
+      lastRefresh: null,
+      refreshProgress: '',
+      refreshStartTime: null,
+      
+      // Auto-refresh functionality (Logs page system)
+      autoRefreshEnabled: true, // Enable by default for "automatic" branding
+      autoRefreshInterval: 30000, // 30 seconds (base interval)
+      baseRefreshInterval: 30000, // Store original interval
+      autoRefreshTimer: null,
+      countdown: 30,
+      countdownTimer: null,
+      
+      // Connection health tracking
+      connectionLost: false,
+      consecutiveErrors: 0,
+      lastSuccessfulLoad: null,
+      
+      // Smart refresh rate tracking
+      recentActivity: [], // Track recent entries for smart adjustment
+      
+      // Performance optimizations
+      filterDebounceTimer: null,
+      lastLoadTime: null,
+      newEntryIds: new Set(),
+      
+      // Cache system
+      cache: new CustomerCache(),
       
       // Modal states
       showModal: false,
@@ -573,114 +757,127 @@ export default {
       this.validationErrors = {}
     },
 
-    // ============ EXISTING METHODS ============
-    async fetchCustomers() {
+    // ============ ENHANCED DATA FETCHING WITH LOGS PAGE SYSTEM ============
+    async fetchCustomers(isAutoRefresh = false, isEmergencyReconnect = false) {
+      // Prevent multiple simultaneous requests
+      if (this.loading && !isAutoRefresh && !isEmergencyReconnect) return
+      
+      // Check cache first (only for non-emergency requests)
+      if (!isEmergencyReconnect && this.cache.metadata.enabled) {
+        const cachedCustomers = this.cache.getCustomers()
+        if (cachedCustomers && !isAutoRefresh) {
+          this.customers = cachedCustomers
+          this.filteredCustomers = cachedCustomers
+          console.log('✅ Customers loaded from cache instantly')
+          return
+        }
+      }
+
       this.loading = true
-      this.error = null
+      if (!isEmergencyReconnect) {
+        this.error = null
+      }
+      this.refreshStartTime = Date.now()
       
       try {
-        console.log('Fetching customers from API...')
+        const previousLength = this.customers.length
+        
+        // Simulate progress updates
+        const progressInterval = setInterval(() => {
+          if (!this.loading) {
+            clearInterval(progressInterval)
+            return
+          }
+          
+          const elapsed = Date.now() - this.refreshStartTime
+          if (elapsed < 1000) {
+            this.refreshProgress = 'Connecting to server...'
+          } else if (elapsed < 2000) {
+            this.refreshProgress = 'Fetching customer data...'
+          } else {
+            this.refreshProgress = 'Processing customer records...'
+          }
+        }, 500)
+        
+        console.log(`📡 Fetching customers from API... (${isAutoRefresh ? 'auto-refresh' : isEmergencyReconnect ? 'emergency-reconnect' : 'manual'})`)
         const data = await apiService.getCustomers()
+        
+        // Clear progress interval
+        clearInterval(progressInterval)
+        
+        // Connection health tracking
+        this.connectionLost = false
+        this.consecutiveErrors = 0
+        this.lastSuccessfulLoad = Date.now()
+        this.error = null
+        
+        // Smart refresh rate adjustment
+        this.trackActivityAndAdjustRefreshRate(data, previousLength)
+        
+        // Track new entries for highlighting
+        if (isAutoRefresh && this.customers.length > 0) {
+          const existingIds = new Set(this.customers.map(customer => customer._id || customer.customer_id))
+          data.forEach(customer => {
+            const id = customer._id || customer.customer_id
+            if (!existingIds.has(id)) {
+              this.newEntryIds.add(id)
+              // Track for activity analysis
+              this.recentActivity.push({
+                timestamp: Date.now(),
+                customerId: id
+              })
+            }
+          })
+          
+          // Clear new entry highlights after 5 seconds
+          setTimeout(() => {
+            this.newEntryIds.clear()
+          }, 5000)
+        }
+        
+        // Store in cache
+        if (this.cache.metadata.enabled) {
+          this.cache.setCustomers(data)
+        }
+        
         this.customers = data
         this.filteredCustomers = data
-        console.log('Customers loaded:', data)
-      } catch (error) {
-        console.error('Error fetching customers:', error)
-        this.error = `Failed to load customers: ${error.message}`
-      } finally {
-        this.loading = false
-      }
-    },
-
-    handleSearch() {
-      if (!this.searchQuery.trim()) {
-        this.filteredCustomers = this.customers
-        return
-      }
-
-      const query = this.searchQuery.toLowerCase()
-      this.filteredCustomers = this.customers.filter(customer => {
-        const fullName = (customer.full_name || '').toLowerCase()
-        const email = (customer.email || '').toLowerCase()
-        const phone = (customer.phone || '').toLowerCase()
-        const address = this.formatAddress(customer.delivery_address).toLowerCase()
+        this.lastRefresh = new Date()
+        this.lastLoadTime = Date.now()
         
-        return fullName.includes(query) ||
-              email.includes(query) ||
-              phone.includes(query) ||
-              address.includes(query)
-      })
-
-      // Clear selections when searching
-      this.selectedCustomers = []
-    },
-
-    clearSearch() {
-      this.searchQuery = ''
-      this.filteredCustomers = this.customers
-      this.selectedCustomers = []
-    },
-
-    highlightMatch(text, query) {
-      if (!query || !text) return text
-      
-      const regex = new RegExp(`(${query})`, 'gi')
-      return text.replace(regex, '<mark class="search-highlight">$1</mark>')
-    },
-
-    async refreshData() {
-      console.log('=== COMPREHENSIVE CUSTOMER DATA REFRESH INITIATED ===')
-      
-      // Clear any existing messages
-      this.successMessage = null
-      this.error = null
-      
-      // Preserve current customer selections and search state
-      const currentSelections = [...this.selectedCustomers]
-      const currentSearch = this.searchQuery
-      
-      try {
-        // Set loading state
-        this.loading = true
-        
-        // 1. Refresh KPI Cards Data
-        console.log('Refreshing KPI data...')
-        await this.loadKPIData()
-        
-        // 2. Refresh Customer Table Data
-        console.log('Refreshing customer data...')
-        await this.fetchCustomers()
-        
-        // 3. Restore user state
-        this.selectedCustomers = currentSelections.filter(customerId => 
-          this.customers.some(customer => 
-            (customer._id === customerId) || (customer.customer_id === customerId)
-          )
-        )
-        
-        // Restore search and reapply search filter
-        this.searchQuery = currentSearch
-        this.handleSearch()
-        
-        // 4. Show success message
-        this.successMessage = `Data refreshed successfully! ${this.customers.length} customers and KPI metrics updated.`
-        
-        console.log('✅ Comprehensive refresh completed successfully')
-        
-        // Auto-clear success message
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
+        console.log(`✅ Customers loaded successfully: ${data.length} customers`)
         
       } catch (error) {
-        console.error('❌ Comprehensive refresh failed:', error)
-        this.error = `Refresh failed: ${error.message || 'An unexpected error occurred'}`
+        console.error('❌ Error fetching customers:', error)
+        
+        // Handle connection errors
+        this.consecutiveErrors++
+        this.error = this.getDetailedErrorMessage(error)
+        
+        // Mark connection as lost after 3 consecutive errors
+        if (this.consecutiveErrors >= 3) {
+          this.connectionLost = true
+          console.log('Connection marked as lost after 3 consecutive errors')
+        }
+        
+        // Slow down refresh rate when experiencing errors
+        if (this.consecutiveErrors >= 2) {
+          this.autoRefreshInterval = Math.min(this.baseRefreshInterval * 2, 120000) // Max 2 minutes
+          console.log(`Slowing refresh rate to ${this.autoRefreshInterval / 1000}s due to errors`)
+        }
+        
+        // Don't clear data on auto-refresh failures
+        if (!isAutoRefresh) {
+          this.customers = []
+          this.filteredCustomers = []
+        }
       } finally {
         this.loading = false
+        this.refreshProgress = ''
       }
     },
 
-    async loadKPIData() {
+    async loadKPIData(isAutoRefresh = false) {
       try {
         // Load all KPI data in parallel for better performance
         const [activeResult, monthlyResult, dailyResult] = await Promise.allSettled([
@@ -737,12 +934,316 @@ export default {
           this.dailyUsersCount = 'Error'
         }
         
+        console.log(`✅ KPI data loading completed (${isAutoRefresh ? 'auto-refresh' : 'manual'})`)
+        
       } catch (error) {
         console.error('❌ Error loading KPI data:', error)
         this.activeUsersCount = 'Error'
         this.monthlyUsersCount = 'Error'
         this.dailyUsersCount = 'Error'
       }
+    },
+
+    // Smart refresh rate adjustment based on activity
+    trackActivityAndAdjustRefreshRate(newData, previousLength) {
+      const now = Date.now()
+      
+      // Clean old activity data (older than 5 minutes)
+      this.recentActivity = this.recentActivity.filter(
+        activity => now - activity.timestamp < 300000
+      )
+      
+      // Count recent activity (last 2 minutes)
+      const recentCount = this.recentActivity.filter(
+        activity => now - activity.timestamp < 120000
+      ).length
+      
+      // Adjust refresh rate based on activity
+      if (recentCount >= 10) {
+        // High activity: refresh every 10 seconds
+        this.autoRefreshInterval = 10000
+        console.log('High activity detected: refresh rate increased to 10s')
+      } else if (recentCount >= 5) {
+        // Medium activity: refresh every 20 seconds
+        this.autoRefreshInterval = 20000
+        console.log('Medium activity detected: refresh rate set to 20s')
+      } else if (recentCount === 0 && this.recentActivity.length === 0) {
+        // No activity: refresh every 60 seconds
+        this.autoRefreshInterval = 60000
+        console.log('No activity detected: refresh rate decreased to 60s')
+      } else {
+        // Normal activity: use base interval
+        this.autoRefreshInterval = this.baseRefreshInterval
+      }
+      
+      // Restart auto-refresh with new interval if it's running
+      if (this.autoRefreshEnabled && this.autoRefreshTimer) {
+        this.startAutoRefresh()
+      }
+    },
+
+    // Emergency reconnect method
+    async emergencyReconnect() {
+      console.log('Emergency reconnect initiated')
+      this.consecutiveErrors = 0
+      this.connectionLost = false
+      await Promise.all([
+        this.loadKPIData(false),
+        this.fetchCustomers(false, true)
+      ])
+      
+      // Restart auto-refresh if it was stopped
+      if (!this.autoRefreshEnabled) {
+        this.autoRefreshEnabled = true
+        this.startAutoRefresh()
+      }
+    },
+
+    // Connection status methods
+    getConnectionStatus() {
+      if (this.connectionLost) return 'connection-lost'
+      if (this.consecutiveErrors > 0) return 'connection-unstable'
+      if (this.lastSuccessfulLoad && (Date.now() - this.lastSuccessfulLoad < 60000)) return 'connection-good'
+      return 'connection-unknown'
+    },
+
+    getConnectionIcon() {
+      switch (this.getConnectionStatus()) {
+        case 'connection-good': return 'bi bi-wifi text-success'
+        case 'connection-unstable': return 'bi bi-wifi-1 text-warning'
+        case 'connection-lost': return 'bi bi-wifi-off text-danger'
+        default: return 'bi bi-wifi text-muted'
+      }
+    },
+
+    getConnectionText() {
+      switch (this.getConnectionStatus()) {
+        case 'connection-good': return 'Connected'
+        case 'connection-unstable': return 'Unstable'
+        case 'connection-lost': return 'Connection Lost'
+        default: return 'Connecting...'
+      }
+    },
+
+    getDetailedErrorMessage(error) {
+      if (error.name === 'NetworkError' || error.message.includes('fetch')) {
+        return 'Network connection failed. Please check your internet connection and try again.'
+      } else if (error.status === 401) {
+        return 'Authentication failed. Please log in again.'
+      } else if (error.status === 403) {
+        return 'Access denied. You do not have permission to view customer data.'
+      } else if (error.status === 500) {
+        return 'Server error occurred. Please try again later.'
+      }
+      return `Failed to load customers: ${error.message || 'Unknown error occurred'}`
+    },
+
+    // ============ LOGS PAGE AUTO-REFRESH SYSTEM ============
+    toggleAutoRefresh() {
+      if (this.autoRefreshEnabled) {
+        this.autoRefreshEnabled = false
+        this.stopAutoRefresh()
+        console.log('Auto-refresh disabled by user')
+      } else {
+        this.autoRefreshEnabled = true
+        this.startAutoRefresh()
+        console.log('Auto-refresh enabled by user')
+      }
+    },
+    
+    startAutoRefresh() {
+      this.stopAutoRefresh() // Clear any existing timers
+      
+      // Start countdown
+      this.countdown = this.autoRefreshInterval / 1000
+      this.countdownTimer = setInterval(() => {
+        this.countdown--
+        if (this.countdown <= 0) {
+          this.countdown = this.autoRefreshInterval / 1000
+        }
+      }, 1000)
+      
+      // Start auto-refresh timer
+      this.autoRefreshTimer = setInterval(() => {
+        Promise.all([
+          this.loadKPIData(true),
+          this.fetchCustomers(true)
+        ])
+      }, this.autoRefreshInterval)
+      
+      console.log(`Auto-refresh started (${this.autoRefreshInterval / 1000}s interval)`)
+    },
+    
+    stopAutoRefresh() {
+      if (this.autoRefreshTimer) {
+        clearInterval(this.autoRefreshTimer)
+        this.autoRefreshTimer = null
+      }
+      
+      if (this.countdownTimer) {
+        clearInterval(this.countdownTimer)
+        this.countdownTimer = null
+      }
+      
+      console.log('Auto-refresh stopped')
+    },
+
+    // ============ ENHANCED REFRESH SYSTEM ============
+    async refreshData() {
+      console.log('=== COMPREHENSIVE CUSTOMER DATA REFRESH INITIATED ===')
+      
+      // Clear any existing messages
+      this.successMessage = null
+      this.error = null
+      
+      // Preserve current customer selections and search state
+      const currentSelections = [...this.selectedCustomers]
+      const currentSearch = this.searchQuery
+      
+      console.log('Preserving current state:', {
+        selections: currentSelections,
+        search: currentSearch
+      })
+      
+      try {
+        // Set loading state
+        this.loading = true
+        this.refreshStartTime = Date.now()
+        
+        // Clear cache for fresh data
+        if (this.cache.metadata.enabled) {
+          this.cache.clear()
+          console.log('🗑️ Cache cleared for fresh data')
+        }
+        
+        // Simulate progress updates
+        const progressInterval = setInterval(() => {
+          if (!this.loading) {
+            clearInterval(progressInterval)
+            return
+          }
+          
+          const elapsed = Date.now() - this.refreshStartTime
+          if (elapsed < 1000) {
+            this.refreshProgress = 'Refreshing KPI data...'
+          } else if (elapsed < 2000) {
+            this.refreshProgress = 'Processing customer data...'
+          } else {
+            this.refreshProgress = 'Finalizing data...'
+          }
+        }, 500)
+        
+        // Refresh both KPI and customer data in parallel
+        await Promise.all([
+          this.loadKPIData(false),
+          this.fetchCustomers(false)
+        ])
+        
+        // Clear progress interval
+        clearInterval(progressInterval)
+        
+        // Restore user state
+        this.selectedCustomers = currentSelections.filter(customerId => 
+          this.customers.some(customer => 
+            (customer._id === customerId) || (customer.customer_id === customerId)
+          )
+        )
+        
+        // Restore search and reapply search filter
+        this.searchQuery = currentSearch
+        this.handleSearch()
+        
+        // Show success message
+        this.successMessage = `Data refreshed successfully! ${this.customers.length} customers and KPI metrics updated.`
+        
+        console.log('✅ Comprehensive refresh completed successfully')
+        console.log('Final state:', {
+          totalCustomers: this.customers.length,
+          filteredCustomers: this.filteredCustomers.length,
+          selectedCustomers: this.selectedCustomers.length
+        })
+        
+        // Auto-clear success message
+        setTimeout(() => {
+          this.successMessage = null
+        }, 3000)
+        
+      } catch (error) {
+        console.error('❌ Comprehensive refresh failed:', error)
+        this.error = this.getDetailedErrorMessage(error)
+      } finally {
+        this.loading = false
+        this.refreshProgress = ''
+      }
+    },
+
+    // ============ CACHE MANAGEMENT METHODS ============
+    formatCacheTime(timestamp) {
+      if (!timestamp) return 'Never'
+      
+      const now = Date.now()
+      const diff = now - timestamp
+      const minutes = Math.floor(diff / 60000)
+      const seconds = Math.floor((diff % 60000) / 1000)
+      
+      if (minutes > 0) {
+        return `${minutes}m ${seconds}s ago`
+      } else {
+        return `${seconds}s ago`
+      }
+    },
+
+    // ============ EXISTING METHODS (OPTIMIZED) ============
+    handleSearch() {
+      // Debounced search for better performance
+      if (this.searchTimeout) {
+        clearTimeout(this.searchTimeout)
+      }
+      
+      this.searchTimeout = setTimeout(() => {
+        this.performSearch()
+      }, 300) // 300ms debounce
+    },
+
+    performSearch() {
+      if (!this.searchQuery.trim()) {
+        this.filteredCustomers = this.customers
+        return
+      }
+
+      const query = this.searchQuery.toLowerCase()
+      const startTime = performance.now()
+      
+      this.filteredCustomers = this.customers.filter(customer => {
+        const fullName = (customer.full_name || '').toLowerCase()
+        const email = (customer.email || '').toLowerCase()
+        const phone = (customer.phone || '').toLowerCase()
+        const address = this.formatAddress(customer.delivery_address).toLowerCase()
+        
+        return fullName.includes(query) ||
+              email.includes(query) ||
+              phone.includes(query) ||
+              address.includes(query)
+      })
+
+      const endTime = performance.now()
+      console.log(`🔍 Search completed in ${(endTime - startTime).toFixed(2)}ms`)
+      
+      // Clear selections when searching
+      this.selectedCustomers = []
+    },
+
+    clearSearch() {
+      this.searchQuery = ''
+      this.filteredCustomers = this.customers
+      this.selectedCustomers = []
+    },
+
+    highlightMatch(text, query) {
+      if (!query || !text) return text
+      
+      const regex = new RegExp(`(${query})`, 'gi')
+      return text.replace(regex, '<mark class="search-highlight">$1</mark>')
     },
 
     selectAll(event) {
@@ -779,6 +1280,9 @@ export default {
           this.successMessage += ` (${errorCount} failed)`
         }
         this.selectedCustomers = []
+        
+        // Clear cache and refresh for accurate data
+        this.cache.clear()
         await this.fetchCustomers()
       } else {
         this.error = 'Failed to delete customers'
@@ -798,6 +1302,9 @@ export default {
       try {
         await apiService.deleteCustomer(customer._id || customer.customer_id)
         this.successMessage = `Customer "${customer.full_name}" deleted successfully`
+        
+        // Clear cache and refresh for accurate data
+        this.cache.clear()
         await this.fetchCustomers()
         
         setTimeout(() => {
@@ -893,6 +1400,9 @@ export default {
         }
 
         this.closeModal()
+        
+        // Clear cache and refresh for accurate data
+        this.cache.clear()
         await this.fetchCustomers()
         
         setTimeout(() => {
@@ -960,9 +1470,9 @@ export default {
   },
 
   async mounted() {
-    console.log('Customers component mounted')
+    console.log('=== CUSTOMERS COMPONENT MOUNTED ===')
     
-    // Load KPI data and customer data in parallel
+    // Load KPI data and customer data in parallel with caching
     await Promise.all([
       this.loadKPIData(),
       this.fetchCustomers()
@@ -974,6 +1484,17 @@ export default {
     this.$nextTick(() => {
       window.scrollTo(0, 0)
     })
+    
+    console.log('✅ Component initialization complete')
+  },
+
+  beforeUnmount() {
+    // Clear any pending timeouts
+    if (this.searchTimeout) {
+      clearTimeout(this.searchTimeout)
+    }
+    
+    console.log('🧹 Component cleanup complete')
   }
 }
 </script>
@@ -985,6 +1506,19 @@ export default {
   margin: 0 auto;
   background-color: #f8fafc;
   min-height: 100vh;
+}
+
+/* Cache Status Indicator */
+.refresh-indicator {
+  margin-bottom: 1rem;
+}
+
+/* Enhanced Refresh Progress */
+
+/* Enhanced table row states */
+.customers-table tbody tr.refreshing {
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
 }
 
 /* KPI Cards Container */
@@ -1015,10 +1549,26 @@ export default {
   gap: 2rem;
 }
 
+/* Search and Actions Row */
+.search-and-actions-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+}
+
 /* Search Section Styles */
 .search-section {
   flex: 1;
   max-width: 500px;
+}
+
+.action-buttons-group {
+  display: flex;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  align-items: flex-start;
 }
 
 .search-container {
@@ -1159,6 +1709,15 @@ export default {
 
 .btn-danger:hover:not(:disabled) {
   background-color: #dc2626;
+}
+
+.btn-info {
+  background-color: #06b6d4;
+  color: white;
+}
+
+.btn-info:hover:not(:disabled) {
+  background-color: #0891b2;
 }
 
 /* Spinning icon animation */
@@ -1607,8 +2166,19 @@ input[type="checkbox"] {
     gap: 1rem;
   }
 
+  .search-and-actions-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
   .search-section {
     max-width: none;
+  }
+
+  .action-buttons-group {
+    justify-content: center;
+    flex-wrap: wrap;
   }
 }
 
@@ -1695,5 +2265,149 @@ input[type="checkbox"] {
     font-size: 0.75rem;
     padding: 0.5rem 0.75rem;
   }
+}
+
+/* Enhanced Alert Styles */
+.alert {
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  border: 1px solid transparent;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+}
+
+.alert-success {
+  color: #0f5132;
+  background-color: #d1e7dd;
+  border-color: #badbcc;
+}
+
+.alert-danger {
+  color: #842029;
+  background-color: #f8d7da;
+  border-color: #f5c2c7;
+}
+
+.alert-info {
+  color: #055160;
+  background-color: #d1ecf1;
+  border-color: #b8daff;
+}
+
+.d-flex {
+  display: flex !important;
+}
+
+.align-items-center {
+  align-items: center !important;
+}
+
+.justify-content-between {
+  justify-content: space-between !important;
+}
+
+.justify-content-center {
+  justify-content: center !important;
+}
+
+.flex-grow-1 {
+  flex-grow: 1 !important;
+}
+
+.gap-2 {
+  gap: 0.5rem !important;
+}
+
+.me-2 {
+  margin-right: 0.5rem !important;
+}
+
+.mt-1 {
+  margin-top: 0.25rem !important;
+}
+
+.mt-3 {
+  margin-top: 1rem !important;
+}
+
+.mb-3 {
+  margin-bottom: 1rem !important;
+}
+
+.py-5 {
+  padding-top: 3rem !important;
+  padding-bottom: 3rem !important;
+}
+
+.text-center {
+  text-align: center !important;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+  border-radius: 0.25rem;
+}
+
+.btn-outline-secondary {
+  color: #6c757d;
+  border-color: #6c757d;
+  background-color: transparent;
+}
+
+.btn-outline-secondary:hover:not(:disabled) {
+  color: #fff;
+  background-color: #6c757d;
+  border-color: #6c757d;
+}
+
+.spinner-border {
+  display: inline-block;
+  width: 2rem;
+  height: 2rem;
+  vertical-align: text-bottom;
+  border: 0.25em solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spinner-border 0.75s linear infinite;
+}
+
+.spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+  border-width: 0.2em;
+}
+
+@keyframes spinner-border {
+  to { transform: rotate(360deg); }
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  word-wrap: break-word;
+  background-color: #fff;
+  background-clip: border-box;
+  border: 1px solid rgba(0, 0, 0, 0.125);
+  border-radius: 0.375rem;
+}
+
+.card-body {
+  flex: 1 1 auto;
+  padding: 1rem;
 }
 </style>
