@@ -14,6 +14,7 @@ import ProductBulkEntry from '@/pages/inventory/ProductBulkEntry.vue'
 import ProductDetails from '@/pages/inventory/ProductDetails.vue'
 import Categories from '@/pages/inventory/Categories.vue'
 import CategoryDetails from '@/pages/inventory/CategoryDetails.vue'
+import Promotions from '@/pages/Promotions.vue'
 import SalesByItem from '@/pages/reports/SalesByItem.vue'
 import SalesByCategory from '@/pages/reports/SalesByCategory.vue'
 
@@ -103,6 +104,11 @@ const router = createRouter({
           path: 'home',
           name: 'home',
           component: HomeView
+        },
+        {
+          path: 'promotions',
+          name: 'Promotions',
+          component: Promotions
         },
         {
           path: 'sales-by-item',

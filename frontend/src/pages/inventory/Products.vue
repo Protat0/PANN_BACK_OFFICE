@@ -220,13 +220,13 @@
     </div>
 
     <!-- Data Table - Separate Section -->
-    <DataTable
+  <DataTable
   v-if="!loading || products.length > 0"
   :total-items="filteredProducts.length"
   :current-page="currentPage"
   :items-per-page="itemsPerPage"
   @page-changed="handlePageChange"
->
+  >
   <template #header>
     <tr>
       <!-- Checkbox Column (Always visible) -->
