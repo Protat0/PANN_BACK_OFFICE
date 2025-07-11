@@ -6,784 +6,389 @@
     </div>
 
     <!-- KPI Cards Row -->
-    <div class="kpi-cards-container">
-      <CardTemplate
-        title="Active Users"
-        :value="activeUsersCount"
-        border-color="info"
-        subtitle="Total Active Users"
-        change=""
-        change-type="positive"
-        variant=""
-        class="kpi-card"
-      />
-      <CardTemplate
-        title="Monthly New Users"
-        :value="monthlyUsersCount"
-        border-color="success"
-        subtitle="This month's new users"
-        change=""
-        change-type="positive"
-        variant=""
-        class="kpi-card"
-      />
-      <CardTemplate
-        title="Daily Customer Logins"
-        :value="dailyUsersCount"
-        border-color="danger"
-        subtitle="Last 24 hours"
-        change=""
-        change-type="positive"
-        variant=""
-        class="kpi-card"
-      />
+    <div class="row g-4 mb-2">
+      <div class="col-md-4">
+        <CardTemplate
+          title="Active Users"
+          :value="activeUsersCount"
+          subtitle="Total Active Users"
+          size="md"
+          value-color="success"
+          border-color="success"
+          border-position="start"
+          shadow="sm"
+        />
+      </div>
+      <div class="col-md-4">
+        <CardTemplate
+          title="Monthly New Users"
+          :value="monthlyUsersCount"
+          subtitle="This month's new users"
+          size="md"
+          value-color="primary"
+          border-color="primary"
+          border-position="start"
+          shadow="sm"
+        />
+      </div>
+      <div class="col-md-4">
+        <CardTemplate
+          title="Daily Customer Logins"
+          :value="dailyUsersCount"
+          subtitle="Last 24 hours"
+          size="md"
+          value-color="info"
+          border-color="info"
+          border-position="start"
+          shadow="sm"
+        />
+      </div>
     </div>
 
-    <!-- Header Section -->
-    <div class="page-header">
-      <!-- Search Bar -->
-      <div class="search-section">
-        <div class="search-container">
-          <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
-            <path d="21 21l-4.35-4.35" stroke="currentColor" stroke-width="2"/>
-          </svg>
-          <input 
-            v-model="searchQuery"
-            @input="handleSearch"
-            type="text" 
-            class="search-input"
-            placeholder="Search customers by name, email, phone, or address..."
-          />
-          <button 
-            v-if="searchQuery" 
-            @click="clearSearch" 
-            class="clear-search-btn"
-            title="Clear search"
-          >
-            ✕
+    <!-- Action Bar -->
+    <div v-if="!loading || customers.length > 0" class="mb-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <!-- Left: Actions -->
+        <div v-if="selectedCustomers.length === 0" class="d-flex gap-2">
+          <button class="btn btn-success btn-sm btn-with-icon-sm" @click="showAddCustomerModal">
+            <Plus :size="14" />
+            ADD CUSTOMER
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" @click="exportData">
+            EXPORT
+          </button>
+          <button class="btn btn-outline-secondary btn-sm" @click="refreshData" :disabled="loading">
+            <RefreshCw :size="14" :class="{ 'spin-animation': loading }" />
+            REFRESH
           </button>
         </div>
-        <div v-if="searchQuery" class="search-results-info">
-          Showing {{ filteredCustomers.length }} of {{ customers.length }} customers
+
+        <!-- Selection Actions -->
+        <div v-if="selectedCustomers.length > 0" class="d-flex gap-2">
+          <button class="btn btn-delete btn-sm btn-with-icon-sm" @click="deleteSelected">
+            <Trash2 :size="14" />
+            DELETE
+          </button>
         </div>
-      </div>
-      
-      <!-- Action Buttons -->
-      <div class="header-actions">
-        <button 
-          class="btn btn-danger" 
-          @click="deleteSelected" 
-          :disabled="selectedCustomers.length === 0 || loading"
-        >
-          Delete Selected ({{ selectedCustomers.length }})
-        </button>
-        <button class="btn btn-success" @click="showAddCustomerModal">
-          Add Customer
-        </button>
-        <button class="btn btn-primary" @click="exportData" :disabled="loading || exporting">
-            <i class="bi bi-download"></i> {{ exporting ? 'Exporting...' : 'Export' }}
-        </button>
-        <button class="btn btn-warning" @click="refreshData" :disabled="loading">
-          <i class="bi bi-arrow-clockwise" :class="{ 'spinning': loading }"></i>
-          {{ loading ? 'Refreshing...' : 'Refresh' }}
-        </button>
+
+        <!-- Right: Search & Filters -->
+        <div class="d-flex align-items-center gap-2">
+          <!-- Search Toggle -->
+          <button 
+            class="btn btn-secondary btn-sm"
+            @click="toggleSearchMode"
+            :class="{ 'active': searchMode }"
+          >
+            <Search :size="16" />
+          </button>
+
+          <!-- Filters -->
+          <template v-if="!searchMode">
+            <div class="filter-dropdown">
+              <label class="filter-label">Status</label>
+              <select class="form-select form-select-sm" v-model="statusFilter" @change="applyFilters">
+                <option value="all">All customers</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+
+            <div class="filter-dropdown">
+              <label class="filter-label">Points Range</label>
+              <select class="form-select form-select-sm" v-model="pointsFilter" @change="applyFilters">
+                <option value="all">All ranges</option>
+                <option value="0-100">0-100 points</option>
+                <option value="101-500">101-500 points</option>
+                <option value="501+">501+ points</option>
+              </select>
+            </div>
+          </template>
+
+          <!-- Search Bar -->
+          <div v-if="searchMode" class="search-container">
+            <div class="position-relative">
+              <input 
+                ref="searchInput"
+                v-model="searchQuery" 
+                @input="handleSearch"
+                type="text" 
+                class="form-control form-control-sm"
+                placeholder="Search customers..."
+              />
+              <button 
+                class="btn btn-sm btn-link position-absolute end-0 top-50 translate-middle-y"
+                @click="clearSearch"
+              >
+                <X :size="16" />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading && customers.length === 0" class="loading-state">
-      <p>Loading customers...</p>
+    <div v-if="loading && customers.length === 0" class="text-center py-5">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <p class="mt-3" style="color: var(--tertiary-medium);">Loading customers...</p>
     </div>
 
     <!-- Error State -->
-    <div v-if="error" class="error-state">
-      <p>{{ error }}</p>
-      <button class="btn btn-primary" @click="refreshData">Try Again</button>
+    <div v-if="error" class="alert alert-danger d-flex align-items-center justify-content-between" role="alert">
+      <span>{{ error }}</span>
+      <button class="btn btn-sm btn-danger" @click="refreshData">Try Again</button>
     </div>
 
     <!-- Success Message -->
-    <div v-if="successMessage" class="success-message">
+    <div v-if="successMessage" class="alert alert-success alert-dismissible fade show" role="alert">
       {{ successMessage }}
     </div>
 
-    <!-- Table Container -->
-    <div v-if="!loading || customers.length > 0" class="table-container">
-      <table class="customers-table">
-        <thead>
-          <tr>
-            <th class="checkbox-column">
-              <input 
-                type="checkbox" 
-                @change="selectAll" 
-                :checked="allSelected"
-                :indeterminate="someSelected"
-              />
-            </th>
-            <th style="padding-left: 57px;">ID</th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Phone</th>
-            <th>Address</th>
-            <th>Loyalty Points</th>
-            <th>Date Created</th>
-            <th class="actions-column">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr 
-            v-for="customer in filteredCustomers" 
-            :key="customer._id || customer.customer_id"
-            :class="{ 'selected': selectedCustomers.includes(customer._id || customer.customer_id) }"
-          >
-            <td class="checkbox-column">
-              <input 
-                type="checkbox" 
-                :value="customer._id || customer.customer_id"
-                v-model="selectedCustomers"
-              />
-            </td>
-            <td class="id-column" :title="customer.customer_id || customer._id">
+    <!-- Table -->
+    <DataTable 
+      v-if="!loading || customers.length > 0"
+      :items-per-page="itemsPerPage"
+      :total-items="filteredCustomers.length"
+      :current-page="currentPage"
+      @page-changed="handlePageChange"
+    >
+      <template #header>
+        <tr>
+          <th class="text-center" style="width: 50px;">
+            <input 
+              type="checkbox" 
+              class="form-check-input"
+              @change="selectAll" 
+              :checked="allSelected"
+              :indeterminate="someSelected"
+            />
+          </th>
+          <th style="width: 80px;">ID</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Delivery Address</th>
+          <th class="text-center" style="width: 100px;">Points</th>
+          <th style="width: 120px;">Date Created</th>
+          <th class="text-center" style="width: 130px;">Actions</th>
+        </tr>
+      </template>
+      
+      <template #body>
+        <tr 
+          v-for="customer in paginatedCustomers" 
+          :key="customer._id || customer.customer_id"
+          :class="{ 'table-primary': selectedCustomers.includes(customer._id || customer.customer_id) }"
+        >
+          <td class="text-center">
+            <input 
+              type="checkbox" 
+              class="form-check-input"
+              :value="customer._id || customer.customer_id"
+              v-model="selectedCustomers"
+            />
+          </td>
+          <td>
+            <span class="badge bg-light text-primary" style="font-family: monospace;">
               {{ (customer.customer_id || customer._id).slice(-6) }}
-            </td>
-            <td class="name-column">
-              <span v-html="highlightMatch(customer.full_name, searchQuery)"></span>
-            </td>
-            <td class="email-column">
-              <span v-html="highlightMatch(customer.email, searchQuery)"></span>
-            </td>
-            <td class="phone-column">
-              <span v-html="highlightMatch(customer.phone || 'N/A', searchQuery)"></span>
-            </td>
-            <td class="address-column">
-              <span v-html="highlightMatch(formatAddress(customer.delivery_address), searchQuery)"></span>
-            </td>
-            <td class="points-column">{{ customer.loyalty_points || 0 }}</td>
-            <td class="date-column">{{ formatDate(customer.date_created) }}</td>
-            <td class="actions-column">
-              <div class="action-buttons">
-                <button 
-                  class="btn btn-outline-secondary btn-icon-only btn-xs" 
-                  @click="editCustomer(customer)"
-                  data-bs-toggle="tooltip"
-                  title="Edit"
-                  :disabled="loading"
-                >
-                  <Edit :size="14" />
-                </button>
-                <button 
-                  class="btn btn-outline-primary btn-icon-only btn-xs" 
-                  @click="viewCustomer(customer)"
-                  data-bs-toggle="tooltip"
-                  title="View"
-                  :disabled="loading"
-                >
-                  <Eye :size="14" />
-                </button>
-                <button 
-                  class="btn btn-outline-danger btn-icon-only btn-xs" 
-                  @click="deleteCustomer(customer)"
-                  data-bs-toggle="tooltip"
-                  title="Delete"
-                  :disabled="loading"
-                >
-                  <Trash2 :size="14" />
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+            </span>
+          </td>
+          <td class="fw-medium" style="color: var(--tertiary-dark);">
+            <span v-html="highlightMatch(customer.full_name, searchQuery)"></span>
+          </td>
+          <td style="color: var(--tertiary-medium);">
+            <span v-html="highlightMatch(customer.email, searchQuery)"></span>
+          </td>
+          <td style="color: var(--tertiary-medium);">
+            <span v-html="highlightMatch(customer.phone || 'N/A', searchQuery)"></span>
+          </td>
+          <td style="color: var(--tertiary-medium);">
+            <span v-html="highlightMatch(formatAddress(customer.delivery_address), searchQuery)" 
+                  :title="formatAddress(customer.delivery_address)"></span>
+          </td>
+          <td class="text-center">
+            <span class="badge bg-success">{{ customer.loyalty_points || 0 }}</span>
+          </td>
+          <td style="color: var(--tertiary-medium); font-size: 0.875rem;">
+            {{ formatDate(customer.date_created) }}
+          </td>
+          <td>
+            <div class="d-flex justify-content-center gap-1">
+              <button class="btn btn-outline-primary action-btn action-btn-edit" 
+                      @click="editCustomer(customer)" 
+                      title="Edit">
+                <Edit :size="14" />
+              </button>
+              <button class="btn btn-outline-primary action-btn action-btn-view" 
+                      @click="viewCustomer(customer)" 
+                      title="View">
+                <Eye :size="14" />
+              </button>
+              <button class="btn btn-outline-danger action-btn action-btn-delete" 
+                      @click="deleteCustomer(customer)" 
+                      title="Delete">
+                <Trash2 :size="14" />
+              </button>
+            </div>
+          </td>
+        </tr>
+      </template>
+    </DataTable>
 
     <!-- Empty State -->
-    <div v-if="!loading && filteredCustomers.length === 0 && !error" class="empty-state">
-      <p v-if="searchQuery">No customers found matching "{{ searchQuery }}"</p>
-      <p v-else>No customers found</p>
-      <button v-if="!searchQuery" class="btn btn-primary" @click="showAddCustomerModal">
-        Add First Customer
+    <div v-if="!loading && filteredCustomers.length === 0 && !error" 
+         class="text-center py-5 bg-white rounded shadow-sm">
+      <UserX :size="48" style="color: var(--tertiary-medium);" class="mb-3" />
+      <p style="color: var(--tertiary-medium);">
+        {{ customers.length === 0 ? 'No customers found' : 'No customers match the current filters' }}
+      </p>
+      <button 
+        v-if="customers.length === 0" 
+        class="btn btn-primary btn-with-icon mt-3" 
+        @click="showAddCustomerModal"
+      >
+        <Plus :size="16" />
+        <span>Add First Customer</span>
       </button>
-      <button v-else class="btn btn-secondary" @click="clearSearch">
-        Clear Search
+      <button 
+        v-else 
+        class="btn btn-secondary btn-with-icon mt-3"
+        @click="clearFilters"
+      >
+        <RefreshCw :size="16" />
+        <span>Clear Filters</span>
       </button>
     </div>
 
-    <!-- Customer Modal (Add/Edit) -->
-    <div v-if="showModal" class="modal-overlay" @click="closeModal">
-      <div class="modal-content" @click.stop>
-        <h2>{{ isEditMode ? 'Edit Customer' : 'Add New Customer' }}</h2>
-        
-        <form @submit.prevent="saveCustomer" class="customer-form">
-          <div class="form-group">
-            <label for="username">Username:</label>
-            <input 
-              id="username"
-              v-model="customerForm.username" 
-              type="text" 
-              required 
-              :disabled="formLoading"
-            />
-          </div>
-          
-          <div class="form-group">
-            <label for="full_name">Full Name:</label>
-            <input 
-              id="full_name"
-              v-model="customerForm.full_name" 
-              type="text" 
-              required 
-              :disabled="formLoading"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="email">Email:</label>
-            <input 
-              id="email"
-              v-model="customerForm.email" 
-              type="email" 
-              required 
-              :disabled="formLoading"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="phone">Phone:</label>
-            <input 
-              id="phone"
-              v-model="customerForm.phone" 
-              type="tel" 
-              :disabled="formLoading"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="street">Street Address:</label>
-            <input 
-              id="street"
-              v-model="customerForm.delivery_address.street" 
-              type="text" 
-              :disabled="formLoading"
-            />
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label for="city">City:</label>
-              <input 
-                id="city"
-                v-model="customerForm.delivery_address.city" 
-                type="text" 
-                :disabled="formLoading"
-              />
-            </div>
-
-            <div class="form-group">
-              <label for="postal_code">Postal Code:</label>
-              <input 
-                id="postal_code"
-                v-model="customerForm.delivery_address.postal_code" 
-                type="text" 
-                :disabled="formLoading"
-              />
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="loyalty_points">Loyalty Points:</label>
-            <input 
-              id="loyalty_points"
-              v-model.number="customerForm.loyalty_points" 
-              type="number" 
-              min="0"
-              :disabled="formLoading"
-            />
-          </div>
-
-          <div v-if="formError" class="form-error">
-            {{ formError }}
-          </div>
-
-          <div class="form-actions">
-            <button type="button" @click="closeModal" :disabled="formLoading">
-              Cancel
-            </button>
-            <button type="submit" :disabled="formLoading" class="btn-primary">
-              {{ formLoading ? 'Saving...' : (isEditMode ? 'Update' : 'Create') }}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- View Customer Modal -->
-    <div v-if="showViewModal" class="modal-overlay" @click="closeViewModal">
-      <div class="modal-content" @click.stop>
-        <h2>Customer Details</h2>
-        <div class="customer-details" v-if="selectedCustomer">
-          <div class="detail-row">
-            <strong>ID:</strong> {{ selectedCustomer.customer_id || selectedCustomer._id }}
-          </div>
-          <div class="detail-row">
-            <strong>Name:</strong> {{ selectedCustomer.full_name }}
-          </div>
-          <div class="detail-row">
-            <strong>Email:</strong> {{ selectedCustomer.email }}
-          </div>
-          <div class="detail-row">
-            <strong>Phone:</strong> {{ selectedCustomer.phone || 'N/A' }}
-          </div>
-          <div class="detail-row">
-            <strong>Address:</strong> {{ formatAddress(selectedCustomer.delivery_address) }}
-          </div>
-          <div class="detail-row">
-            <strong>Loyalty Points:</strong> {{ selectedCustomer.loyalty_points || 0 }}
-          </div>
-          <div class="detail-row">
-            <strong>Status:</strong> {{ selectedCustomer.status || 'active' }}
-          </div>
-          <div class="detail-row">
-            <strong>Date Created:</strong> {{ formatDate(selectedCustomer.date_created) }}
-          </div>
-          <div class="detail-row">
-            <strong>Last Updated:</strong> {{ formatDate(selectedCustomer.last_updated) }}
-          </div>
-        </div>
-        <div class="form-actions">
-          <button @click="closeViewModal">Close</button>
-          <button @click="editCustomer(selectedCustomer)" class="btn-primary">Edit</button>
-        </div>
-      </div>
-    </div>
+    <!-- Customer Modal -->
+    <AddCustomerModal
+      :show="showCustomerModal"
+      :mode="modalMode"
+      :customer="modalCustomer"
+      @close="closeCustomerModal"
+      @edit-mode="handleEditMode"
+    />
   </div>
 </template>
 
 <script>
-import apiService from '../services/api.js'
-import CustomerApiService from '../services/apiCustomers.js'
+import { onMounted } from 'vue'
 import CardTemplate from '@/components/common/CardTemplate.vue'
-import { Edit, Eye, Trash2, Lock, Unlock } from 'lucide-vue-next'
+import DataTable from '../components/common/TableTemplate.vue'
+import AddCustomerModal from '@/components/customers/AddCustomerModal.vue'
+import { useCustomers } from '../composables/ui/customers/useCustomers.js'
 
 export default {
   name: 'CustomersPage',
   components: {
     CardTemplate,
-    Edit,
-    Eye,
-    Trash2,
-    Lock,
-    Unlock
+    DataTable,
+    AddCustomerModal
   },
-  data() {
-    return {
-      customers: [],
-      filteredCustomers: [],
-      selectedCustomers: [],
-      loading: false,
-      error: null,
-      successMessage: null,
-      searchQuery: '',
-      exporting: false,
+  setup() {
+    const {
+      // State
+      customers,
+      filteredCustomers,
+      selectedCustomers,
+      loading,
+      error,
+      successMessage,
+      searchQuery,
+      searchMode,
+      statusFilter,
+      pointsFilter,
+      currentPage,
+      itemsPerPage,
+      showCustomerModal,
+      modalMode,
+      modalCustomer,
+      activeUsersCount,
+      monthlyUsersCount,
+      dailyUsersCount,
       
-      // Modal states
-      showModal: false,
-      showViewModal: false,
-      isEditMode: false,
-      formLoading: false,
-      formError: null,
-      selectedCustomer: null,
+      // Computed
+      allSelected,
+      someSelected,
+      paginatedCustomers,
       
-      // KPI Cards
-      activeUsersCount: 'Loading...',
-      monthlyUsersCount: 'Loading...',
-      dailyUsersCount: 'Loading...',
+      // Methods
+      initialize,
+      toggleSearchMode,
+      handleSearch,
+      clearSearch,
+      applyFilters,
+      clearFilters,
+      refreshData,
+      selectAll,
+      deleteSelectedCustomers,
+      deleteCustomer,
+      showAddCustomerModal,
+      editCustomer,
+      viewCustomer,
+      handleEditMode,
+      closeCustomerModal,
+      exportData,
+      formatAddress,
+      formatDate,
+      highlightMatch,
+      handlePageChange
+    } = useCustomers()
 
-      // Customer form data
-      customerForm: {
-        username: '',
-        full_name: '',
-        email: '',
-        phone: '',
-        delivery_address: {
-          street: '',
-          city: '',
-          postal_code: ''
-        },
-        loyalty_points: 0
-      }
-    }
-  },
-  computed: {
-    allSelected() {
-      return this.filteredCustomers.length > 0 && this.selectedCustomers.length === this.filteredCustomers.length
-    },
-    someSelected() {
-      return this.selectedCustomers.length > 0 && this.selectedCustomers.length < this.filteredCustomers.length
-    }
-  },
-  methods: {
-    async fetchCustomers() {
-      this.loading = true
-      this.error = null
-      
-      try {
-        console.log('Fetching customers from API...')
-        const data = await apiService.getCustomers()
-        this.customers = data
-        this.filteredCustomers = data
-        console.log('Customers loaded:', data)
-      } catch (error) {
-        console.error('Error fetching customers:', error)
-        this.error = `Failed to load customers: ${error.message}`
-      } finally {
-        this.loading = false
-      }
-    },
-
-    handleSearch() {
-      if (!this.searchQuery.trim()) {
-        this.filteredCustomers = this.customers
-        return
-      }
-
-      const query = this.searchQuery.toLowerCase()
-      this.filteredCustomers = this.customers.filter(customer => {
-        const fullName = (customer.full_name || '').toLowerCase()
-        const email = (customer.email || '').toLowerCase()
-        const phone = (customer.phone || '').toLowerCase()
-        const address = this.formatAddress(customer.delivery_address).toLowerCase()
-        
-        return fullName.includes(query) ||
-              email.includes(query) ||
-              phone.includes(query) ||
-              address.includes(query)
-      })
-
-      // Clear selections when searching
-      this.selectedCustomers = []
-    },
-
-    clearSearch() {
-      this.searchQuery = ''
-      this.filteredCustomers = this.customers
-      this.selectedCustomers = []
-    },
-
-    highlightMatch(text, query) {
-      if (!query || !text) return text
-      
-      const regex = new RegExp(`(${query})`, 'gi')
-      return text.replace(regex, '<mark class="search-highlight">$1</mark>')
-    },
-
-    async refreshData() {
-      console.log('=== COMPREHENSIVE CUSTOMER DATA REFRESH INITIATED ===')
-      
-      // Clear any existing messages
-      this.successMessage = null
-      this.error = null
-      
-      // Preserve current customer selections and search state
-      const currentSelections = [...this.selectedCustomers]
-      const currentSearch = this.searchQuery
-      
-      try {
-        // Set loading state
-        this.loading = true
-        
-        // 1. Refresh KPI Cards Data
-        console.log('Refreshing KPI data...')
-        await this.loadKPIData()
-        
-        // 2. Refresh Customer Table Data
-        console.log('Refreshing customer data...')
-        await this.fetchCustomers()
-        
-        // 3. Restore user state
-        this.selectedCustomers = currentSelections.filter(customerId => 
-          this.customers.some(customer => 
-            (customer._id === customerId) || (customer.customer_id === customerId)
-          )
-        )
-        
-        // Restore search and reapply search filter
-        this.searchQuery = currentSearch
-        this.handleSearch()
-        
-        // 4. Show success message
-        this.successMessage = `Data refreshed successfully! ${this.customers.length} customers and KPI metrics updated.`
-        
-        console.log('✅ Comprehensive refresh completed successfully')
-        
-        // Auto-clear success message
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
-        
-      } catch (error) {
-        console.error('❌ Comprehensive refresh failed:', error)
-        this.error = `Refresh failed: ${error.message || 'An unexpected error occurred'}`
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async loadKPIData() {
-      try {
-        // Load all KPI data in parallel for better performance
-        const [activeResult, monthlyResult, dailyResult] = await Promise.allSettled([
-          CustomerApiService.ActiveUser(),
-          CustomerApiService.MonthlyUser(),
-          CustomerApiService.DailyUser()
-        ])
-        
-        // Handle Active Users
-        if (activeResult.status === 'fulfilled') {
-          this.activeUsersCount = activeResult.value.active_customers?.toString() || '0'
-        } else {
-          console.error('Failed to load active users:', activeResult.reason)
-          this.activeUsersCount = 'Error'
-        }
-        
-        // Handle Monthly Users
-        if (monthlyResult.status === 'fulfilled') {
-          this.monthlyUsersCount = monthlyResult.value.monthly_customers?.toString() || '0'
-        } else {
-          console.error('Failed to load monthly users:', monthlyResult.reason)
-          this.monthlyUsersCount = 'Error'
-        }
-        
-        // Handle Daily Users
-        if (dailyResult.status === 'fulfilled') {
-          this.dailyUsersCount = dailyResult.value.daily_customers?.toString() || '0'
-        } else {
-          console.error('Failed to load daily users:', dailyResult.reason)
-          this.dailyUsersCount = 'Error'
-        }
-        
-      } catch (error) {
-        console.error('❌ Error loading KPI data:', error)
-        this.activeUsersCount = 'Error'
-        this.monthlyUsersCount = 'Error'
-        this.dailyUsersCount = 'Error'
-      }
-    },
-
-    selectAll(event) {
-      if (event.target.checked) {
-        this.selectedCustomers = this.filteredCustomers.map(customer => customer._id || customer.customer_id)
-      } else {
-        this.selectedCustomers = []
-      }
-    },
-
-    async deleteSelected() {
-      if (this.selectedCustomers.length === 0) return
-      
-      const confirmed = confirm(`Are you sure you want to delete ${this.selectedCustomers.length} customer(s)?`)
-      if (!confirmed) return
-
-      this.loading = true
-      let successCount = 0
-      let errorCount = 0
-
-      for (const customerId of this.selectedCustomers) {
-        try {
-          await apiService.deleteCustomer(customerId)
-          successCount++
-        } catch (error) {
-          console.error(`Error deleting customer ${customerId}:`, error)
-          errorCount++
-        }
-      }
-
-      if (successCount > 0) {
-        this.successMessage = `Successfully deleted ${successCount} customer(s)`
-        if (errorCount > 0) {
-          this.successMessage += ` (${errorCount} failed)`
-        }
-        this.selectedCustomers = []
-        await this.fetchCustomers()
-      } else {
-        this.error = 'Failed to delete customers'
-      }
-
-      this.loading = false
-      
-      setTimeout(() => {
-        this.successMessage = null
-      }, 3000)
-    },
-
-    async deleteCustomer(customer) {
-      const confirmed = confirm(`Are you sure you want to delete customer "${customer.full_name}"?`)
-      if (!confirmed) return
-
-      try {
-        await apiService.deleteCustomer(customer._id || customer.customer_id)
-        this.successMessage = `Customer "${customer.full_name}" deleted successfully`
-        await this.fetchCustomers()
-        
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
-      } catch (error) {
-        console.error('Error deleting customer:', error)
-        this.error = `Failed to delete customer: ${error.message}`
-      }
-    },
-
-    showAddCustomerModal() {
-      this.isEditMode = false
-      this.customerForm = {
-        username: '',
-        full_name: '',
-        email: '',
-        phone: '',
-        delivery_address: {
-          street: '',
-          city: '',
-          postal_code: ''
-        },
-        loyalty_points: 0
-      }
-      this.formError = null
-      this.showModal = true
-    },
-
-    editCustomer(customer) {
-      this.isEditMode = true
-      this.selectedCustomer = customer
-      this.customerForm = {
-        username: customer.username || '',
-        full_name: customer.full_name || '',
-        email: customer.email || '',
-        phone: customer.phone || '',
-        delivery_address: {
-          street: customer.delivery_address?.street || '',
-          city: customer.delivery_address?.city || '',
-          postal_code: customer.delivery_address?.postal_code || ''
-        },
-        loyalty_points: customer.loyalty_points || 0
-      }
-      this.formError = null
-      this.showViewModal = false
-      this.showModal = true
-    },
-
-    viewCustomer(customer) {
-      this.selectedCustomer = customer
-      this.showViewModal = true
-    },
-
-    closeModal() {
-      this.showModal = false
-      this.isEditMode = false
-      this.selectedCustomer = null
-      this.formError = null
-    },
-
-    closeViewModal() {
-      this.showViewModal = false
-      this.selectedCustomer = null
-    },
-
-    async saveCustomer() {
-      this.formLoading = true
-      this.formError = null
-
-      try {
-        if (this.isEditMode) {
-          const customerId = this.selectedCustomer._id || this.selectedCustomer.customer_id
-          await apiService.updateCustomer(customerId, this.customerForm)
-          this.successMessage = `Customer "${this.customerForm.full_name}" updated successfully`
-        } else {
-          await apiService.createCustomer(this.customerForm)
-          this.successMessage = `Customer "${this.customerForm.full_name}" created successfully`
-        }
-
-        this.closeModal()
-        await this.fetchCustomers()
-        
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
-      } catch (error) {
-        console.error('Error saving customer:', error)
-        this.formError = error.message
-      } finally {
-        this.formLoading = false
-      }
-    },
-
-    exportData() {
-      this.exporting = true
-      
-      try {
-        const headers = ['ID', 'Name', 'Email', 'Phone', 'Address', 'Loyalty Points', 'Date Created']
-        const csvContent = [
-          headers.join(','),
-          ...this.filteredCustomers.map(customer => [
-            customer.customer_id || customer._id,
-            customer.full_name,
-            customer.email,
-            customer.phone || '',
-            this.formatAddress(customer.delivery_address),
-            customer.loyalty_points || 0,
-            this.formatDate(customer.date_created)
-          ].join(','))
-        ].join('\n')
-
-        const blob = new Blob([csvContent], { type: 'text/csv' })
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `customers_${new Date().toISOString().split('T')[0]}.csv`
-        a.click()
-        window.URL.revokeObjectURL(url)
-      } finally {
-        this.exporting = false
-      }
-    },
-
-    formatAddress(address) {
-      if (!address) return 'N/A'
-      if (typeof address === 'string') return address
-      
-      const parts = []
-      if (address.street) parts.push(address.street)
-      if (address.city) parts.push(address.city)
-      if (address.postal_code) parts.push(address.postal_code)
-      
-      return parts.length > 0 ? parts.join(', ') : 'N/A'
-    },
-
-    formatDate(dateString) {
-      if (!dateString) return 'N/A'
-      const date = new Date(dateString)
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      })
-    }
-  },
-
-  async mounted() {
-    console.log('Customers component mounted')
-    
-    // Load KPI data and customer data in parallel
-    await Promise.all([
-      this.loadKPIData(),
-      this.fetchCustomers()
-    ])
-    
-    // Force scroll to top
-    window.scrollTo(0, 0)
-    
-    this.$nextTick(() => {
+    onMounted(() => {
       window.scrollTo(0, 0)
+      initialize()
     })
+
+    return {
+      // State
+      customers,
+      filteredCustomers,
+      selectedCustomers,
+      loading,
+      error,
+      successMessage,
+      searchQuery,
+      searchMode,
+      statusFilter,
+      pointsFilter,
+      currentPage,
+      itemsPerPage,
+      showCustomerModal,
+      modalMode,
+      modalCustomer,
+      activeUsersCount,
+      monthlyUsersCount,
+      dailyUsersCount,
+      
+      // Computed
+      allSelected,
+      someSelected,
+      paginatedCustomers,
+      
+      // Methods
+      toggleSearchMode,
+      handleSearch,
+      clearSearch,
+      applyFilters,
+      clearFilters,
+      refreshData,
+      selectAll,
+      deleteSelected: deleteSelectedCustomers,
+      deleteCustomer,
+      showAddCustomerModal,
+      editCustomer,
+      viewCustomer,
+      handleEditMode,
+      closeCustomerModal,
+      exportData,
+      formatAddress,
+      formatDate,
+      highlightMatch,
+      handlePageChange
+    }
   }
 }
 </script>
@@ -793,186 +398,10 @@ export default {
   padding: 1.5rem;
   max-width: 1400px;
   margin: 0 auto;
-  background-color: #f8fafc;
   min-height: 100vh;
 }
 
-/* KPI Cards Container */
-.kpi-cards-container {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-}
-
-.kpi-card {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
-}
-
-.kpi-card:hover {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  transform: translateY(-1px);
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1.5rem;
-  gap: 2rem;
-}
-
-/* Search Section Styles */
-.search-section {
-  flex: 1;
-  max-width: 500px;
-}
-
-.search-container {
-  position: relative;
-  display: flex;
-  align-items: center;
-  background: white;
-  border: 2px solid #e5e7eb;
-  border-radius: 0.75rem;
-  padding: 0.75rem 1rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
-}
-
-.search-container:focus-within {
-  border-color: #4f46e5;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-}
-
-.search-icon {
-  color: #9ca3af;
-  margin-right: 0.75rem;
-  flex-shrink: 0;
-}
-
-.search-input {
-  flex: 1;
-  border: none;
-  outline: none;
-  font-size: 1rem;
-  background: transparent;
-  color: #1f2937;
-}
-
-.search-input::placeholder {
-  color: #9ca3af;
-}
-
-.clear-search-btn {
-  background: none;
-  border: none;
-  color: #9ca3af;
-  cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 0.25rem;
-  transition: all 0.2s ease;
-  font-size: 1.25rem;
-  line-height: 1;
-}
-
-.clear-search-btn:hover {
-  color: #6b7280;
-  background-color: #f3f4f6;
-}
-
-.search-results-info {
-  margin-top: 0.5rem;
-  font-size: 0.875rem;
-  color: #6b7280;
-  padding-left: 1rem;
-}
-
-/* Search highlighting */
-.search-highlight {
-  background-color: #fef3c7;
-  color: #92400e;
-  padding: 0.125rem 0.25rem;
-  border-radius: 0.25rem;
-  font-weight: 500;
-}
-
-.header-actions {
-  display: flex;
-  gap: 0.75rem;
-  flex-shrink: 0;
-}
-
-/* Enhanced button styles */
-.btn {
-  padding: 0.5rem 1.25rem;
-  border-radius: 0.5rem;
-  border: none;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.875rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  white-space: nowrap;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background-color: #3b82f6;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background-color: #2563eb;
-}
-
-.btn-secondary {
-  background-color: #e2e8f0;
-  color: #475569;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background-color: #cbd5e1;
-}
-
-.btn-success {
-  background-color: #10b981;
-  color: white;
-}
-
-.btn-success:hover:not(:disabled) {
-  background-color: #059669;
-}
-
-.btn-warning {
-  background-color: #f59e0b;
-  color: white;
-}
-
-.btn-warning:hover:not(:disabled) {
-  background-color: #d97706;
-}
-
-.btn-danger {
-  background-color: #ef4444;
-  color: white;
-}
-
-.btn-danger:hover:not(:disabled) {
-  background-color: #dc2626;
-}
-
-/* Spinning icon animation */
-.spinning {
+.spin-animation {
   animation: spin 1s linear infinite;
 }
 
@@ -981,448 +410,15 @@ export default {
   to { transform: rotate(360deg); }
 }
 
-.loading-state, .error-state {
-  text-align: center;
-  padding: 3rem;
-  background: white;
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-}
-
-.error-state {
-  color: #dc2626;
-}
-
-.success-message {
-  background-color: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #16a34a;
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  margin-bottom: 1rem;
-  text-align: center;
-}
-
-.table-container {
-  background: white;
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-}
-
-.customers-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.customers-table thead {
-  background-color: #567cdc;
-  color: white;
-}
-
-.customers-table th {
-  padding: 1rem;
-  text-align: left;
-  font-weight: 600;
-  font-size: 0.875rem;
-  letter-spacing: 0.025em;
-}
-
-.customers-table td {
-  padding: 1rem;
-  border-bottom: 1px solid #e2e8f0;
-  font-size: 0.875rem;
-}
-
-.customers-table tbody tr:hover {
-  background-color: #f8fafc;
-}
-
-.customers-table tbody tr.selected {
-  background-color: #ede9fe;
-}
-
-/* Column width definitions */
-.checkbox-column {
-  width: 40px;
-  text-align: center;
-}
-
-.id-column {
-  width: 80px;
-  font-weight: 500;
-  color: #6366f1;
-  font-family: monospace;
-  text-align: center;
-  font-size: 0.75rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.name-column {
-  width: 150px;
-  max-width: 150px;
-  font-weight: 500;
-  color: #1e293b;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.email-column {
-  width: 180px;
-  max-width: 180px;
-  color: #64748b;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.phone-column {
-  width: 120px;
-  max-width: 120px;
-  color: #64748b;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.address-column {
-  width: 200px;
-  max-width: 200px;
-  color: #64748b;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.points-column {
-  width: 100px;
-  font-weight: 500;
-  text-align: center;
-  color: #1e293b;
-}
-
-.date-column {
-  width: 120px;
-  color: #64748b;
-  font-size: 0.8125rem;
-}
-
-.actions-column {
-  width: 140px;
-  text-align: center;
-  vertical-align: middle;
-}
-
-/* Action Button Styles */
-.btn-xs {
-  padding: 0.25rem 0.4rem;
-  font-size: 0.75rem;
-  line-height: 1;
-  border-radius: 0.375rem;
-}
-
-.btn-icon-only {
-  padding: 0.35rem;
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: 1px solid;
-}
-
-.btn-outline-secondary {
-  color: #6b7280;
-  border-color: #d1d5db;
-  background-color: transparent;
-}
-
-.btn-outline-secondary:hover:not(:disabled) {
-  color: #374151;
-  background-color: #f3f4f6;
-  border-color: #9ca3af;
-}
-
-.btn-outline-primary {
-  color: #3b82f6;
-  border-color: #93c5fd;
-  background-color: transparent;
-}
-
-.btn-outline-primary:hover:not(:disabled) {
-  color: #ffffff;
-  background-color: #3b82f6;
-  border-color: #3b82f6;
-}
-
-.btn-outline-danger {
-  color: #ef4444;
-  border-color: #fca5a5;
-  background-color: transparent;
-}
-
-.btn-outline-danger:hover:not(:disabled) {
-  color: #ffffff;
-  background-color: #ef4444;
-  border-color: #ef4444;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 0.375rem;
-  justify-content: center;
-  align-items: center;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 3rem;
-  color: #64748b;
-  background: white;
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-}
-
-/* Modal Styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 2000;
-}
-
-.modal-content {
-  background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  max-width: 500px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-content h2 {
-  margin-bottom: 1.5rem;
-  color: #1f2937;
-}
-
-.customer-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.form-group label {
-  font-weight: 500;
-  color: #374151;
-}
-
-.form-group input {
-  padding: 0.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.form-group input:disabled {
-  background-color: #f9fafb;
-  cursor: not-allowed;
-}
-
-.form-error {
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
-  padding: 0.75rem;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-}
-
-.form-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-  margin-top: 1.5rem;
-}
-
-.form-actions button {
-  padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
-  border: 1px solid #d1d5db;
-  background: white;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.form-actions button.btn-primary {
-  background-color: #3b82f6;
-  color: white;
-  border-color: #3b82f6;
-}
-
-.form-actions button:hover:not(:disabled) {
-  background-color: #f9fafb;
-}
-
-.form-actions button.btn-primary:hover:not(:disabled) {
-  background-color: #2563eb;
-}
-
-.customer-details {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.detail-row {
-  display: flex;
-  gap: 1rem;
-  color: #1e293b;
-}
-
-.detail-row strong {
-  min-width: 120px;
-  color: #374151;
-}
-
-/* Custom checkbox styling */
-input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: #8b5cf6;
-  cursor: pointer;
-}
-
-/* Responsive Design */
 @media (max-width: 1024px) {
   .customers-page {
     padding: 1rem;
   }
-  
-  .kpi-cards-container {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-  }
-  
-  .table-container {
-    overflow-x: auto;
-  }
-  
-  .customers-table {
-    min-width: 900px;
-  }
-
-  .page-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 1rem;
-  }
-
-  .search-section {
-    max-width: none;
-  }
 }
 
-@media (max-width: 768px) {
-  .kpi-cards-container {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-
-  .page-header {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
-  }
-  
-  .header-actions {
-    justify-content: center;
-    flex-wrap: wrap;
-  }
-  
-  .btn {
-    padding: 0.5rem 1rem;
-    font-size: 0.8125rem;
-  }
-  
-  .customers-table th,
-  .customers-table td {
-    padding: 0.75rem 0.5rem;
-    font-size: 0.8125rem;
-  }
-
-  .form-row {
-    grid-template-columns: 1fr;
-  }
-
-  .modal-content {
-    padding: 1.5rem;
-  }
-
-  .search-container {
-    padding: 0.5rem 0.75rem;
-  }
-
-  .search-input {
-    font-size: 0.875rem;
-  }
-
-  .search-results-info {
-    text-align: center;
-    padding-left: 0;
-  }
-}
-
-@media (max-width: 640px) {
-  .kpi-cards-container {
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-  }
-
-  .page-header {
-    gap: 0.75rem;
-  }
-
-  .header-actions {
-    grid-template-columns: repeat(2, 1fr);
-    display: grid;
-    gap: 0.5rem;
-  }
-
-  .btn {
-    font-size: 0.75rem;
-    padding: 0.5rem 0.75rem;
+@media (max-width: 576px) {
+  .customers-page {
+    padding: 0.75rem;
   }
 }
 </style>
