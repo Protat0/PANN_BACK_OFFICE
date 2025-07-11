@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import HttpResponse
-from ..services.session_services import SessionLogService
+from ..services.session_services import SessionLogService, SessionDisplay
 from ..services.session_management_service import SessionManagementService
 from ..services.customer_service import CustomerService
 from ..services.product_service import ProductService
@@ -113,5 +113,14 @@ class SessionStatisticsView(APIView):
             session_mgmt = SessionManagementService()
             stats = session_mgmt.get_session_statistics()
             return Response(stats, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+class SessionDisplayView(APIView):
+    def get(self,request):
+        try:
+            session_serv = SessionDisplay()
+            result = session_serv.get_session_logs()
+            return Response(result, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

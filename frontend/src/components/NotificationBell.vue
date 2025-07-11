@@ -111,9 +111,20 @@
         <!-- Modal Header -->
         <div class="modal-header">
           <h2>All Notifications</h2>
-          <button @click="closeFullModal" class="modal-close-btn">
-            ✕
-          </button>
+          <div class="header-actions">
+            <!-- Bulk Actions for Unread Notifications -->
+            <button 
+              v-if="unreadModalCount > 0"
+              @click="markAllModalAsRead"
+              class="bulk-action-btn mark-all-read-btn"
+              :disabled="markingAllAsRead"
+            >
+              {{ markingAllAsRead ? 'Marking...' : `Mark all ${unreadModalCount} as read` }}
+            </button>
+            <button @click="closeFullModal" class="modal-close-btn">
+              ✕
+            </button>
+          </div>
         </div>
 
         <!-- Modal Filters -->
@@ -181,7 +192,8 @@
               class="modal-notification-item"
               :class="{ 
                 'unread': !notification.is_read,
-                [`priority-${notification.priority}`]: true 
+                [`priority-${notification.priority}`]: true,
+                'archiving': notification.isArchiving
               }"
             >
               <!-- Priority Indicator -->
@@ -196,10 +208,20 @@
                     <button 
                       v-if="!notification.is_read"
                       @click="markAsRead(notification)"
-                      class="mark-read-btn"
+                      class="action-btn mark-read-btn"
                       title="Mark as read"
+                      :disabled="notification.isMarkingRead"
                     >
-                      ✓
+                      {{ notification.isMarkingRead ? '...' : '✓' }}
+                    </button>
+                    <!-- Archive Button (X) -->
+                    <button 
+                      @click="archiveNotification(notification)"
+                      class="action-btn archive-btn"
+                      title="Archive notification"
+                      :disabled="notification.isArchiving"
+                    >
+                      {{ notification.isArchiving ? '...' : '✕' }}
                     </button>
                   </div>
                 </div>
@@ -227,15 +249,11 @@
 
         <!-- Modal Footer -->
         <div class="modal-footer">
-          <button 
-            v-if="unreadCount > 0"
-            @click="markAllAsReadInModal"
-            class="btn-secondary"
-            :disabled="markingAllAsRead"
-          >
-            {{ markingAllAsRead ? 'Marking...' : `Mark all ${unreadCount} as read` }}
-          </button>
-          
+          <div class="footer-stats">
+            <span class="stat-item">Total: {{ pagination.total_count || 0 }}</span>
+            <span class="stat-item">Unread: {{ unreadModalCount }}</span>
+            <span class="stat-item">Showing: {{ filteredModalNotifications.length }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -271,14 +289,24 @@ export default {
       }
     }
   },
-  mounted() { //This was used for debugging and ensuring that the notifications does get recent entries. 
-   // this.fetchNotifications()
-    //this.startPolling()
+  computed: {
+    unreadModalCount() {
+      return this.filteredModalNotifications.filter(n => !n.is_read).length;
+    }
+  },
+  mounted() {
+    // Uncomment for debugging
+    this.fetchNotifications()
+    this.startPolling()
   },
   beforeUnmount() {
     this.stopPolling()
   },
   methods: {
+    // ================================================================
+    // DATA FETCHING METHODS
+    // ================================================================
+    
     async fetchNotifications() {
       this.loading = true
       try {
@@ -313,87 +341,6 @@ export default {
       }
     },
 
-    updateUnreadCount() {
-      this.unreadCount = this.notifications.filter(n => !n.is_read).length
-    },
-
-    toggleDropdown() {
-      this.showDropdown = !this.showDropdown
-      if (this.showDropdown) {
-        this.fetchNotifications() // Always fetch fresh data when opening dropdown
-      }
-    },
-
-    async markAsRead(notification) {
-      if (notification.is_read) return
-
-      try {
-        const response = await fetch(
-          `http://localhost:8000/api/notifications/${notification.id}/mark-read/`,
-          {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          }
-        )
-
-        if (response.ok) {
-          notification.is_read = true
-          this.updateUnreadCount()
-          
-          // Also update in modal notifications if exists
-          const modalNotification = this.allNotifications.find(n => n.id === notification.id)
-          if (modalNotification) {
-            modalNotification.is_read = true
-          }
-          this.applyModalFilters()
-        } else {
-          console.error('Failed to mark notification as read:', await response.text())
-        }
-      } catch (error) {
-        console.error('Error marking notification as read:', error)
-      }
-    },
-
-    async markAllAsRead() {
-      if (this.unreadCount === 0) return
-      
-      this.markingAllAsRead = true
-      try {
-        // Mark all notifications as read individually since we don't have a bulk endpoint
-        const unreadNotifications = this.notifications.filter(n => !n.is_read)
-        
-        for (const notification of unreadNotifications) {
-          await this.markAsRead(notification)
-        }
-        
-        // Update counts
-        this.unreadCount = 0
-        this.applyModalFilters()
-      } catch (error) {
-        console.error('Error marking all notifications as read:', error)
-      } finally {
-        this.markingAllAsRead = false
-      }
-    },
-
-    viewAllNotifications() {
-      console.log('Opening modal...')
-      this.showDropdown = false
-      this.showFullModal = true
-      this.fetchAllNotifications()
-    },
-
-    closeFullModal() {
-      console.log('Closing modal...')
-      this.showFullModal = false
-      this.modalFilter = 'all'
-      this.priorityFilter = ''
-      this.typeFilter = ''
-      this.pagination.current_page = 1
-    },
-
     async fetchAllNotifications() {
       this.modalLoading = true
       try {
@@ -402,8 +349,6 @@ export default {
             'Content-Type': 'application/json'
           }
         })
-
-       // console.log('All notifications API Response status:', response.status) !THis is to check if the Notifications API will be able to connect and fetch
 
         if (response.ok) {
           const result = await response.json()
@@ -457,6 +402,266 @@ export default {
       }
     },
 
+    // ================================================================
+    // UI STATE MANAGEMENT
+    // ================================================================
+    
+    updateUnreadCount() {
+      this.unreadCount = this.notifications.filter(n => !n.is_read).length
+    },
+
+    toggleDropdown() {
+      this.showDropdown = !this.showDropdown
+      if (this.showDropdown) {
+        this.fetchNotifications() // Always fetch fresh data when opening dropdown
+      }
+    },
+
+    viewAllNotifications() {
+      console.log('Opening modal...')
+      this.showDropdown = false
+      this.showFullModal = true
+      this.fetchAllNotifications()
+    },
+
+    closeFullModal() {
+      console.log('Closing modal...')
+      this.showFullModal = false
+      this.modalFilter = 'all'
+      this.priorityFilter = ''
+      this.typeFilter = ''
+      this.pagination.current_page = 1
+    },
+
+    // ================================================================
+    // NOTIFICATION ACTIONS - INDIVIDUAL
+    // ================================================================
+    
+    async markAsRead(notification) {
+      if (notification.is_read) return
+
+      const notificationId = notification.id || notification._id;
+      
+      // Vue 3 way - direct assignment
+      notification.isMarkingRead = true;
+
+      try {
+        const response = await fetch(
+          `http://localhost:8000/api/notifications/${notificationId}/mark-read/`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (response.ok) {
+          notification.is_read = true
+          this.updateUnreadCount()
+          
+          // Also update in modal notifications if exists
+          const modalNotification = this.allNotifications.find(n => (n.id || n._id) === (notification.id || notification._id))
+          if (modalNotification) {
+            modalNotification.is_read = true
+          }
+          this.applyModalFilters()
+        } else {
+          console.error('Failed to mark notification as read:', await response.text())
+        }
+      } catch (error) {
+        console.error('Error marking notification as read:', error)
+      } finally {
+        // Vue 3 way - direct assignment
+        notification.isMarkingRead = false;
+      }
+    },
+
+    async archiveNotification(notification) {
+      console.log('🗂️ === FRONTEND ARCHIVE DEBUG ===');
+      
+      // Get the correct ID - handle both _id and id
+      const notificationId = notification.id || notification._id;
+      
+      console.log('📋 Notification object:', notification);
+      console.log('🆔 Using ID:', notificationId);
+      
+      if (!notificationId) {
+        console.error('❌ No valid ID found for notification');
+        return;
+      }
+
+      // Vue 3 way - direct assignment
+      notification.isArchiving = true;
+
+      try {
+        const url = `http://localhost:8000/api/notifications/${notificationId}/archive/`;
+        console.log('🌐 Archive URL:', url);
+        
+        const response = await fetch(url, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        console.log('📡 Response status:', response.status);
+        console.log('✅ Response ok:', response.ok);
+
+        if (response.ok) {
+          const result = await response.json();
+          console.log('🎉 Archive success:', result);
+          
+          // Remove from both arrays using the correct ID
+          this.notifications = this.notifications.filter(n => (n.id || n._id) !== notificationId);
+          this.allNotifications = this.allNotifications.filter(n => (n.id || n._id) !== notificationId);
+          
+          // Update counts and refresh filters
+          this.updateUnreadCount();
+          this.applyModalFilters();
+          
+          console.log('✅ Archive completed successfully');
+        } else {
+          const errorText = await response.text();
+          console.error('❌ Archive failed:', errorText);
+          await this.deleteNotificationFallback(notification);
+        }
+      } catch (error) {
+        console.error('💥 Archive error:', error);
+        await this.deleteNotificationFallback(notification);
+      } finally {
+        // Vue 3 way - direct assignment
+        notification.isArchiving = false;
+      }
+    },
+
+    // ================================================================
+    // NOTIFICATION ACTIONS - BULK
+    // ================================================================
+    
+    async markAllAsRead() {
+      if (this.unreadCount === 0) return
+      
+      this.markingAllAsRead = true
+      try {
+        const response = await fetch('http://localhost:8000/api/notifications/mark-all-read/', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          console.log('Mark all as read response:', result)
+          
+          // Update all notifications to read status
+          this.notifications.forEach(notification => {
+            notification.is_read = true
+          })
+          
+          this.allNotifications.forEach(notification => {
+            notification.is_read = true
+          })
+          
+          // Update counts
+          this.unreadCount = 0
+          this.applyModalFilters()
+          
+        } else {
+          console.error('Failed to mark all as read:', await response.text())
+          await this.fallbackMarkAllAsRead()
+        }
+      } catch (error) {
+        console.error('Error marking all notifications as read:', error)
+        await this.fallbackMarkAllAsRead()
+      } finally {
+        this.markingAllAsRead = false
+      }
+    },
+
+    async markAllModalAsRead() {
+      if (this.unreadModalCount === 0) return
+      
+      this.markingAllAsRead = true
+      try {
+        const response = await fetch('http://localhost:8000/api/notifications/mark-all-read/', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          console.log('Modal mark all as read response:', result)
+          
+          // Update all notifications to read status
+          this.allNotifications.forEach(notification => {
+            notification.is_read = true
+          })
+          
+          this.notifications.forEach(notification => {
+            notification.is_read = true
+          })
+          
+          // Update counts and refresh filters
+          this.unreadCount = 0
+          this.applyModalFilters()
+          
+        } else {
+          console.error('Failed to mark all as read:', await response.text())
+        }
+      } catch (error) {
+        console.error('Error marking all notifications as read:', error)
+      } finally {
+        this.markingAllAsRead = false
+      }
+    },
+
+    // ================================================================
+    // FALLBACK METHODS
+    // ================================================================
+    
+    async fallbackMarkAllAsRead() {
+      const unreadNotifications = this.notifications.filter(n => !n.is_read)
+      for (const notification of unreadNotifications) {
+        await this.markAsRead(notification)
+      }
+    },
+
+    async deleteNotificationFallback(notification) {
+      try {
+        const notificationId = notification.id || notification._id;
+        const response = await fetch(`http://localhost:8000/api/notifications/${notificationId}/delete/`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          // Remove from both arrays using consistent ID matching
+          this.notifications = this.notifications.filter(n => (n.id || n._id) !== notificationId)
+          this.allNotifications = this.allNotifications.filter(n => (n.id || n._id) !== notificationId)
+          
+          // Update counts and refresh filters
+          this.updateUnreadCount()
+          this.applyModalFilters()
+          
+          console.log(`Notification ${notificationId} deleted as fallback`)
+        } else {
+          console.error('Delete fallback also failed:', await response.text())
+        }
+      } catch (error) {
+        console.error('Delete fallback error:', error)
+      }
+    },
+
+    // ================================================================
+    // FILTERING AND SEARCH
+    // ================================================================
+    
     applyModalFilters() {
       console.log('Applying filters:', this.modalFilter, this.priorityFilter, this.typeFilter)
       let filtered = [...this.allNotifications]
@@ -493,26 +698,10 @@ export default {
       console.log('Filtered notifications:', this.filteredModalNotifications.length)
     },
 
-    async markAllAsReadInModal() {
-      if (this.unreadCount === 0) return
-      
-      this.markingAllAsRead = true
-      try {
-        const unreadNotifications = this.allNotifications.filter(n => !n.is_read)
-        
-        for (const notification of unreadNotifications) {
-          await this.markAsRead(notification)
-        }
-        
-        this.unreadCount = 0
-        this.applyModalFilters()
-      } catch (error) {
-        console.error('Error marking all notifications as read:', error)
-      } finally {
-        this.markingAllAsRead = false
-      }
-    },
-
+    // ================================================================
+    // POLLING AND BACKGROUND UPDATES
+    // ================================================================
+    
     startPolling() {
       // Poll for new notifications every 30 seconds
       this.pollInterval = setInterval(() => {
@@ -525,9 +714,14 @@ export default {
     stopPolling() {
       if (this.pollInterval) {
         clearInterval(this.pollInterval)
+        this.pollInterval = null
       }
     },
 
+    // ================================================================
+    // UTILITY METHODS
+    // ================================================================
+    
     formatTimeAgo(dateString) {
       const now = new Date()
       const notificationDate = new Date(dateString)
@@ -576,7 +770,7 @@ export default {
 </script>
 
 <style scoped>
-/* ... (keeping all the existing styles) ... */
+/* Existing styles preserved... */
 .notification-container {
   position: relative;
 }
@@ -929,6 +1123,47 @@ export default {
   color: #1f2937;
 }
 
+.modal-header .header-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+/* Enhanced Bulk Action Button */
+.bulk-action-btn {
+  background: #6366f1;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bulk-action-btn:hover:not(:disabled) {
+  background: #4f46e5;
+  transform: translateY(-1px);
+}
+
+.bulk-action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.mark-all-read-btn {
+  background: #10b981;
+}
+
+.mark-all-read-btn:hover:not(:disabled) {
+  background: #059669;
+}
+
 .modal-close-btn {
   background: none;
   border: none;
@@ -989,11 +1224,20 @@ export default {
   padding: 0 2rem;
 }
 
+.pagination-info {
+  padding: 1rem 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+  border-bottom: 1px solid #f3f4f6;
+  margin-bottom: 1rem;
+}
+
 .modal-notification-item {
   display: flex;
   padding: 1.5rem 0;
   border-bottom: 1px solid #f3f4f6;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
+  position: relative;
 }
 
 .modal-notification-item:hover {
@@ -1014,6 +1258,11 @@ export default {
   padding-right: 2rem;
 }
 
+.modal-notification-item.archiving {
+  opacity: 0.6;
+  transform: scale(0.98);
+}
+
 .modal-notification-item .notification-header {
   display: flex;
   justify-content: space-between;
@@ -1027,23 +1276,49 @@ export default {
   gap: 0.5rem;
 }
 
-.mark-read-btn {
-  background: #6366f1;
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
+/* Enhanced Action Buttons */
+.action-btn {
+  background: none;
+  border: 1px solid;
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   font-size: 0.75rem;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
+  font-weight: 500;
 }
 
-.mark-read-btn:hover {
-  background: #4f46e5;
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mark-read-btn {
+  color: #10b981;
+  border-color: #10b981;
+  background: white;
+}
+
+.mark-read-btn:hover:not(:disabled) {
+  color: white;
+  background: #10b981;
+  transform: scale(1.05);
+}
+
+.archive-btn {
+  color: #ef4444;
+  border-color: #ef4444;
+  background: white;
+}
+
+.archive-btn:hover:not(:disabled) {
+  color: white;
+  background: #ef4444;
+  transform: scale(1.05);
 }
 
 .notification-source {
@@ -1054,45 +1329,53 @@ export default {
   border-radius: 9999px;
 }
 
+.load-more-container {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.load-more-btn {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.load-more-btn:hover:not(:disabled) {
+  background: #e5e7eb;
+}
+
+.load-more-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .modal-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   padding: 1.5rem 2rem;
   border-top: 1px solid #e5e7eb;
   background-color: #f9fafb;
 }
 
-.btn-primary, .btn-secondary {
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
+.footer-stats {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+}
+
+.stat-item {
+  font-size: 0.875rem;
+  color: #6b7280;
   font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
 }
 
-.btn-primary {
-  background-color: #6366f1;
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: #4f46e5;
-}
-
-.btn-secondary {
-  background-color: #f3f4f6;
+.stat-item:first-child {
   color: #374151;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background-color: #e5e7eb;
-}
-
-.btn-secondary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 @media (max-width: 768px) {
@@ -1103,6 +1386,13 @@ export default {
   
   .modal-header {
     padding: 1rem 1.5rem;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  
+  .modal-header .header-actions {
+    justify-content: space-between;
   }
   
   .modal-filters {
@@ -1117,13 +1407,22 @@ export default {
   
   .modal-footer {
     padding: 1rem 1.5rem;
-    flex-direction: column;
-    gap: 1rem;
   }
   
-  .modal-footer .btn-primary,
-  .modal-footer .btn-secondary {
-    width: 100%;
+  .footer-stats {
+    flex-direction: column;
+    gap: 0.5rem;
+    text-align: center;
+  }
+  
+  .notification-actions {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .bulk-action-btn {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.8rem;
   }
 }
 </style>

@@ -1,5 +1,10 @@
 <template>
   <div class="customers-page">
+    <!-- Page Title -->
+    <div class="mb-3">
+      <h1 class="h3 fw-semibold text-primary-dark mb-0">Customer Management</h1>
+    </div>
+
     <!-- KPI Cards Row -->
     <div class="row g-4 mb-2">
       <div class="col-md-4">

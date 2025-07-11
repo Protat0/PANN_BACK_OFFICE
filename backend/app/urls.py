@@ -8,6 +8,7 @@ from .kpi_views.session_views import (
     ActiveSessionsView,
     UserSessionsView,
     SessionStatisticsView,
+    SessionDisplayView,
 )
 
 from .kpi_views.user_views import (
@@ -76,16 +77,27 @@ from .kpi_views.category_views import (
     CategoryDetailView,
     CategoryKPIView,
     CategorySubcategoryView,
+    CategoryDataView,
 
 )
 
 from .kpi_views.saleslog_views import (
     SalesLogView,
-    SalesLogStatsView
+    SalesLogStatsView,
+    SalesItemHistoryView,
+    SalesTopItemView,
+    SalesTopItemChartView,
+)
+
+from .kpi_views.sales_bulk_views import (
+    SalesLogBulkImportView,
+    SalesLogTemplateView,
+    SalesLogExportView,
 )
 
 from .views import (
     APIDocumentationView,
+    
 )
 
 urlpatterns = [
@@ -150,6 +162,7 @@ urlpatterns = [
     
     # Session logs endpoint
     path('session-logs/', SessionLogsView.as_view(), name='session-logs'),
+    path('session-logs/display/', SessionDisplayView.as_view(), name='session-logs-display'), #Data View
 
     # Session management endpoints
     path('sessions/', SessionManagementView.as_view(), name='session-management'),
@@ -163,16 +176,26 @@ urlpatterns = [
      path('customerkpidaily/', DailyCustomerKPIView.as_view(), name="get-daily-users"),
 
     # Category endpoints
-    path('category/', CategoryKPIView.as_view(), name="category-operations"),  # GET all categories, POST create category
+    path('category/', CategoryKPIView.as_view(), name="category-operations"), # GET all categories, POST create category
+    path('category/dataview/', CategoryDataView.as_view(), name="category-dataview"),  # DataView
     path('category/<str:category_id>/', CategoryDetailView.as_view(), name="category-detail"),  # GET, PUT, DELETE specific category
     path('category/<str:category_id>/subcategories/', CategorySubcategoryView.as_view(), name="category-subcategories"),  # Manage subcategories
+  
 
-    # Sales Log CRUD Operations
+   # Bulk import and template endpoints (MUST be first)
+    path('invoices/bulk-import/', SalesLogBulkImportView.as_view(), name='invoice-bulk-import'),
+    path('invoices/export/', SalesLogExportView.as_view(), name='invoice-export'),
+   # path('invoices/template/', SalesLogTemplateView.as_view(), name='invoice-template'), this is debugging
+    path('invoices/stats/', SalesLogStatsView.as_view(), name='invoice-stats'),
+    
+    # Generic CRUD operations (MUST be last)
     path('invoices/', SalesLogView.as_view(), name='invoice-list-create'),
     path('invoices/<str:invoice_id>/', SalesLogView.as_view(), name='invoice-detail'),
-    
-    # Sales Log Statistics
-    path('invoices/stats/', SalesLogStatsView.as_view(), name='invoice-stats'),
+
+    #Sales item Transaction History
+    path('reports/top-item/', SalesTopItemView.as_view(), name='top-items'),
+    path('reports/top-chart-item/', SalesTopItemChartView.as_view(), name='top-chart-items'), 
+    path('reports/item-history/', SalesItemHistoryView.as_view(), name='item-history'),
 
     # API Documentation
     path('docs/', APIDocumentationView.as_view(), name='api-documentation'),
