@@ -24,12 +24,6 @@
           </button>
           <ul class="dropdown-menu dropdown-menu-modern">
             <li>
-              <a class="dropdown-item" href="#" @click.prevent="createOrder">
-                <Plus :size="16" class="me-2" />
-                Create Purchase Order
-              </a>
-            </li>
-            <li>
               <a class="dropdown-item" href="#" @click.prevent="viewPaymentHistory">
                 <CreditCard :size="16" class="me-2" />
                 Payment History
@@ -114,11 +108,55 @@
       <button type="button" class="btn-close" @click="successMessage = null"></button>
     </div>
 
+    <!-- Quick Stats Card - Moved to Top -->
+    <div v-if="!loading && !error && supplier" class="card stats-card mb-4">
+      <div class="card-header">
+        <h5 class="card-title mb-0">
+          <BarChart3 :size="18" class="me-2" />
+          Quick Statistics
+        </h5>
+      </div>
+      <div class="card-body">
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-number text-primary">{{ supplier.purchaseOrders || 0 }}</div>
+            <div class="stat-label">Total Orders</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number text-warning">{{ getActiveOrders() }}</div>
+            <div class="stat-label">Active Orders</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number text-success">₱{{ formatCurrency(getTotalSpent()) }}</div>
+            <div class="stat-label">Total Spent</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number text-info">{{ getDaysActive() }}</div>
+            <div class="stat-label">Days Active</div>
+          </div>
+        </div>
+        
+        <!-- Performance Rating -->
+        <div class="mt-3 pt-3 border-top">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <small class="text-muted">Performance Rating</small>
+            <small class="text-muted">{{ supplier.rating || 4.5 }}/5.0</small>
+          </div>
+          <div class="progress" style="height: 6px;">
+            <div 
+              class="progress-bar bg-success" 
+              :style="{ width: ((supplier.rating || 4.5) / 5 * 100) + '%' }">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Supplier Details Content -->
     <div v-if="!loading && !error && supplier" class="row">
-      <!-- Left Column - Supplier Info Card -->
+      <!-- Left Column - Supplier Info Card with Notes -->
       <div class="col-lg-4">
-        <!-- Main Info Card -->
+        <!-- Main Info Card with Integrated Notes -->
         <div class="card supplier-info-card mb-4">
           <div class="card-header bg-primary text-white">
             <div class="d-flex align-items-center">
@@ -154,6 +192,14 @@
             </div>
           </div>
           <div class="card-body">
+            <!-- Contact Information -->
+            <div class="section-header">
+              <h6 class="fw-bold text-tertiary-dark mb-3">
+                <User :size="16" class="me-2" />
+                Contact Information
+              </h6>
+            </div>
+            
             <div class="info-item">
               <label>
                 <User :size="16" class="me-2" />
@@ -197,6 +243,16 @@
                 </button>
               </span>
             </div>
+
+            <!-- Business Information -->
+            <div class="section-divider"></div>
+            <div class="section-header">
+              <h6 class="fw-bold text-tertiary-dark mb-3">
+                <Building :size="16" class="me-2" />
+                Business Information
+              </h6>
+            </div>
+
             <div class="info-item">
               <label>
                 <Tag :size="16" class="me-2" />
@@ -211,54 +267,43 @@
               </label>
               <span>{{ formatDate(supplier.createdAt) }}</span>
             </div>
-            <div class="info-item mb-0">
+            <div class="info-item">
               <label>
                 <Clock :size="16" class="me-2" />
                 Last Updated:
               </label>
               <span>{{ formatDate(supplier.updatedAt) }}</span>
             </div>
-          </div>
-        </div>
 
-        <!-- Quick Stats Card -->
-        <div class="card stats-card mb-4">
-          <div class="card-header">
-            <h5 class="card-title mb-0">
-              <BarChart3 :size="18" class="me-2" />
-              Quick Stats
-            </h5>
-          </div>
-          <div class="card-body">
-            <div class="stats-grid">
-              <div class="stat-item">
-                <div class="stat-number text-primary">{{ supplier.purchaseOrders || 0 }}</div>
-                <div class="stat-label">Total Orders</div>
-              </div>
-              <div class="stat-item">
-                <div class="stat-number text-warning">{{ getActiveOrders() }}</div>
-                <div class="stat-label">Active Orders</div>
-              </div>
-              <div class="stat-item">
-                <div class="stat-number text-success">₱{{ formatCurrency(getTotalSpent()) }}</div>
-                <div class="stat-label">Total Spent</div>
-              </div>
-              <div class="stat-item">
-                <div class="stat-number text-info">{{ getDaysActive() }}</div>
-                <div class="stat-label">Days Active</div>
+            <!-- Additional Notes Section - Integrated -->
+            <div class="section-divider"></div>
+            <div class="section-header">
+              <div class="d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold text-tertiary-dark mb-0">
+                  <FileText :size="16" class="me-2" />
+                  Additional Notes
+                </h6>
+                <button class="btn btn-outline-secondary btn-sm" @click="toggleNotesEdit">
+                  <Edit :size="14" class="me-1" />
+                  {{ editingNotes ? 'Save' : 'Edit' }}
+                </button>
               </div>
             </div>
-            
-            <!-- Performance Rating -->
-            <div class="mt-3 pt-3 border-top">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <small class="text-muted">Performance Rating</small>
-                <small class="text-muted">{{ supplier.rating || 4.5 }}/5.0</small>
+
+            <div class="mt-3">
+              <div v-if="!editingNotes" class="notes-content">
+                {{ supplier.notes || 'No additional notes available' }}
               </div>
-              <div class="progress" style="height: 6px;">
-                <div 
-                  class="progress-bar bg-success" 
-                  :style="{ width: ((supplier.rating || 4.5) / 5 * 100) + '%' }">
+              <div v-else>
+                <textarea 
+                  class="form-control" 
+                  v-model="editableNotes" 
+                  rows="3"
+                  placeholder="Add notes about this supplier..."
+                ></textarea>
+                <div class="mt-2">
+                  <button class="btn btn-primary btn-sm me-2" @click="saveNotes">Save</button>
+                  <button class="btn btn-secondary btn-sm" @click="cancelNotesEdit">Cancel</button>
                 </div>
               </div>
             </div>
@@ -294,10 +339,6 @@
                     <li><a class="dropdown-item" href="#" @click="sortOrders('status')">Sort by Status</a></li>
                   </ul>
                 </div>
-                <button class="btn btn-primary btn-sm" @click="createOrder">
-                  <Plus :size="16" class="me-1" />
-                  New Order
-                </button>
               </div>
             </div>
           </div>
@@ -440,39 +481,6 @@
             <div v-if="recentActivity.length === 0" class="text-center py-4">
               <Clock :size="32" class="text-muted mb-2" />
               <p class="text-muted">No recent activity</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Notes Section -->
-        <div v-if="supplier.notes || editableNotes" class="card notes-card mt-4">
-          <div class="card-header">
-            <div class="d-flex justify-content-between align-items-center">
-              <h5 class="card-title mb-0">
-                <FileText :size="18" class="me-2" />
-                Additional Notes
-              </h5>
-              <button class="btn btn-outline-secondary btn-sm" @click="toggleNotesEdit">
-                <Edit :size="14" class="me-1" />
-                {{ editingNotes ? 'Save' : 'Edit' }}
-              </button>
-            </div>
-          </div>
-          <div class="card-body">
-            <div v-if="!editingNotes" class="notes-content">
-              {{ supplier.notes || 'No notes available' }}
-            </div>
-            <div v-else>
-              <textarea 
-                class="form-control" 
-                v-model="editableNotes" 
-                rows="4"
-                placeholder="Add notes about this supplier..."
-              ></textarea>
-              <div class="mt-2">
-                <button class="btn btn-primary btn-sm me-2" @click="saveNotes">Save</button>
-                <button class="btn btn-secondary btn-sm" @click="cancelNotesEdit">Cancel</button>
-              </div>
             </div>
           </div>
         </div>
@@ -1491,6 +1499,16 @@ export default {
   border-radius: 6px;
 }
 
+.section-header {
+  margin-bottom: 1rem;
+}
+
+.section-divider {
+  height: 1px;
+  background-color: var(--neutral-medium);
+  margin: 1.5rem 0;
+}
+
 .info-item {
   display: flex;
   flex-direction: column;
@@ -1622,9 +1640,10 @@ export default {
   color: var(--tertiary-dark);
   line-height: 1.6;
   background: var(--neutral-light);
-  padding: 1rem;
+  padding: 0.75rem;
   border-radius: 8px;
   font-style: italic;
+  border: 1px solid var(--neutral-medium);
 }
 
 .modern-modal {
@@ -1652,7 +1671,7 @@ export default {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 1rem;
 }
 
@@ -1661,6 +1680,7 @@ export default {
   padding: 1rem;
   background: var(--neutral-light);
   border-radius: 8px;
+  border: 1px solid var(--neutral-medium);
 }
 
 .stat-number {
@@ -1690,6 +1710,12 @@ export default {
 }
 
 /* Responsive adjustments */
+@media (max-width: 992px) {
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 @media (max-width: 768px) {
   .stats-grid {
     grid-template-columns: 1fr;
@@ -1703,6 +1729,20 @@ export default {
   .dropdown-menu-modern {
     width: 100%;
     min-width: unset;
+  }
+  
+  .supplier-details-page {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .page-header {
+    padding: 1rem;
+  }
+  
+  .section-divider {
+    margin: 1rem 0;
   }
 }
 </style>
