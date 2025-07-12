@@ -10,17 +10,13 @@
         <div>
           <h1 class="h3 fw-semibold text-primary-dark mb-0">Purchase Orders History</h1>
           <p class="text-tertiary-medium mb-0" v-if="!loading">
-            {{ ordersComposable?.filteredOrders?.length || 0 }} orders found
+            {{ displayOrders?.length || 0 }} orders found
           </p>
         </div>
       </div>
       
       <!-- Quick Actions -->
       <div class="d-flex gap-2">
-        <button class="btn btn-success btn-sm" @click="createNewOrder">
-          <Plus :size="14" class="me-1" />
-          New Order
-        </button>
         <button class="btn btn-outline-secondary btn-sm" @click="exportOrders">
           <Download :size="14" class="me-1" />
           Export
@@ -141,7 +137,7 @@
           <h5 class="mb-0">Purchase Orders</h5>
           <div class="d-flex align-items-center gap-3">
             <span class="badge bg-white text-primary">
-              {{ ordersComposable?.filteredOrders?.length || 0 }} orders
+              {{ displayOrders?.length || 0 }} orders
             </span>
             <button 
               v-if="hasFilters" 
@@ -155,7 +151,7 @@
         </div>
       </div>
 
-      <div class="table-responsive" v-if="ordersComposable?.filteredOrders?.length > 0">
+      <div class="table-responsive" v-if="displayOrders?.length > 0">
         <table class="table table-hover mb-0">
           <thead class="table-light sticky-top">
             <tr>
@@ -241,10 +237,10 @@
                     <Eye :size="14" />
                   </button>
                   <button 
-                    class="btn btn-sm btn-outline-secondary" 
+                    :class="getEditButtonClass(order)"
                     @click="editOrder(order)"
-                    title="Edit Order"
-                    :disabled="order.status === 'delivered' || order.status === 'cancelled'"
+                    :title="getEditTooltip(order)"
+                    :disabled="!canEditOrder(order) && !canEditLimited(order)"
                   >
                     <Edit :size="14" />
                   </button>
@@ -263,7 +259,7 @@
       </div>
 
       <!-- Empty State -->
-      <div v-if="ordersComposable?.filteredOrders?.length === 0" class="text-center py-5">
+      <div v-if="displayOrders?.length === 0" class="text-center py-5">
         <div class="py-4">
           <Package :size="48" class="text-tertiary-medium mb-3" />
           <h5 class="text-tertiary-dark">No Orders Found</h5>
@@ -275,19 +271,15 @@
               <RefreshCw :size="16" class="me-1" />
               Clear Filters
             </button>
-            <button class="btn btn-success" @click="createNewOrder">
-              <Plus :size="16" class="me-1" />
-              Create First Order
-            </button>
           </div>
         </div>
       </div>
 
       <!-- Pagination -->
-      <div v-if="ordersComposable?.filteredOrders?.length > itemsPerPage" class="card-footer">
+      <div v-if="displayOrders?.length > itemsPerPage" class="card-footer">
         <nav class="d-flex justify-content-between align-items-center">
           <div class="text-tertiary-medium">
-            Showing {{ startItem }}-{{ endItem }} of {{ ordersComposable.filteredOrders.length }} orders
+            Showing {{ startItem }}-{{ endItem }} of {{ displayOrders.length }} orders
           </div>
           <ul class="pagination pagination-sm mb-0">
             <li class="page-item" :class="{ disabled: currentPage === 1 }">
@@ -370,9 +362,9 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" @click="closeModal">Close</button>
-            <button type="button" class="btn btn-outline-primary" @click="editOrder(selectedOrder)">
+            <button type="button" class="btn btn-outline-primary" @click="editOrder(selectedOrder)" :disabled="!canEditOrder(selectedOrder) && !canEditLimited(selectedOrder)">
               <Edit :size="16" class="me-1" />
-              Edit Order
+              {{ canEditOrder(selectedOrder) ? 'Edit Order' : canEditLimited(selectedOrder) ? 'Edit Details' : 'Cannot Edit' }}
             </button>
             <button type="button" class="btn btn-outline-info" @click="downloadOrder(selectedOrder)">
               <Download :size="16" class="me-1" />
@@ -383,6 +375,132 @@
       </div>
     </div>
     <div v-if="showOrderModal" class="modal-backdrop fade show" @click="closeModal"></div>
+
+    <!-- Edit Order Modal -->
+    <div v-if="showEditModal" class="modal fade show" style="display: block;" tabindex="-1">
+      <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+          <div class="modal-header bg-warning text-dark">
+            <h5 class="modal-title">
+              <Edit :size="20" class="me-2" />
+              Edit Order - {{ editingOrder?.id }}
+            </h5>
+            <button type="button" class="btn-close" @click="closeEditModal"></button>
+          </div>
+          <div class="modal-body">
+            <div v-if="editingOrder" class="row">
+              <!-- Order Details Section -->
+              <div class="col-md-6">
+                <h6 class="fw-bold text-tertiary-dark mb-3">Order Information</h6>
+                <div class="mb-3">
+                  <label class="form-label text-tertiary-dark">Order ID</label>
+                  <input type="text" class="form-control" :value="editingOrder.id" disabled>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label text-tertiary-dark">Order Date</label>
+                  <input type="date" class="form-control" v-model="editingOrder.orderDate">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label text-tertiary-dark">Expected Delivery</label>
+                  <input type="date" class="form-control" v-model="editingOrder.expectedDelivery">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label text-tertiary-dark">Status</label>
+                  <select class="form-select" v-model="editingOrder.status">
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="in_transit">In Transit</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Supplier Details Section -->
+              <div class="col-md-6">
+                <h6 class="fw-bold text-tertiary-dark mb-3">Supplier Information</h6>
+                <div class="mb-3">
+                  <label class="form-label text-tertiary-dark">Supplier Name</label>
+                  <select class="form-select" v-model="editingOrder.supplier">
+                    <option value="Bravo Warehouse">Bravo Warehouse</option>
+                    <option value="John Doe Supplies">John Doe Supplies</option>
+                    <option value="San Juan Groups">San Juan Groups</option>
+                    <option value="Bagatayam Inc.">Bagatayam Inc.</option>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label text-tertiary-dark">Supplier Email</label>
+                  <input type="email" class="form-control" v-model="editingOrder.supplierEmail">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label text-tertiary-dark">Total Amount</label>
+                  <div class="input-group">
+                    <span class="input-group-text">₱</span>
+                    <input type="number" class="form-control" v-model="editingOrder.totalAmount" step="0.01">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Items Section -->
+              <div class="col-12 mt-4">
+                <h6 class="fw-bold text-tertiary-dark mb-3">Order Items</h6>
+                <div class="table-responsive">
+                  <table class="table table-bordered">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Item Name</th>
+                        <th style="width: 120px;">Quantity</th>
+                        <th style="width: 140px;">Unit Price (₱)</th>
+                        <th style="width: 140px;">Total (₱)</th>
+                        <th style="width: 80px;">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(item, index) in editingOrder.items" :key="index">
+                        <td>
+                          <input type="text" class="form-control form-control-sm" v-model="item.name">
+                        </td>
+                        <td>
+                          <input type="number" class="form-control form-control-sm" v-model="item.quantity" min="1">
+                        </td>
+                        <td>
+                          <input type="number" class="form-control form-control-sm" v-model="item.unitPrice" step="0.01" min="0">
+                        </td>
+                        <td>
+                          <span class="fw-bold">₱{{ formatCurrency(item.quantity * item.unitPrice) }}</span>
+                        </td>
+                        <td>
+                          <button class="btn btn-sm btn-outline-danger" @click="removeItem(index)" title="Remove Item">
+                            <X :size="14" />
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                  <button class="btn btn-outline-success btn-sm" @click="addNewItem">
+                    <Plus :size="14" class="me-1" />
+                    Add Item
+                  </button>
+                  <div class="text-end">
+                    <strong class="text-tertiary-dark">Total Amount: ₱{{ formatCurrency(calculateTotal()) }}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="closeEditModal">Cancel</button>
+            <button type="button" class="btn btn-warning" @click="saveOrderChanges">
+              <Edit :size="16" class="me-1" />
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="showEditModal" class="modal-backdrop fade show" @click="closeEditModal"></div>
   </div>
 </template>
 
@@ -391,7 +509,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   ArrowLeft,
-  Plus,
   Download,
   Search,
   X,
@@ -402,7 +519,8 @@ import {
   ChevronUp,
   ChevronLeft,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Plus
 } from 'lucide-vue-next'
 
 // Composables
@@ -412,7 +530,6 @@ export default {
   name: 'OrdersHistory',
   components: {
     ArrowLeft,
-    Plus,
     Download,
     Search,
     X,
@@ -423,11 +540,61 @@ export default {
     ChevronUp,
     ChevronLeft,
     ChevronRight,
-    AlertCircle
+    AlertCircle,
+    Plus
   },
   setup() {
     const router = useRouter()
     const ordersComposable = useOrdersHistory()
+    
+    // Mock data for demonstration
+    const mockOrders = ref([
+      {
+        id: 'PO-2025-001',
+        supplier: 'Bravo Warehouse',
+        supplierEmail: 'orders@bravowarehouse.com',
+        status: 'in_transit',
+        orderDate: '2025-01-10',
+        expectedDelivery: '2025-01-15',
+        totalAmount: 25750.00,
+        items: [
+          { name: 'Shin Ramyun (Pack of 20)', quantity: 10, unitPrice: 950.00 },
+          { name: 'Samyang Hot Chicken (Pack of 5)', quantity: 15, unitPrice: 425.00 },
+          { name: 'Kimchi 500g', quantity: 20, unitPrice: 180.00 },
+          { name: 'Korean Seaweed Snacks (Box)', quantity: 8, unitPrice: 320.00 }
+        ]
+      },
+      {
+        id: 'PO-2025-002',
+        supplier: 'John Doe Supplies',
+        supplierEmail: 'contact@johndoesupplies.ph',
+        status: 'delivered',
+        orderDate: '2025-01-05',
+        expectedDelivery: '2025-01-12',
+        totalAmount: 18900.00,
+        items: [
+          { name: 'Nongshim Bowl Noodles (Pack of 12)', quantity: 12, unitPrice: 680.00 },
+          { name: 'Korean Rice Cakes 1kg', quantity: 8, unitPrice: 350.00 },
+          { name: 'Gochujang Sauce 500g', quantity: 15, unitPrice: 250.00 },
+          { name: 'Korean Corn Tea (Pack of 30)', quantity: 6, unitPrice: 485.00 }
+        ]
+      },
+      {
+        id: 'PO-2025-003',
+        supplier: 'San Juan Groups',
+        supplierEmail: 'procurement@sanjuangroups.com',
+        status: 'pending',
+        orderDate: '2025-01-12',
+        expectedDelivery: '2025-01-18',
+        totalAmount: 32400.00,
+        items: [
+          { name: 'Korean Instant Noodles Variety Pack', quantity: 25, unitPrice: 750.00 },
+          { name: 'Korean BBQ Sauce 750ml', quantity: 12, unitPrice: 280.00 },
+          { name: 'Kimchi Premium 1kg', quantity: 18, unitPrice: 320.00 },
+          { name: 'Korean Green Tea (Premium Box)', quantity: 10, unitPrice: 540.00 }
+        ]
+      }
+    ])
     
     // Local state
     const loading = ref(false)
@@ -440,17 +607,27 @@ export default {
     const searchFilter = ref('')
     const showOrderModal = ref(false)
     const selectedOrder = ref(null)
+    const showEditModal = ref(false)
+    const editingOrder = ref(null)
 
     // Computed
+    const displayOrders = computed(() => {
+      // Use mock data if composable data is not available or empty
+      if (!ordersComposable?.filteredOrders?.length) {
+        return applyLocalFilters(mockOrders.value)
+      }
+      return ordersComposable.filteredOrders
+    })
+
     const paginatedOrders = computed(() => {
-      if (!ordersComposable?.filteredOrders?.length) return []
+      if (!displayOrders.value?.length) return []
       const start = (currentPage.value - 1) * itemsPerPage.value
       const end = start + itemsPerPage.value
-      return ordersComposable.filteredOrders.slice(start, end)
+      return displayOrders.value.slice(start, end)
     })
 
     const totalPages = computed(() => {
-      return Math.ceil((ordersComposable?.filteredOrders?.length || 0) / itemsPerPage.value)
+      return Math.ceil((displayOrders.value?.length || 0) / itemsPerPage.value)
     })
 
     const startItem = computed(() => {
@@ -458,7 +635,7 @@ export default {
     })
 
     const endItem = computed(() => {
-      return Math.min(currentPage.value * itemsPerPage.value, ordersComposable?.filteredOrders?.length || 0)
+      return Math.min(currentPage.value * itemsPerPage.value, displayOrders.value?.length || 0)
     })
 
     const visiblePages = computed(() => {
@@ -519,6 +696,67 @@ export default {
       }
     }
 
+    const applyLocalFilters = (orders) => {
+      let filtered = [...orders]
+      
+      // Status filter
+      if (statusFilter.value !== 'all') {
+        filtered = filtered.filter(order => order.status === statusFilter.value)
+      }
+      
+      // Supplier filter
+      if (supplierFilter.value !== 'all') {
+        const supplierMap = {
+          'bravo_warehouse': 'Bravo Warehouse',
+          'john_doe_supplies': 'John Doe Supplies',
+          'san_juan_groups': 'San Juan Groups',
+          'bagatayam_inc': 'Bagatayam Inc.'
+        }
+        const supplierName = supplierMap[supplierFilter.value]
+        if (supplierName) {
+          filtered = filtered.filter(order => order.supplier === supplierName)
+        }
+      }
+      
+      // Date filter
+      if (dateFilter.value !== 'all') {
+        const now = new Date()
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        
+        filtered = filtered.filter(order => {
+          const orderDate = new Date(order.orderDate)
+          
+          switch (dateFilter.value) {
+            case 'today':
+              return orderDate >= today
+            case 'week':
+              const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
+              return orderDate >= weekAgo
+            case 'month':
+              const monthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
+              return orderDate >= monthAgo
+            case 'quarter':
+              const quarterAgo = new Date(today.getFullYear(), today.getMonth() - 3, today.getDate())
+              return orderDate >= quarterAgo
+            default:
+              return true
+          }
+        })
+      }
+      
+      // Search filter
+      if (searchFilter.value.trim()) {
+        const searchTerm = searchFilter.value.toLowerCase().trim()
+        filtered = filtered.filter(order => 
+          order.id.toLowerCase().includes(searchTerm) ||
+          order.supplier.toLowerCase().includes(searchTerm) ||
+          order.supplierEmail.toLowerCase().includes(searchTerm)
+        )
+      }
+      
+      return filtered
+    }
+
     const applyFilters = () => {
       if (ordersComposable?.filters) {
         ordersComposable.filters.status = statusFilter.value
@@ -561,17 +799,56 @@ export default {
       selectedOrder.value = null
     }
 
+    const closeEditModal = () => {
+      showEditModal.value = false
+      editingOrder.value = null
+    }
+
     const editOrder = (order) => {
       closeModal()
-      alert(`Edit order ${order.id} - This would open an edit modal or navigate to edit page`)
+      
+      if (canEditOrder(order)) {
+        // Open full edit modal for pending orders
+        editingOrder.value = { ...order } // Create a copy for editing
+        showEditModal.value = true
+      } else if (canEditLimited(order)) {
+        alert(`Limited edit for order ${order.id} - This would open an edit modal with only delivery date and contact details editable`)
+      } else {
+        alert(`Order ${order.id} cannot be edited due to its current status: ${order.status}`)
+      }
+    }
+
+    const saveOrderChanges = () => {
+      // In a real app, this would save to the backend
+      alert(`Order ${editingOrder.value.id} saved successfully!`)
+      closeEditModal()
+    }
+
+    const addNewItem = () => {
+      editingOrder.value.items.push({
+        name: '',
+        quantity: 1,
+        unitPrice: 0
+      })
+    }
+
+    const removeItem = (index) => {
+      if (editingOrder.value.items.length > 1) {
+        editingOrder.value.items.splice(index, 1)
+      } else {
+        alert('Order must have at least one item')
+      }
+    }
+
+    const calculateTotal = () => {
+      if (!editingOrder.value?.items) return 0
+      return editingOrder.value.items.reduce((total, item) => {
+        return total + (item.quantity * item.unitPrice)
+      }, 0)
     }
 
     const downloadOrder = (order) => {
       alert(`Downloading order ${order.id} as PDF...`)
-    }
-
-    const createNewOrder = () => {
-      alert('Create new order - This would open a create order modal or navigate to create page')
     }
 
     const exportOrders = () => {
@@ -579,6 +856,44 @@ export default {
         ordersComposable.exportOrdersData('csv')
       } else {
         alert('Export functionality - This would export the filtered orders to CSV')
+      }
+    }
+
+    // Utility methods for order editing
+    const canEditOrder = (order) => {
+      // Only pending orders can be fully edited
+      return order.status === 'pending'
+    }
+
+    const canEditLimited = (order) => {
+      // Confirmed orders can have limited edits (like delivery dates)
+      return order.status === 'confirmed'
+    }
+
+    const getEditTooltip = (order) => {
+      switch (order.status) {
+        case 'pending':
+          return 'Edit Order'
+        case 'confirmed':
+          return 'Edit delivery details only'
+        case 'in_transit':
+          return 'Cannot edit - Order is in transit'
+        case 'delivered':
+          return 'Cannot edit - Order has been delivered'
+        case 'cancelled':
+          return 'Cannot edit - Order has been cancelled'
+        default:
+          return 'Edit not available'
+      }
+    }
+
+    const getEditButtonClass = (order) => {
+      if (canEditOrder(order)) {
+        return 'btn btn-sm btn-outline-secondary'
+      } else if (canEditLimited(order)) {
+        return 'btn btn-sm btn-outline-warning'
+      } else {
+        return 'btn btn-sm btn-outline-secondary'
       }
     }
 
@@ -689,6 +1004,9 @@ export default {
       // Composables
       ordersComposable,
       
+      // Mock data
+      mockOrders,
+      
       // Local state
       loading,
       error,
@@ -700,8 +1018,11 @@ export default {
       searchFilter,
       showOrderModal,
       selectedOrder,
+      showEditModal,
+      editingOrder,
       
       // Computed
+      displayOrders,
       paginatedOrders,
       totalPages,
       startItem,
@@ -709,7 +1030,14 @@ export default {
       visiblePages,
       hasFilters,
       
+      // Order editing utilities
+      canEditOrder,
+      canEditLimited,
+      getEditTooltip,
+      getEditButtonClass,
+      
       // Methods
+      applyLocalFilters,
       goBack,
       refreshData,
       applyFilters,
@@ -718,10 +1046,14 @@ export default {
       goToPage,
       viewOrder,
       closeModal,
+      closeEditModal,
       editOrder,
       downloadOrder,
-      createNewOrder,
       exportOrders,
+      saveOrderChanges,
+      addNewItem,
+      removeItem,
+      calculateTotal,
       formatDate,
       formatCurrency,
       getDaysAgo,
