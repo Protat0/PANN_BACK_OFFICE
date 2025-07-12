@@ -1,150 +1,50 @@
 <template>
-  <div class="container-fluid py-4 suppliers-page">
-    <!-- Header Section -->
-    <div class="d-flex justify-content-between align-items-center mb-4 page-header">
-      <h1 class="h2 fw-semibold text-primary-dark mb-0">Supplier Management</h1>
-      <div class="d-flex gap-2 flex-wrap">
-        <!-- Add Suppliers Dropdown -->
-        <div class="dropdown" ref="addDropdownRef">
-          <button 
-            class="btn btn-primary btn-sm btn-with-icon-sm dropdown-toggle" 
-            type="button"
-            @click="addDropdown.toggleDropdown"
-            :class="{ 'active': addDropdown.showDropdown.value }"
-          >
-            <Plus :size="16" />
-            Add Suppliers
-          </button>
-          
-          <div 
-            class="dropdown-menu custom-dropdown-menu" 
-            :class="{ 'show': addDropdown.showDropdown.value }"
-          >
-            <button class="dropdown-item custom-dropdown-item" @click="handleSingleSupplier">
-              <div class="d-flex align-items-center gap-3">
-                <Plus :size="18" class="text-primary" />
-                <div>
-                  <div class="fw-semibold">Single Supplier</div>
-                  <small class="text-muted">Add one supplier manually</small>
-                </div>
-              </div>
-            </button>
-            
-            <button class="dropdown-item custom-dropdown-item" @click="handleBulkAdd">
-              <div class="d-flex align-items-center gap-3">
-                <Building :size="18" class="text-primary" />
-                <div>
-                  <div class="fw-semibold">Bulk Entry</div>
-                  <small class="text-muted">Add multiple suppliers (5-20 items)</small>
-                </div>
-              </div>
-            </button>
-            
-            <button class="dropdown-item custom-dropdown-item" @click="handleImport">
-              <div class="d-flex align-items-center gap-3">
-                <FileText :size="18" class="text-primary" />
-                <div>
-                  <div class="fw-semibold">Import File</div>
-                  <small class="text-muted">Upload CSV/Excel (20+ items)</small>
-                </div>
-              </div>
-            </button>
-          </div>
-        </div>
-        
-        <button 
-          class="btn btn-outline-primary btn-sm btn-with-icon-sm"
-          @click="exportComposable.openExportModal"
-        >
-          <Download :size="16" />
-          Export
-        </button>
-        <button 
-          class="btn btn-outline-secondary btn-sm btn-with-icon-sm"
-          @click="suppliersComposable.refreshData" 
-          :disabled="suppliersComposable.loading.value"
-          :class="{ 'btn-loading': suppliersComposable.loading.value }"
-        >
-          <RefreshCw :size="16" :class="{ 'spin': suppliersComposable.loading.value }" />
-          {{ suppliersComposable.loading.value ? 'Loading...' : 'Refresh' }}
-        </button>
-      </div>
+  <div class="container-fluid pt-2 pb-4 suppliers-page">
+    <!-- Page Title -->
+    <div class="mb-3">
+      <h1 class="h3 fw-semibold text-primary-dark mb-0">Supplier Management</h1>
     </div>
 
     <!-- Reports Section -->
-    <div class="row mb-4" v-if="!suppliersComposable.loading.value">
-      <div class="col-md-6 col-lg-3 mb-3">
-        <div class="card border-start border-warning border-4 h-100 report-card" @click="showActiveOrdersReport">
-          <div class="card-body">
-            <h6 class="card-title text-tertiary-dark mb-2">Active Orders</h6>
-            <h2 class="text-warning fw-bold mb-1">{{ suppliersComposable.reportData.activeOrdersCount }}</h2>
-            <small class="text-tertiary-medium">Pending Purchase Orders</small>
-          </div>
-        </div>
+    <div class="row mb-3" v-if="!suppliersComposable.loading?.value">
+      <div class="col-6 col-md-6 mb-2">
+        <CardTemplate
+          size="xs"
+          border-color="warning"
+          border-position="start"
+          title="Active Orders"
+          :value="reportsComposable.activeOrdersCount"
+          value-color="warning"
+          subtitle="Pending Purchase Orders"
+          clickable
+          @click="reportsComposable.openActiveOrdersModal"
+        />
       </div>
-      <div class="col-md-6 col-lg-3 mb-3">
-        <div class="card border-start border-success border-4 h-100 report-card" @click="showTopSuppliersReport">
-          <div class="card-body">
-            <h6 class="card-title text-tertiary-dark mb-2">Top Performers</h6>
-            <h2 class="text-success fw-bold mb-1">{{ suppliersComposable.reportData.topSuppliersCount }}</h2>
-            <small class="text-tertiary-medium">High Volume Suppliers</small>
-          </div>
-        </div>
+      <div class="col-6 col-md-6 mb-2">
+        <CardTemplate
+          size="xs"
+          border-color="success"
+          border-position="start"
+          title="Top Performers"
+          :value="reportsComposable.topPerformersCount"
+          value-color="success"
+          subtitle="High Volume Suppliers"
+          clickable
+          @click="reportsComposable.openTopPerformersModal"
+        />
       </div>
     </div>
 
-    <!-- Filters -->
-    <div class="card mb-4">
-      <div class="card-body">
-        <div class="row g-3">
-          <div class="col-md-6 col-lg-3">
-            <label for="typeFilter" class="form-label text-tertiary-dark fw-medium">Type</label>
-            <select id="typeFilter" class="form-select" v-model="suppliersComposable.filters.type">
-              <option value="all">All Types</option>
-              <option value="food">Food & Beverages</option>
-              <option value="packaging">Packaging</option>
-              <option value="equipment">Equipment</option>
-              <option value="services">Services</option>
-            </select>
-          </div>
-          
-          <div class="col-md-6 col-lg-3">
-            <label for="statusFilter" class="form-label text-tertiary-dark fw-medium">Status</label>
-            <select id="statusFilter" class="form-select" v-model="suppliersComposable.filters.status">
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="pending">Pending</option>
-            </select>
-          </div>
-
-          <div class="col-md-6 col-lg-3">
-            <label for="orderFilter" class="form-label text-tertiary-dark fw-medium">Order Volume</label>
-            <select id="orderFilter" class="form-select" v-model="suppliersComposable.filters.order">
-              <option value="all">All Volumes</option>
-              <option value="high">High Volume (10+)</option>
-              <option value="medium">Medium Volume (5-9)</option>
-              <option value="low">Low Volume (1-4)</option>
-              <option value="none">No Orders</option>
-            </select>
-          </div>
-
-          <div class="col-md-6 col-lg-3">
-            <label for="searchFilter" class="form-label text-tertiary-dark fw-medium">Search</label>
-            <input 
-              id="searchFilter" 
-              v-model="suppliersComposable.filters.search" 
-              type="text" 
-              class="form-control"
-              placeholder="Search by name, email, or phone..."
-            />
-          </div>
-        </div>
-      </div>
+    <!-- Debug Info (remove in production) -->
+    <div v-if="false" class="alert alert-info mb-4">
+      <h6>Debug Info:</h6>
+      <p>Loading: {{ suppliersComposable.loading?.value ?? 'undefined' }}</p>
+      <p>Suppliers Length: {{ suppliersComposable.suppliers?.value?.length ?? 'undefined' }}</p>
+      <p>Report Data: {{ JSON.stringify(reportsComposable.reportData) }}</p>
     </div>
 
     <!-- Loading State -->
-    <div v-if="suppliersComposable.loading.value && suppliersComposable.suppliers.value.length === 0" class="text-center py-5">
+    <div v-if="suppliersComposable.loading?.value && (!suppliersComposable.suppliers?.value || suppliersComposable.suppliers.value.length === 0)" class="text-center py-5">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Loading...</span>
       </div>
@@ -152,47 +52,172 @@
     </div>
 
     <!-- Error State -->
-    <div v-if="suppliersComposable.error.value" class="alert alert-danger text-center" role="alert">
+    <div v-if="suppliersComposable.error?.value" class="alert alert-danger text-center" role="alert">
       <p class="mb-3">{{ suppliersComposable.error.value }}</p>
       <button class="btn btn-primary" @click="suppliersComposable.refreshData">Try Again</button>
     </div>
 
     <!-- Success Message -->
-    <div v-if="suppliersComposable.successMessage.value" class="alert alert-success text-center" role="alert">
+    <div v-if="suppliersComposable.successMessage?.value" class="alert alert-success text-center" role="alert">
       {{ suppliersComposable.successMessage.value }}
     </div>
 
-    <!-- Table Controls -->
-    <div v-if="!suppliersComposable.loading.value || suppliersComposable.suppliers.value.length > 0" class="card mb-3">
-      <div class="card-body py-3">
-        <div class="d-flex justify-content-between align-items-center">
-          <div class="d-flex align-items-center gap-3">
+    <!-- Action Bar and Filters - Separate Section -->
+    <div v-if="!suppliersComposable.loading?.value || (suppliersComposable.suppliers?.value && suppliersComposable.suppliers.value.length > 0)" class="action-bar-container mb-3">
+      <!-- Integrated Header with Actions and Filters -->
+      <div class="action-bar-controls">
+        <!-- Action Row: Action Buttons and Filters -->
+        <div class="action-row">
+          <!-- Left Side: Main Actions (Always visible when no selection) -->
+          <div v-if="suppliersComposable.selectedSuppliers?.value?.length === 0" class="d-flex gap-2">
+            <!-- Add Suppliers Dropdown -->
+            <div class="dropdown" ref="addDropdownRef">
+              <button 
+                class="btn btn-success btn-sm btn-with-icon-sm dropdown-toggle"
+                type="button"
+                @click="toggleAddDropdown"
+                :class="{ 'active': showAddDropdown }"
+              >
+                <Plus :size="14" />
+                ADD ITEM
+              </button>
+              
+              <div 
+                class="dropdown-menu custom-dropdown-menu" 
+                :class="{ 'show': showAddDropdown }"
+              >
+                <button class="dropdown-item custom-dropdown-item" @click="handleSingleSupplier">
+                  <div class="d-flex align-items-center gap-3">
+                    <Plus :size="16" class="text-primary" />
+                    <div>
+                      <div class="fw-semibold">Single Supplier</div>
+                      <small class="text-muted">Add one supplier manually</small>
+                    </div>
+                  </div>
+                </button>
+                
+                <button class="dropdown-item custom-dropdown-item" @click="handleBulkAdd">
+                  <div class="d-flex align-items-center gap-3">
+                    <Building :size="16" class="text-primary" />
+                    <div>
+                      <div class="fw-semibold">Bulk Entry</div>
+                      <small class="text-muted">Add multiple suppliers (5-20 items)</small>
+                    </div>
+                  </div>
+                </button>
+                
+                <button class="dropdown-item custom-dropdown-item" @click="handleImport">
+                  <div class="d-flex align-items-center gap-3">
+                    <FileText :size="16" class="text-primary" />
+                    <div>
+                      <div class="fw-semibold">Import File</div>
+                      <small class="text-muted">Upload CSV/Excel (20+ items)</small>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
             <button 
-              class="btn btn-sm btn-danger"
-              @click="suppliersComposable.deleteSelected" 
-              :disabled="suppliersComposable.selectedSuppliers.value.length === 0 || suppliersComposable.loading.value"
+              class="btn btn-outline-secondary btn-sm"
+              @click="exportComposable.openExportModal"
             >
-              <i class="bi bi-trash me-1"></i>
-              Delete Selected ({{ suppliersComposable.selectedSuppliers.value.length }})
+              EXPORT
             </button>
           </div>
-          <small class="text-tertiary-medium">
-            Showing {{ suppliersComposable.filteredSuppliers.value.length }} of {{ suppliersComposable.suppliers.value.length }} suppliers
-          </small>
+
+          <!-- Selection Actions (Visible when items are selected) -->
+          <div v-if="suppliersComposable.selectedSuppliers?.value?.length > 0" class="d-flex gap-2">
+            <button 
+              class="btn btn-delete btn-sm btn-with-icon-sm"
+              @click="suppliersComposable.deleteSelected"
+              :disabled="suppliersComposable.loading?.value"
+            >
+              <Trash2 :size="14" />
+              DELETE
+            </button>
+          </div>
+
+          <!-- Right Side: Filters and Search -->
+          <div class="d-flex align-items-center gap-2">
+            <!-- Search Toggle -->
+            <button 
+              class="btn btn-secondary btn-sm"
+              @click="toggleSearchMode"
+              :class="{ 'active': searchMode }"
+              style="height: calc(1.5em + 0.75rem + 2px); display: flex; align-items: center; justify-content: center; padding: 0 0.75rem;"
+            >
+              <Search :size="16" />
+            </button>
+
+            <!-- Filter Dropdowns (Hidden when search is active) -->
+            <template v-if="!searchMode">
+              <div class="filter-dropdown">
+                <label class="filter-label">Category</label>
+                <select 
+                  class="form-select form-select-sm" 
+                  v-model="suppliersComposable.filters.type" 
+                  @change="applyFilters"
+                >
+                  <option value="all">All items</option>
+                  <option value="food">Food & Beverages</option>
+                  <option value="packaging">Packaging</option>
+                  <option value="equipment">Equipment</option>
+                  <option value="services">Services</option>
+                </select>
+              </div>
+
+              <div class="filter-dropdown">
+                <label class="filter-label">Stock alert</label>
+                <select 
+                  class="form-select form-select-sm" 
+                  v-model="suppliersComposable.filters.order" 
+                  @change="applyFilters"
+                >
+                  <option value="all">All items</option>
+                  <option value="high">High Volume (10+)</option>
+                  <option value="medium">Medium Volume (5-9)</option>
+                  <option value="low">Low Volume (1-4)</option>
+                  <option value="none">No Orders</option>
+                </select>
+              </div>
+            </template>
+
+            <!-- Search Bar (Visible when search mode is active) -->
+            <div v-if="searchMode" class="search-container">
+              <div class="position-relative">
+                <input 
+                  ref="searchInputRef"
+                  v-model="suppliersComposable.filters.search" 
+                  @input="applyFilters"
+                  type="text" 
+                  class="form-control form-control-sm search-input"
+                  placeholder="Search"
+                />
+                <button 
+                  class="btn btn-sm btn-link position-absolute end-0 top-50 translate-middle-y"
+                  @click="clearSearch"
+                  style="border: none; padding: 0.25rem;"
+                >
+                  <X :size="16" />
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Suppliers Grid -->
-    <div v-if="!suppliersComposable.loading.value || suppliersComposable.suppliers.value.length > 0" class="row g-4">
+    <div v-if="!suppliersComposable.loading?.value || (suppliersComposable.suppliers?.value && suppliersComposable.suppliers.value.length > 0)" class="row g-4">
       <div 
-        v-for="supplier in suppliersComposable.filteredSuppliers.value" 
+        v-for="supplier in suppliersComposable.filteredSuppliers?.value || []" 
         :key="supplier.id"
         class="col-12 col-md-6 col-lg-4"
       >
         <SupplierCard
           :supplier="supplier"
-          :is-selected="suppliersComposable.selectedSuppliers.value.includes(supplier.id)"
+          :is-selected="suppliersComposable.selectedSuppliers?.value?.includes(supplier.id) || false"
           @toggle-select="toggleSupplierSelection"
           @edit="formComposable.editSupplier"
           @view="viewSupplier"
@@ -202,28 +227,28 @@
       </div>
 
       <!-- Empty State -->
-      <div v-if="suppliersComposable.filteredSuppliers.value.length === 0" class="col-12">
+      <div v-if="!suppliersComposable.filteredSuppliers?.value?.length" class="col-12">
         <div class="text-center py-5">
           <div class="card">
             <div class="card-body py-5">
-              <i class="bi bi-building display-1 text-muted mb-3"></i>
+              <Building :size="48" class="text-tertiary-medium mb-3" />
               <p class="text-tertiary-medium mb-3">
-                {{ suppliersComposable.suppliers.value.length === 0 ? 'No suppliers found' : 'No suppliers match the current filters' }}
+                {{ !suppliersComposable.suppliers?.value?.length ? 'No suppliers found' : 'No suppliers match the current filters' }}
               </p>
               <button 
-                v-if="suppliersComposable.suppliers.value.length === 0" 
-                class="btn btn-primary" 
+                v-if="!suppliersComposable.suppliers?.value?.length" 
+                class="btn btn-primary btn-with-icon" 
                 @click="handleSingleSupplier"
               >
-                <i class="bi bi-plus me-1"></i>
+                <Plus :size="16" />
                 Add First Supplier
               </button>
               <button 
                 v-else 
-                class="btn btn-secondary" 
-                @click="suppliersComposable.clearFilters"
+                class="btn btn-secondary btn-with-icon"
+                @click="clearFilters"
               >
-                <i class="bi bi-arrow-clockwise me-1"></i>
+                <RefreshCw :size="16" />
                 Clear Filters
               </button>
             </div>
@@ -232,23 +257,40 @@
       </div>
     </div>
 
+    <!-- Active Orders Modal -->
+    <ActiveOrdersModal
+      :show="reportsComposable.showActiveOrdersModal.value"
+      :orders="reportsComposable.activeOrders.value"
+      :loading="reportsComposable.loading.value"
+      @close="reportsComposable.closeActiveOrdersModal"
+      @view-all="handleViewAllOrders"
+    />
+
+    <!-- Top Performers Modal -->
+    <TopPerformersModal
+      :show="reportsComposable.showTopPerformersModal.value"
+      :suppliers="reportsComposable.topPerformers.value"
+      :loading="reportsComposable.loading.value"
+      @close="reportsComposable.closeTopPerformersModal"
+    />
+
     <!-- Create Order Modal -->
     <CreateOrderModal
-      :show="createOrderComposable.showCreateOrderModal.value"
-      :supplier="createOrderComposable.selectedSupplier.value"
+      :show="createOrderComposable.showCreateOrderModal?.value || false"
+      :supplier="createOrderComposable.selectedSupplier?.value"
       @close="createOrderComposable.closeCreateOrderModal"
       @save="handleOrderSave"
     />
 
     <!-- Add Supplier Modal -->
     <SupplierFormModal
-      :show="formComposable.showAddModal.value"
-      :is-edit="formComposable.isEditMode.value"
+      :show="formComposable.showAddModal?.value || false"
+      :is-edit="formComposable.isEditMode?.value || false"
       :form-data="formComposable.formData"
-      :form-errors="formComposable.formErrors.value"
-      :loading="formComposable.formLoading.value"
-      :is-valid="formComposable.isFormValid.value"
-      :add-another="formComposable.addAnotherAfterSave.value"
+      :form-errors="formComposable.formErrors?.value || {}"
+      :loading="formComposable.formLoading?.value || false"
+      :is-valid="formComposable.isFormValid?.value || false"
+      :add-another="formComposable.addAnotherAfterSave?.value || false"
       @close="formComposable.closeAddModal"
       @save="handleSaveSupplier"
       @clear-error="formComposable.clearFormError"
@@ -257,24 +299,24 @@
 
     <!-- Bulk Suppliers Modal -->
     <BulkSuppliersModal
-      :show="bulkComposable.showBulkModal.value"
-      :existing-suppliers="suppliersComposable.suppliers.value"
+      :show="bulkComposable.showBulkModal?.value || false"
+      :existing-suppliers="suppliersComposable.suppliers?.value || []"
       @close="bulkComposable.closeBulkModal"
       @save="handleBulkSave"
     />
 
     <!-- Import File Modal -->
     <ImportFileModal
-      :show="importComposable.showImportModal.value"
-      :existing-suppliers="suppliersComposable.suppliers.value"
+      :show="importComposable.showImportModal?.value || false"
+      :existing-suppliers="suppliersComposable.suppliers?.value || []"
       @close="importComposable.closeImportModal"
       @save="handleImportSave"
     />
 
     <!-- Export Modal -->
     <ExportModal
-      :show="exportComposable.showExportModal.value"
-      :selected-format="exportComposable.selectedExportFormat.value"
+      :show="exportComposable.showExportModal?.value || false"
+      :selected-format="exportComposable.selectedExportFormat?.value"
       :options="exportComposable.exportOptions"
       @close="exportComposable.closeExportModal"
       @select-format="exportComposable.selectedExportFormat.value = $event"
@@ -285,14 +327,17 @@
 </template>
 
 <script>
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   Plus, 
   Download, 
   RefreshCw,
   Building, 
-  FileText
+  FileText,
+  Trash2,
+  Search,
+  X
 } from 'lucide-vue-next'
 
 // Composables
@@ -303,14 +348,18 @@ import { useDropdown } from '@/composables/ui/suppliers/useDropdown'
 import { useBulkSuppliers } from '@/composables/ui/suppliers/useBulkSuppliers'
 import { useImportSuppliers } from '@/composables/ui/suppliers/useImportSuppliers'
 import { useCreateOrder } from '@/composables/ui/suppliers/useCreateOrder'
+import { useSupplierReports } from '@/composables/ui/suppliers/useSupplierReports'
 
 // Components
+import CardTemplate from '@/components/common/CardTemplate.vue'
 import SupplierCard from '@/components/suppliers/SupplierCard.vue'
 import SupplierFormModal from '@/components/suppliers/SupplierFormModal.vue'
 import ExportModal from '@/components/suppliers/ExportModal.vue'
 import BulkSuppliersModal from '@/components/suppliers/BulkSuppliersModal.vue'
 import ImportFileModal from '@/components/suppliers/ImportFileModal.vue'
 import CreateOrderModal from '@/components/suppliers/CreateOrderModal.vue'
+import ActiveOrdersModal from '@/components/suppliers/ActiveOrdersModal.vue'
+import TopPerformersModal from '@/components/suppliers/TopPerformersModal.vue'
 
 export default {
   name: 'Suppliers',
@@ -320,12 +369,18 @@ export default {
     RefreshCw,
     Building,
     FileText,
+    Trash2,
+    Search,
+    X,
+    CardTemplate,
     SupplierCard,
     SupplierFormModal,
     BulkSuppliersModal,
     ExportModal,
     ImportFileModal,
-    CreateOrderModal
+    CreateOrderModal,
+    ActiveOrdersModal,
+    TopPerformersModal
   },
   setup() {
     // Initialize composables
@@ -336,31 +391,109 @@ export default {
     const bulkComposable = useBulkSuppliers()
     const importComposable = useImportSuppliers()
     const createOrderComposable = useCreateOrder()
+    const reportsComposable = useSupplierReports()
     const router = useRouter()
+
+    // Local reactive state for UI
+    const showAddDropdown = ref(false)
+    const searchMode = ref(false)
+    const addDropdownRef = ref(null)
+    const searchInputRef = ref(null)
+
+    // Debug log to check if composables are working
+    console.log('Suppliers composable:', suppliersComposable)
+    console.log('Loading state:', suppliersComposable.loading?.value)
 
     // Load suppliers on mount
     onMounted(async () => {
       console.log('Suppliers component mounted')
-      await suppliersComposable.fetchSuppliers()
+      try {
+        await suppliersComposable.fetchSuppliers()
+        await reportsComposable.refreshReports()
+        
+        // Add click outside listener
+        document.addEventListener('click', handleClickOutside)
+      } catch (error) {
+        console.error('Error fetching suppliers:', error)
+      }
     })
 
+    // Cleanup
+    const cleanup = () => {
+      document.removeEventListener('click', handleClickOutside)
+    }
+
     // Methods
+    const handleClickOutside = (event) => {
+      if (addDropdownRef.value && !addDropdownRef.value.contains(event.target)) {
+        showAddDropdown.value = false
+      }
+    }
+
+    const toggleAddDropdown = (event) => {
+      event.stopPropagation()
+      showAddDropdown.value = !showAddDropdown.value
+    }
+
+    const closeAddDropdown = () => {
+      showAddDropdown.value = false
+    }
+
+    const toggleSearchMode = () => {
+      searchMode.value = !searchMode.value
+      
+      if (searchMode.value) {
+        setTimeout(() => {
+          if (searchInputRef.value) {
+            searchInputRef.value.focus()
+          }
+        }, 50)
+      } else {
+        if (suppliersComposable.filters) {
+          suppliersComposable.filters.search = ''
+        }
+        applyFilters()
+      }
+    }
+
+    const clearSearch = () => {
+      if (suppliersComposable.filters) {
+        suppliersComposable.filters.search = ''
+      }
+      searchMode.value = false
+      applyFilters()
+    }
+
+    const applyFilters = () => {
+      // This would typically trigger filtering in the composable
+      if (suppliersComposable.applyFilters) {
+        suppliersComposable.applyFilters()
+      }
+    }
+
+    const clearFilters = () => {
+      if (suppliersComposable.clearFilters) {
+        suppliersComposable.clearFilters()
+      }
+      searchMode.value = false
+    }
+
     const handleSingleSupplier = (event) => {
       if (event) event.stopPropagation()
       formComposable.showAddSupplierModal()
-      addDropdown.closeDropdown()
+      closeAddDropdown()
     }
     
     const handleBulkAdd = (event) => {
       event.stopPropagation()
       bulkComposable.openBulkModal() 
-      addDropdown.closeDropdown()
+      closeAddDropdown()
     }
 
     const handleBulkSave = (newSuppliers) => {
       const result = bulkComposable.handleBulkSave(
         newSuppliers, 
-        suppliersComposable.suppliers.value
+        suppliersComposable.suppliers?.value || []
       )
       
       if (result.success) {
@@ -373,13 +506,13 @@ export default {
     }
     
     const handleImport = (event) => {
-      event.stopPropagation()
+      if (event) event.stopPropagation()
       importComposable.openImportModal()
-      addDropdown.closeDropdown()
+      closeAddDropdown()
     }
 
     const toggleSupplierSelection = (supplierId) => {
-      const selectedSuppliers = suppliersComposable.selectedSuppliers.value
+      const selectedSuppliers = suppliersComposable.selectedSuppliers?.value || []
       const index = selectedSuppliers.indexOf(supplierId)
       
       if (index > -1) {
@@ -390,7 +523,7 @@ export default {
     }
 
     const viewSupplier = (supplier) => {
-        router.push({ 
+      router.push({ 
         name: 'SupplierDetails', 
         params: { supplierId: supplier.id.toString() } 
       })
@@ -401,7 +534,7 @@ export default {
     }
 
     const handleSaveSupplier = async () => {
-      const result = await formComposable.saveSupplier(suppliersComposable.suppliers.value)
+      const result = await formComposable.saveSupplier(suppliersComposable.suppliers?.value || [])
       
       if (result.success) {
         suppliersComposable.successMessage.value = result.message
@@ -415,7 +548,7 @@ export default {
     const handleOrderSave = (orderData) => {
       const result = createOrderComposable.handleOrderSave(
         orderData, 
-        suppliersComposable.suppliers.value
+        suppliersComposable.suppliers?.value || []
       )
       
       if (result.success) {
@@ -432,7 +565,7 @@ export default {
     const handleImportSave = (importedSuppliers) => {
       const result = importComposable.handleImportSave(
         importedSuppliers, 
-        suppliersComposable.suppliers.value
+        suppliersComposable.suppliers?.value || []
       )
       
       if (result.success) {
@@ -445,7 +578,7 @@ export default {
     }
 
     const handleExport = () => {
-      const result = exportComposable.handleExport(suppliersComposable.suppliers.value)
+      const result = exportComposable.handleExport(suppliersComposable.suppliers?.value || [])
       
       if (result.success) {
         suppliersComposable.successMessage.value = result.message
@@ -459,11 +592,18 @@ export default {
     }
 
     const showActiveOrdersReport = () => {
-      alert('Active Orders Report - Coming soon!')
+      console.log('Active Orders Report clicked')
+      reportsComposable.openActiveOrdersModal()
     }
 
     const showTopSuppliersReport = () => {
-      alert('Top Suppliers Report - Coming soon!')
+      console.log('Top Suppliers Report clicked')
+      reportsComposable.openTopPerformersModal()
+    }
+
+    const handleViewAllOrders = () => {
+      const route = reportsComposable.handleViewAllOrders()
+      router.push(route)
     }
 
     return {
@@ -475,6 +615,13 @@ export default {
       bulkComposable,
       importComposable,
       createOrderComposable,
+      reportsComposable,
+      
+      // Local state
+      showAddDropdown,
+      searchMode,
+      addDropdownRef,
+      searchInputRef,
       
       // Methods
       handleSingleSupplier,
@@ -489,7 +636,15 @@ export default {
       handleImportSave,
       handleExport,
       showActiveOrdersReport,
-      showTopSuppliersReport
+      showTopSuppliersReport,
+      handleViewAllOrders,
+      toggleAddDropdown,
+      closeAddDropdown,
+      toggleSearchMode,
+      clearSearch,
+      applyFilters,
+      clearFilters,
+      cleanup
     }
   }
 }
@@ -500,13 +655,101 @@ export default {
 @import '@/assets/styles/colors.css';
 @import '@/assets/styles/buttons.css';
 
+.suppliers-page {
+  background-color: var(--neutral-light);
+  min-height: 100vh;
+}
+
+.text-primary-dark {
+  color: var(--primary-dark) !important;
+}
+
+.text-tertiary-dark {
+  color: var(--tertiary-dark) !important;
+}
+
+.text-tertiary-medium {
+  color: var(--tertiary-medium) !important;
+}
+
+/* Action Bar Container */
+.action-bar-container {
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  overflow: visible;
+  position: relative;
+  z-index: 1000;
+}
+
+.action-bar-controls {
+  border-bottom: 1px solid var(--neutral);
+  background-color: white;
+  position: relative;
+  z-index: 1001;
+}
+
+.action-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+/* Filter Dropdown */
+.filter-dropdown {
+  min-width: 120px;
+}
+
+.filter-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--tertiary-medium);
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+/* Search Container */
+.search-container {
+  min-width: 300px;
+}
+
+.search-input {
+  padding-right: 2.5rem;
+  height: calc(1.5em + 0.75rem + 2px);
+}
+
+.search-container .position-relative .btn {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Custom dropdown styling */
+.dropdown {
+  position: relative;
+  z-index: 1100;
+}
+
 .custom-dropdown-menu {
   min-width: 280px;
   border: 1px solid var(--neutral);
   border-radius: 0.75rem;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
   animation: dropdownSlide 0.2s ease;
+  z-index: 1200 !important;
+  position: absolute !important;
+  top: 100% !important;
+  left: 0 !important;
+  transform: none !important;
+}
+
+.custom-dropdown-menu.show {
+  display: block !important;
+  z-index: 1200 !important;
 }
 
 @keyframes dropdownSlide {
@@ -534,38 +777,18 @@ export default {
   background-color: var(--primary-light);
 }
 
-/* Report cards hover effect */
-.report-card {
-  cursor: pointer;
-  transition: all 0.2s ease;
+/* Button States */
+.btn.active {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: white;
 }
 
-.report-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15);
-}
-
-/* Custom color classes using colors.css variables */
-.text-primary-dark {
-  color: var(--primary-dark) !important;
-}
-
-.text-tertiary-dark {
-  color: var(--tertiary-dark) !important;
-}
-
-.text-tertiary-medium {
-  color: var(--tertiary-medium) !important;
-}
-
-/* Spin animation for refresh button */
-.spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+/* Custom hover states for import/export buttons */
+.btn.btn-outline-secondary:hover {
+  background-color: var(--info-light);
+  border-color: var(--info);
+  color: var(--info-dark);
 }
 
 /* Form controls focus states */
@@ -575,42 +798,15 @@ export default {
   box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
 }
 
-/* Suppliers page background */
-.suppliers-page {
-  background-color: var(--neutral-light);
-  min-height: 100vh;
-}
-
-/* Page header styling */
-.page-header {
-  background: white;
-  padding: 1.5rem;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .custom-dropdown-menu {
-    min-width: 250px;
-    right: 0;
-    left: auto;
+  .action-row {
+    flex-direction: column;
+    align-items: stretch;
   }
   
-  .custom-dropdown-item {
-    padding: 0.875rem 1rem;
-  }
-  
-  .page-header {
-    padding: 1rem;
-  }
-  
-  .page-header h1 {
-    font-size: 1.5rem;
-  }
-  
-  .d-flex.gap-2.flex-wrap {
-    gap: 0.5rem !important;
+  .search-container {
+    min-width: 100%;
   }
 }
 
@@ -618,10 +814,6 @@ export default {
   .btn-sm {
     font-size: 0.8rem;
     padding: 0.375rem 0.5rem;
-  }
-  
-  .custom-dropdown-menu {
-    min-width: 220px;
   }
 }
 </style>

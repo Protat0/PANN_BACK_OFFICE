@@ -1,0 +1,808 @@
+<template>
+  <div class="container-fluid pt-2 pb-4 orders-history-page">
+    <!-- Page Title with Back Button -->
+    <div class="d-flex align-items-center justify-content-between mb-4">
+      <div class="d-flex align-items-center">
+        <button class="btn btn-outline-secondary btn-sm me-3" @click="goBack">
+          <ArrowLeft :size="16" />
+          Back
+        </button>
+        <div>
+          <h1 class="h3 fw-semibold text-primary-dark mb-0">Purchase Orders History</h1>
+          <p class="text-tertiary-medium mb-0" v-if="!loading">
+            {{ ordersComposable?.filteredOrders?.length || 0 }} orders found
+          </p>
+        </div>
+      </div>
+      
+      <!-- Quick Actions -->
+      <div class="d-flex gap-2">
+        <button class="btn btn-success btn-sm" @click="createNewOrder">
+          <Plus :size="14" class="me-1" />
+          New Order
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" @click="exportOrders">
+          <Download :size="14" class="me-1" />
+          Export
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div v-if="loading" class="text-center py-5">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <p class="mt-3 text-tertiary-medium">Loading orders...</p>
+    </div>
+
+    <!-- Error State -->
+    <div v-if="error" class="alert alert-danger" role="alert">
+      <div class="d-flex align-items-center">
+        <AlertCircle :size="20" class="me-2" />
+        <div>
+          <strong>Error loading orders:</strong> {{ error }}
+          <button class="btn btn-sm btn-outline-danger ms-2" @click="refreshData">
+            <RefreshCw :size="14" class="me-1" />
+            Retry
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters Bar -->
+    <div v-if="!loading" class="card mb-3">
+      <div class="card-body py-2">
+        <div class="row align-items-center">
+          <div class="col-md-8">
+            <div class="d-flex gap-3 align-items-center flex-wrap">
+              <!-- Status Filter -->
+              <div class="d-flex align-items-center gap-2">
+                <label class="form-label mb-0 text-tertiary-dark fw-medium">Status:</label>
+                <select 
+                  class="form-select form-select-sm" 
+                  v-model="statusFilter" 
+                  @change="applyFilters"
+                  style="min-width: 130px;"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="in_transit">In Transit</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+
+              <!-- Supplier Filter -->
+              <div class="d-flex align-items-center gap-2">
+                <label class="form-label mb-0 text-tertiary-dark fw-medium">Supplier:</label>
+                <select 
+                  class="form-select form-select-sm" 
+                  v-model="supplierFilter" 
+                  @change="applyFilters"
+                  style="min-width: 150px;"
+                >
+                  <option value="all">All Suppliers</option>
+                  <option value="bravo_warehouse">Bravo Warehouse</option>
+                  <option value="john_doe_supplies">John Doe Supplies</option>
+                  <option value="san_juan_groups">San Juan Groups</option>
+                  <option value="bagatayam_inc">Bagatayam Inc.</option>
+                </select>
+              </div>
+
+              <!-- Date Range Filter -->
+              <div class="d-flex align-items-center gap-2">
+                <label class="form-label mb-0 text-tertiary-dark fw-medium">Period:</label>
+                <select 
+                  class="form-select form-select-sm" 
+                  v-model="dateFilter" 
+                  @change="applyFilters"
+                  style="min-width: 120px;"
+                >
+                  <option value="all">All Time</option>
+                  <option value="today">Today</option>
+                  <option value="week">This Week</option>
+                  <option value="month">This Month</option>
+                  <option value="quarter">This Quarter</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          
+          <div class="col-md-4">
+            <!-- Search -->
+            <div class="position-relative">
+              <Search :size="16" class="position-absolute top-50 start-0 translate-middle-y ms-3 text-tertiary-medium" />
+              <input 
+                v-model="searchFilter" 
+                @input="applyFilters"
+                type="text" 
+                class="form-control form-control-sm ps-5"
+                placeholder="Search orders, suppliers..."
+              />
+              <button 
+                v-if="searchFilter"
+                class="btn btn-sm btn-link position-absolute top-50 end-0 translate-middle-y me-2 p-0"
+                @click="clearSearch"
+              >
+                <X :size="16" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Orders Table -->
+    <div v-if="!loading" class="card">
+      <div class="card-header bg-primary-medium text-white">
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Purchase Orders</h5>
+          <div class="d-flex align-items-center gap-3">
+            <span class="badge bg-white text-primary">
+              {{ ordersComposable?.filteredOrders?.length || 0 }} orders
+            </span>
+            <button 
+              v-if="hasFilters" 
+              class="btn btn-sm btn-outline-light" 
+              @click="clearAllFilters"
+            >
+              <X :size="14" class="me-1" />
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-responsive" v-if="ordersComposable?.filteredOrders?.length > 0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light sticky-top">
+            <tr>
+              <th style="width: 140px;">
+                <div class="d-flex align-items-center">
+                  Order ID
+                  <ChevronUp :size="14" class="ms-1 text-tertiary-medium" />
+                </div>
+              </th>
+              <th style="width: 180px;">Supplier</th>
+              <th style="width: 110px;">Status</th>
+              <th style="width: 120px;">Order Date</th>
+              <th style="width: 120px;">Expected Delivery</th>
+              <th style="width: 100px;" class="text-end">Amount</th>
+              <th style="width: 80px;" class="text-center">Items</th>
+              <th style="width: 140px;" class="text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr 
+              v-for="order in paginatedOrders" 
+              :key="order.id"
+              :class="getRowClass(order)"
+            >
+              <!-- Order ID -->
+              <td>
+                <div class="fw-semibold text-primary">{{ order.id }}</div>
+              </td>
+              
+              <!-- Supplier -->
+              <td>
+                <div>
+                  <div class="fw-medium text-tertiary-dark">{{ order.supplier }}</div>
+                  <small class="text-tertiary-medium">{{ order.supplierEmail }}</small>
+                </div>
+              </td>
+              
+              <!-- Status -->
+              <td>
+                <span :class="getStatusBadgeClass(order.status)" class="badge">
+                  {{ getStatusText(order.status) }}
+                </span>
+              </td>
+              
+              <!-- Order Date -->
+              <td>
+                <div>
+                  <div class="fw-medium">{{ formatDate(order.orderDate) }}</div>
+                  <small class="text-tertiary-medium">{{ getDaysAgo(order.orderDate) }}</small>
+                </div>
+              </td>
+              
+              <!-- Expected Delivery -->
+              <td>
+                <div>
+                  <div class="fw-medium">{{ formatDate(order.expectedDelivery) }}</div>
+                  <small :class="getDeliveryStatusClass(order)">
+                    {{ getDeliveryStatus(order) }}
+                  </small>
+                </div>
+              </td>
+              
+              <!-- Amount -->
+              <td class="text-end">
+                <div class="fw-bold">₱{{ formatCurrency(order.totalAmount) }}</div>
+              </td>
+              
+              <!-- Items Count -->
+              <td class="text-center">
+                <span class="badge bg-light text-dark">
+                  {{ order.items?.length || 0 }}
+                </span>
+              </td>
+              
+              <!-- Actions -->
+              <td>
+                <div class="d-flex gap-1 justify-content-center">
+                  <button 
+                    class="btn btn-sm btn-outline-primary" 
+                    @click="viewOrder(order)"
+                    title="View Details"
+                  >
+                    <Eye :size="14" />
+                  </button>
+                  <button 
+                    class="btn btn-sm btn-outline-secondary" 
+                    @click="editOrder(order)"
+                    title="Edit Order"
+                    :disabled="order.status === 'delivered' || order.status === 'cancelled'"
+                  >
+                    <Edit :size="14" />
+                  </button>
+                  <button 
+                    class="btn btn-sm btn-outline-info" 
+                    @click="downloadOrder(order)"
+                    title="Download PDF"
+                  >
+                    <Download :size="14" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty State -->
+      <div v-if="ordersComposable?.filteredOrders?.length === 0" class="text-center py-5">
+        <div class="py-4">
+          <Package :size="48" class="text-tertiary-medium mb-3" />
+          <h5 class="text-tertiary-dark">No Orders Found</h5>
+          <p class="text-tertiary-medium mb-3">
+            {{ hasFilters ? 'No orders match your current filters.' : 'No purchase orders have been created yet.' }}
+          </p>
+          <div class="d-flex gap-2 justify-content-center">
+            <button v-if="hasFilters" class="btn btn-outline-secondary" @click="clearAllFilters">
+              <RefreshCw :size="16" class="me-1" />
+              Clear Filters
+            </button>
+            <button class="btn btn-success" @click="createNewOrder">
+              <Plus :size="16" class="me-1" />
+              Create First Order
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div v-if="ordersComposable?.filteredOrders?.length > itemsPerPage" class="card-footer">
+        <nav class="d-flex justify-content-between align-items-center">
+          <div class="text-tertiary-medium">
+            Showing {{ startItem }}-{{ endItem }} of {{ ordersComposable.filteredOrders.length }} orders
+          </div>
+          <ul class="pagination pagination-sm mb-0">
+            <li class="page-item" :class="{ disabled: currentPage === 1 }">
+              <button class="page-link" @click="goToPage(currentPage - 1)" :disabled="currentPage === 1">
+                <ChevronLeft :size="16" />
+              </button>
+            </li>
+            <li 
+              v-for="page in visiblePages" 
+              :key="page"
+              class="page-item" 
+              :class="{ active: page === currentPage }"
+            >
+              <button class="page-link" @click="goToPage(page)">{{ page }}</button>
+            </li>
+            <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+              <button class="page-link" @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages">
+                <ChevronRight :size="16" />
+              </button>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+
+    <!-- Order Details Modal -->
+    <div v-if="showOrderModal" class="modal fade show" style="display: block;" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              <Package :size="20" class="me-2" />
+              Order Details - {{ selectedOrder?.id }}
+            </h5>
+            <button type="button" class="btn-close" @click="closeModal"></button>
+          </div>
+          <div class="modal-body">
+            <div v-if="selectedOrder" class="row">
+              <div class="col-md-6">
+                <h6 class="fw-bold">Order Information</h6>
+                <p><strong>Order ID:</strong> {{ selectedOrder.id }}</p>
+                <p><strong>Status:</strong> 
+                  <span :class="getStatusBadgeClass(selectedOrder.status)" class="badge ms-1">
+                    {{ getStatusText(selectedOrder.status) }}
+                  </span>
+                </p>
+                <p><strong>Order Date:</strong> {{ formatDate(selectedOrder.orderDate) }}</p>
+                <p><strong>Expected Delivery:</strong> {{ formatDate(selectedOrder.expectedDelivery) }}</p>
+                <p><strong>Total Amount:</strong> <strong>₱{{ formatCurrency(selectedOrder.totalAmount) }}</strong></p>
+              </div>
+              <div class="col-md-6">
+                <h6 class="fw-bold">Supplier Information</h6>
+                <p><strong>Supplier:</strong> {{ selectedOrder.supplier }}</p>
+                <p><strong>Email:</strong> {{ selectedOrder.supplierEmail }}</p>
+              </div>
+              <div class="col-12 mt-3">
+                <h6 class="fw-bold">Items ({{ selectedOrder.items?.length || 0 }})</h6>
+                <div class="table-responsive">
+                  <table class="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Quantity</th>
+                        <th>Unit Price</th>
+                        <th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(item, index) in selectedOrder.items" :key="index">
+                        <td>{{ item.name }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>₱{{ formatCurrency(item.unitPrice) }}</td>
+                        <td>₱{{ formatCurrency(item.quantity * item.unitPrice) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="closeModal">Close</button>
+            <button type="button" class="btn btn-outline-primary" @click="editOrder(selectedOrder)">
+              <Edit :size="16" class="me-1" />
+              Edit Order
+            </button>
+            <button type="button" class="btn btn-outline-info" @click="downloadOrder(selectedOrder)">
+              <Download :size="16" class="me-1" />
+              Download PDF
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="showOrderModal" class="modal-backdrop fade show" @click="closeModal"></div>
+  </div>
+</template>
+
+<script>
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { 
+  ArrowLeft,
+  Plus,
+  Download,
+  Search,
+  X,
+  Eye,
+  Edit,
+  Package,
+  RefreshCw,
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  AlertCircle
+} from 'lucide-vue-next'
+
+// Composables
+import { useOrdersHistory } from '@/composables/ui/suppliers/useOrdersHistory'
+
+export default {
+  name: 'OrdersHistory',
+  components: {
+    ArrowLeft,
+    Plus,
+    Download,
+    Search,
+    X,
+    Eye,
+    Edit,
+    Package,
+    RefreshCw,
+    ChevronUp,
+    ChevronLeft,
+    ChevronRight,
+    AlertCircle
+  },
+  setup() {
+    const router = useRouter()
+    const ordersComposable = useOrdersHistory()
+    
+    // Local state
+    const loading = ref(false)
+    const error = ref(null)
+    const currentPage = ref(1)
+    const itemsPerPage = ref(15)
+    const statusFilter = ref('all')
+    const supplierFilter = ref('all')
+    const dateFilter = ref('all')
+    const searchFilter = ref('')
+    const showOrderModal = ref(false)
+    const selectedOrder = ref(null)
+
+    // Computed
+    const paginatedOrders = computed(() => {
+      if (!ordersComposable?.filteredOrders?.length) return []
+      const start = (currentPage.value - 1) * itemsPerPage.value
+      const end = start + itemsPerPage.value
+      return ordersComposable.filteredOrders.slice(start, end)
+    })
+
+    const totalPages = computed(() => {
+      return Math.ceil((ordersComposable?.filteredOrders?.length || 0) / itemsPerPage.value)
+    })
+
+    const startItem = computed(() => {
+      return (currentPage.value - 1) * itemsPerPage.value + 1
+    })
+
+    const endItem = computed(() => {
+      return Math.min(currentPage.value * itemsPerPage.value, ordersComposable?.filteredOrders?.length || 0)
+    })
+
+    const visiblePages = computed(() => {
+      const pages = []
+      const total = totalPages.value
+      const current = currentPage.value
+      
+      if (total <= 7) {
+        for (let i = 1; i <= total; i++) {
+          pages.push(i)
+        }
+      } else {
+        if (current <= 4) {
+          for (let i = 1; i <= 5; i++) {
+            pages.push(i)
+          }
+          pages.push('...', total)
+        } else if (current >= total - 3) {
+          pages.push(1, '...')
+          for (let i = total - 4; i <= total; i++) {
+            pages.push(i)
+          }
+        } else {
+          pages.push(1, '...')
+          for (let i = current - 1; i <= current + 1; i++) {
+            pages.push(i)
+          }
+          pages.push('...', total)
+        }
+      }
+      
+      return pages
+    })
+
+    const hasFilters = computed(() => {
+      return statusFilter.value !== 'all' || 
+             supplierFilter.value !== 'all' || 
+             dateFilter.value !== 'all' || 
+             searchFilter.value.trim() !== ''
+    })
+
+    // Methods
+    const goBack = () => {
+      router.go(-1)
+    }
+
+    const refreshData = async () => {
+      loading.value = true
+      error.value = null
+      try {
+        if (ordersComposable?.fetchOrders) {
+          await ordersComposable.fetchOrders()
+        }
+      } catch (err) {
+        error.value = err.message
+      } finally {
+        loading.value = false
+      }
+    }
+
+    const applyFilters = () => {
+      if (ordersComposable?.filters) {
+        ordersComposable.filters.status = statusFilter.value
+        ordersComposable.filters.supplier = supplierFilter.value
+        ordersComposable.filters.dateRange = dateFilter.value
+        ordersComposable.filters.search = searchFilter.value
+        if (ordersComposable.applyFilters) {
+          ordersComposable.applyFilters()
+        }
+      }
+      currentPage.value = 1
+    }
+
+    const clearSearch = () => {
+      searchFilter.value = ''
+      applyFilters()
+    }
+
+    const clearAllFilters = () => {
+      statusFilter.value = 'all'
+      supplierFilter.value = 'all'
+      dateFilter.value = 'all'
+      searchFilter.value = ''
+      applyFilters()
+    }
+
+    const goToPage = (page) => {
+      if (page >= 1 && page <= totalPages.value) {
+        currentPage.value = page
+      }
+    }
+
+    const viewOrder = (order) => {
+      selectedOrder.value = order
+      showOrderModal.value = true
+    }
+
+    const closeModal = () => {
+      showOrderModal.value = false
+      selectedOrder.value = null
+    }
+
+    const editOrder = (order) => {
+      closeModal()
+      alert(`Edit order ${order.id} - This would open an edit modal or navigate to edit page`)
+    }
+
+    const downloadOrder = (order) => {
+      alert(`Downloading order ${order.id} as PDF...`)
+    }
+
+    const createNewOrder = () => {
+      alert('Create new order - This would open a create order modal or navigate to create page')
+    }
+
+    const exportOrders = () => {
+      if (ordersComposable?.exportOrdersData) {
+        ordersComposable.exportOrdersData('csv')
+      } else {
+        alert('Export functionality - This would export the filtered orders to CSV')
+      }
+    }
+
+    // Utility methods
+    const formatDate = (dateString) => {
+      try {
+        return new Date(dateString).toLocaleDateString('en-US', { 
+          year: 'numeric', month: 'short', day: 'numeric' 
+        })
+      } catch {
+        return dateString
+      }
+    }
+
+    const formatCurrency = (amount) => {
+      try {
+        return new Intl.NumberFormat('en-PH').format(amount || 0)
+      } catch {
+        return amount || 0
+      }
+    }
+
+    const getDaysAgo = (dateString) => {
+      try {
+        const date = new Date(dateString)
+        const now = new Date()
+        const diffTime = Math.abs(now - date)
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        
+        if (diffDays === 1) return '1 day ago'
+        if (diffDays < 7) return `${diffDays} days ago`
+        if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
+        return `${Math.floor(diffDays / 30)} months ago`
+      } catch {
+        return ''
+      }
+    }
+
+    const getDeliveryStatus = (order) => {
+      try {
+        const expectedDate = new Date(order.expectedDelivery)
+        const now = new Date()
+        
+        if (order.status === 'delivered') return 'Delivered'
+        if (order.status === 'cancelled') return 'Cancelled'
+        
+        const diffTime = expectedDate - now
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        
+        if (diffDays < 0) return `${Math.abs(diffDays)} days overdue`
+        if (diffDays === 0) return 'Due today'
+        if (diffDays === 1) return 'Due tomorrow'
+        return `${diffDays} days remaining`
+      } catch {
+        return ''
+      }
+    }
+
+    const getDeliveryStatusClass = (order) => {
+      try {
+        const expectedDate = new Date(order.expectedDelivery)
+        const now = new Date()
+        const diffDays = Math.ceil((expectedDate - now) / (1000 * 60 * 60 * 24))
+        
+        if (order.status === 'delivered') return 'text-success'
+        if (order.status === 'cancelled') return 'text-tertiary-medium'
+        if (diffDays < 0) return 'text-danger'
+        if (diffDays <= 2) return 'text-warning'
+        return 'text-tertiary-medium'
+      } catch {
+        return 'text-tertiary-medium'
+      }
+    }
+
+    const getStatusBadgeClass = (status) => {
+      const classes = {
+        'pending': 'bg-warning text-dark',
+        'confirmed': 'bg-info text-white',
+        'in_transit': 'bg-primary text-white',
+        'delivered': 'bg-success text-white',
+        'cancelled': 'bg-danger text-white'
+      }
+      return classes[status] || 'bg-secondary text-white'
+    }
+
+    const getStatusText = (status) => {
+      const texts = {
+        'pending': 'Pending',
+        'confirmed': 'Confirmed',
+        'in_transit': 'In Transit',
+        'delivered': 'Delivered',
+        'cancelled': 'Cancelled'
+      }
+      return texts[status] || status
+    }
+
+    const getRowClass = (order) => {
+      if (order.status === 'cancelled') return 'text-muted'
+      return ''
+    }
+
+    // Initialize
+    onMounted(async () => {
+      await refreshData()
+    })
+
+    return {
+      // Composables
+      ordersComposable,
+      
+      // Local state
+      loading,
+      error,
+      currentPage,
+      itemsPerPage,
+      statusFilter,
+      supplierFilter,
+      dateFilter,
+      searchFilter,
+      showOrderModal,
+      selectedOrder,
+      
+      // Computed
+      paginatedOrders,
+      totalPages,
+      startItem,
+      endItem,
+      visiblePages,
+      hasFilters,
+      
+      // Methods
+      goBack,
+      refreshData,
+      applyFilters,
+      clearSearch,
+      clearAllFilters,
+      goToPage,
+      viewOrder,
+      closeModal,
+      editOrder,
+      downloadOrder,
+      createNewOrder,
+      exportOrders,
+      formatDate,
+      formatCurrency,
+      getDaysAgo,
+      getDeliveryStatus,
+      getDeliveryStatusClass,
+      getStatusBadgeClass,
+      getStatusText,
+      getRowClass
+    }
+  }
+}
+</script>
+
+<style scoped>
+@import '@/assets/styles/colors.css';
+
+.orders-history-page {
+  background-color: var(--neutral-light);
+  min-height: 100vh;
+}
+
+.text-primary-dark {
+  color: var(--primary-dark) !important;
+}
+
+.text-tertiary-dark {
+  color: var(--tertiary-dark) !important;
+}
+
+.text-tertiary-medium {
+  color: var(--tertiary-medium) !important;
+}
+
+.bg-primary-medium {
+  background-color: var(--primary-medium) !important;
+}
+
+.sticky-top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.modal-backdrop.show {
+  opacity: 0.5;
+}
+
+.table th {
+  border-bottom: 2px solid var(--neutral);
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--tertiary-dark);
+}
+
+.table td {
+  vertical-align: middle;
+  border-bottom: 1px solid var(--neutral-light);
+}
+
+.table tbody tr:hover {
+  background-color: var(--neutral-light);
+}
+
+.page-link {
+  color: var(--primary);
+  border-color: var(--neutral);
+}
+
+.page-link:hover {
+  color: var(--primary-dark);
+  background-color: var(--primary-light);
+  border-color: var(--primary);
+}
+
+.page-item.active .page-link {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.page-item.disabled .page-link {
+  color: var(--tertiary-medium);
+  background-color: var(--neutral-light);
+}
+</style>

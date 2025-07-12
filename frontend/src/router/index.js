@@ -16,6 +16,7 @@ import SalesByItem from '@/pages/reports/SalesByItem.vue'
 import SalesByCategory from '@/pages/reports/SalesByCategory.vue'
 import Suppliers from '@/pages/suppliers/Suppliers.vue'
 import SupplierDetails from '@/pages/suppliers/SupplierDetails.vue'
+import OrdersHistory from '@/pages/suppliers/OrdersHistory.vue'
 
 // Auth guard function
 function requireAuth(to, from, next) {
@@ -95,6 +96,19 @@ const router = createRouter({
           path: 'suppliers',
           name: 'Suppliers',
           component: Suppliers
+        },
+        {
+          path: 'suppliers/orders',
+          name: 'OrdersHistory',
+          component: OrdersHistory,
+          meta: {
+            title: 'Purchase Orders History',
+            breadcrumb: [
+              { name: 'Dashboard', path: '/dashboard' },
+              { name: 'Suppliers', path: '/suppliers' },
+              { name: 'Orders History', path: null }
+            ]
+          }
         },
         {
           path: 'suppliers/:supplierId',

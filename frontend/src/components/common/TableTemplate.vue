@@ -212,8 +212,8 @@ export default {
 
 /* Action Button Base Styles */
 .data-table :deep(.action-btn) {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

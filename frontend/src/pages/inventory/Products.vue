@@ -331,7 +331,7 @@ async exportData() {
             <td>
               <div class="d-flex gap-1 justify-content-center">
                 <button 
-                  class="btn btn-outline-secondary btn-icon-only btn-xs" 
+                  class="btn btn-outline-secondary btn-icon-only btn-lg" 
                   @click="editProduct(product)"
                   data-bs-toggle="tooltip"
                   title="Edit Product"
@@ -339,7 +339,7 @@ async exportData() {
                   <Edit :size="12" />
                 </button>
                 <button 
-                  class="btn btn-outline-primary btn-icon-only btn-xs" 
+                  class="btn btn-outline-primary btn-icon-only btn-lg" 
                   @click="viewProduct(product)"
                   data-bs-toggle="tooltip"
                   title="View Details"
@@ -347,15 +347,15 @@ async exportData() {
                   <Eye :size="12" />
                 </button>
                 <button 
-                  class="btn btn-outline-info btn-icon-only btn-xs" 
+                  class="btn btn-outline-info btn-icon-only btn-lg" 
                   @click="restockProduct(product)"
                   data-bs-toggle="tooltip"
                   title="Update Stock"
                 >
                   <Package :size="12" />
                 </button>
-                <button 
-                  class="btn btn-outline-success btn-icon-only btn-xs"
+                <!-- <button 
+                  class="btn btn-outline-success btn-icon-only btn-lg"
                   @click="toggleProductStatus(product)"
                   data-bs-toggle="tooltip"
                   :title="product.status === 'active' ? 'Deactivate Product' : 'Activate Product'"
@@ -363,9 +363,9 @@ async exportData() {
                 >
                   <Lock v-if="product.status === 'active'" :size="12" />
                   <Unlock v-else :size="12" />
-                </button>
+                </button> -->
                 <button 
-                  class="btn btn-outline-danger btn-icon-only btn-xs" 
+                  class="btn btn-outline-danger btn-icon-only btn-lg" 
                   @click="deleteProduct(product)"
                   data-bs-toggle="tooltip"
                   title="Delete Product"
