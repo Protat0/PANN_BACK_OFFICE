@@ -7,27 +7,6 @@ Backend: Django REST Framework
 Database: MongoDB (local development) / MongoDB Atlas (production)
 Deployment: Netlify (frontend) + Render (backend)
 
-Project Structure
-PANN_POS/
-├── frontend/              # Vue.js application
-│   ├── src/
-│   ├── public/
-│   ├── package.json
-│   └── vite.config.js
-├── backend/               # Django application
-│   ├── posbackend/        # Django project
-│   ├── settings/          # Organized settings
-│   │   ├── base.py        # Common settings
-│   │   ├── local.py       # Development settings
-│   │   └── production.py  # Production settings
-│   ├── api/               # API endpoints
-│   ├── venv/              # Virtual environment
-│   └── manage.py
-├── .gitignore
-└── README.md
-Prerequisites
-Before setting up the project, ensure you have:
-
 Node.js (v16 or higher) - Download here
 Python (v3.9 or higher) - Download here
 Git - Download here
