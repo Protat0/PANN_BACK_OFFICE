@@ -22,13 +22,32 @@ CORS_ALLOWED_ORIGINS = config(
     cast=lambda v: [s.strip() for s in v.split(',') if s.strip()]
 )
 
-# Database Configuration - Use SQLite only
+# Database Configuration - Always use SQLite for Django ORM
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# MongoDB Configuration for Custom API Operations
+USE_MONGODB = config('USE_MONGODB', default=False, cast=bool)
+
+if USE_MONGODB:
+    # MongoDB connection settings for your custom API operations
+    MONGODB_URI = config('MONGODB_URI')
+    MONGODB_DATABASE = config('MONGODB_DATABASE', default='pos_system')
+    
+    MONGODB_SETTINGS = {
+        'host': MONGODB_URI,
+        'database': MONGODB_DATABASE
+    }
+else:
+    # Fallback MongoDB settings (won't be used)
+    MONGODB_SETTINGS = {
+        'host': 'mongodb://localhost:27017',
+        'database': 'pos_system_local'
+    }
 
 # Security settings for production
 SECURE_BROWSER_XSS_FILTER = True
