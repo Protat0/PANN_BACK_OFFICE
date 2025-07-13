@@ -22,38 +22,23 @@ CORS_ALLOWED_ORIGINS = config(
     cast=lambda v: [s.strip() for s in v.split(',') if s.strip()]
 )
 
-# MongoDB Configuration
-USE_MONGODB = config('USE_MONGODB', default=True, cast=bool)
+# Database Configuration - Use SQLite for Django ORM
+# Your custom MongoDB operations will still work via pymongo
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
 
-if USE_MONGODB:
-    # MongoDB Atlas for production
-    MONGODB_URI = config('MONGODB_URI')
-    MONGODB_DATABASE = config('MONGODB_DATABASE', default='pos_system')
-    
-    # Using djongo for Django ORM compatibility
-    DATABASES = {
-        'default': {
-            'ENGINE': 'djongo',
-            'NAME': MONGODB_DATABASE,
-            'CLIENT': {
-                'host': MONGODB_URI,
-            }
-        }
-    }
-    
-    # MongoDB connection settings for your custom MongoDB operations
-    MONGODB_SETTINGS = {
-        'host': MONGODB_URI,
-        'database': MONGODB_DATABASE
-    }
-else:
-    # Fallback to SQLite (for testing production settings locally)
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+# MongoDB connection settings for your custom MongoDB operations
+MONGODB_URI = config('MONGODB_URI')
+MONGODB_DATABASE = config('MONGODB_DATABASE', default='pos_system_prod')
+
+MONGODB_SETTINGS = {
+    'host': MONGODB_URI,
+    'database': MONGODB_DATABASE
+}
 
 # Security settings for production
 SECURE_BROWSER_XSS_FILTER = True
