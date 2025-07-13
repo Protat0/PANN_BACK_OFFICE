@@ -1,4 +1,5 @@
 from .base import *
+from decouple import config
 
 DEBUG = True
 ALLOWED_HOSTS = ['localhost', '127.0.0.1']
@@ -23,6 +24,12 @@ DATABASES = {
 
 # MongoDB connection (we'll use this manually)
 MONGODB_SETTINGS = {
-    'host': 'mongodb://localhost:27017',
-    'database': 'pos_system_dev'
+    'host': config('MONGODB_URI'),
+    'database': config('MONGODB_DATABASE', default='pann_production')
+}
+
+# Backup local settings (for fallback)
+MONGODB_LOCAL_SETTINGS = {
+    'host': config('MONGODB_LOCAL_URI', default='mongodb://localhost:27017'),
+    'database': config('MONGODB_LOCAL_DATABASE', default='pos_system')
 }

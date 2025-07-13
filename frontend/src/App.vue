@@ -1,33 +1,66 @@
 <template>
-  <div>
-    <h1>POS System</h1>
-    <button @click="testAPI">Test Backend Connection</button>
-    <div v-if="apiResponse">
-      <h3>Backend Response:</h3>
-      <pre>{{ apiResponse }}</pre>
-    </div>
+  <div id="app">
+    <!-- This will show either Login page or the main app based on authentication -->
+    <router-view />
   </div>
 </template>
 
 <script>
-import axios from 'axios'
-
 export default {
-  data() {
-    return {
-      apiResponse: null
-    }
+  name: 'App',
+  mounted() {
+    // Check authentication status when app loads
+    this.checkAuthStatus()
   },
   methods: {
-    async testAPI() {
-      try {
-        const response = await axios.get('http://localhost:8000/api/status/')
-        this.apiResponse = response.data
-      } catch (error) {
-        console.error('API Error:', error)
-        this.apiResponse = 'Connection failed!'
+    checkAuthStatus() {
+      const token = localStorage.getItem('authToken')
+      const currentPath = this.$route.path
+      
+      console.log('App mounted - Current path:', currentPath)
+      console.log('App mounted - Has token:', !!token)
+      
+      // If no token and not on login page, redirect to login
+      if (!token && currentPath !== '/login') {
+        console.log('No auth token, redirecting to login')
+        this.$router.push('/login')
+      }
+      
+      // If has token and on login page, redirect to dashboard
+      if (token && currentPath === '/login') {
+        console.log('Already authenticated, redirecting to dashboard')
+        this.$router.push('/dashboard')
       }
     }
   }
 }
 </script>
+
+<style>
+/* Global reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #f9fafb;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+</style>

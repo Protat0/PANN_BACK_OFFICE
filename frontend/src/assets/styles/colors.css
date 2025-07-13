@@ -1,0 +1,65 @@
+:root {
+  /* Primary Colors */
+  --primary: #7392E2;
+  --primary-light: #ABBDED;
+  --primary-medium: #567CDC;
+  --primary-dark: #2854C5;
+  
+  /* Secondary Colors */
+  --secondary: #A07BE3;
+  --secondary-light: #C9B4EF;
+  --secondary-medium: #8B5EDC;
+  --secondary-dark: #632ACA;
+  
+  /* Tertiary Colors */
+  --tertiary: #99899A;
+  --tertiary-light: #B4A8B4;
+  --tertiary-medium: #8B798C;
+  --tertiary-dark: #6C5D6D;
+  
+  /* Error Colors */
+  --error: #E53935;
+  --error-light: #EB6966;
+  --error-medium: #E0211C;
+  --error-dark: #AE1916;
+  
+  /* Success Colors */
+  --success: #5EB488;
+  --success-light: #83C5A3;
+  --success-medium: #4EA87A;
+  --success-dark: #3C825F;
+  
+  /* Info Colors */
+  --info: #7F598B;
+  --info-light: #966EA2;
+  --info-medium: #72507D;
+  --info-dark: #583E61;
+  
+  /* Neutral Colors */
+  --neutral: #D1D1D1;
+  --neutral-light: #FAFAFA;
+  --neutral-medium: #BCBCBC;
+  --neutral-dark: #929292;
+  
+  /* Neutral Variant */
+  --neutral-variant: #B8A9A0;
+  --neutral-variant-light: #D5CCC7;
+  --neutral-variant-medium: #A9978C;
+  --neutral-variant-dark: #897466;
+
+  /* Background Colors */
+  --bg-primary: #EEEEEE;
+  --bg-secondary: #FFFFFF;
+  --bg-muted: #E0E0E0;
+  --bg-dark: #2C3E50;
+  --bg-light: #FAFAFA;
+}
+
+/* Dark theme variables */
+:root[data-theme="dark"] {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --bg-muted: #3a3a3a;
+  --bg-dark: #0d1117;
+  --bg-light: #2d2d2d;
+}
