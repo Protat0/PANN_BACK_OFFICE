@@ -102,7 +102,7 @@ export default {
       error: null,
       successMessage: null,
       // Use the API service base URL
-      apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
+      apiBaseUrl: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1',
       isDev: import.meta.env.DEV
     }
   },
