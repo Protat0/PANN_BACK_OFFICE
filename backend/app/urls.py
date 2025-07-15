@@ -9,6 +9,7 @@ from .kpi_views.session_views import (
     UserSessionsView,
     SessionStatisticsView,
     SessionDisplayView,
+    CombinedLogsView,
 )
 
 from .kpi_views.user_views import (
@@ -177,6 +178,7 @@ urlpatterns = [
     # Session logs endpoint
     path('session-logs/', SessionLogsView.as_view(), name='session-logs'),
     path('session-logs/display/', SessionDisplayView.as_view(), name='session-logs-display'), #Data View
+    path('session-logs/combined/', CombinedLogsView.as_view(), name='combined-logs'),
 
     # Session management endpoints
     path('sessions/', SessionManagementView.as_view(), name='session-management'),
@@ -226,8 +228,6 @@ urlpatterns = [
     path('category/uncategorized/', UncategorizedCategoryView.as_view(), name='uncategorized-category'),
     path('category/uncategorized/products/', UncategorizedCategoryProductsView.as_view(), name='uncategorized-category-products'),
     path('category/uncategorized/migrate/', MigrateUncategorizedProductsView.as_view(), name='migrate-uncategorized-products'),
-
-
 
    # Bulk import and template endpoints (MUST be first)
     path('invoices/bulk-import/', SalesLogBulkImportView.as_view(), name='invoice-bulk-import'),

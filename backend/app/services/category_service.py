@@ -5,11 +5,13 @@ from ..database import db_manager
 from ..models import Category
 import bcrypt
 from notifications.services import notification_service
+from .audit_service import AuditLogService
 
 class CategoryService:
     def __init__(self):
         self.db = db_manager.get_database()  
         self.category_collection = self.db.category
+        self.audit_service = AuditLogService()
     
     # ================================================================
     # UTILITY METHODS
@@ -138,7 +140,7 @@ class CategoryService:
     # CRUD OPERATIONS
     # ================================================================
     
-    def create_category(self, category_data):
+    def create_category(self, category_data, current_user=None):
         """Create a new category with automatic 'None' subcategory"""
         try:
             # Debug: Print received data
@@ -235,6 +237,14 @@ class CategoryService:
             # Convert ObjectId for response
             created_category = self.convert_object_id(created_category)
             
+            if current_user:  
+                try:
+                    audit_category_data = {**created_category, "category_id": str(category_result.inserted_id)}
+                    self.audit_service.log_category_create(current_user, audit_category_data)
+                    print(f"✅ Audit log created for category creation")
+                except Exception as audit_error:
+                    print(f"⚠️ Failed to create audit log: {audit_error}")
+
             # Send notification directly in the method
             try:
                 category_name = created_category.get('category_name', 'Unknown Category')
@@ -358,7 +368,7 @@ class CategoryService:
         except Exception as e:
             raise Exception(f"Error getting deleted categories: {str(e)}")
     
-    def update_category(self, category_id, update_data):
+    def update_category(self, category_id, update_data, current_user=None):
         """Update an existing category including image fields"""
         try:
             print(f"\n🔍 UPDATE_CATEGORY: Updating {category_id}")
@@ -379,6 +389,7 @@ class CategoryService:
             
             # Get the existing category
             existing_category = self.category_collection.find_one({'_id': ObjectId(category_id)})
+            old_category_data = existing_category.copy()
             if not existing_category:
                 raise Exception(f"Category with ID {category_id} not found")
             
@@ -419,6 +430,13 @@ class CategoryService:
             # Fetch and return updated category
             updated_category = self.category_collection.find_one({'_id': ObjectId(category_id)})
             
+            if current_user:
+                try:
+                    self.audit_service.log_category_update(current_user, category_id, old_category_data, filtered_update_data)
+                    print(f"✅ Audit log created for category update")
+                except Exception as audit_error:
+                    print(f"⚠️ Failed to create audit log: {audit_error}")
+
             return self.convert_object_id(updated_category)
             
         except Exception as e:
@@ -431,7 +449,7 @@ class CategoryService:
     # DELETE OPERATIONS (NEW - SOFT AND HARD DELETE)
     # ================================================================
     
-    def soft_delete_category(self, category_id):
+    def soft_delete_category(self, category_id, current_user=None):
         """
         Soft delete a category (sets isDeleted to True)
         This hides the category from normal queries but keeps data intact
@@ -464,6 +482,12 @@ class CategoryService:
             )
             
             if result.modified_count > 0:
+                if current_user:
+                    try:
+                        self.audit_service.log_category_delete(current_user, category_to_delete)
+                        print(f"✅ Audit log created for category soft deletion")
+                    except Exception as audit_error:
+                        print(f"⚠️ Failed to create audit log: {audit_error}")
                 # Send notification
                 self._send_category_notification('soft_deleted', category_to_delete, category_id)
                 return True
@@ -473,7 +497,7 @@ class CategoryService:
         except Exception as e:
             raise Exception(f"Error deleting category: {str(e)}")
     
-    def hard_delete_category(self, category_id, admin_user_id=None):
+    def hard_delete_category(self, category_id, admin_user_id=None, current_user=None):
         """
         Hard delete a category (permanently removes from database)
         This should only be accessible by admin users
@@ -519,6 +543,12 @@ class CategoryService:
             result = self.category_collection.delete_one({'_id': category_id})
             
             if result.deleted_count > 0:
+                if current_user:
+                    try:
+                        self.audit_service.log_category_delete(current_user, category_to_delete)
+                        print(f"✅ Audit log created for category hard deletion")
+                    except Exception as audit_error:
+                        print(f"⚠️ Failed to create audit log: {audit_error}")
                 # Send notification
                 self._send_category_notification('hard_deleted', category_to_delete, category_id)
                 print(f"✅ Category '{category_to_delete.get('category_name')}' hard deleted successfully")

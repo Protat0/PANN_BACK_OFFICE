@@ -141,31 +141,26 @@ class AuthService:
             raise e
     
     def logout(self, token: str):
-        """Logout user by blacklisting token"""
+        print(f"Logout attempt with token: {token[:20]}...")
+        
         try:
-            # Get user info from token before blacklisting
-            payload = self.verify_token(token)  
+            clean_token = token.replace("Bearer ", "").strip()
             
-            # Add token to blacklist
-            self.blacklist_collection.insert_one({
-                "token": token,
+            # Check if already blacklisted
+            existing = self.blacklist_collection.find_one({"token": clean_token})
+            print(f"Token already blacklisted: {existing is not None}")
+            
+            # Add to blacklist
+            result = self.blacklist_collection.insert_one({
+                "token": clean_token,
                 "blacklisted_at": datetime.utcnow()
             })
-            
-            # Log the logout session
-            if payload:
-                try:
-                    from .session_services import SessionLogService
-                    session_service = SessionLogService()
-                    session_service.log_logout(payload["sub"])
-                except Exception as session_error:
-                    print(f"Session logout logging error: {session_error}")
-                    # Don't fail logout if session logging fails
+            print(f"Blacklist insert result: {result.inserted_id}")
             
             return {"message": "Successfully logged out"}
-        
         except Exception as e:
-            raise Exception(f"Error during logout: {str(e)}")
+            print(f"Logout error: {str(e)}")
+            raise e
     
     def get_current_user(self, token: str):
         """Get current user from token"""

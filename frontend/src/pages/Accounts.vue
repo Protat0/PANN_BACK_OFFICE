@@ -4,6 +4,7 @@
     <div class="page-header">
       <h1 class="page-title">User Management</h1>
       <div class="header-actions">
+        <!-- Auto-refresh status and controls (same as logs page) -->
         <div class="auto-refresh-status">
           <i class="bi bi-arrow-repeat text-success" :class="{ 'spinning': loading }"></i>
           <span class="status-text">
@@ -20,6 +21,23 @@
             {{ autoRefreshEnabled ? 'Disable' : 'Enable' }}
           </button>
         </div>
+        
+        <!-- Connection health indicator (same as logs page) -->
+        <div class="connection-indicator" :class="getConnectionStatus()">
+          <i :class="getConnectionIcon()"></i>
+          <span class="connection-text">{{ getConnectionText() }}</span>
+        </div>
+        
+        <!-- Emergency Refresh - Only show if error or connection lost -->
+        <button 
+          v-if="error || connectionLost" 
+          class="btn btn-warning" 
+          @click="emergencyReconnect"
+          :disabled="loading"
+        >
+          <i class="bi bi-arrow-clockwise" :class="{ 'spinning': loading }"></i>
+          {{ loading ? 'Reconnecting...' : 'Reconnect' }}
+        </button>
 
         <button 
           class="btn btn-danger" 
@@ -37,6 +55,7 @@
       </div>
     </div>
 
+    <!-- Rest of the component remains the same -->
     <!-- Filters Section -->
     <div class="filters-section">
       <div class="filter-group">
@@ -111,19 +130,6 @@
           <span class="visually-hidden">Loading...</span>
         </div>
         Refreshing user data... {{ refreshProgress }}
-      </div>
-    </div>
-
-    <!-- Connection Status (visible when connection issues) -->
-    <div v-if="connectionLost" class="connection-status">
-      <div class="alert alert-warning d-flex align-items-center justify-content-between" role="alert">
-        <div class="d-flex align-items-center">
-          <i :class="getConnectionIcon()"></i>
-          <span class="ms-2">{{ getConnectionText() }} - Auto-refresh paused</span>
-        </div>
-        <button class="btn btn-sm btn-outline-warning" @click="emergencyReconnect">
-          Reconnect
-        </button>
       </div>
     </div>
 
@@ -1439,31 +1445,58 @@ export default {
   align-items: center;
 }
 
-/* Auto-refresh status indicator */
+/* Auto-refresh status indicator (same as logs page) */
 .auto-refresh-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #f0fdf4;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #bbf7d0;
+  min-width: 280px;
+}
+
+.status-text {
+  font-size: 0.875rem;
+  color: #16a34a;
+  font-weight: 500;
+  flex: 1;
+}
+
+/* Connection indicator (same as logs page) */
+.connection-indicator {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  background: white;
   border-radius: 0.5rem;
-  border: 1px solid #e5e7eb;
   font-size: 0.875rem;
-}
-
-.status-text {
-  color: #6b7280;
   font-weight: 500;
 }
 
-/* Connection status */
-.connection-status {
-  margin-bottom: 1rem;
+.connection-good {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #16a34a;
 }
 
-/* Cache status */
-.cache-status {
-  margin-bottom: 1rem;
+.connection-unstable {
+  background: #fefce8;
+  border: 1px solid #fde047;
+  color: #ca8a04;
+}
+
+.connection-lost {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.connection-unknown {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
 }
 
 /* New entry highlighting */
@@ -1715,6 +1748,11 @@ export default {
   margin-bottom: 1rem;
 }
 
+/* Cache status */
+.cache-status {
+  margin-bottom: 1rem;
+}
+
 /* Column width definitions */
 .checkbox-column {
   width: 40px;
@@ -1858,12 +1896,6 @@ export default {
   color: #f59e0b;
   border-color: #fcd34d;
   background-color: transparent;
-}
-
-.btn-outline-warning:hover:not(:disabled) {
-  color: #ffffff;
-  background-color: #f59e0b;
-  border-color: #f59e0b;
 }
 
 .btn-outline-danger {
@@ -2307,6 +2339,11 @@ input[type="checkbox"] {
     flex-direction: column;
     text-align: center;
     gap: 0.25rem;
+    min-width: auto;
+  }
+
+  .connection-indicator {
+    order: -1;
   }
 }
 
@@ -2323,6 +2360,10 @@ input[type="checkbox"] {
   }
 
   .auto-refresh-status {
+    grid-column: span 2;
+  }
+
+  .connection-indicator {
     grid-column: span 2;
   }
 }

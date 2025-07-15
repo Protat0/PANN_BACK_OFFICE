@@ -174,6 +174,54 @@ class SessionLogsAPI {
     }
   }
 
+    /**
+   * Get combined session and audit logs
+   * @param {Object} params - Query parameters (limit, type)
+   * @returns {Promise<Object>} Combined logs data
+   */
+  async DisplayCombinedLogs(params = {}) {
+    try {
+        console.log("This API call is getting combined session and audit logs");
+        
+        const queryParams = new URLSearchParams();
+        if (params.limit) queryParams.append('limit', params.limit);
+        if (params.type) queryParams.append('type', params.type);
+        
+        const response = await api.get(`/session-logs/combined/?${queryParams}`);
+        return response.data;
+        
+    } catch (error) {
+        console.error("Error fetching combined logs:", error);
+        throw error;
+    }
+  }
+
+  /**
+   * Get only session logs (existing functionality preserved)
+   */
+  async DisplaySessionLogsOnly(params = {}) {
+    try {
+        console.log("This API call is getting session logs only");
+        return await this.DisplayCombinedLogs({ ...params, type: 'session' });
+    } catch (error) {
+        console.error("Error fetching session logs:", error);
+        throw error;
+    }
+  }
+
+  /**
+   * Get only audit logs
+   */
+  async DisplayAuditLogsOnly(params = {}) {
+    try {
+        console.log("This API call is getting audit logs only");
+        return await this.DisplayCombinedLogs({ ...params, type: 'audit' });
+    } catch (error) {
+        console.error("Error fetching audit logs:", error);
+        throw error;
+    }
+  }
+
 }
 
 // Create and export singleton instance

@@ -17,6 +17,12 @@ from datetime import datetime
 class CategoryKPIView(APIView):
     def post(self, request):
         """Category Creation"""
+        print("🚀🚀🚀 CategoryKPIView.post() WAS CALLED! 🚀🚀🚀")
+        print(f"🔍 Request method: {request.method}")
+        print(f"🔍 Request path: {request.path}")
+        print(f"🔍 Request data: {request.data}")
+        print(f"🔍 Request user: {request.user}")
+        print("=" * 50)
         try:
             category_service = CategoryService()
             
@@ -63,7 +69,24 @@ class CategoryKPIView(APIView):
                 print(f"ℹ️ IMAGE: No image data provided")
             
             # Create the category
-            result = category_service.create_category(category_data)
+            current_user = {
+                "user_id": getattr(request.user, 'id', None),
+                "username": getattr(request.user, 'username', 'unknown'),
+                "branch_id": getattr(request.user, 'branch_id', 1),
+                "ip_address": request.META.get('REMOTE_ADDR'),
+                "user_agent": request.META.get('HTTP_USER_AGENT')
+            }
+
+            print("=" * 50)
+            print("CATEGORY CREATION DEBUG")
+            print(f"User: {request.user}")
+            print(f"Is authenticated: {request.user.is_authenticated}")
+            print(f"Username: {getattr(request.user, 'username', 'NO_USERNAME')}")
+            print(f"User ID: {getattr(request.user, 'id', 'NO_ID')}")
+            print(f"Current user object: {current_user}")
+            print("=" * 50)
+
+            result = category_service.create_category(category_data, current_user)
             
             return Response({
                 "message": "Category created successfully",
@@ -184,7 +207,15 @@ class CategoryDetailView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            result = category_service.update_category(category_id, update_data)
+            current_user = {
+                "user_id": getattr(request.user, 'id', None),
+                "username": getattr(request.user, 'username', 'unknown'),
+                "branch_id": getattr(request.user, 'branch_id', 1),
+                "ip_address": request.META.get('REMOTE_ADDR'),
+                "user_agent": request.META.get('HTTP_USER_AGENT')
+            }
+
+            result = category_service.update_category(category_id, update_data, current_user)
             
             if not result:
                 return Response(
@@ -210,7 +241,15 @@ class CategoryDetailView(APIView):
         """Soft delete a category (legacy method - now calls soft_delete)"""
         try:
             category_service = CategoryService()
-            result = category_service.soft_delete_category(category_id)  # UPDATED: Now calls soft delete
+            current_user = {
+                "user_id": getattr(request.user, 'id', None),
+                "username": getattr(request.user, 'username', 'unknown'),
+                "branch_id": getattr(request.user, 'branch_id', 1),
+                "ip_address": request.META.get('REMOTE_ADDR'),
+                "user_agent": request.META.get('HTTP_USER_AGENT')
+            }
+
+            result = category_service.soft_delete_category(category_id, current_user)
             
             if not result:
                 return Response(
@@ -238,8 +277,16 @@ class CategorySoftDeleteView(APIView):
         """Soft delete a category"""
         try:
             category_service = CategoryService()
-            result = category_service.soft_delete_category(category_id)
-            
+            current_user = {
+                "user_id": getattr(request.user, 'id', None),
+                "username": getattr(request.user, 'username', 'unknown'),
+                "branch_id": getattr(request.user, 'branch_id', 1),
+                "ip_address": request.META.get('REMOTE_ADDR'),
+                "user_agent": request.META.get('HTTP_USER_AGENT')
+            }
+
+            result = category_service.soft_delete_category(category_id, current_user)
+                        
             if not result:
                 return Response(
                     {"error": "Category not found or already deleted"}, 
@@ -300,7 +347,15 @@ class CategoryHardDeleteView(APIView):
             category_service = CategoryService()
             admin_user_id = getattr(request.user, 'id', None)  # Get admin user ID
             
-            result = category_service.hard_delete_category(category_id, admin_user_id=admin_user_id)
+            current_user = {
+                "user_id": getattr(request.user, 'id', None),
+                "username": getattr(request.user, 'username', 'unknown'),
+                "branch_id": getattr(request.user, 'branch_id', 1),
+                "ip_address": request.META.get('REMOTE_ADDR'),
+                "user_agent": request.META.get('HTTP_USER_AGENT')
+            }
+
+            result = category_service.hard_delete_category(category_id, admin_user_id=admin_user_id, current_user=current_user)
             
             if not result:
                 return Response(

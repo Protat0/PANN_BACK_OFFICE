@@ -47,9 +47,20 @@
         <label for="categoryFilter">Filter by Category:</label>
         <select id="categoryFilter" v-model="categoryFilter" @change="handleFilterChange" :disabled="loading">
           <option value="all">All Categories</option>
+          
+          <!-- Session Events -->
+          <option value="session">Sessions</option>
           <option value="login">Login</option>
           <option value="logout">Logout</option>
-          <option value="session">Session</option>
+          
+          <!-- Audit Events -->
+          <option value="category">Categories</option>
+          <option value="product">Products</option>
+          <option value="customer">Customers</option>
+          <option value="user">Users</option>
+          <option value="create">Create Actions</option>
+          <option value="update">Update Actions</option>
+          <option value="delete">Delete Actions</option>
         </select>
       </div>
 
@@ -81,6 +92,7 @@
       </div>
     </div>
 
+    
     <!-- Loading State -->
     <div v-if="loading && session_logs.length === 0" class="loading-state">
       <div class="spinner-border text-primary"></div>
@@ -128,8 +140,8 @@
             <th>User ID</th>
             <th>Ref. ID</th>
             <th>Event Type</th>
-            <th>Amount/Qty</th>
-            <th>Status</th>
+            <th style="text-align: center;">Amount/Qty</th>
+            <th style="text-align: center;">Status</th>
             <th>Timestamp</th>
             <th>Remarks</th>
           </tr>
@@ -256,6 +268,7 @@ export default {
       // Filters
       categoryFilter: 'all',
       searchFilter: '',
+      
       
       // Pagination data
       currentPage: 1,
@@ -398,7 +411,11 @@ export default {
     // DATA FETCHING - OPTIMIZED WITH CONNECTION HEALTH & SMART REFRESH
     // ================================================================
     async loadLogs(isAutoRefresh = false, isEmergencyReconnect = false) {
-      // Prevent multiple simultaneous requests
+      return await this.loadCombinedLogs(isAutoRefresh, isEmergencyReconnect)
+    },
+
+    // ADD this new method after loadLogs
+    async loadCombinedLogs(isAutoRefresh = false, isEmergencyReconnect = false) {
       if (this.loading && !isAutoRefresh && !isEmergencyReconnect) return
       
       this.loading = true
@@ -407,36 +424,48 @@ export default {
       }
       
       try {
-        const response = await APILogs.DisplayLogs()
+        // Use the new combined logs API
+        let logType = 'all'
+        if (['session', 'login', 'logout'].includes(this.categoryFilter)) {
+          logType = 'session'
+        } else if (['category', 'product', 'customer', 'user', 'create', 'update', 'delete'].includes(this.categoryFilter)) {
+          logType = 'audit'
+        }
+
+        const response = await APILogs.DisplayCombinedLogs({
+          limit: 100,
+          type: logType
+        })
+        
         const previousLogsLength = this.session_logs.length
         
-        // Handle different response formats
+        // Handle response
         let newLogs = []
         if (response && response.success && response.data) {
           newLogs = response.data
+          console.log(`Loaded ${newLogs.length} combined logs (${response.session_count} session, ${response.audit_count} audit)`)
         } else if (Array.isArray(response)) {
           newLogs = response
         } else if (response && response.data) {
           newLogs = response.data
         }
         
-        // OPTION 2: Connection health tracking
+        // Connection health tracking (same as existing)
         this.connectionLost = false
         this.consecutiveErrors = 0
         this.lastSuccessfulLoad = Date.now()
         this.error = null
         
-        // OPTION 3: Smart refresh rate adjustment
+        // Smart refresh rate adjustment (same as existing)
         this.trackActivityAndAdjustRefreshRate(newLogs, previousLogsLength)
         
-        // Track new entries for highlighting
+        // Track new entries for highlighting (same as existing)
         if (isAutoRefresh && this.session_logs.length > 0) {
           const existingIds = new Set(this.session_logs.map(log => log.log_id || log._id))
           newLogs.forEach(log => {
             const id = log.log_id || log._id
             if (!existingIds.has(id)) {
               this.newEntryIds.add(id)
-              // Track for activity analysis
               this.recentActivity.push({
                 timestamp: Date.now(),
                 logId: id
@@ -444,7 +473,6 @@ export default {
             }
           })
           
-          // Clear new entry highlights after 5 seconds
           setTimeout(() => {
             this.newEntryIds.clear()
           }, 5000)
@@ -452,42 +480,30 @@ export default {
         
         this.session_logs = newLogs
         this.lastLoadTime = Date.now()
-        
-        // Clear memoization cache when data changes
         this.memoizedFilters.result = []
         
-        // Only reset to first page if it's not an auto-refresh
         if (!isAutoRefresh) {
           this.currentPage = 1
         }
         
-        // Validate current page after data load
         if (this.currentPage > this.totalPages && this.totalPages > 0) {
           this.currentPage = this.totalPages
         }
         
-        console.log(`Loaded ${newLogs.length} session logs (${isAutoRefresh ? 'auto-refresh' : isEmergencyReconnect ? 'emergency-reconnect' : 'manual'})`)
-        
       } catch (error) {
-        console.error("Error loading session logs:", error)
+        console.error("Error loading combined logs:", error)
         
-        // OPTION 2: Handle connection errors
         this.consecutiveErrors++
-        this.error = error.message || 'Failed to load session logs'
+        this.error = error.message || 'Failed to load logs'
         
-        // Mark connection as lost after 3 consecutive errors
         if (this.consecutiveErrors >= 3) {
           this.connectionLost = true
-          console.log('Connection marked as lost after 3 consecutive errors')
         }
         
-        // OPTION 3: Slow down refresh rate when experiencing errors
         if (this.consecutiveErrors >= 2) {
-          this.autoRefreshInterval = Math.min(this.baseRefreshInterval * 2, 120000) // Max 2 minutes
-          console.log(`Slowing refresh rate to ${this.autoRefreshInterval / 1000}s due to errors`)
+          this.autoRefreshInterval = Math.min(this.baseRefreshInterval * 2, 120000)
         }
         
-        // Don't clear data on auto-refresh failures
         if (!isAutoRefresh) {
           this.session_logs = []
         }

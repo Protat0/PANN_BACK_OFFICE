@@ -65,8 +65,39 @@
           <h1>Category Analysis</h1>
         </div>
         <div class="header-actions">
-          <button class="btn btn-warning" style="color:white" @click="refreshData" :disabled="loading">
-            <i class="bi bi-arrow-clockwise"></i> {{ loading ? 'Loading...' : 'Refresh' }}
+          <!-- Auto-refresh status and controls (same as logs page) -->
+          <div class="auto-refresh-status">
+            <i class="bi bi-arrow-repeat text-success" :class="{ 'spinning': loading }"></i>
+            <span class="status-text">
+              <span v-if="autoRefreshEnabled">Updates in {{ countdown }}s </span>
+              <span v-else>Auto-refresh disabled</span>
+            </span>
+            
+            <!-- Toggle button -->
+            <button 
+              class="btn btn-sm"
+              :class="autoRefreshEnabled ? 'btn-outline-secondary' : 'btn-outline-success'"
+              @click="toggleAutoRefresh"
+            >
+              {{ autoRefreshEnabled ? 'Disable' : 'Enable' }}
+            </button>
+          </div>
+          
+          <!-- Connection health indicator (same as logs page) -->
+          <div class="connection-indicator" :class="getConnectionStatus()">
+            <i :class="getConnectionIcon()"></i>
+            <span class="connection-text">{{ getConnectionText() }}</span>
+          </div>
+          
+          <!-- Emergency Refresh - Only show if error or connection lost -->
+          <button 
+            v-if="error || connectionLost" 
+            class="btn btn-warning" 
+            @click="emergencyReconnect"
+            :disabled="loading"
+          >
+            <i class="bi bi-arrow-clockwise" :class="{ 'spinning': loading }"></i>
+            {{ loading ? 'Reconnecting...' : 'Reconnect' }}
           </button>
         </div>
       </div>
@@ -153,7 +184,22 @@ export default {
       },
       
       // Category data
-      categories: []
+      categories: [],
+
+      autoRefreshEnabled: true,
+      autoRefreshInterval: 30000, // 30 seconds
+      baseRefreshInterval: 30000,
+      autoRefreshTimer: null,
+      countdown: 30,
+      countdownTimer: null,
+      
+      // Connection health tracking
+      connectionLost: false,
+      consecutiveErrors: 0,
+      lastSuccessfulLoad: null,
+      
+      // Smart refresh rate tracking
+      recentActivity: [],
     };
   },
 
@@ -185,17 +231,25 @@ export default {
   // ====================================================================
   async mounted() {
     console.log("=== SalesByCategory Component Mounted ===");
-    console.log("CategoryService:", CategoryService);
     
-    // Load all category data with frequency filtering
     try {
-      console.log("Loading all category data with frequency filtering...");
       await this.loadAllCategoryData();
+      
+      // Start auto-refresh
+      if (this.autoRefreshEnabled) {
+        this.startAutoRefresh();
+      }
+      
       console.log("✅ All category data loaded");
     } catch (error) {
       console.error("❌ Category data loading failed:", error);
     }
   },
+
+beforeUnmount() {
+  this.stopAutoRefresh();
+  console.log('🧹 Component cleanup complete');
+},
   
   // ====================================================================
   // METHODS
@@ -214,7 +268,7 @@ export default {
         this.loading = true;
         this.loadingTopItems = true;
         this.loadingChart = true;
-        
+            
         if (!CategoryService?.CategoryData) {
           throw new Error("CategoryData method not found in CategoryService");
         }
@@ -249,8 +303,22 @@ export default {
           this.setFallbackData();
         }
         
+        // ✅ CONNECTION HEALTH TRACKING - Move this to success block
+        this.connectionLost = false;
+        this.consecutiveErrors = 0;
+        this.lastSuccessfulLoad = Date.now();
+
       } catch (error) {
         console.error("❌ Error loading category data:", error);
+        
+        // Handle connection errors
+        this.consecutiveErrors++;
+        
+        if (this.consecutiveErrors >= 3) {
+          this.connectionLost = true;
+          console.log('Connection marked as lost after 3 consecutive errors');
+        }
+        
         this.setFallbackData();
       } finally {
         this.loading = false;
@@ -829,6 +897,92 @@ export default {
       }
       
       return `${categoryNames.slice(0, 3).join(', ')} +${categoryNames.length - 3} more`;
+    },
+
+    // ============ AUTO-REFRESH SYSTEM ============
+    toggleAutoRefresh() {
+      if (this.autoRefreshEnabled) {
+        this.autoRefreshEnabled = false
+        this.stopAutoRefresh()
+        console.log('Auto-refresh disabled by user')
+      } else {
+        this.autoRefreshEnabled = true
+        this.startAutoRefresh()
+        console.log('Auto-refresh enabled by user')
+      }
+    },
+  
+    startAutoRefresh() {
+      this.stopAutoRefresh() // Clear any existing timers
+      
+      // Start countdown
+      this.countdown = this.autoRefreshInterval / 1000
+      this.countdownTimer = setInterval(() => {
+        this.countdown--
+        if (this.countdown <= 0) {
+          this.countdown = this.autoRefreshInterval / 1000
+        }
+      }, 1000)
+      
+      // Start auto-refresh timer
+      this.autoRefreshTimer = setInterval(() => {
+        this.loadAllCategoryData() // Use your existing refresh method
+      }, this.autoRefreshInterval)
+      
+      console.log(`Auto-refresh started (${this.autoRefreshInterval / 1000}s interval)`)
+    },
+  
+    stopAutoRefresh() {
+      if (this.autoRefreshTimer) {
+        clearInterval(this.autoRefreshTimer)
+        this.autoRefreshTimer = null
+      }
+      
+      if (this.countdownTimer) {
+        clearInterval(this.countdownTimer)
+        this.countdownTimer = null
+      }
+      
+      console.log('Auto-refresh stopped')
+    },
+
+    // Emergency reconnect method
+    async emergencyReconnect() {
+      console.log('Emergency reconnect initiated')
+      this.consecutiveErrors = 0
+      this.connectionLost = false
+      await this.loadAllCategoryData()
+      
+      if (!this.autoRefreshEnabled) {
+        this.autoRefreshEnabled = true
+        this.startAutoRefresh()
+      }
+    },
+
+    // Connection status methods
+    getConnectionStatus() {
+      if (this.connectionLost) return 'connection-lost'
+      if (this.consecutiveErrors > 0) return 'connection-unstable'
+      if (this.lastSuccessfulLoad && (Date.now() - this.lastSuccessfulLoad < 60000)) return 'connection-good'
+      return 'connection-unknown'
+    },
+
+    getConnectionIcon() {
+      switch (this.getConnectionStatus()) {
+        case 'connection-good': return 'bi bi-wifi text-success'
+        case 'connection-unstable': return 'bi bi-wifi-1 text-warning'
+        case 'connection-lost': return 'bi bi-wifi-off text-danger'
+        default: return 'bi bi-wifi text-muted'
+      }
+    },
+
+    getConnectionText() {
+      switch (this.getConnectionStatus()) {
+        case 'connection-good': return 'Connected'
+        case 'connection-unstable': return 'Unstable'
+        case 'connection-lost': return 'Connection Lost'
+        default: return 'Connecting...'
+      }
     }
   }
 }
@@ -1302,4 +1456,113 @@ export default {
     font-size: 12px;
   }
 }
+
+/* Auto-refresh status indicator */
+.auto-refresh-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #f0fdf4;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #bbf7d0;
+  min-width: 280px;
+}
+
+.status-text {
+  font-size: 0.875rem;
+  color: #16a34a;
+  font-weight: 500;
+  flex: 1;
+}
+
+/* Connection indicator */
+.connection-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.connection-good {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #16a34a;
+}
+
+.connection-unstable {
+  background: #fefce8;
+  border: 1px solid #fde047;
+  color: #ca8a04;
+}
+
+.connection-lost {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.connection-unknown {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+  border-radius: 0.25rem;
+}
+
+.btn-outline-secondary {
+  color: #6c757d;
+  border: 1px solid #6c757d;
+  background-color: transparent;
+}
+
+.btn-outline-secondary:hover:not(:disabled) {
+  color: #fff;
+  background-color: #6c757d;
+  border-color: #6c757d;
+}
+
+.btn-outline-success {
+  color: #10b981;
+  border: 1px solid #10b981;
+  background-color: transparent;
+}
+
+.btn-outline-success:hover:not(:disabled) {
+  color: #fff;
+  background-color: #10b981;
+  border-color: #10b981;
+}
+
+/* Spinning icon animation */
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .auto-refresh-status {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.25rem;
+    min-width: auto;
+  }
+
+  .connection-indicator {
+    order: -1;
+  }
+}
+
 </style>

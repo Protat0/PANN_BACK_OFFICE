@@ -48,7 +48,7 @@ openpyxl>=3.0.0
 # Production Server (Optional)
 # Uncomment for production deployment
 # gunicorn==21.2.0
-# whitenoise==6.6.0
+ whitenoise==6.6.0
 
 # Payment Integration (Future)
 # Add when implementing PayMongo/HitPay

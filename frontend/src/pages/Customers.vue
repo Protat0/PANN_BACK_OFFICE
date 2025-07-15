@@ -72,22 +72,40 @@
         
         <!-- Action Buttons -->
         <div class="action-buttons-group">
+          <!-- Auto-refresh status and controls (same as logs page) -->
           <div class="auto-refresh-status">
-          <i class="bi bi-arrow-repeat text-success" :class="{ 'spinning': loading }"></i>
-          <span class="status-text">
-            <span v-if="autoRefreshEnabled">Updates in {{ countdown }}s</span>
-            <span v-else>Auto-refresh disabled</span>
-          </span>
+            <i class="bi bi-arrow-repeat text-success" :class="{ 'spinning': loading }"></i>
+            <span class="status-text">
+              <span v-if="autoRefreshEnabled">Updates in {{ countdown }}s</span>
+              <span v-else>Auto-refresh disabled</span>
+            </span>
+            
+            <!-- Toggle button -->
+            <button 
+              class="btn btn-sm"
+              :class="autoRefreshEnabled ? 'btn-outline-secondary' : 'btn-outline-success'"
+              @click="toggleAutoRefresh"
+            >
+              {{ autoRefreshEnabled ? 'Disable' : 'Enable' }}
+            </button>
+          </div>
           
-          <!-- Toggle button -->
+          <!-- Connection health indicator (same as logs page) -->
+          <div class="connection-indicator" :class="getConnectionStatus()">
+            <i :class="getConnectionIcon()"></i>
+            <span class="connection-text">{{ getConnectionText() }}</span>
+          </div>
+          
+          <!-- Emergency Refresh - Only show if error or connection lost -->
           <button 
-            class="btn btn-sm"
-            :class="autoRefreshEnabled ? 'btn-outline-secondary' : 'btn-outline-success'"
-            @click="toggleAutoRefresh"
+            v-if="error || connectionLost" 
+            class="btn btn-warning" 
+            @click="emergencyReconnect"
+            :disabled="loading"
           >
-            {{ autoRefreshEnabled ? 'Disable' : 'Enable' }}
+            <i class="bi bi-arrow-clockwise" :class="{ 'spinning': loading }"></i>
+            {{ loading ? 'Reconnecting...' : 'Reconnect' }}
           </button>
-        </div>
 
           <button 
             class="btn btn-danger" 
@@ -127,7 +145,7 @@
       <div class="alert alert-danger text-center" role="alert">
         <i class="bi bi-exclamation-triangle"></i>
         <p class="mb-3">{{ error }}</p>
-        <button class="btn btn-primary" @click="refreshData" :disabled="loading">
+        <button class="btn btn-primary" @click="emergencyReconnect" :disabled="loading">
           <i class="bi bi-arrow-clockwise"></i>
           {{ loading ? 'Retrying...' : 'Try Again' }}
         </button>
@@ -586,9 +604,9 @@ export default {
       refreshStartTime: null,
       
       // Auto-refresh functionality (Logs page system)
-      autoRefreshEnabled: true, // Enable by default for "automatic" branding
-      autoRefreshInterval: 30000, // 30 seconds (base interval)
-      baseRefreshInterval: 30000, // Store original interval
+      autoRefreshEnabled: true,
+      autoRefreshInterval: 30000, // 30 seconds
+      baseRefreshInterval: 30000,
       autoRefreshTimer: null,
       countdown: 30,
       countdownTimer: null,
@@ -599,7 +617,7 @@ export default {
       lastSuccessfulLoad: null,
       
       // Smart refresh rate tracking
-      recentActivity: [], // Track recent entries for smart adjustment
+      recentActivity: [],
       
       // Performance optimizations
       filterDebounceTimer: null,
@@ -653,6 +671,318 @@ export default {
     }
   },
   methods: {
+    // ============ LOGS PAGE AUTO-REFRESH SYSTEM ============
+    toggleAutoRefresh() {
+      if (this.autoRefreshEnabled) {
+        this.autoRefreshEnabled = false
+        this.stopAutoRefresh()
+        console.log('Auto-refresh disabled by user')
+      } else {
+        this.autoRefreshEnabled = true
+        this.startAutoRefresh()
+        console.log('Auto-refresh enabled by user')
+      }
+    },
+    
+    startAutoRefresh() {
+      this.stopAutoRefresh() // Clear any existing timers
+      
+      // Start countdown
+      this.countdown = this.autoRefreshInterval / 1000
+      this.countdownTimer = setInterval(() => {
+        this.countdown--
+        if (this.countdown <= 0) {
+          this.countdown = this.autoRefreshInterval / 1000
+        }
+      }, 1000)
+      
+      // Start auto-refresh timer
+      this.autoRefreshTimer = setInterval(() => {
+        Promise.all([
+          this.loadKPIData(true),
+          this.fetchCustomers(true)
+        ])
+      }, this.autoRefreshInterval)
+      
+      console.log(`Auto-refresh started (${this.autoRefreshInterval / 1000}s interval)`)
+    },
+    
+    stopAutoRefresh() {
+      if (this.autoRefreshTimer) {
+        clearInterval(this.autoRefreshTimer)
+        this.autoRefreshTimer = null
+      }
+      
+      if (this.countdownTimer) {
+        clearInterval(this.countdownTimer)
+        this.countdownTimer = null
+      }
+      
+      console.log('Auto-refresh stopped')
+    },
+
+    // Emergency reconnect method
+    async emergencyReconnect() {
+      console.log('Emergency reconnect initiated')
+      this.consecutiveErrors = 0
+      this.connectionLost = false
+      await Promise.all([
+        this.loadKPIData(false),
+        this.fetchCustomers(false, true)
+      ])
+      
+      // Restart auto-refresh if it was stopped
+      if (!this.autoRefreshEnabled) {
+        this.autoRefreshEnabled = true
+        this.startAutoRefresh()
+      }
+    },
+
+    // Connection status methods
+    getConnectionStatus() {
+      if (this.connectionLost) return 'connection-lost'
+      if (this.consecutiveErrors > 0) return 'connection-unstable'
+      if (this.lastSuccessfulLoad && (Date.now() - this.lastSuccessfulLoad < 60000)) return 'connection-good'
+      return 'connection-unknown'
+    },
+
+    getConnectionIcon() {
+      switch (this.getConnectionStatus()) {
+        case 'connection-good': return 'bi bi-wifi text-success'
+        case 'connection-unstable': return 'bi bi-wifi-1 text-warning'
+        case 'connection-lost': return 'bi bi-wifi-off text-danger'
+        default: return 'bi bi-wifi text-muted'
+      }
+    },
+
+    getConnectionText() {
+      switch (this.getConnectionStatus()) {
+        case 'connection-good': return 'Connected'
+        case 'connection-unstable': return 'Unstable'
+        case 'connection-lost': return 'Connection Lost'
+        default: return 'Connecting...'
+      }
+    },
+
+    // ============ ENHANCED DATA FETCHING ============
+    async fetchCustomers(isAutoRefresh = false, isEmergencyReconnect = false) {
+      if (this.loading && !isAutoRefresh && !isEmergencyReconnect) return
+      
+      // Check cache first
+      if (!isEmergencyReconnect && this.cache.metadata.enabled) {
+        const cachedCustomers = this.cache.getCustomers()
+        if (cachedCustomers && !isAutoRefresh) {
+          this.customers = cachedCustomers
+          this.filteredCustomers = cachedCustomers
+          console.log('✅ Customers loaded from cache instantly')
+          return
+        }
+      }
+
+      this.loading = true
+      if (!isEmergencyReconnect) {
+        this.error = null
+      }
+      this.refreshStartTime = Date.now()
+      
+      try {
+        const previousLength = this.customers.length
+        
+        // Progress updates
+        const progressInterval = setInterval(() => {
+          if (!this.loading) {
+            clearInterval(progressInterval)
+            return
+          }
+          
+          const elapsed = Date.now() - this.refreshStartTime
+          if (elapsed < 1000) {
+            this.refreshProgress = 'Connecting to server...'
+          } else if (elapsed < 2000) {
+            this.refreshProgress = 'Fetching customer data...'
+          } else {
+            this.refreshProgress = 'Processing customer records...'
+          }
+        }, 500)
+        
+        console.log(`📡 Fetching customers from API... (${isAutoRefresh ? 'auto-refresh' : isEmergencyReconnect ? 'emergency-reconnect' : 'manual'})`)
+        const data = await apiService.getCustomers()
+        
+        clearInterval(progressInterval)
+        
+        // Connection health tracking
+        this.connectionLost = false
+        this.consecutiveErrors = 0
+        this.lastSuccessfulLoad = Date.now()
+        this.error = null
+        
+        // Smart refresh rate adjustment
+        this.trackActivityAndAdjustRefreshRate(data, previousLength)
+        
+        // Track new entries for highlighting
+        if (isAutoRefresh && this.customers.length > 0) {
+          const existingIds = new Set(this.customers.map(customer => customer._id || customer.customer_id))
+          data.forEach(customer => {
+            const id = customer._id || customer.customer_id
+            if (!existingIds.has(id)) {
+              this.newEntryIds.add(id)
+              this.recentActivity.push({
+                timestamp: Date.now(),
+                customerId: id
+              })
+            }
+          })
+          
+          setTimeout(() => {
+            this.newEntryIds.clear()
+          }, 5000)
+        }
+        
+        // Store in cache
+        if (this.cache.metadata.enabled) {
+          this.cache.setCustomers(data)
+        }
+        
+        this.customers = data
+        this.filteredCustomers = data
+        this.lastRefresh = new Date()
+        this.lastLoadTime = Date.now()
+        
+        console.log(`✅ Customers loaded successfully: ${data.length} customers`)
+        
+      } catch (error) {
+        console.error('❌ Error fetching customers:', error)
+        
+        this.consecutiveErrors++
+        this.error = this.getDetailedErrorMessage(error)
+        
+        if (this.consecutiveErrors >= 3) {
+          this.connectionLost = true
+          console.log('Connection marked as lost after 3 consecutive errors')
+        }
+        
+        if (this.consecutiveErrors >= 2) {
+          this.autoRefreshInterval = Math.min(this.baseRefreshInterval * 2, 120000) // Max 2 minutes
+          console.log(`Slowing refresh rate to ${this.autoRefreshInterval / 1000}s due to errors`)
+        }
+        
+        if (!isAutoRefresh) {
+          this.customers = []
+          this.filteredCustomers = []
+        }
+      } finally {
+        this.loading = false
+        this.refreshProgress = ''
+      }
+    },
+
+    async loadKPIData(isAutoRefresh = false) {
+      try {
+        const [activeResult, monthlyResult, dailyResult] = await Promise.allSettled([
+          CustomerApiService.ActiveUser(),
+          CustomerApiService.MonthlyUser(),
+          CustomerApiService.DailyUser()
+        ])
+        
+        // Handle Active Users
+        if (activeResult.status === 'fulfilled') {
+          const activeCustomers = activeResult.value.active_customers || []
+          if (Array.isArray(activeCustomers)) {
+            const customerUsers = activeCustomers.filter(user => user.role === 'customer')
+            this.activeUsersCount = customerUsers.length.toString()
+          } else {
+            this.activeUsersCount = activeCustomers.toString() || '0'
+          }
+        } else {
+          console.error('Failed to load active users:', activeResult.reason)
+          this.activeUsersCount = 'Error'
+        }
+        
+        // Handle Monthly Users
+        if (monthlyResult.status === 'fulfilled') {
+          const monthlyCustomers = monthlyResult.value.monthly_customers || []
+          if (Array.isArray(monthlyCustomers)) {
+            const customerUsers = monthlyCustomers.filter(user => user.role === 'customer')
+            this.monthlyUsersCount = customerUsers.length.toString()
+          } else {
+            this.monthlyUsersCount = monthlyCustomers.toString() || '0'
+          }
+        } else {
+          console.error('Failed to load monthly users:', monthlyResult.reason)
+          this.monthlyUsersCount = 'Error'
+        }
+        
+        // Handle Daily Users
+        if (dailyResult.status === 'fulfilled') {
+          const dailyCustomers = dailyResult.value.daily_customers || []
+          if (Array.isArray(dailyCustomers)) {
+            const customerUsers = dailyCustomers.filter(user => user.role === 'customer')
+            this.dailyUsersCount = customerUsers.length.toString()
+          } else {
+            this.dailyUsersCount = dailyCustomers.toString() || '0'
+          }
+        } else {
+          console.error('Failed to load daily users:', dailyResult.reason)
+          this.dailyUsersCount = 'Error'
+        }
+        
+        console.log(`✅ KPI data loading completed (${isAutoRefresh ? 'auto-refresh' : 'manual'})`)
+        
+      } catch (error) {
+        console.error('❌ Error loading KPI data:', error)
+        this.activeUsersCount = 'Error'
+        this.monthlyUsersCount = 'Error'
+        this.dailyUsersCount = 'Error'
+      }
+    },
+
+    // Smart refresh rate adjustment based on activity
+    trackActivityAndAdjustRefreshRate(newData, previousLength) {
+      const now = Date.now()
+      
+      // Clean old activity data (older than 5 minutes)
+      this.recentActivity = this.recentActivity.filter(
+        activity => now - activity.timestamp < 300000
+      )
+      
+      // Count recent activity (last 2 minutes)
+      const recentCount = this.recentActivity.filter(
+        activity => now - activity.timestamp < 120000
+      ).length
+      
+      // Adjust refresh rate based on activity
+      if (recentCount >= 10) {
+        this.autoRefreshInterval = 10000 // High activity: 10 seconds
+        console.log('High activity detected: refresh rate increased to 10s')
+      } else if (recentCount >= 5) {
+        this.autoRefreshInterval = 20000 // Medium activity: 20 seconds
+        console.log('Medium activity detected: refresh rate set to 20s')
+      } else if (recentCount === 0 && this.recentActivity.length === 0) {
+        this.autoRefreshInterval = 60000 // No activity: 60 seconds
+        console.log('No activity detected: refresh rate decreased to 60s')
+      } else {
+        this.autoRefreshInterval = this.baseRefreshInterval // Normal activity
+      }
+      
+      // Restart auto-refresh with new interval if it's running
+      if (this.autoRefreshEnabled && this.autoRefreshTimer) {
+        this.startAutoRefresh()
+      }
+    },
+
+    getDetailedErrorMessage(error) {
+      if (error.name === 'NetworkError' || error.message.includes('fetch')) {
+        return 'Network connection failed. Please check your internet connection and try again.'
+      } else if (error.status === 401) {
+        return 'Authentication failed. Please log in again.'
+      } else if (error.status === 403) {
+        return 'Access denied. You do not have permission to view customer data.'
+      } else if (error.status === 500) {
+        return 'Server error occurred. Please try again later.'
+      }
+      return `Failed to load customers: ${error.message || 'Unknown error occurred'}`
+    },
+
     // ============ VALIDATION METHODS ============
     checkEmailDuplicate(email, excludeId = null) {
       if (!email) return false
@@ -757,366 +1087,25 @@ export default {
       this.validationErrors = {}
     },
 
-    // ============ ENHANCED DATA FETCHING WITH LOGS PAGE SYSTEM ============
-    async fetchCustomers(isAutoRefresh = false, isEmergencyReconnect = false) {
-      // Prevent multiple simultaneous requests
-      if (this.loading && !isAutoRefresh && !isEmergencyReconnect) return
-      
-      // Check cache first (only for non-emergency requests)
-      if (!isEmergencyReconnect && this.cache.metadata.enabled) {
-        const cachedCustomers = this.cache.getCustomers()
-        if (cachedCustomers && !isAutoRefresh) {
-          this.customers = cachedCustomers
-          this.filteredCustomers = cachedCustomers
-          console.log('✅ Customers loaded from cache instantly')
-          return
-        }
-      }
-
-      this.loading = true
-      if (!isEmergencyReconnect) {
-        this.error = null
-      }
-      this.refreshStartTime = Date.now()
-      
-      try {
-        const previousLength = this.customers.length
-        
-        // Simulate progress updates
-        const progressInterval = setInterval(() => {
-          if (!this.loading) {
-            clearInterval(progressInterval)
-            return
-          }
-          
-          const elapsed = Date.now() - this.refreshStartTime
-          if (elapsed < 1000) {
-            this.refreshProgress = 'Connecting to server...'
-          } else if (elapsed < 2000) {
-            this.refreshProgress = 'Fetching customer data...'
-          } else {
-            this.refreshProgress = 'Processing customer records...'
-          }
-        }, 500)
-        
-        console.log(`📡 Fetching customers from API... (${isAutoRefresh ? 'auto-refresh' : isEmergencyReconnect ? 'emergency-reconnect' : 'manual'})`)
-        const data = await apiService.getCustomers()
-        
-        // Clear progress interval
-        clearInterval(progressInterval)
-        
-        // Connection health tracking
-        this.connectionLost = false
-        this.consecutiveErrors = 0
-        this.lastSuccessfulLoad = Date.now()
-        this.error = null
-        
-        // Smart refresh rate adjustment
-        this.trackActivityAndAdjustRefreshRate(data, previousLength)
-        
-        // Track new entries for highlighting
-        if (isAutoRefresh && this.customers.length > 0) {
-          const existingIds = new Set(this.customers.map(customer => customer._id || customer.customer_id))
-          data.forEach(customer => {
-            const id = customer._id || customer.customer_id
-            if (!existingIds.has(id)) {
-              this.newEntryIds.add(id)
-              // Track for activity analysis
-              this.recentActivity.push({
-                timestamp: Date.now(),
-                customerId: id
-              })
-            }
-          })
-          
-          // Clear new entry highlights after 5 seconds
-          setTimeout(() => {
-            this.newEntryIds.clear()
-          }, 5000)
-        }
-        
-        // Store in cache
-        if (this.cache.metadata.enabled) {
-          this.cache.setCustomers(data)
-        }
-        
-        this.customers = data
-        this.filteredCustomers = data
-        this.lastRefresh = new Date()
-        this.lastLoadTime = Date.now()
-        
-        console.log(`✅ Customers loaded successfully: ${data.length} customers`)
-        
-      } catch (error) {
-        console.error('❌ Error fetching customers:', error)
-        
-        // Handle connection errors
-        this.consecutiveErrors++
-        this.error = this.getDetailedErrorMessage(error)
-        
-        // Mark connection as lost after 3 consecutive errors
-        if (this.consecutiveErrors >= 3) {
-          this.connectionLost = true
-          console.log('Connection marked as lost after 3 consecutive errors')
-        }
-        
-        // Slow down refresh rate when experiencing errors
-        if (this.consecutiveErrors >= 2) {
-          this.autoRefreshInterval = Math.min(this.baseRefreshInterval * 2, 120000) // Max 2 minutes
-          console.log(`Slowing refresh rate to ${this.autoRefreshInterval / 1000}s due to errors`)
-        }
-        
-        // Don't clear data on auto-refresh failures
-        if (!isAutoRefresh) {
-          this.customers = []
-          this.filteredCustomers = []
-        }
-      } finally {
-        this.loading = false
-        this.refreshProgress = ''
-      }
-    },
-
-    async loadKPIData(isAutoRefresh = false) {
-      try {
-        // Load all KPI data in parallel for better performance
-        const [activeResult, monthlyResult, dailyResult] = await Promise.allSettled([
-          CustomerApiService.ActiveUser(),
-          CustomerApiService.MonthlyUser(),
-          CustomerApiService.DailyUser()
-        ])
-        
-        // Handle Active Users
-        if (activeResult.status === 'fulfilled') {
-          const activeCustomers = activeResult.value.active_customers || []
-          if (Array.isArray(activeCustomers)) {
-            // Filter for customers only
-            const customerUsers = activeCustomers.filter(user => user.role === 'customer')
-            this.activeUsersCount = customerUsers.length.toString()
-          } else {
-            // If it's already a count, use it directly
-            this.activeUsersCount = activeCustomers.toString() || '0'
-          }
-        } else {
-          console.error('Failed to load active users:', activeResult.reason)
-          this.activeUsersCount = 'Error'
-        }
-        
-        // Handle Monthly Users
-        if (monthlyResult.status === 'fulfilled') {
-          const monthlyCustomers = monthlyResult.value.monthly_customers || []
-          if (Array.isArray(monthlyCustomers)) {
-            // Filter for customers only
-            const customerUsers = monthlyCustomers.filter(user => user.role === 'customer')
-            this.monthlyUsersCount = customerUsers.length.toString()
-          } else {
-            // If it's already a count, use it directly
-            this.monthlyUsersCount = monthlyCustomers.toString() || '0'
-          }
-        } else {
-          console.error('Failed to load monthly users:', monthlyResult.reason)
-          this.monthlyUsersCount = 'Error'
-        }
-        
-        // Handle Daily Users
-        if (dailyResult.status === 'fulfilled') {
-          const dailyCustomers = dailyResult.value.daily_customers || []
-          if (Array.isArray(dailyCustomers)) {
-            // Filter for customers only
-            const customerUsers = dailyCustomers.filter(user => user.role === 'customer')
-            this.dailyUsersCount = customerUsers.length.toString()
-          } else {
-            // If it's already a count, use it directly
-            this.dailyUsersCount = dailyCustomers.toString() || '0'
-          }
-        } else {
-          console.error('Failed to load daily users:', dailyResult.reason)
-          this.dailyUsersCount = 'Error'
-        }
-        
-        console.log(`✅ KPI data loading completed (${isAutoRefresh ? 'auto-refresh' : 'manual'})`)
-        
-      } catch (error) {
-        console.error('❌ Error loading KPI data:', error)
-        this.activeUsersCount = 'Error'
-        this.monthlyUsersCount = 'Error'
-        this.dailyUsersCount = 'Error'
-      }
-    },
-
-    // Smart refresh rate adjustment based on activity
-    trackActivityAndAdjustRefreshRate(newData, previousLength) {
-      const now = Date.now()
-      
-      // Clean old activity data (older than 5 minutes)
-      this.recentActivity = this.recentActivity.filter(
-        activity => now - activity.timestamp < 300000
-      )
-      
-      // Count recent activity (last 2 minutes)
-      const recentCount = this.recentActivity.filter(
-        activity => now - activity.timestamp < 120000
-      ).length
-      
-      // Adjust refresh rate based on activity
-      if (recentCount >= 10) {
-        // High activity: refresh every 10 seconds
-        this.autoRefreshInterval = 10000
-        console.log('High activity detected: refresh rate increased to 10s')
-      } else if (recentCount >= 5) {
-        // Medium activity: refresh every 20 seconds
-        this.autoRefreshInterval = 20000
-        console.log('Medium activity detected: refresh rate set to 20s')
-      } else if (recentCount === 0 && this.recentActivity.length === 0) {
-        // No activity: refresh every 60 seconds
-        this.autoRefreshInterval = 60000
-        console.log('No activity detected: refresh rate decreased to 60s')
-      } else {
-        // Normal activity: use base interval
-        this.autoRefreshInterval = this.baseRefreshInterval
-      }
-      
-      // Restart auto-refresh with new interval if it's running
-      if (this.autoRefreshEnabled && this.autoRefreshTimer) {
-        this.startAutoRefresh()
-      }
-    },
-
-    // Emergency reconnect method
-    async emergencyReconnect() {
-      console.log('Emergency reconnect initiated')
-      this.consecutiveErrors = 0
-      this.connectionLost = false
-      await Promise.all([
-        this.loadKPIData(false),
-        this.fetchCustomers(false, true)
-      ])
-      
-      // Restart auto-refresh if it was stopped
-      if (!this.autoRefreshEnabled) {
-        this.autoRefreshEnabled = true
-        this.startAutoRefresh()
-      }
-    },
-
-    // Connection status methods
-    getConnectionStatus() {
-      if (this.connectionLost) return 'connection-lost'
-      if (this.consecutiveErrors > 0) return 'connection-unstable'
-      if (this.lastSuccessfulLoad && (Date.now() - this.lastSuccessfulLoad < 60000)) return 'connection-good'
-      return 'connection-unknown'
-    },
-
-    getConnectionIcon() {
-      switch (this.getConnectionStatus()) {
-        case 'connection-good': return 'bi bi-wifi text-success'
-        case 'connection-unstable': return 'bi bi-wifi-1 text-warning'
-        case 'connection-lost': return 'bi bi-wifi-off text-danger'
-        default: return 'bi bi-wifi text-muted'
-      }
-    },
-
-    getConnectionText() {
-      switch (this.getConnectionStatus()) {
-        case 'connection-good': return 'Connected'
-        case 'connection-unstable': return 'Unstable'
-        case 'connection-lost': return 'Connection Lost'
-        default: return 'Connecting...'
-      }
-    },
-
-    getDetailedErrorMessage(error) {
-      if (error.name === 'NetworkError' || error.message.includes('fetch')) {
-        return 'Network connection failed. Please check your internet connection and try again.'
-      } else if (error.status === 401) {
-        return 'Authentication failed. Please log in again.'
-      } else if (error.status === 403) {
-        return 'Access denied. You do not have permission to view customer data.'
-      } else if (error.status === 500) {
-        return 'Server error occurred. Please try again later.'
-      }
-      return `Failed to load customers: ${error.message || 'Unknown error occurred'}`
-    },
-
-    // ============ LOGS PAGE AUTO-REFRESH SYSTEM ============
-    toggleAutoRefresh() {
-      if (this.autoRefreshEnabled) {
-        this.autoRefreshEnabled = false
-        this.stopAutoRefresh()
-        console.log('Auto-refresh disabled by user')
-      } else {
-        this.autoRefreshEnabled = true
-        this.startAutoRefresh()
-        console.log('Auto-refresh enabled by user')
-      }
-    },
-    
-    startAutoRefresh() {
-      this.stopAutoRefresh() // Clear any existing timers
-      
-      // Start countdown
-      this.countdown = this.autoRefreshInterval / 1000
-      this.countdownTimer = setInterval(() => {
-        this.countdown--
-        if (this.countdown <= 0) {
-          this.countdown = this.autoRefreshInterval / 1000
-        }
-      }, 1000)
-      
-      // Start auto-refresh timer
-      this.autoRefreshTimer = setInterval(() => {
-        Promise.all([
-          this.loadKPIData(true),
-          this.fetchCustomers(true)
-        ])
-      }, this.autoRefreshInterval)
-      
-      console.log(`Auto-refresh started (${this.autoRefreshInterval / 1000}s interval)`)
-    },
-    
-    stopAutoRefresh() {
-      if (this.autoRefreshTimer) {
-        clearInterval(this.autoRefreshTimer)
-        this.autoRefreshTimer = null
-      }
-      
-      if (this.countdownTimer) {
-        clearInterval(this.countdownTimer)
-        this.countdownTimer = null
-      }
-      
-      console.log('Auto-refresh stopped')
-    },
-
-    // ============ ENHANCED REFRESH SYSTEM ============
+    // ============ EXISTING METHODS ============
     async refreshData() {
       console.log('=== COMPREHENSIVE CUSTOMER DATA REFRESH INITIATED ===')
       
-      // Clear any existing messages
       this.successMessage = null
       this.error = null
       
-      // Preserve current customer selections and search state
       const currentSelections = [...this.selectedCustomers]
       const currentSearch = this.searchQuery
       
-      console.log('Preserving current state:', {
-        selections: currentSelections,
-        search: currentSearch
-      })
-      
       try {
-        // Set loading state
         this.loading = true
         this.refreshStartTime = Date.now()
         
-        // Clear cache for fresh data
         if (this.cache.metadata.enabled) {
           this.cache.clear()
           console.log('🗑️ Cache cleared for fresh data')
         }
         
-        // Simulate progress updates
         const progressInterval = setInterval(() => {
           if (!this.loading) {
             clearInterval(progressInterval)
@@ -1133,37 +1122,26 @@ export default {
           }
         }, 500)
         
-        // Refresh both KPI and customer data in parallel
         await Promise.all([
           this.loadKPIData(false),
           this.fetchCustomers(false)
         ])
         
-        // Clear progress interval
         clearInterval(progressInterval)
         
-        // Restore user state
         this.selectedCustomers = currentSelections.filter(customerId => 
           this.customers.some(customer => 
             (customer._id === customerId) || (customer.customer_id === customerId)
           )
         )
         
-        // Restore search and reapply search filter
         this.searchQuery = currentSearch
         this.handleSearch()
         
-        // Show success message
         this.successMessage = `Data refreshed successfully! ${this.customers.length} customers and KPI metrics updated.`
         
         console.log('✅ Comprehensive refresh completed successfully')
-        console.log('Final state:', {
-          totalCustomers: this.customers.length,
-          filteredCustomers: this.filteredCustomers.length,
-          selectedCustomers: this.selectedCustomers.length
-        })
         
-        // Auto-clear success message
         setTimeout(() => {
           this.successMessage = null
         }, 3000)
@@ -1177,32 +1155,14 @@ export default {
       }
     },
 
-    // ============ CACHE MANAGEMENT METHODS ============
-    formatCacheTime(timestamp) {
-      if (!timestamp) return 'Never'
-      
-      const now = Date.now()
-      const diff = now - timestamp
-      const minutes = Math.floor(diff / 60000)
-      const seconds = Math.floor((diff % 60000) / 1000)
-      
-      if (minutes > 0) {
-        return `${minutes}m ${seconds}s ago`
-      } else {
-        return `${seconds}s ago`
-      }
-    },
-
-    // ============ EXISTING METHODS (OPTIMIZED) ============
     handleSearch() {
-      // Debounced search for better performance
       if (this.searchTimeout) {
         clearTimeout(this.searchTimeout)
       }
       
       this.searchTimeout = setTimeout(() => {
         this.performSearch()
-      }, 300) // 300ms debounce
+      }, 300)
     },
 
     performSearch() {
@@ -1212,7 +1172,6 @@ export default {
       }
 
       const query = this.searchQuery.toLowerCase()
-      const startTime = performance.now()
       
       this.filteredCustomers = this.customers.filter(customer => {
         const fullName = (customer.full_name || '').toLowerCase()
@@ -1225,11 +1184,7 @@ export default {
               phone.includes(query) ||
               address.includes(query)
       })
-
-      const endTime = performance.now()
-      console.log(`🔍 Search completed in ${(endTime - startTime).toFixed(2)}ms`)
       
-      // Clear selections when searching
       this.selectedCustomers = []
     },
 
@@ -1281,7 +1236,6 @@ export default {
         }
         this.selectedCustomers = []
         
-        // Clear cache and refresh for accurate data
         this.cache.clear()
         await this.fetchCustomers()
       } else {
@@ -1303,7 +1257,6 @@ export default {
         await apiService.deleteCustomer(customer._id || customer.customer_id)
         this.successMessage = `Customer "${customer.full_name}" deleted successfully`
         
-        // Clear cache and refresh for accurate data
         this.cache.clear()
         await this.fetchCustomers()
         
@@ -1379,7 +1332,6 @@ export default {
       this.formError = null
 
       try {
-        // Validate form before saving
         const isValid = this.validateForm()
         
         if (!isValid) {
@@ -1389,7 +1341,6 @@ export default {
           return
         }
 
-        // Proceed with saving if validation passes
         if (this.isEditMode) {
           const customerId = this.selectedCustomer._id || this.selectedCustomer.customer_id
           await apiService.updateCustomer(customerId, this.customerForm)
@@ -1401,7 +1352,6 @@ export default {
 
         this.closeModal()
         
-        // Clear cache and refresh for accurate data
         this.cache.clear()
         await this.fetchCustomers()
         
@@ -1459,43 +1409,50 @@ export default {
     },
 
     formatDate(dateString) {
-      if (!dateString) return 'N/A'
-      const date = new Date(dateString)
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-      })
-    }
-  },
+     if (!dateString) return 'N/A'
+     const date = new Date(dateString)
+     return date.toLocaleDateString('en-US', {
+       year: 'numeric',
+       month: '2-digit',
+       day: '2-digit'
+     })
+   }
+ },
 
-  async mounted() {
-    console.log('=== CUSTOMERS COMPONENT MOUNTED ===')
-    
-    // Load KPI data and customer data in parallel with caching
-    await Promise.all([
-      this.loadKPIData(),
-      this.fetchCustomers()
-    ])
-    
-    // Force scroll to top
-    window.scrollTo(0, 0)
-    
-    this.$nextTick(() => {
-      window.scrollTo(0, 0)
-    })
-    
-    console.log('✅ Component initialization complete')
-  },
+ async mounted() {
+   console.log('=== CUSTOMERS COMPONENT MOUNTED ===')
+   
+   // Load KPI data and customer data in parallel with caching
+   await Promise.all([
+     this.loadKPIData(),
+     this.fetchCustomers()
+   ])
+   
+   // Start auto-refresh
+   if (this.autoRefreshEnabled) {
+     this.startAutoRefresh()
+   }
+   
+   // Force scroll to top
+   window.scrollTo(0, 0)
+   
+   this.$nextTick(() => {
+     window.scrollTo(0, 0)
+   })
+   
+   console.log('✅ Component initialization complete')
+ },
 
-  beforeUnmount() {
-    // Clear any pending timeouts
-    if (this.searchTimeout) {
-      clearTimeout(this.searchTimeout)
-    }
-    
-    console.log('🧹 Component cleanup complete')
-  }
+ beforeUnmount() {
+   this.stopAutoRefresh()
+   
+   // Clear any pending timeouts
+   if (this.searchTimeout) {
+     clearTimeout(this.searchTimeout)
+   }
+   
+   console.log('🧹 Component cleanup complete')
+ }
 }
 </script>
 
@@ -2409,5 +2366,82 @@ input[type="checkbox"] {
 .card-body {
   flex: 1 1 auto;
   padding: 1rem;
+}
+/* Auto-refresh status indicator (same as logs page) */
+.auto-refresh-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #f0fdf4;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #bbf7d0;
+  min-width: 280px;
+}
+
+.status-text {
+  font-size: 0.875rem;
+  color: #16a34a;
+  font-weight: 500;
+  flex: 1;
+}
+
+/* Connection indicator (same as logs page) */
+.connection-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.connection-good {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #16a34a;
+}
+
+.connection-unstable {
+  background: #fefce8;
+  border: 1px solid #fde047;
+  color: #ca8a04;
+}
+
+.connection-lost {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.connection-unknown {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+}
+
+/* Spinning icon animation */
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .auto-refresh-status {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.25rem;
+    min-width: auto;
+  }
+
+  .connection-indicator {
+    order: -1;
+  }
 }
 </style>
