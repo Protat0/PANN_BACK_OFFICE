@@ -12,6 +12,7 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@vuepic/vue-datepicker": "^11.0.2",
     "axios": "^1.9.0",
     "bootstrap": "^5.3.7",
     "chart.js": "^4.5.0",

@@ -1,3 +1,6 @@
+import VueDatePicker from '@vuepic/vue-datepicker';
+import '@vuepic/vue-datepicker/dist/main.css'
+
 // Import Bootstrap CSS and JS
 import 'bootstrap/dist/css/bootstrap.min.css'
 import * as bootstrap from 'bootstrap/dist/js/bootstrap.bundle.min.js'
@@ -18,6 +21,8 @@ import lucidePlugin from './plugins/lucide.js'
 window.bootstrap = bootstrap
 
 const app = createApp(App)
+
+app.component('VueDatePicker', VueDatePicker)
 
 // Optional: Add a global method to change themes
 app.config.globalProperties.$setTheme = (theme) => {
