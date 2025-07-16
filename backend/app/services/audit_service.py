@@ -430,30 +430,87 @@ class AuditLogDisplay:
             }
     
     def get_combined_logs(self, limit=100):
-        """Get both session and audit logs combined"""
+        """Get logs with continuous numbering by type (never resets)"""
         try:
-            # Import your existing SessionDisplay
-            from .session_service import SessionDisplay
+            # ✅ STEP 1: Fetch session logs
+            session_cursor = self.collection.find().sort("login_time", -1)
+            session_logs = list(session_cursor)
             
-            session_display = SessionDisplay()
-            session_result = session_display.get_session_logs()
-            audit_result = self.get_audit_logs(limit=limit)
+            # ✅ STEP 2: Fetch audit logs
+            audit_logs = []
+            try:
+                audit_collection = self.db.audit_logs
+                audit_cursor = audit_collection.find().sort("timestamp", -1)
+                audit_logs = list(audit_cursor)
+                print(f"✅ Fetched {len(audit_logs)} audit logs")
+            except Exception as e:
+                print(f"⚠️ No audit logs available: {e}")
+                audit_logs = []
             
+            # ✅ STEP 3: Create all logs with sorting keys
             all_logs = []
             
-            if session_result['success']:
-                all_logs.extend(session_result['data'])
+            # Add session logs
+            for log in session_logs:
+                log = self.convert_object_id(log)
+                formatted_log = {
+                    "user_id": log.get('username', 'Unknown'),
+                    "ref_id": log.get('_id', '')[:12],
+                    "event_type": "Session",
+                    "amount_qty": f"{log.get('session_duration', 0)}s",
+                    "status": log.get('status', 'Unknown').title(),
+                    "timestamp": str(log.get('login_time', '')),
+                    "remarks": f"Branch {log.get('branch_id', 'N/A')}",
+                    "log_source": "session",
+                    "sort_time": self._parse_timestamp(str(log.get('login_time', '')))
+                }
+                all_logs.append(formatted_log)
             
-            if audit_result['success']:
-                all_logs.extend(audit_result['data'])
+            # Add audit logs
+            for log in audit_logs:
+                log = self.convert_object_id(log)
+                formatted_log = {
+                    "user_id": log.get('username', 'Unknown'),
+                    "ref_id": log.get('_id', '')[:12],
+                    "event_type": log.get('event_type', 'Unknown').replace('_', ' ').title(),
+                    "amount_qty": self._format_audit_amount(log),
+                    "status": log.get('status', 'Unknown').title(),
+                    "timestamp": str(log.get('timestamp', '')),
+                    "remarks": self._format_audit_remarks(log),
+                    "log_source": "audit",
+                    "sort_time": self._parse_timestamp(str(log.get('timestamp', '')))
+                }
+                all_logs.append(formatted_log)
             
-            # Sort by timestamp (newest first)
-            all_logs.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+            # ✅ STEP 4: Sort all logs by timestamp (newest first)
+            all_logs.sort(key=lambda x: x.get('sort_time', datetime.min), reverse=True)
+            
+            # ✅ STEP 5: Count totals first, then number backwards
+            session_count = sum(1 for log in all_logs if log['log_source'] == 'session')
+            audit_count = sum(1 for log in all_logs if log['log_source'] == 'audit')
+            
+            session_counter = session_count
+            audit_counter = audit_count
+            
+            formatted_logs = []
+            for log in all_logs[:limit]:
+                log.pop('sort_time', None)
+                
+                if log['log_source'] == 'session':
+                    log['log_id'] = f"SES-{session_counter:04d}"
+                    session_counter -= 1
+                else:
+                    log['log_id'] = f"AUD-{audit_counter:04d}"
+                    audit_counter -= 1
+                
+                formatted_logs.append(log)
             
             return {
                 'success': True,
-                'data': all_logs[:limit],
-                'total_count': len(all_logs)
+                'data': formatted_logs,
+                'total_count': len(all_logs),
+                'session_count': len(session_logs),
+                'audit_count': len(audit_logs)
             }
             
         except Exception as e:

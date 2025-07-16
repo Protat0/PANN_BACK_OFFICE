@@ -124,9 +124,9 @@
     <!-- Table Info -->
     <div v-if="!loading && paginatedLogs.length > 0" class="table-info">
       <span>
-        Showing {{ startRecord }} to {{ endRecord }} of {{ filteredLogs.length }} entries
+        Showing positions {{ startRecord }} to {{ endRecord }} of {{ filteredLogs.length }} entries
         <span v-if="hasActiveFilters" class="filter-indicator">
-          (filtered from {{ session_logs.length }} total records)
+          (filtered from {{ totalLogsCount }} total records)
         </span>
       </span>
     </div>
@@ -152,7 +152,9 @@
             :key="sessionLog.log_id || sessionLog._id"
             :class="{ 'new-entry': isNewEntry(sessionLog) }"
           >
-            <td class="log-id-column">{{ sessionLog.log_id }}</td>
+            <td class="log-id-column">
+              <span class="position-number" :class="sessionLog.logType">{{ sessionLog.formattedLogId }}</span>
+            </td>
             <td class="user-id-column">{{ sessionLog.user_id }}</td>
             <td class="ref-id-column">{{ sessionLog.ref_id }}</td>
             <td class="event-type-column">{{ sessionLog.event_type }}</td>
@@ -247,7 +249,7 @@
       <div class="pagination-info">
         <small class="text-muted">
           Page {{ currentPage }} of {{ totalPages }} 
-          ({{ filteredLogs.length }} total records)
+          ({{ filteredLogs.length }} filtered records out of {{ totalLogsCount }} total)
         </small>
       </div>
     </div>
@@ -336,6 +338,13 @@ export default {
         )
       }
       
+      // Sort by timestamp (latest first) to ensure consistent ordering
+      filtered.sort((a, b) => {
+        const dateA = new Date(a.timestamp || 0)
+        const dateB = new Date(b.timestamp || 0)
+        return dateB - dateA // Latest first
+      })
+      
       // Cache the result
       this.memoizedFilters = {
         categoryFilter: this.categoryFilter,
@@ -350,12 +359,25 @@ export default {
     totalPages() {
       return Math.ceil(this.filteredLogs.length / this.pageSize)
     },
-    
-    // Get logs for current page
+
+    // Get logs for current page with formatted log IDs
     paginatedLogs() {
       const start = (this.currentPage - 1) * this.pageSize
       const end = start + this.pageSize
-      return this.filteredLogs.slice(start, end)
+      const logs = this.filteredLogs.slice(start, end)
+      
+      // Add formatted log ID and log type to each log
+      return logs.map((log, index) => {
+        const position = start + index + 1;
+        const logType = this.getLogType(log);
+        
+        return {
+          ...log,
+          positionNumber: position,
+          logType: logType,
+          formattedLogId: this.getFormattedLogId(log, position)
+        }
+      })
     },
     
     // Calculate record numbers for display
@@ -368,6 +390,10 @@ export default {
       return end > this.filteredLogs.length ? this.filteredLogs.length : end
     },
     
+    totalLogsCount() {
+      return this.session_logs.length
+    },
+
     // Check if any filters are active
     hasActiveFilters() {
       return this.categoryFilter !== 'all' || this.searchFilter.trim() !== ''
@@ -690,6 +716,65 @@ export default {
     },
 
     // ================================================================
+    // LOG TYPE AND FORMATTING METHODS
+    // ================================================================
+    
+    // Determine log type based on event_type
+    getLogType(log) {
+      const eventType = (log.event_type || '').toLowerCase();
+      
+      // Session-related events
+      if (eventType.includes('session') || 
+          eventType.includes('login') || 
+          eventType.includes('logout') || 
+          eventType.includes('auth')) {
+        return 'session';
+      }
+      
+      // Audit-related events (CRUD operations)
+      if (eventType.includes('create') || 
+          eventType.includes('update') || 
+          eventType.includes('delete') || 
+          eventType.includes('product') || 
+          eventType.includes('customer') || 
+          eventType.includes('category') || 
+          eventType.includes('user')) {
+        return 'audit';
+      }
+      
+      // Default to session if unsure
+      return 'session';
+    },
+
+    // Generate formatted log ID (SES-1, AUD-1, etc.)
+    getFormattedLogId(log, position) {
+      const logType = this.getLogType(log);
+      const prefix = logType === 'session' ? 'SES' : 'AUD';
+      
+      // Get the counter for this specific log type
+      const typeCounter = this.getTypeCounter(position, logType);
+      
+      return `${prefix}-${typeCounter}`;
+    },
+
+    // Calculate counter for each log type separately
+    getTypeCounter(currentPosition, logType) {
+      let counter = 0;
+      
+      // Count logs of the same type up to current position
+      for (let i = 0; i < currentPosition; i++) {
+        if (i < this.filteredLogs.length) {
+          const log = this.filteredLogs[i];
+          if (this.getLogType(log) === logType) {
+            counter++;
+          }
+        }
+      }
+      
+      return counter;
+    },
+
+    // ================================================================
     // UTILITY METHODS - OPTIMIZED WITH MEMOIZATION
     // ================================================================
     getAmountQty(sessionLog) {
@@ -945,6 +1030,18 @@ export default {
   border-color: #16a34a;
 }
 
+.btn-outline-secondary {
+  background-color: transparent;
+  color: #6b7280;
+  border: 1px solid #6b7280;
+}
+
+.btn-outline-secondary:hover {
+  background-color: #6b7280;
+  color: white;
+  border-color: #6b7280;
+}
+
 /* Spinning icon animation */
 .spinning {
   animation: spin 1s linear infinite;
@@ -1064,14 +1161,100 @@ export default {
   background-color: #f8fafc;
 }
 
-/* Column width definitions */
+/* Updated Log ID column to show formatted IDs */
 .log-id-column {
   width: 100px;
-  font-weight: 500;
-  color: #6366f1;
-  font-family: monospace;
+  text-align: center;
+  font-weight: 600;
+  color: #475569;
+  padding: 0.5rem;
 }
 
+.position-number {
+  display: inline-block;
+  min-width: 60px;
+  padding: 0.5rem 0.75rem;
+  color: white;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  font-family: monospace;
+  letter-spacing: 0.5px;
+}
+
+/* Session log styling (blue theme) */
+.position-number.session {
+  background-color: #567cdc;
+  border: 2px solid #4f46e5;
+}
+
+/* Audit log styling (purple theme) */
+.position-number.audit {
+  background-color: #7c3aed;
+  border: 2px solid #6d28d9;
+}
+
+/* Latest entry highlighting - keep original colors but add glow effect */
+.logs-table tbody tr:first-child .position-number.session {
+  animation: latestSessionPulse 2s ease-in-out;
+  box-shadow: 0 0 0 3px rgba(86, 124, 220, 0.4);
+}
+
+.logs-table tbody tr:first-child .position-number.audit {
+  animation: latestAuditPulse 2s ease-in-out;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.4);
+}
+
+@keyframes latestSessionPulse {
+  0%, 100% { 
+    background-color: #567cdc;
+    border-color: #4f46e5;
+    transform: scale(1);
+  }
+  50% { 
+    background-color: #4f46e5;
+    border-color: #3730a3;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes latestAuditPulse {
+  0%, 100% { 
+    background-color: #7c3aed;
+    border-color: #6d28d9;
+    transform: scale(1);
+  }
+  50% { 
+    background-color: #6d28d9;
+    border-color: #5b21b6;
+    transform: scale(1.05);
+  }
+}
+
+/* New entry highlighting - orange for both types */
+.new-entry .position-number.session,
+.new-entry .position-number.audit {
+  background-color: #f59e0b;
+  border-color: #d97706;
+  animation: newPositionFade 5s ease-out forwards;
+}
+
+@keyframes newPositionFade {
+  0% {
+    background-color: #f59e0b;
+    border-color: #d97706;
+    transform: scale(1.1);
+  }
+  25% {
+    background-color: #f59e0b;
+    border-color: #d97706;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Other column styles */
 .user-id-column {
   width: 120px;
   font-weight: 500;
@@ -1154,6 +1337,33 @@ export default {
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
 }
 
+.card {
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.card-body {
+  padding: 1.5rem;
+}
+
+.py-5 {
+  padding-top: 3rem;
+  padding-bottom: 3rem;
+}
+
+.d-flex {
+  display: flex;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.justify-content-center {
+  justify-content: center;
+}
+
 /* Pagination styles */
 .pagination-container {
   background: white;
@@ -1165,10 +1375,23 @@ export default {
 
 .pagination {
   margin-bottom: 1rem;
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.pagination-sm .page-link {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
 }
 
 .pagination-info {
   text-align: center;
+}
+
+.page-item {
+  margin: 0;
 }
 
 .page-link {
@@ -1177,6 +1400,10 @@ export default {
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
   transition: all 0.2s ease;
+  text-decoration: none;
+  background: white;
+  border-radius: 0;
+  margin: 0;
 }
 
 .page-link:hover {
@@ -1195,6 +1422,19 @@ export default {
   color: #9ca3af;
   background-color: #fff;
   border-color: #e2e8f0;
+  cursor: not-allowed;
+}
+
+.page-item:first-child .page-link {
+  border-radius: 0.375rem 0 0 0.375rem;
+}
+
+.page-item:last-child .page-link {
+  border-radius: 0 0.375rem 0.375rem 0;
+}
+
+.justify-content-center {
+  justify-content: center;
 }
 
 /* Alert styles */
@@ -1202,6 +1442,7 @@ export default {
   padding: 1rem;
   border-radius: 0.5rem;
   border: 1px solid transparent;
+  margin-bottom: 1rem;
 }
 
 .alert-danger {
@@ -1214,6 +1455,61 @@ export default {
   background-color: #eff6ff;
   border-color: #bfdbfe;
   color: #1d4ed8;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.mb-3 {
+  margin-bottom: 1rem;
+}
+
+.me-2 {
+  margin-right: 0.5rem;
+}
+
+.mt-3 {
+  margin-top: 1rem;
+}
+
+.spinner-border {
+  width: 2rem;
+  height: 2rem;
+  border: 0.25em solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+.spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+  border-width: 0.2em;
+}
+
+.text-primary {
+  color: #3b82f6;
+}
+
+.text-success {
+  color: #10b981;
+}
+
+.text-muted {
+  color: #6b7280;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Responsive Design */
@@ -1272,9 +1568,41 @@ export default {
     justify-content: center;
   }
 
-  .auto-refresh-control {
+  .auto-refresh-status {
+    min-width: auto;
     width: 100%;
     justify-content: center;
+  }
+
+  /* Responsive adjustments for position numbers */
+  .log-id-column {
+    width: 90px;
+  }
+  
+  .position-number {
+    font-size: 0.75rem;
+    padding: 0.375rem 0.5rem;
+    min-width: 50px;
+  }
+  
+  .user-id-column,
+  .ref-id-column,
+  .event-type-column {
+    width: 100px;
+  }
+  
+  .amount-column,
+  .status-column {
+    width: 80px;
+  }
+  
+  .timestamp-column {
+    width: 130px;
+  }
+  
+  .remarks-column {
+    width: 150px;
+    max-width: 150px;
   }
 }
 
@@ -1288,6 +1616,15 @@ export default {
   .btn {
     font-size: 0.75rem;
     padding: 0.5rem 0.75rem;
+  }
+
+  .auto-refresh-status {
+    min-width: auto;
+    padding: 0.5rem;
+  }
+
+  .connection-indicator {
+    padding: 0.375rem 0.5rem;
   }
 }
 </style>

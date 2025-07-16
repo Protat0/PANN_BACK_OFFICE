@@ -230,6 +230,7 @@
 </template>
 
 <script>
+import apiService from '../services/api.js'
 import { 
   LayoutDashboard,
   Package,
@@ -325,24 +326,17 @@ export default {
         return
       }
       
-      console.log('Calling logout API...')
+      console.log('Calling logout API using apiService...')
       
-      const response = await fetch('/logout', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
+      try {
+        // ✅ Use the API service (same pattern as login)
+        const result = await apiService.logout()
+        console.log('Logout successful via apiService:', result)
+        return result
+      } catch (error) {
+        console.error('API service logout error:', error)
+        throw error
       }
-      
-      const result = await response.json()
-      console.log('Logout successful:', result.message)
-      return result
     },
     
     getStoredToken() {

@@ -82,57 +82,69 @@ class SessionLogService:
             raise Exception(f"Error logging session: {str(e)}")
     
     def log_logout(self, user_id):
-        """Log user logout and calculate session duration - FIXED VERSION"""
+        """Log user logout and calculate session duration - ENHANCED DEBUG VERSION"""
         try:
-            print(f"🔍 SessionLogService.log_logout() called with user_id: {user_id}")
+            print(f"\n🔍 ===== LOGOUT DEBUG START =====")
+            print(f"🔍 log_logout() called with user_id: {user_id}")
             print(f"🔍 user_id type: {type(user_id)}")
+            print(f"🔍 user_id length: {len(str(user_id))}")
             
-            # ✅ FIXED: Handle different user_id formats for logout
-            search_user_id = user_id
+            # Convert user_id to ObjectId format to match what's stored
+            search_user_id = None
             
-            # Try to convert to ObjectId if it's a string that looks like ObjectId
-            if isinstance(user_id, str) and len(user_id) == 24:
-                try:
-                    search_user_id = ObjectId(user_id)
-                    print(f"🔍 Converted string user_id to ObjectId: {search_user_id}")
-                except Exception as e:
-                    print(f"⚠️ Could not convert user_id to ObjectId, keeping as string: {e}")
+            if isinstance(user_id, str):
+                if len(user_id) == 24:  # Standard ObjectId string length
+                    try:
+                        search_user_id = ObjectId(user_id)
+                        print(f"🔍 Converted string to ObjectId: {search_user_id}")
+                    except Exception as e:
+                        print(f"❌ Failed to convert string to ObjectId: {e}")
+                        search_user_id = user_id
+                else:
                     search_user_id = user_id
+                    print(f"🔍 Using string user_id (not ObjectId format): {search_user_id}")
             elif isinstance(user_id, ObjectId):
                 search_user_id = user_id
                 print(f"🔍 user_id is already ObjectId: {search_user_id}")
+            else:
+                search_user_id = user_id
+                print(f"🔍 Unknown user_id type, using as-is: {search_user_id}")
+            
+            # Debug: Show what we're searching for
+            print(f"🔍 Searching for session with user_id: {search_user_id} (type: {type(search_user_id)})")
+            
+            # Check all active sessions first (for debugging)
+            all_active_sessions = list(self.collection.find({"logout_time": None}))
+            print(f"🔍 Total active sessions in database: {len(all_active_sessions)}")
+            
+            for i, session in enumerate(all_active_sessions[:3]):  # Show first 3 for debugging
+                print(f"🔍 Active session {i+1}:")
+                print(f"    user_id: {session.get('user_id')} (type: {type(session.get('user_id'))})")
+                print(f"    username: {session.get('username')}")
+                print(f"    login_time: {session.get('login_time')}")
             
             # Find the latest active session for this user
-            # Try with the converted user_id first, then with string version if needed
             latest_session = self.collection.find_one(
                 {"user_id": search_user_id, "logout_time": None},
                 sort=[("login_time", -1)]
             )
             
-            # If not found and we tried ObjectId, try with string version
-            if not latest_session and isinstance(search_user_id, ObjectId):
-                print(f"🔍 No session found with ObjectId, trying with string version")
-                latest_session = self.collection.find_one(
-                    {"user_id": str(search_user_id), "logout_time": None},
-                    sort=[("login_time", -1)]
-                )
-            
-            # If still not found and we tried string, try with ObjectId version
-            elif not latest_session and isinstance(search_user_id, str):
-                try:
-                    print(f"🔍 No session found with string, trying with ObjectId version")
-                    latest_session = self.collection.find_one(
-                        {"user_id": ObjectId(search_user_id), "logout_time": None},
-                        sort=[("login_time", -1)]
-                    )
-                except:
-                    pass
-            
-            print(f"🔍 Latest session found: {latest_session is not None}")
+            print(f"🔍 Found matching session: {latest_session is not None}")
             
             if latest_session:
+                print(f"✅ Found session to update:")
+                print(f"    _id: {latest_session['_id']}")
+                print(f"    user_id: {latest_session['user_id']}")
+                print(f"    username: {latest_session['username']}")
+                print(f"    login_time: {latest_session['login_time']}")
+                
                 logout_time = datetime.utcnow()
                 duration = (logout_time - latest_session["login_time"]).total_seconds()
+                
+                print(f"🔍 Calculating session duration:")
+                print(f"    logout_time: {logout_time}")
+                print(f"    login_time: {latest_session['login_time']}")
+                print(f"    duration: {duration} seconds")
                 
                 # Update the session with logout info
                 update_result = self.collection.update_one(
@@ -147,17 +159,67 @@ class SessionLogService:
                     }
                 )
                 
-                print(f"✅ Session logout updated. Modified count: {update_result.modified_count}")
+                print(f"✅ Update result:")
+                print(f"    matched_count: {update_result.matched_count}")
+                print(f"    modified_count: {update_result.modified_count}")
                 
-                return {"message": "Session logged out successfully"}
-            
-            print(f"⚠️ No active session found for user_id: {user_id}")
-            return {"message": "No active session found"}
+                if update_result.modified_count > 0:
+                    print(f"✅ Session logout logged successfully!")
+                    
+                    # Verify the update worked
+                    updated_session = self.collection.find_one({"_id": latest_session["_id"]})
+                    print(f"🔍 Verification - Updated session:")
+                    print(f"    logout_time: {updated_session.get('logout_time')}")
+                    print(f"    session_duration: {updated_session.get('session_duration')}")
+                    print(f"    status: {updated_session.get('status')}")
+                    
+                    print(f"🔍 ===== LOGOUT DEBUG END =====\n")
+                    return {"message": "Session logged out successfully"}
+                else:
+                    print(f"❌ Update failed - no documents modified")
+                    print(f"🔍 ===== LOGOUT DEBUG END =====\n")
+                    return {"message": "Update failed"}
+            else:
+                print(f"❌ No active session found for user_id: {search_user_id}")
+                
+                # Additional debugging - try different search methods
+                print(f"🔍 Trying alternative search methods...")
+                
+                # Try searching by username if we have it
+                if hasattr(self, 'last_known_username'):
+                    username_session = self.collection.find_one(
+                        {"username": self.last_known_username, "logout_time": None},
+                        sort=[("login_time", -1)]
+                    )
+                    print(f"🔍 Search by username '{self.last_known_username}': {username_session is not None}")
+                
+                # Try searching with string version of ObjectId
+                if isinstance(search_user_id, ObjectId):
+                    string_session = self.collection.find_one(
+                        {"user_id": str(search_user_id), "logout_time": None},
+                        sort=[("login_time", -1)]
+                    )
+                    print(f"🔍 Search with string version: {string_session is not None}")
+                
+                # Try searching with ObjectId version if we have string
+                elif isinstance(search_user_id, str) and len(search_user_id) == 24:
+                    try:
+                        objectid_session = self.collection.find_one(
+                            {"user_id": ObjectId(search_user_id), "logout_time": None},
+                            sort=[("login_time", -1)]
+                        )
+                        print(f"🔍 Search with ObjectId version: {objectid_session is not None}")
+                    except:
+                        print(f"🔍 Could not convert to ObjectId for alternative search")
+                
+                print(f"🔍 ===== LOGOUT DEBUG END =====\n")
+                return {"message": "No active session found"}
         
         except Exception as e:
             print(f"❌ Error logging logout: {str(e)}")
             import traceback
             traceback.print_exc()
+            print(f"🔍 ===== LOGOUT DEBUG END =====\n")
             raise Exception(f"Error logging logout: {str(e)}")
 
 class SessionDisplay:

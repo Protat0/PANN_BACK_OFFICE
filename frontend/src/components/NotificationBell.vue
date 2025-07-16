@@ -108,6 +108,7 @@
 </template>
 
 <script>
+import apijs from '../services/api'
 export default {
   name: 'NotificationBell',
   data() {

@@ -141,10 +141,37 @@ class AuthService:
             raise e
     
     def logout(self, token: str):
+        print(f"🚀🚀🚀 AUTH SERVICE LOGOUT CALLED! 🚀🚀🚀")
         print(f"Logout attempt with token: {token[:20]}...")
         
         try:
             clean_token = token.replace("Bearer ", "").strip()
+            
+            # ✅ NEW: Get user info from token BEFORE blacklisting
+            try:
+                current_user = self.get_current_user(clean_token)
+                print(f"🔍 LOGOUT: Got current user: {current_user}")
+                
+                if current_user and current_user.get('user_id'):
+                    user_id = current_user.get('user_id')
+                    print(f"🔍 LOGOUT: Extracted user_id: {user_id}")
+                    
+                    # ✅ NEW: Log session logout
+                    try:
+                        from .session_services import SessionLogService
+                        session_service = SessionLogService()
+                        print(f"🔍 LOGOUT: About to call session_service.log_logout({user_id})")
+                        session_result = session_service.log_logout(user_id)
+                        print(f"✅ LOGOUT: Session logout result: {session_result}")
+                    except Exception as session_error:
+                        print(f"❌ LOGOUT: Session logout failed: {session_error}")
+                        # Continue with token blacklisting even if session logout fails
+                else:
+                    print(f"⚠️ LOGOUT: Could not extract user_id from token")
+                    
+            except Exception as user_error:
+                print(f"❌ LOGOUT: Could not get current user: {user_error}")
+                # Continue with token blacklisting even if we can't get user info
             
             # Check if already blacklisted
             existing = self.blacklist_collection.find_one({"token": clean_token})

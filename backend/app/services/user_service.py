@@ -6,8 +6,18 @@ import bcrypt
 
 class UserService:
     def __init__(self):
+        """Initialize UserService with audit logging"""
         self.db = db_manager.get_database()
-        self.collection = self.db.users 
+        self.collection = self.db.users
+        
+        # ✅ ADD: Initialize audit service
+        try:
+            from .audit_service import AuditLogService
+            self.audit_service = AuditLogService()
+            print("✅ Audit service initialized for UserService")
+        except Exception as e:
+            print(f"⚠️ Could not initialize audit service: {e}")
+            self.audit_service = None
     
     # ================================================================
     # UTILITY METHODS
@@ -131,9 +141,13 @@ class UserService:
     # CRUD OPERATIONS
     # ================================================================
     
-    def create_user(self, user_data):
-        """Create a new user"""
+    def create_user(self, user_data, current_user=None):
+        """Create a new user with audit logging"""
         try:
+            # ✅ ADD: Log who is creating the user
+            if current_user:
+                print(f"🔍 Creating user with admin: {current_user['username']}")
+            
             # Hash password
             if 'password' in user_data:
                 user_data['password'] = self.hash_password(user_data['password'])
@@ -154,8 +168,20 @@ class UserService:
             # Send notification if employee
             self._send_employee_notification('created', created_user, user_id)
             
+            # ✅ ADD: Audit logging for successful creation
+            if current_user and hasattr(self, 'audit_service'):
+                try:
+                    # Create audit log for user creation
+                    audit_user_data = created_user.copy()
+                    audit_user_data['_id'] = user_id
+                    
+                    self.audit_service.log_user_create(current_user, audit_user_data)
+                    print(f"✅ Audit log created for user creation")
+                except Exception as audit_error:
+                    print(f"❌ Audit logging failed: {audit_error}")
+            
             return created_user
-        
+    
         except Exception as e:
             raise Exception(f"Error creating user: {str(e)}")
     
@@ -194,13 +220,17 @@ class UserService:
         except Exception as e:
             raise Exception(f"Error getting user by username: {str(e)}")
     
-    def update_user(self, user_id, user_data):
-        """Update user"""
+    def update_user(self, user_id, user_data, current_user=None):
+        """Update user with audit logging"""
         try:
+            # ✅ ADD: Log who is updating the user
+            if current_user:
+                print(f"🔍 Updating user {user_id} with admin: {current_user['username']}")
+            
             if not ObjectId.is_valid(user_id):
                 return None
             
-            # Get current user data for notification comparison
+            # Get current user data for notification comparison and audit
             old_user = self.collection.find_one({'_id': ObjectId(user_id)})
             if not old_user:
                 return None
@@ -230,19 +260,37 @@ class UserService:
                     updated_user.get('role', '').lower() == 'employee'):
                     self._send_employee_notification('updated', updated_user, user_id, old_user)
                 
+                # ✅ ADD: Audit logging for successful update
+                if current_user and hasattr(self, 'audit_service'):
+                    try:
+                        # Create audit log for user update
+                        self.audit_service.log_user_update(
+                            current_user, 
+                            user_id, 
+                            old_user, 
+                            user_data
+                        )
+                        print(f"✅ Audit log created for user update")
+                    except Exception as audit_error:
+                        print(f"❌ Audit logging failed: {audit_error}")
+                
                 return updated_user
             return None
         
         except Exception as e:
             raise Exception(f"Error updating user: {str(e)}")
     
-    def delete_user(self, user_id):
-        """Delete user"""
+    def delete_user(self, user_id, current_user=None):
+        """Delete user with audit logging"""
         try:
+            # ✅ ADD: Log who is deleting the user
+            if current_user:
+                print(f"🔍 Deleting user {user_id} with admin: {current_user['username']}")
+            
             if not ObjectId.is_valid(user_id):
                 return False
             
-            # Get user data before deletion for notification
+            # Get user data before deletion for notification and audit
             user_to_delete = self.collection.find_one({'_id': ObjectId(user_id)})
             if not user_to_delete:
                 return False
@@ -255,6 +303,16 @@ class UserService:
             if result.deleted_count > 0:
                 # Send notification if employee
                 self._send_employee_notification('deleted', user_to_delete, user_id)
+                
+                # ✅ ADD: Audit logging for successful deletion
+                if current_user and hasattr(self, 'audit_service'):
+                    try:
+                        # Create audit log for user deletion
+                        self.audit_service.log_user_delete(current_user, user_to_delete)
+                        print(f"✅ Audit log created for user deletion")
+                    except Exception as audit_error:
+                        print(f"❌ Audit logging failed: {audit_error}")
+                
                 return True
             
             return False

@@ -12,17 +12,67 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 from datetime import datetime
 
+#====JWT HELPER==== 
+def get_authenticated_user_from_jwt(request):
+    """Helper function to get authenticated user with proper username from JWT token"""
+    try:
+        authorization = request.headers.get("Authorization")
+        if not authorization or not authorization.startswith("Bearer "):
+            return None
+        
+        token = authorization.split(" ")[1]
+        
+        from ..services.auth_services import AuthService
+        from bson import ObjectId
+        
+        auth_service = AuthService()
+        user_data = auth_service.get_current_user(token)
+        
+        if not user_data:
+            return None
+        
+        user_id = user_data.get('user_id')
+        
+        # Get full user document from database to check username
+        user_doc = auth_service.user_collection.find_one({"_id": ObjectId(user_id)})
+        
+        if not user_doc:
+            return None
+        
+        # Determine the best username to use
+        actual_username = user_doc.get('username')
+        if actual_username and actual_username.strip():
+            display_username = actual_username
+        else:
+            display_username = user_doc.get('email', 'unknown')
+        
+        return {
+            "user_id": user_id,
+            "username": display_username,
+            "email": user_doc.get('email'),
+            "branch_id": 1,
+            "role": user_doc.get('role', 'admin'),
+            "ip_address": request.META.get('REMOTE_ADDR'),
+            "user_agent": request.META.get('HTTP_USER_AGENT')
+        }
+        
+    except Exception as e:
+        print(f"JWT Auth helper error: {e}")
+        return None
+
 # ================ CATEGORY VIEWS ================
 
 class CategoryKPIView(APIView):
     def post(self, request):
-        """Category Creation"""
+        """Category Creation with JWT token authentication"""
         print("🚀🚀🚀 CategoryKPIView.post() WAS CALLED! 🚀🚀🚀")
-        print(f"🔍 Request method: {request.method}")
-        print(f"🔍 Request path: {request.path}")
-        print(f"🔍 Request data: {request.data}")
-        print(f"🔍 Request user: {request.user}")
-        print("=" * 50)
+        
+        # ✅ Debug: Check what headers we're receiving
+        print(f"🔍 REQUEST HEADERS:")
+        for key, value in request.headers.items():
+            if 'auth' in key.lower():
+                print(f"  {key}: {value[:50]}..." if len(str(value)) > 50 else f"  {key}: {value}")
+        
         try:
             category_service = CategoryService()
             
@@ -32,7 +82,7 @@ class CategoryKPIView(APIView):
             status_value = request.data.get('status', 'active')
             sub_categories = request.data.get('sub_categories', [])
             
-            # ✅ ADD: Extract image fields from request
+            # Extract image fields
             image_url = request.data.get('image_url')
             image_filename = request.data.get('image_filename')
             image_size = request.data.get('image_size')
@@ -54,50 +104,107 @@ class CategoryKPIView(APIView):
                 'sub_categories': sub_categories
             }
             
-            # ✅ ADD: Include image fields if they exist
+            # Include image fields if they exist
             if image_url:
-                category_data['image_url'] = image_url
-                category_data['image_filename'] = image_filename
-                category_data['image_size'] = image_size
-                category_data['image_type'] = image_type
-                category_data['image_uploaded_at'] = image_uploaded_at
-                print(f"✅ IMAGE: Adding image data to category creation")
-                print(f"   - filename: {image_filename}")
-                print(f"   - size: {image_size}")
-                print(f"   - type: {image_type}")
-            else:
-                print(f"ℹ️ IMAGE: No image data provided")
+                category_data.update({
+                    'image_url': image_url,
+                    'image_filename': image_filename,
+                    'image_size': image_size,
+                    'image_type': image_type,
+                    'image_uploaded_at': image_uploaded_at
+                })
+
+            # ✅ FIXED: Get user data from JWT token instead of request.user
+            current_user = None
             
-            # Create the category
-            current_user = {
-                "user_id": getattr(request.user, 'id', None),
-                "username": getattr(request.user, 'username', 'unknown'),
-                "branch_id": getattr(request.user, 'branch_id', 1),
-                "ip_address": request.META.get('REMOTE_ADDR'),
-                "user_agent": request.META.get('HTTP_USER_AGENT')
-            }
+            try:
+                authorization = request.headers.get("Authorization")
+                if authorization and authorization.startswith("Bearer "):
+                    token = authorization.split(" ")[1]
+                    
+                    from ..services.auth_services import AuthService
+                    auth_service = AuthService()
+                    
+                    user_data = auth_service.get_current_user(token)
+                    print(f"🔍 User data from token: {user_data}")
+                    
+                    if user_data:
+                        user_id = user_data.get('user_id')
+                        print(f"🔍 Getting full user data for user_id: {user_id}")
+                        
+                        # ✅ FIXED: Get the full user document from database to check username
+                        from bson import ObjectId
+                        user_doc = auth_service.user_collection.find_one({"_id": ObjectId(user_id)})
+                        
+                        if user_doc:
+                            print(f"🔍 Full user document fields: {list(user_doc.keys())}")
+                            print(f"🔍 username field: {user_doc.get('username')}")
+                            print(f"🔍 email field: {user_doc.get('email')}")
+                            
+                            # ✅ FIXED: Use actual username from database if it exists
+                            actual_username = user_doc.get('username')
+                            if actual_username and actual_username.strip():
+                                display_username = actual_username
+                                print(f"✅ Using database username: {display_username}")
+                            else:
+                                display_username = user_doc.get('email', 'unknown')
+                                print(f"✅ No username found, using email: {display_username}")
+                            
+                            # ✅ Build current_user with proper username
+                            current_user = {
+                                "user_id": user_id,
+                                "username": display_username,  # Use the actual username or email fallback
+                                "email": user_doc.get('email'),
+                                "branch_id": 1,
+                                "role": user_doc.get('role', 'admin'),
+                                "ip_address": request.META.get('REMOTE_ADDR'),
+                                "user_agent": request.META.get('HTTP_USER_AGENT')
+                            }
+                            
+                            print(f"✅ FINAL CURRENT_USER:")
+                            print(f"  user_id: '{current_user['user_id']}'")
+                            print(f"  username: '{current_user['username']}'")
+                            print(f"  email: '{current_user['email']}'")
+                            
+                        else:
+                            print(f"❌ Could not find user document in database")
+                            return Response(
+                                {"error": "User not found"}, 
+                                status=status.HTTP_401_UNAUTHORIZED
+                            )
+                    else:
+                        print(f"❌ Could not get user data from token")
+                        return Response(
+                            {"error": "Invalid token"}, 
+                            status=status.HTTP_401_UNAUTHORIZED
+                        )
+                else:
+                    print(f"❌ No Authorization header")
+                    return Response(
+                        {"error": "Authorization required"}, 
+                        status=status.HTTP_401_UNAUTHORIZED
+                    )
+                    
+            except Exception as auth_error:
+                print(f"❌ Authentication error: {auth_error}")
+                return Response(
+                    {"error": "Authentication failed"}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
 
-            print("=" * 50)
-            print("CATEGORY CREATION DEBUG")
-            print(f"User: {request.user}")
-            print(f"Is authenticated: {request.user.is_authenticated}")
-            print(f"Username: {getattr(request.user, 'username', 'NO_USERNAME')}")
-            print(f"User ID: {getattr(request.user, 'id', 'NO_ID')}")
-            print(f"Current user object: {current_user}")
-            print("=" * 50)
-
+            # Create category with proper username
+            print(f"🚀 Creating category with username: {current_user['username']}")
             result = category_service.create_category(category_data, current_user)
             
             return Response({
                 "message": "Category created successfully",
-                "category": result
+                "category": result,
+                "created_by": current_user['username']  # Show who created it
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            print(f"❌ Error: {str(e)}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def get(self, request):
         """Get all categories or search categories"""
@@ -156,8 +263,21 @@ class CategoryDetailView(APIView):
             )
     
     def put(self, request, category_id):
-        """Update a category"""
+        """Update a category with JWT authentication"""
+        print("🚀🚀🚀 CategoryDetailView.put() - UPDATE CATEGORY! 🚀🚀🚀")
+        
         try:
+            # ✅ Get authenticated user from JWT
+            current_user = get_authenticated_user_from_jwt(request)
+            
+            if not current_user:
+                return Response(
+                    {"error": "Authentication required"}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            print(f"✅ Authenticated user for UPDATE: {current_user['username']}")
+            
             category_service = CategoryService()
             
             # Extract update data
@@ -171,23 +291,19 @@ class CategoryDetailView(APIView):
             if 'sub_categories' in request.data:
                 update_data['sub_categories'] = request.data['sub_categories']
             
-            # ✅ ADD: Extract image fields from request
+            # Handle image fields
             if 'image_url' in request.data:
                 update_data['image_url'] = request.data['image_url']
-                
             if 'image_filename' in request.data:
                 update_data['image_filename'] = request.data['image_filename']
-                
             if 'image_size' in request.data:
                 update_data['image_size'] = request.data['image_size']
-                
             if 'image_type' in request.data:
                 update_data['image_type'] = request.data['image_type']
-                
             if 'image_uploaded_at' in request.data:
                 update_data['image_uploaded_at'] = request.data['image_uploaded_at']
             
-            # ✅ ADD: Handle image removal (when image_url is explicitly set to null)
+            # Handle image removal
             if 'image_url' in request.data and request.data['image_url'] is None:
                 print("🗑️ IMAGE: Removing image from category")
                 update_data['image_url'] = None
@@ -195,11 +311,6 @@ class CategoryDetailView(APIView):
                 update_data['image_size'] = None
                 update_data['image_type'] = None
                 update_data['image_uploaded_at'] = None
-            elif 'image_url' in request.data and request.data['image_url']:
-                print("✅ IMAGE: Updating category image")
-                print(f"   - filename: {request.data.get('image_filename')}")
-                print(f"   - size: {request.data.get('image_size')}")
-                print(f"   - type: {request.data.get('image_type')}")
             
             if not update_data:
                 return Response(
@@ -207,14 +318,7 @@ class CategoryDetailView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            current_user = {
-                "user_id": getattr(request.user, 'id', None),
-                "username": getattr(request.user, 'username', 'unknown'),
-                "branch_id": getattr(request.user, 'branch_id', 1),
-                "ip_address": request.META.get('REMOTE_ADDR'),
-                "user_agent": request.META.get('HTTP_USER_AGENT')
-            }
-
+            print(f"🚀 Updating category {category_id} with user: {current_user['username']}")
             result = category_service.update_category(category_id, update_data, current_user)
             
             if not result:
@@ -225,30 +329,35 @@ class CategoryDetailView(APIView):
             
             return Response({
                 "message": "Category updated successfully",
-                "category": result
+                "category": result,
+                "updated_by": current_user['username']
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
             print(f"❌ Error updating category: {str(e)}")
-            import traceback
-            traceback.print_exc()
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
     def delete(self, request, category_id):
-        """Soft delete a category (legacy method - now calls soft_delete)"""
+        """Soft delete a category with JWT authentication"""
+        print("🚀🚀🚀 CategoryDetailView.delete() - SOFT DELETE! 🚀🚀🚀")
+        
         try:
+            # ✅ Get authenticated user from JWT
+            current_user = get_authenticated_user_from_jwt(request)
+            
+            if not current_user:
+                return Response(
+                    {"error": "Authentication required"}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            print(f"✅ Authenticated user for SOFT DELETE: {current_user['username']}")
+            
             category_service = CategoryService()
-            current_user = {
-                "user_id": getattr(request.user, 'id', None),
-                "username": getattr(request.user, 'username', 'unknown'),
-                "branch_id": getattr(request.user, 'branch_id', 1),
-                "ip_address": request.META.get('REMOTE_ADDR'),
-                "user_agent": request.META.get('HTTP_USER_AGENT')
-            }
-
+            print(f"🚀 Soft deleting category {category_id} with user: {current_user['username']}")
             result = category_service.soft_delete_category(category_id, current_user)
             
             if not result:
@@ -259,10 +368,12 @@ class CategoryDetailView(APIView):
             
             return Response({
                 "message": "Category soft deleted successfully",
-                "action": "soft_delete"  # NEW: Indicate action type
+                "action": "soft_delete",
+                "deleted_by": current_user['username']
             }, status=status.HTTP_200_OK)
         
         except Exception as e:
+            print(f"❌ Error soft deleting category: {str(e)}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -274,17 +385,23 @@ class CategorySoftDeleteView(APIView):
     """Soft delete operations for categories"""
     
     def delete(self, request, category_id):
-        """Soft delete a category"""
+        """Soft delete a category with JWT authentication"""
+        print("🚀🚀🚀 CategorySoftDeleteView.delete() - SOFT DELETE! 🚀🚀🚀")
+        
         try:
+            # ✅ Get authenticated user from JWT
+            current_user = get_authenticated_user_from_jwt(request)
+            
+            if not current_user:
+                return Response(
+                    {"error": "Authentication required"}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            print(f"✅ Authenticated user for SOFT DELETE: {current_user['username']}")
+            
             category_service = CategoryService()
-            current_user = {
-                "user_id": getattr(request.user, 'id', None),
-                "username": getattr(request.user, 'username', 'unknown'),
-                "branch_id": getattr(request.user, 'branch_id', 1),
-                "ip_address": request.META.get('REMOTE_ADDR'),
-                "user_agent": request.META.get('HTTP_USER_AGENT')
-            }
-
+            print(f"🚀 Soft deleting category {category_id} with user: {current_user['username']}")
             result = category_service.soft_delete_category(category_id, current_user)
                         
             if not result:
@@ -297,10 +414,12 @@ class CategorySoftDeleteView(APIView):
                 "message": "Category soft deleted successfully",
                 "category_id": category_id,
                 "action": "soft_delete",
-                "can_restore": True
+                "can_restore": True,
+                "deleted_by": current_user['username']
             }, status=status.HTTP_200_OK)
         
         except Exception as e:
+            print(f"❌ Error soft deleting category: {str(e)}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -335,27 +454,37 @@ class CategoryHardDeleteView(APIView):
     """Hard delete operations for categories (Admin only)"""
     
     def delete(self, request, category_id):
-        """Hard delete a category (permanent removal)"""
+        """Hard delete a category with JWT authentication (Admin only)"""
+        print("🚀🚀🚀 CategoryHardDeleteView.delete() - HARD DELETE! 🚀🚀🚀")
+        
         try:
-            # TODO: Add admin permission check here
-            # if not self.is_admin_user(request.user):
-            #     return Response(
-            #         {"error": "Admin permissions required"}, 
-            #         status=status.HTTP_403_FORBIDDEN
-            #     )
+            # ✅ Get authenticated user from JWT
+            current_user = get_authenticated_user_from_jwt(request)
+            
+            if not current_user:
+                return Response(
+                    {"error": "Authentication required"}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # ✅ Check if user is admin
+            if current_user.get('role', '').lower() != 'admin':
+                return Response(
+                    {"error": "Admin permissions required for hard delete"}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            print(f"✅ Authenticated ADMIN user for HARD DELETE: {current_user['username']}")
             
             category_service = CategoryService()
-            admin_user_id = getattr(request.user, 'id', None)  # Get admin user ID
+            admin_user_id = current_user.get('user_id')
             
-            current_user = {
-                "user_id": getattr(request.user, 'id', None),
-                "username": getattr(request.user, 'username', 'unknown'),
-                "branch_id": getattr(request.user, 'branch_id', 1),
-                "ip_address": request.META.get('REMOTE_ADDR'),
-                "user_agent": request.META.get('HTTP_USER_AGENT')
-            }
-
-            result = category_service.hard_delete_category(category_id, admin_user_id=admin_user_id, current_user=current_user)
+            print(f"🚀 Hard deleting category {category_id} with admin: {current_user['username']}")
+            result = category_service.hard_delete_category(
+                category_id, 
+                admin_user_id=admin_user_id, 
+                current_user=current_user
+            )
             
             if not result:
                 return Response(
@@ -367,13 +496,15 @@ class CategoryHardDeleteView(APIView):
                 "message": "Category permanently deleted",
                 "category_id": category_id,
                 "action": "hard_delete",
-                "warning": "This action cannot be undone"
+                "warning": "This action cannot be undone",
+                "deleted_by": current_user['username']
             }, status=status.HTTP_200_OK)
         
         except Exception as e:
+            print(f"❌ Error hard deleting category: {str(e)}")
             return Response(
                 {"error": str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+               status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 class CategoryRestoreView(APIView):
@@ -454,8 +585,21 @@ class CategoryDeleteInfoView(APIView):
 
 class CategorySubcategoryView(APIView):
     def post(self, request, category_id):
-        """Add a subcategory to a category"""
+        """Add a subcategory to a category with JWT authentication"""
+        print("🚀🚀🚀 CategorySubcategoryView.post() - ADD SUBCATEGORY! 🚀🚀🚀")
+        
         try:
+            # ✅ Get authenticated user from JWT
+            current_user = get_authenticated_user_from_jwt(request)
+            
+            if not current_user:
+                return Response(
+                    {"error": "Authentication required"}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            print(f"✅ Authenticated user for ADD SUBCATEGORY: {current_user['username']}")
+            
             category_service = CategoryService()
             subcategory_data = request.data.get('subcategory')
             
@@ -465,7 +609,8 @@ class CategorySubcategoryView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            result = category_service.add_subcategory(category_id, subcategory_data)
+            print(f"🚀 Adding subcategory to {category_id} with user: {current_user['username']}")
+            result = category_service.add_subcategory(category_id, subcategory_data, current_user)
             
             if not result:
                 return Response(
@@ -474,18 +619,33 @@ class CategorySubcategoryView(APIView):
                 )
             
             return Response({
-                "message": "Subcategory added successfully"
+                "message": "Subcategory added successfully",
+                "added_by": current_user['username']
             }, status=status.HTTP_201_CREATED)
         
         except Exception as e:
+            print(f"❌ Error adding subcategory: {str(e)}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
     def delete(self, request, category_id):
-        """Remove a subcategory from a category"""
+        """Remove a subcategory from a category with JWT authentication"""
+        print("🚀🚀🚀 CategorySubcategoryView.delete() - REMOVE SUBCATEGORY! 🚀🚀🚀")
+        
         try:
+            # ✅ Get authenticated user from JWT
+            current_user = get_authenticated_user_from_jwt(request)
+            
+            if not current_user:
+                return Response(
+                    {"error": "Authentication required"}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            print(f"✅ Authenticated user for REMOVE SUBCATEGORY: {current_user['username']}")
+            
             category_service = CategoryService()
             subcategory_data = request.data.get('subcategory')
             
@@ -495,7 +655,8 @@ class CategorySubcategoryView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            result = category_service.remove_subcategory(category_id, subcategory_data)
+            print(f"🚀 Removing subcategory from {category_id} with user: {current_user['username']}")
+            result = category_service.remove_subcategory(category_id, subcategory_data, current_user)
             
             if not result:
                 return Response(
@@ -504,14 +665,17 @@ class CategorySubcategoryView(APIView):
                 )
             
             return Response({
-                "message": "Subcategory removed successfully"
+                "message": "Subcategory removed successfully",
+                "removed_by": current_user['username']
             }, status=status.HTTP_200_OK)
         
         except Exception as e:
+            print(f"❌ Error removing subcategory: {str(e)}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
     
     def get(self, request, category_id):
         """Get all subcategories for a category"""
@@ -675,17 +839,20 @@ class ProductSubcategoryUpdateView(APIView):
     """Update product subcategory within a category"""
     
     def put(self, request):
-        """
-        Update a product's subcategory or remove from category
+        """Update product subcategory with JWT authentication"""
+        print("🚀🚀🚀 ProductSubcategoryUpdateView.put() - UPDATE PRODUCT SUBCATEGORY! 🚀🚀🚀")
         
-        Expected payload:
-        {
-            "product_id": "product123",
-            "new_subcategory": "Electronics" or null,
-            "category_id": "category456"
-        }
-        """
         try:
+            # ✅ Get authenticated user from JWT
+            current_user = get_authenticated_user_from_jwt(request)
+            
+            if not current_user:
+                return Response(
+                    {"error": "Authentication required"}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            print(f"✅ Authenticated user for UPDATE PRODUCT SUBCATEGORY: {current_user['username']}")
             
             # Extract data from request
             product_id = request.data.get('product_id')
@@ -717,13 +884,20 @@ class ProductSubcategoryUpdateView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Perform the update
-            result = service.update_product_subcategory(product_id, new_subcategory, category_id)
+            print(f"🚀 Updating product {product_id} subcategory with user: {current_user['username']}")
+            # Perform the update with current_user for audit logging
+            result = service.update_product_subcategory(
+                product_id, 
+                new_subcategory, 
+                category_id, 
+                current_user=current_user  # Pass user for audit logging
+            )
             
             if result.get('success'):
                 return Response({
                     "message": result.get('message'),
-                    "result": result
+                    "result": result,
+                    "updated_by": current_user['username']
                 }, status=status.HTTP_200_OK)
             else:
                 return Response(
@@ -732,6 +906,7 @@ class ProductSubcategoryUpdateView(APIView):
                 )
         
         except Exception as e:
+            print(f"❌ Error updating product subcategory: {str(e)}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -888,16 +1063,21 @@ class ProductMoveToUncategorizedView(APIView):
     """Move a single product to Uncategorized category"""
     
     def put(self, request):
-        """
-        Move a product from its current category to Uncategorized category
+        """Move a product to Uncategorized category with JWT authentication"""
+        print("🚀🚀🚀 ProductMoveToUncategorizedView.put() - MOVE TO UNCATEGORIZED! 🚀🚀🚀")
         
-        Expected payload:
-        {
-            "product_id": "product123",
-            "current_category_id": "category456" (optional, for logging)
-        }
-        """
         try:
+            # ✅ Get authenticated user from JWT
+            current_user = get_authenticated_user_from_jwt(request)
+            
+            if not current_user:
+                return Response(
+                    {"error": "Authentication required"}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            print(f"✅ Authenticated user for MOVE TO UNCATEGORIZED: {current_user['username']}")
+            
             # Extract data from request
             product_id = request.data.get('product_id')
             current_category_id = request.data.get('current_category_id')
@@ -911,15 +1091,14 @@ class ProductMoveToUncategorizedView(APIView):
             
             # Initialize service
             service = ProductSubcategoryService()
-            
-            # Move to uncategorized category by setting subcategory to null
-            # and using the uncategorized category ID
             UNCATEGORIZED_CATEGORY_ID = '686a4de143821e2b21f725c6'
             
+            print(f"🚀 Moving product {product_id} to uncategorized with user: {current_user['username']}")
             result = service.update_product_subcategory(
                 product_id=product_id,
                 new_subcategory=None,  # null triggers move to uncategorized
-                category_id=UNCATEGORIZED_CATEGORY_ID
+                category_id=UNCATEGORIZED_CATEGORY_ID,
+                current_user=current_user  # Pass user for audit logging
             )
             
             if result.get('success'):
@@ -928,7 +1107,8 @@ class ProductMoveToUncategorizedView(APIView):
                     "product_id": product_id,
                     "previous_category_id": current_category_id,
                     "new_category_id": UNCATEGORIZED_CATEGORY_ID,
-                    "result": result
+                    "result": result,
+                    "moved_by": current_user['username']
                 }, status=status.HTTP_200_OK)
             else:
                 return Response(
@@ -937,6 +1117,7 @@ class ProductMoveToUncategorizedView(APIView):
                 )
         
         except Exception as e:
+            print(f"❌ Error moving product to uncategorized: {str(e)}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -946,16 +1127,21 @@ class ProductBulkMoveToUncategorizedView(APIView):
     """Move multiple products to Uncategorized category"""
     
     def put(self, request):
-        """
-        Bulk move products from their current category to Uncategorized category
+        """Bulk move products to Uncategorized category with JWT authentication"""
+        print("🚀🚀🚀 ProductBulkMoveToUncategorizedView.put() - BULK MOVE TO UNCATEGORIZED! 🚀🚀🚀")
         
-        Expected payload:
-        {
-            "product_ids": ["product1", "product2", "product3"],
-            "current_category_id": "category456" (optional, for logging)
-        }
-        """
         try:
+            # ✅ Get authenticated user from JWT
+            current_user = get_authenticated_user_from_jwt(request)
+            
+            if not current_user:
+                return Response(
+                    {"error": "Authentication required"}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            print(f"✅ Authenticated user for BULK MOVE TO UNCATEGORIZED: {current_user['username']}")
+            
             # Extract data from request
             product_ids = request.data.get('product_ids', [])
             current_category_id = request.data.get('current_category_id')
@@ -977,6 +1163,8 @@ class ProductBulkMoveToUncategorizedView(APIView):
             service = ProductSubcategoryService()
             UNCATEGORIZED_CATEGORY_ID = '686a4de143821e2b21f725c6'
             
+            print(f"🚀 Bulk moving {len(product_ids)} products to uncategorized with user: {current_user['username']}")
+            
             # Process each product
             results = []
             successful = 0
@@ -988,7 +1176,8 @@ class ProductBulkMoveToUncategorizedView(APIView):
                     result = service.update_product_subcategory(
                         product_id=product_id,
                         new_subcategory=None,  # null triggers move to uncategorized
-                        category_id=UNCATEGORIZED_CATEGORY_ID
+                        category_id=UNCATEGORIZED_CATEGORY_ID,
+                        current_user=current_user  # Pass user for audit logging
                     )
                     
                     if result.get('success'):
@@ -1018,9 +1207,9 @@ class ProductBulkMoveToUncategorizedView(APIView):
             if successful > 0 and failed == 0:
                 response_status = status.HTTP_200_OK
             elif successful > 0 and failed > 0:
-                response_status = status.HTTP_207_MULTI_STATUS  # Partial success
+                response_status = status.HTTP_207_MULTI_STATUS
             else:
-                response_status = status.HTTP_400_BAD_REQUEST  # All failed
+                response_status = status.HTTP_400_BAD_REQUEST
             
             return Response({
                 "message": f"Bulk move completed: {successful} successful, {failed} failed",
@@ -1029,10 +1218,12 @@ class ProductBulkMoveToUncategorizedView(APIView):
                 "total_requested": len(product_ids),
                 "previous_category_id": current_category_id,
                 "new_category_id": UNCATEGORIZED_CATEGORY_ID,
-                "results": results
+                "results": results,
+                "moved_by": current_user['username']
             }, status=response_status)
         
         except Exception as e:
+            print(f"❌ Error bulk moving products: {str(e)}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
