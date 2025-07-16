@@ -104,6 +104,9 @@ class Product:
             'sync_logs': self.sync_logs
         }
 
+from datetime import datetime
+from bson import ObjectId
+
 class Category:
     def __init__(self, **kwargs):
         self._id = kwargs.get('_id', ObjectId())
@@ -113,17 +116,112 @@ class Category:
         self.date_created = kwargs.get('date_created', datetime.utcnow())
         self.last_updated = kwargs.get('last_updated', datetime.utcnow())
         self.sub_categories = kwargs.get('sub_categories', [])
-
+        
+        # Soft delete fields
+        self.isDeleted = kwargs.get('isDeleted', False)
+        self.deleted_at = kwargs.get('deleted_at', None)
+        self.restored_at = kwargs.get('restored_at', None)
+        
+        # NEW: Image fields
+        self.image_url = kwargs.get('image_url', None)  # URL to the stored image
+        self.image_filename = kwargs.get('image_filename', None)  # Original filename
+        self.image_size = kwargs.get('image_size', None)  # File size in bytes
+        self.image_type = kwargs.get('image_type', None)  # MIME type (e.g., 'image/jpeg')
+        self.image_uploaded_at = kwargs.get('image_uploaded_at', None)  # When image was uploaded
+    
     def to_dict(self):
-        return {
+        """Convert Category object to dictionary for MongoDB insertion"""
+        category_dict = {
             '_id': self._id,
             'category_name': self.category_name,
             'description': self.description,
             'status': self.status,
             'date_created': self.date_created,
             'last_updated': self.last_updated,
-            'sub_categories': self.sub_categories
+            'sub_categories': self.sub_categories,
+            'isDeleted': self.isDeleted
         }
+        
+        # Include timestamp fields if they have values
+        if self.deleted_at is not None:
+            category_dict['deleted_at'] = self.deleted_at
+        if self.restored_at is not None:
+            category_dict['restored_at'] = self.restored_at
+        
+        # Include image fields if they have values
+        if self.image_url is not None:
+            category_dict['image_url'] = self.image_url
+        if self.image_filename is not None:
+            category_dict['image_filename'] = self.image_filename
+        if self.image_size is not None:
+            category_dict['image_size'] = self.image_size
+        if self.image_type is not None:
+            category_dict['image_type'] = self.image_type
+        if self.image_uploaded_at is not None:
+            category_dict['image_uploaded_at'] = self.image_uploaded_at
+            
+        return category_dict
+
+    @classmethod
+    def from_dict(cls, data):
+        """Create Category instance from dictionary"""
+        return cls(**data)
+
+    def has_image(self):
+        """Check if category has an image"""
+        return self.image_url is not None and self.image_url.strip() != ''
+
+    def remove_image(self):
+        """Remove image from category"""
+        self.image_url = None
+        self.image_filename = None
+        self.image_size = None
+        self.image_type = None
+        self.image_uploaded_at = None
+        self.update_last_modified()
+        return self
+
+    def get_image_info(self):
+        """Get comprehensive image information"""
+        if not self.has_image():
+            return None
+        
+        return {
+            'url': self.image_url,
+            'filename': self.image_filename,
+            'size': self.image_size,
+            'type': self.image_type,
+            'uploaded_at': self.image_uploaded_at,
+            'size_formatted': self._format_file_size(self.image_size) if self.image_size else None
+        }
+
+    def _format_file_size(self, size_bytes):
+        """Format file size in human readable format"""
+        if not size_bytes:
+            return None
+        
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size_bytes < 1024:
+                return f"{size_bytes:.1f} {unit}"
+            size_bytes /= 1024
+        return f"{size_bytes:.1f} TB"
+
+    # ✅ ADDED: Missing update_fields method
+    def update_fields(self, **kwargs):
+        """Update multiple fields at once"""
+        for field, value in kwargs.items():
+            if hasattr(self, field):
+                setattr(self, field, value)
+        
+        # Always update the last_updated timestamp
+        self.last_updated = datetime.utcnow()
+        return self
+
+    # ✅ ADDED: Missing update_last_modified method
+    def update_last_modified(self):
+        """Update the last_updated timestamp"""
+        self.last_updated = datetime.utcnow()
+        return self
 
 class Supplier:
     def __init__(self, **kwargs):

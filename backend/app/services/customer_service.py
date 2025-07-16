@@ -7,10 +7,20 @@ from notifications.services import notification_service
 
 class CustomerService:
     def __init__(self):
+        """Initialize CustomerService with audit logging"""
         self.db = db_manager.get_database()  
         self.customer_collection = self.db.customers  
         self.user_collection = self.db.users 
         self.session_logs = self.db.session_logs
+        
+        # ✅ ADD: Initialize audit service
+        try:
+            from .audit_service import AuditLogService
+            self.audit_service = AuditLogService()
+            print("✅ Audit service initialized for CustomerService")
+        except Exception as e:
+            print(f"⚠️ Could not initialize audit service: {e}")
+            self.audit_service = None
     
     # ================================================================
     # UTILITY METHODS
@@ -129,9 +139,14 @@ class CustomerService:
     # CRUD OPERATIONS
     # ================================================================
     
-    def create_customer(self, customer_data):
-        """Create a new customer in both users and customers collections"""
+    def create_customer(self, customer_data, current_user=None):
+        """Create a new customer in both users and customers collections with audit logging"""
         try:
+            print(f"🔍 Creating new customer")
+            print(f"🔍 Customer data: {customer_data}")
+            if current_user:
+                print(f"🔍 User: {current_user['username']}")
+            
             # Extract user-related data
             user_data = {
                 "username": customer_data.get("username", customer_data.get("email")),
@@ -174,6 +189,18 @@ class CustomerService:
             
             # Send notification
             self._send_customer_notification('created', created_customer, user_id)
+            
+            # ✅ ADD: Audit logging for successful creation
+            if current_user and hasattr(self, 'audit_service'):
+                try:
+                    # Create audit log for customer creation
+                    audit_customer_data = created_customer.copy()
+                    audit_customer_data['_id'] = user_id
+                    
+                    self.audit_service.log_customer_create(current_user, audit_customer_data)
+                    print(f"✅ Audit log created for customer creation")
+                except Exception as audit_error:
+                    print(f"❌ Audit logging failed: {audit_error}")
             
             return created_customer
         
@@ -232,13 +259,18 @@ class CustomerService:
         except Exception as e:
             raise Exception(f"Error getting customers: {str(e)}")
     
-    def update_customer(self, customer_id, customer_data):
-        """Update customer in both collections"""
+    def update_customer(self, customer_id, customer_data, current_user=None):
+        """Update customer in both collections with audit logging"""
         try:
+            print(f"🔍 Updating customer {customer_id}")
+            print(f"🔍 Update data: {customer_data}")
+            if current_user:
+                print(f"🔍 User: {current_user['username']}")
+            
             if not ObjectId.is_valid(customer_id):
                 return None
             
-            # Get current customer data for notification comparison
+            # Get current customer data for notification comparison and audit
             old_customer = self.customer_collection.find_one({'_id': ObjectId(customer_id)})
             if not old_customer:
                 return None
@@ -280,19 +312,37 @@ class CustomerService:
                 # Send notification
                 self._send_customer_notification('updated', updated_customer, customer_id, old_customer)
                 
+                # ✅ ADD: Audit logging for successful update
+                if current_user and hasattr(self, 'audit_service'):
+                    try:
+                        # Create audit log for customer update
+                        self.audit_service.log_customer_update(
+                            current_user, 
+                            customer_id, 
+                            old_customer, 
+                            customer_data
+                        )
+                        print(f"✅ Audit log created for customer update")
+                    except Exception as audit_error:
+                        print(f"❌ Audit logging failed: {audit_error}")
+                
                 return updated_customer
             return None
         
         except Exception as e:
             raise Exception(f"Error updating customer: {str(e)}")
     
-    def delete_customer(self, customer_id):
-        """Delete customer from both collections"""
+    def delete_customer(self, customer_id, current_user=None):
+        """Delete customer from both collections with audit logging"""
         try:
+            print(f"🔍 Deleting customer {customer_id}")
+            if current_user:
+                print(f"🔍 User: {current_user['username']}")
+            
             if not ObjectId.is_valid(customer_id):
                 return False
             
-            # Get customer data before deletion for notification
+            # Get customer data before deletion for notification and audit
             customer_to_delete = self.customer_collection.find_one({'_id': ObjectId(customer_id)})
             if not customer_to_delete:
                 return False
@@ -306,6 +356,16 @@ class CustomerService:
             if customer_result.deleted_count > 0 or user_result.deleted_count > 0:
                 # Send notification
                 self._send_customer_notification('deleted', customer_to_delete, customer_id)
+                
+                # ✅ ADD: Audit logging for successful deletion
+                if current_user and hasattr(self, 'audit_service'):
+                    try:
+                        # Create audit log for customer deletion
+                        self.audit_service.log_customer_delete(current_user, customer_to_delete)
+                        print(f"✅ Audit log created for customer deletion")
+                    except Exception as audit_error:
+                        print(f"❌ Audit logging failed: {audit_error}")
+                
                 return True
             
             return False
@@ -427,9 +487,14 @@ class CustomerService:
     # LOYALTY SYSTEM METHODS
     # ================================================================
     
-    def update_loyalty_points(self, customer_id, points_to_add, reason="Purchase"):
-        """Update customer loyalty points and send notification"""
+    def update_loyalty_points(self, customer_id, points_to_add, reason="Purchase", current_user=None):
+        """Update customer loyalty points and send notification with audit logging"""
         try:
+            print(f"🔍 Updating loyalty points for customer {customer_id}")
+            print(f"🔍 Points to add: {points_to_add}, reason: {reason}")
+            if current_user:
+                print(f"🔍 User: {current_user['username']}")
+            
             if not ObjectId.is_valid(customer_id):
                 return None
             
@@ -475,6 +540,20 @@ class CustomerService:
                 except Exception as notification_error:
                     print(f"Failed to create loyalty points notification: {notification_error}")
                 
+                # ✅ ADD: Audit logging for successful loyalty points update
+                if current_user and hasattr(self, 'audit_service'):
+                    try:
+                        # Create audit log for loyalty points update
+                        self.audit_service.log_customer_update(
+                            current_user,
+                            customer_id,
+                            old_values={"loyalty_points": old_points},
+                            new_values={"loyalty_points": new_points, "points_added": points_to_add, "reason": reason}
+                        )
+                        print(f"✅ Audit log created for loyalty points update")
+                    except Exception as audit_error:
+                        print(f"❌ Audit logging failed: {audit_error}")
+                
                 # Return updated customer
                 updated_customer = self.customer_collection.find_one({'_id': ObjectId(customer_id)})
                 return self.convert_object_id(updated_customer)
@@ -483,6 +562,7 @@ class CustomerService:
             
         except Exception as e:
             raise Exception(f"Error updating loyalty points: {str(e)}")
+
     
     # ================================================================
     # SEARCH AND FILTER METHODS
@@ -520,3 +600,71 @@ class CustomerService:
             return [self.convert_object_id(customer) for customer in customers]
         except Exception as e:
             raise Exception(f"Error getting high value customers: {str(e)}")
+        
+    def bulk_delete_customers(self, customer_ids, current_user=None):
+        """Bulk delete multiple customers with audit logging"""
+        try:
+            print(f"🔍 Bulk deleting {len(customer_ids)} customers")
+            if current_user:
+                print(f"🔍 User: {current_user['username']}")
+            
+            if not isinstance(customer_ids, list) or not customer_ids:
+                return {"success": False, "error": "Invalid customer IDs"}
+            
+            # Validate ObjectIds
+            valid_ids = []
+            for customer_id in customer_ids:
+                if ObjectId.is_valid(customer_id):
+                    valid_ids.append(ObjectId(customer_id))
+            
+            if not valid_ids:
+                return {"success": False, "error": "No valid customer IDs provided"}
+            
+            # Get customers to delete for audit logging
+            customers_to_delete = list(self.customer_collection.find({'_id': {'$in': valid_ids}}))
+            
+            # Delete from both collections
+            customer_result = self.customer_collection.delete_many({'_id': {'$in': valid_ids}})
+            user_result = self.user_collection.delete_many({'_id': {'$in': valid_ids}})
+            
+            deleted_count = customer_result.deleted_count
+            
+            if deleted_count > 0:
+                # Send notification for bulk deletion
+                try:
+                    notification_service.create_notification(
+                        title="Bulk Customer Deletion",
+                        message=f"{deleted_count} customers have been deleted from the system",
+                        priority="high",
+                        notification_type="system",
+                        metadata={
+                            "deleted_count": deleted_count,
+                            "requested_count": len(customer_ids),
+                            "action_type": "customers_bulk_deleted"
+                        }
+                    )
+                except Exception as notification_error:
+                    print(f"Failed to create bulk deletion notification: {notification_error}")
+                
+                # ✅ ADD: Audit logging for successful bulk deletion
+                if current_user and hasattr(self, 'audit_service'):
+                    try:
+                        # Create audit log for bulk deletion
+                        deleted_ids = [str(customer['_id']) for customer in customers_to_delete]
+                        self.audit_service.log_customer_bulk_delete(
+                            current_user, 
+                            deleted_count, 
+                            deleted_ids
+                        )
+                        print(f"✅ Audit log created for bulk customer deletion")
+                    except Exception as audit_error:
+                        print(f"❌ Audit logging failed: {audit_error}")
+            
+            return {
+                "success": True,
+                "deleted_count": deleted_count,
+                "requested_count": len(customer_ids)
+            }
+        
+        except Exception as e:
+            raise Exception(f"Error bulk deleting customers: {str(e)}")

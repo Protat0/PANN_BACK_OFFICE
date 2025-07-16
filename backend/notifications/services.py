@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 from bson import ObjectId
 from django.contrib.auth.models import User
+from django.http import JsonResponse
 from app.database import db_manager
 import uuid
 
@@ -151,6 +152,78 @@ class NotificationService:
             
         except Exception as e:
             raise Exception(f"Error getting all notifications: {str(e)}")
+
+    def get_all_notifications_api(self, request):
+        """API endpoint method for getting all notifications"""
+        try:
+            # Get query parameters
+            page = int(request.GET.get('page', 1))
+            limit = int(request.GET.get('limit', 50))
+            include_archived = request.GET.get('include_archived', 'false').lower() == 'true'
+            
+            # Calculate skip for pagination
+            skip = (page - 1) * limit
+            
+            # Get notifications from service
+            notifications, total_count = self.get_all_notifications(
+                skip=skip,
+                limit=limit,
+                include_archived=include_archived  # ✅ Pass this parameter
+            )
+            
+            # Calculate pagination info
+            total_pages = (total_count + limit - 1) // limit
+            has_next = page < total_pages
+            has_previous = page > 1
+            
+            return JsonResponse({
+                'success': True,
+                'data': notifications,
+                'pagination': {
+                    'current_page': page,
+                    'total_pages': total_pages,
+                    'total_count': total_count,
+                    'per_page': limit,
+                    'has_next': has_next,
+                    'has_previous': has_previous
+                }
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e),
+                'data': [],
+                'pagination': {}
+            }, status=500)
+
+    def get_recent_notifications_api(self, request):
+        """API endpoint method for getting recent notifications"""
+        try:
+            limit = int(request.GET.get('limit', 10))
+            hours = request.GET.get('hours')
+            include_archived = request.GET.get('include_archived', 'false').lower() == 'true'
+            
+            if hours:
+                hours = int(hours)
+            
+            notifications = self.get_recent_notifications(
+                limit=limit,
+                hours=hours,
+                include_archived=include_archived  # ✅ Pass this parameter
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'data': notifications
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e),
+                'data': []
+            }, status=500)
     
     def get_unread_count(self, recipient_id=None, include_archived=False):
         """Get count of unread notifications for a user or all notifications"""
@@ -184,6 +257,28 @@ class NotificationService:
             return result.modified_count > 0
         except Exception:
             return False
+
+    def mark_as_read_api(self, notification_id):
+        """API endpoint method for marking notification as read"""
+        try:
+            success = self.mark_as_read(notification_id)
+            
+            if success:
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Notification marked as read successfully'
+                })
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Failed to mark notification as read'
+                }, status=400)
+                
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
     
     def mark_as_unread(self, notification_id):
         """Mark notification as unread"""
@@ -233,6 +328,24 @@ class NotificationService:
             
         except Exception as e:
             raise Exception(f"Error marking notifications as read: {str(e)}")
+
+    def mark_all_as_read_api(self, request):
+        """API endpoint method for marking all notifications as read"""
+        try:
+            recipient_id = request.GET.get('recipient_id')
+            count = self.mark_all_as_read(recipient_id)
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'{count} notifications marked as read',
+                'count': count
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
     
     def mark_all_as_unread(self, recipient_id=None):
         """
@@ -295,6 +408,28 @@ class NotificationService:
             return result.modified_count > 0
         except Exception as e:
             raise Exception(f"Error archiving notification: {str(e)}")
+
+    def archive_notification_api(self, notification_id):
+        """API endpoint method for archiving notification"""
+        try:
+            success = self.archive_notification(notification_id)
+            
+            if success:
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Notification archived successfully'
+                })
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Failed to archive notification'
+                }, status=400)
+                
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
     
     def unarchive_notification(self, notification_id):
         """
@@ -322,6 +457,28 @@ class NotificationService:
             return result.modified_count > 0
         except Exception as e:
             raise Exception(f"Error unarchiving notification: {str(e)}")
+
+    def unarchive_notification_api(self, notification_id):
+        """API endpoint method for unarchiving notification"""
+        try:
+            success = self.unarchive_notification(notification_id)
+            
+            if success:
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Notification unarchived successfully'
+                })
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Failed to unarchive notification'
+                }, status=400)
+                
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
     
     def archive_all_read_notifications(self, recipient_id=None):
         """
@@ -400,6 +557,28 @@ class NotificationService:
             return result.deleted_count > 0
         except Exception:
             return False
+
+    def delete_notification_api(self, notification_id):
+        """API endpoint method for deleting notification"""
+        try:
+            success = self.delete_notification(notification_id)
+            
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': 'Notification deleted successfully'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to delete notification'
+                }), 400
+                
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
     
     def delete_all_notifications(self, recipient_id=None, notification_type=None):
         """
@@ -478,7 +657,7 @@ class NotificationService:
         """Format a single notification for JSON serialization"""
         if notification:
             notification['_id'] = str(notification['_id'])
-            notification['id'] = notification['_id'] 
+            notification['id'] = notification['_id']  # Add id field for consistency
         return notification
     
     def _format_notifications(self, notifications):
@@ -486,13 +665,6 @@ class NotificationService:
         for notification in notifications:
             self._format_notification(notification)
         return notifications
-
-    def _format_notification(self, notification):
-        """Format a single notification for JSON serialization"""
-        if notification:
-            notification['_id'] = str(notification['_id'])
-            notification['id'] = notification['_id']  # Add id field for consistency
-        return notification
 
     def _get_recipient(self, recipient_id=None, recipient_username=None):
         """Helper method to get recipient User object"""

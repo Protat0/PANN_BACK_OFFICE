@@ -127,36 +127,55 @@
 
             <!-- Category Image Upload (Optional) -->
             <div class="mb-3">
-              <label class="form-label text-tertiary-dark fw-semibold">
-                Category Image
-              </label>
-              <div class="category-image-upload">
-                <div class="image-preview-container bg-neutral-light rounded p-4 text-center">
-                  <div v-if="!imagePreview" class="image-placeholder">
-                    <Package :size="48" class="text-tertiary-medium mb-2" />
-                    <p class="text-tertiary-medium mb-2">Upload category image</p>
+                <label class="form-label text-tertiary-dark fw-semibold">
+                  Category Image
+                </label>
+                
+                <!-- Image Preview (if exists) -->
+                <div v-if="imagePreview" class="mb-3">
+                  <div class="image-preview-container bg-neutral-light rounded p-3 text-center">
+                    <img 
+                      :src="imagePreview" 
+                      alt="Category preview" 
+                      class="img-fluid rounded mb-2" 
+                      style="max-height: 120px;" 
+                    />
+                    <br>
+                    <small v-if="hasExistingImage" class="text-muted">Current image</small>
+                    <small v-else class="text-success">New image selected</small>
+                    <br>
+                    <button 
+                      type="button" 
+                      class="btn btn-outline-danger btn-xs mt-2"
+                      @click="removeImage"
+                    >
+                      <Trash2 :size="12" class="me-1" />
+                      Remove Image
+                    </button>
+                  </div>
+                </div>
+                
+                <!-- File Input (always visible) -->
+                <div class="category-image-upload">
+                  <div class="image-upload-container bg-neutral-light rounded p-4 text-center">
+                    <Package :size="32" class="text-tertiary-medium mb-2" />
+                    <p class="text-tertiary-medium mb-2">
+                      {{ imagePreview ? 'Change image' : 'Upload category image' }}
+                    </p>
                     <input 
                       type="file" 
                       class="form-control" 
                       accept="image/*"
                       @change="handleImageUpload"
                       ref="imageInput"
+                      :key="'imageInput-' + (isEditMode ? editingCategoryId : 'new')"
                     />
-                  </div>
-                  <div v-else class="image-preview">
-                    <img :src="imagePreview" alt="Category preview" class="img-fluid rounded mb-2" style="max-height: 120px;" />
-                    <br>
-                    <button 
-                      type="button" 
-                      class="btn btn-cancel btn-xs"
-                      @click="removeImage"
-                    >
-                      Remove Image
-                    </button>
+                    <small class="text-muted mt-2 d-block">
+                      Maximum file size: 5MB. Supported formats: JPEG, PNG, GIF, WebP
+                    </small>
                   </div>
                 </div>
               </div>
-            </div>
           </form>
         </div>
 
@@ -181,6 +200,7 @@
 </template>
 
 <script>
+import categoryApiService from '@/services/apiCategory' // Import your API service
 import { 
   Package,
   Plus,
@@ -200,13 +220,16 @@ export default {
     return {
       isEditMode: false,
       editingCategoryId: null,
+      isLoading: false, // Add loading state
       formData: {
         category_name: '',
         description: '',
         status: 'active',
         sub_categories: []
       },
-      imagePreview: null
+      imagePreview: null,
+      selectedImageFile: null, 
+      hasExistingImage: false
     }
   },
   computed: {
@@ -217,7 +240,8 @@ export default {
   methods: {
     addSubCategory() {
       this.formData.sub_categories.push({
-        name: ''
+        name: '',
+        products: []
       })
     },
     
@@ -226,72 +250,178 @@ export default {
     },
     
     handleImageUpload(event) {
+      console.log('=== handleImageUpload called ===')
+      
       const file = event.target.files[0]
-      if (file) {
-        const reader = new FileReader()
-        reader.onload = (e) => {
-          this.imagePreview = e.target.result
-        }
-        reader.readAsDataURL(file)
+      if (!file) {
+        console.log('❌ No file selected')
+        return
       }
+      
+      console.log('📁 File selected:', {
+        name: file.name,
+        size: file.size,
+        type: file.type
+      })
+      
+      // Store the actual file
+      this.selectedImageFile = file
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        console.error('❌ File too large:', file.size)
+        alert('Image size should be less than 5MB')
+        this.clearImageData()
+        return
+      }
+      
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+      if (!validTypes.includes(file.type)) {
+        console.error('❌ Invalid file type:', file.type)
+        alert('Please select a valid image file (JPEG, PNG, GIF, WebP)')
+        this.clearImageData()
+        return
+      }
+      
+      console.log('✅ File validation passed')
+      
+      const reader = new FileReader()
+      
+      reader.onload = (e) => {
+        console.log('✅ FileReader onload triggered')
+        this.imagePreview = e.target.result
+        this.hasExistingImage = false // This is a new upload
+        console.log('✅ Image preview set, length:', this.imagePreview.length)
+      }
+      
+      reader.onerror = (e) => {
+        console.error('❌ FileReader error:', e)
+        alert('Error reading the image file')
+        this.clearImageData()
+      }
+      
+      reader.readAsDataURL(file)
     },
-    
+
     removeImage() {
+      console.log('🗑️ Removing image')
+      this.clearImageData()
+    },
+    
+    clearImageData() {
       this.imagePreview = null
-      if (this.$refs.imageInput) {
-        this.$refs.imageInput.value = ''
-      }
+      this.selectedImageFile = null
+      this.hasExistingImage = false
     },
     
-    handleSubmit() {
-      if (!this.isFormValid) return
+    async handleSubmit() {
+      if (!this.isFormValid || this.isLoading) return
       
-      // Prepare the data structure based on the collection
-      const categoryData = {
-        category_name: this.formData.category_name,
-        description: this.formData.description,
-        status: this.formData.status,
-        last_updated: new Date().toISOString(),
-        sub_categories: this.formData.sub_categories.filter(sub => sub.name.trim() !== '')
+      this.isLoading = true
+      
+      try {
+        // Prepare the basic category data
+        const categoryData = {
+          category_name: this.formData.category_name.trim(),
+          description: this.formData.description.trim(),
+          status: this.formData.status,
+          sub_categories: this.formData.sub_categories
+            .filter(sub => sub.name.trim() !== '')
+            .map(sub => ({
+              name: sub.name.trim(),
+              products: sub.products || []
+            }))
+        }
+        
+        // Debug info
+        console.log('=== IMAGE DEBUG INFO ===')
+        console.log('imagePreview exists:', !!this.imagePreview)
+        console.log('selectedImageFile exists:', !!this.selectedImageFile)
+        console.log('hasExistingImage:', this.hasExistingImage)
+        
+        // Handle image data
+        if (this.selectedImageFile && this.imagePreview) {
+          // New image uploaded
+          console.log('✅ Adding NEW image data')
+          categoryData.image_filename = this.selectedImageFile.name
+          categoryData.image_size = this.selectedImageFile.size
+          categoryData.image_type = this.selectedImageFile.type
+          categoryData.image_url = this.imagePreview
+          categoryData.image_uploaded_at = new Date().toISOString()
+          
+          console.log('✅ Image data added:', {
+            image_filename: categoryData.image_filename,
+            image_size: categoryData.image_size,
+            image_type: categoryData.image_type,
+            image_url_length: categoryData.image_url.length
+          })
+        } 
+        else if (this.hasExistingImage && this.imagePreview) {
+          // Existing image kept (in edit mode)
+          console.log('✅ Keeping existing image')
+        }
+        else if (this.isEditMode && !this.imagePreview) {
+          // Image was removed in edit mode
+          console.log('🗑️ Removing image in edit mode')
+          categoryData.image_url = null
+          categoryData.image_filename = null
+          categoryData.image_size = null
+          categoryData.image_type = null
+          categoryData.image_uploaded_at = null
+        }
+        else {
+          console.log('ℹ️ No image data to process')
+        }
+        
+        console.log('=== COMPLETE CATEGORY DATA TO SEND ===')
+        console.log(JSON.stringify(categoryData, null, 2))
+        
+        // Call API
+        if (this.isEditMode) {
+          const updatedCategory = await categoryApiService.UpdateCategoryData({
+            id: this.editingCategoryId,
+            ...categoryData
+          })
+          
+          console.log('✅ Category updated successfully:', updatedCategory)
+          this.$emit('category-updated', updatedCategory)
+          alert(`Category "${categoryData.category_name}" updated successfully!`)
+          
+        } else {
+          const newCategory = await categoryApiService.AddCategoryData(categoryData)
+          
+          console.log('✅ Category created successfully:', newCategory)
+          this.$emit('category-added', newCategory)
+          alert(`Category "${categoryData.category_name}" created successfully!`)
+        }
+        
+        this.resetForm()
+        this.closeModal()
+        
+      } catch (error) {
+        console.error('❌ Error in handleSubmit:', error)
+        const action = this.isEditMode ? 'update' : 'create'
+        alert(`Failed to ${action} category. Please try again.\n\nError: ${error.message || 'Unknown error'}`)
+      } finally {
+        this.isLoading = false
       }
-      
-      // Add date_created only for new categories
-      if (!this.isEditMode) {
-        categoryData.date_created = new Date().toISOString()
-      }
-      
-      console.log(`${this.isEditMode ? 'Update' : 'Create'} category data:`, categoryData)
-      
-      if (this.isEditMode) {
-        // TODO: Integrate with update API
-        // Example: await categoriesApi.updateCategory(this.editingCategoryId, categoryData)
-        console.log('Updating category with ID:', this.editingCategoryId)
-        alert('Category updated successfully!')
-      } else {
-        // TODO: Integrate with create API
-        // Example: await categoriesApi.createCategory(categoryData)
-        alert('Category created successfully!')
-      }
-      
-      this.resetForm()
-      this.closeModal()
     },
-    
-    // Method to open modal in add mode
+
     openAddMode() {
       console.log('openAddMode called')
       this.isEditMode = false
       this.editingCategoryId = null
       this.resetForm()
       
-      // Try to show modal with a slight delay to ensure DOM is ready
       this.$nextTick(() => {
         this.showModal()
       })
     },
     
-    // Method to open modal in edit mode
     openEditMode(categoryData) {
+      console.log('Opening edit mode with data:', categoryData)
+      
       this.isEditMode = true
       this.editingCategoryId = categoryData._id || categoryData.id
       
@@ -300,22 +430,42 @@ export default {
         category_name: categoryData.category_name || '',
         description: categoryData.description || '',
         status: categoryData.status || 'active',
-        sub_categories: categoryData.sub_categories ? [...categoryData.sub_categories] : []
+        sub_categories: this.processSubCategories(categoryData.sub_categories || [])
       }
       
-      // Handle existing image if available
+      // Handle existing image
       if (categoryData.image_url) {
         this.imagePreview = categoryData.image_url
+        this.hasExistingImage = true
+        this.selectedImageFile = null
+        console.log('✅ Loaded existing image for edit')
+      } else {
+        this.clearImageData()
+        console.log('ℹ️ No existing image to load')
       }
       
       this.showModal()
     },
     
-    // Show modal
+    processSubCategories(subCategories) {
+      if (!Array.isArray(subCategories)) return []
+      
+      return subCategories.map(sub => {
+        if (typeof sub === 'string') {
+          return { name: sub, products: [] }
+        } else if (sub && typeof sub === 'object') {
+          return {
+            name: sub.name || '',
+            products: sub.products || []
+          }
+        }
+        return { name: '', products: [] }
+      })
+    },
+
     showModal() {
       const modalElement = document.getElementById('addCategoryModal')
       if (modalElement) {
-        // Check if Bootstrap is available
         if (typeof bootstrap !== 'undefined') {
           const modal = new bootstrap.Modal(modalElement)
           modal.show()
@@ -327,27 +477,28 @@ export default {
       }
     },
     
-    // Close modal
     closeModal() {
-      const modal = bootstrap.Modal.getInstance(document.getElementById('addCategoryModal'))
-      if (modal) {
-        modal.hide()
+      try {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('addCategoryModal'))
+        if (modal) {
+          modal.hide()
+        }
+      } catch (error) {
+        console.error('Error closing modal:', error)
       }
     },
     
     resetForm() {
       this.isEditMode = false
       this.editingCategoryId = null
+      this.isLoading = false
       this.formData = {
         category_name: '',
         description: '',
         status: 'active',
         sub_categories: []
       }
-      this.imagePreview = null
-      if (this.$refs.imageInput) {
-        this.$refs.imageInput.value = ''
-      }
+      this.clearImageData()
     }
   }
 }

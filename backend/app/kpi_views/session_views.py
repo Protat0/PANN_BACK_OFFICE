@@ -124,3 +124,30 @@ class SessionDisplayView(APIView):
             return Response(result, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+class CombinedLogsView(APIView):
+    """NEW: Get both session and audit logs combined"""
+    
+    def get(self, request):
+        try:
+            # Get query parameters
+            limit = int(request.query_params.get('limit', 100))
+            log_type = request.query_params.get('type', 'all')  # 'all', 'session', 'audit'
+            
+            print(f"🔍 CombinedLogsView: Getting {log_type} logs (limit: {limit})")
+            
+            # Use your existing SessionDisplay service
+            session_service = SessionDisplay()
+            result = session_service.get_combined_logs_display(limit=limit, log_type=log_type)
+            
+            print(f"✅ CombinedLogsView: Returning {len(result.get('data', []))} logs")
+            
+            return Response(result, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            print(f"❌ CombinedLogsView error: {str(e)}")
+            return Response({
+                'success': False,
+                'error': str(e),
+                'data': []
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

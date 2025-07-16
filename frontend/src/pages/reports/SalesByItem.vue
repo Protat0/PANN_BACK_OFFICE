@@ -63,14 +63,46 @@
       <div class="transaction-header">
         <h1>Transaction History</h1>
         <div class="header-actions">
+          <!-- Auto-refresh status and controls -->
+          <div class="auto-refresh-status">
+            <i class="bi bi-arrow-repeat text-success" :class="{ 'spinning': loading }"></i>
+            <span class="status-text">
+              <span v-if="autoRefreshEnabled">Updates in {{ countdown }}s</span>
+              <span v-else>Auto-refresh disabled</span>
+            </span>
+            
+            <!-- Toggle button -->
+            <button 
+              class="btn btn-sm"
+              :class="autoRefreshEnabled ? 'btn-outline-secondary' : 'btn-outline-success'"
+              @click="toggleAutoRefresh"
+            >
+              {{ autoRefreshEnabled ? 'Disable' : 'Enable' }}
+            </button>
+          </div>
+          
+          <!-- Connection health indicator -->
+          <div class="connection-indicator" :class="getConnectionStatus()">
+            <i :class="getConnectionIcon()"></i>
+            <span class="connection-text">{{ getConnectionText() }}</span>
+          </div>
+          
+          <!-- Emergency Refresh - Only show if error or connection lost -->
+          <button 
+            v-if="error || connectionLost" 
+            class="btn btn-warning" 
+            @click="emergencyReconnect"
+            :disabled="loading"
+          >
+            <i class="bi bi-arrow-clockwise" :class="{ 'spinning': loading }"></i>
+            {{ loading ? 'Reconnecting...' : 'Reconnect' }}
+          </button>
+
           <button class="btn btn-primary" @click="importData" :disabled="loading || importing">
             <i class="bi bi-upload"></i> {{ importing ? 'Importing...' : 'Import' }}
           </button>
           <button class="btn btn-success" @click="exportData" :disabled="loading || exporting">
             <i class="bi bi-download"></i> {{ exporting ? 'Exporting...' : 'Export' }}
-          </button>
-          <button class="btn btn-warning" @click="refreshData" :disabled="loading">
-            <i class="bi bi-arrow-clockwise"></i> {{ loading ? 'Loading...' : 'Refresh' }}
           </button>
         </div>
       </div>
@@ -437,7 +469,26 @@ export default {
         total_pages: 0,
         has_next: false,
         has_prev: false
-      }
+      },
+
+      autoRefreshEnabled: true,
+      autoRefreshInterval: 30000, // 30 seconds
+      baseRefreshInterval: 30000,
+      autoRefreshTimer: null,
+      countdown: 30,
+      countdownTimer: null,
+      
+      // Connection health tracking
+      connectionLost: false,
+      consecutiveErrors: 0,
+      lastSuccessfulLoad: null,
+      error: null, // Add this if it doesn't exist
+      
+      // Smart refresh rate tracking
+      recentActivity: [],
+
+
+
     };
   },
   
@@ -491,7 +542,7 @@ export default {
     // Load data sequentially - separate calls for different purposes
     try {
       console.log("1. Loading top items list...");
-      await this.getTopItems(); // For the top 5 items list only
+      await this.getTopItems();
       console.log("✅ Top items list loaded");
     } catch (error) {
       console.error("❌ Top items list failed:", error);
@@ -499,7 +550,7 @@ export default {
     
     try {
       console.log("2. Loading chart data...");
-      await this.getTopChartItems(); // For the chart only
+      await this.getTopChartItems();
       console.log("✅ Chart data loaded");
     } catch (error) {
       console.error("❌ Chart data failed:", error);
@@ -512,6 +563,16 @@ export default {
     } catch (error) {
       console.error("❌ Transaction history failed:", error);
     }
+    
+    // Start auto-refresh
+    if (this.autoRefreshEnabled) {
+      this.startAutoRefresh();
+    }
+  },
+
+  beforeUnmount() {
+    this.stopAutoRefresh();
+    console.log('🧹 Component cleanup complete');
   },
   
   // ====================================================================
@@ -566,8 +627,25 @@ export default {
             { name: 'No data available', price: '₱0.00' }
           ];
         }
+        
+        // ✅ ADD CONNECTION HEALTH TRACKING
+        this.connectionLost = false;
+        this.consecutiveErrors = 0;
+        this.lastSuccessfulLoad = Date.now();
+        this.error = null;
+        
       } catch (error) {
         console.error("❌ Error loading top items:", error);
+        
+        // ✅ ADD ERROR TRACKING
+        this.consecutiveErrors++;
+        this.error = `Failed to load top items: ${error.message}`;
+        
+        if (this.consecutiveErrors >= 3) {
+          this.connectionLost = true;
+          console.log('Connection marked as lost after 3 consecutive errors');
+        }
+        
         this.topItems = [{ name: 'Error loading data', price: '₱0.00' }];
       } finally {
         this.loadingTopItems = false;
@@ -610,6 +688,13 @@ export default {
             if (items && items.length > 0) {
               this.updateChartData(items.slice(0, 10));
               console.log("✅ Chart data updated successfully");
+              
+              // ✅ ADD CONNECTION HEALTH TRACKING
+              this.connectionLost = false;
+              this.consecutiveErrors = 0;
+              this.lastSuccessfulLoad = Date.now();
+              this.error = null;
+              
               return; // Success, exit early
             }
           } catch (chartError) {
@@ -645,6 +730,13 @@ export default {
               
               this.updateChartData(chartItems.slice(0, 10));
               console.log("✅ Fallback chart data loaded successfully");
+              
+              // ✅ ADD CONNECTION HEALTH TRACKING
+              this.connectionLost = false;
+              this.consecutiveErrors = 0;
+              this.lastSuccessfulLoad = Date.now();
+              this.error = null;
+              
               return;
             }
           } catch (fallbackError) {
@@ -654,10 +746,30 @@ export default {
         
         // If we get here, both APIs failed
         console.warn("Both chart APIs failed, using default chart");
+        
+        // ✅ ADD ERROR TRACKING
+        this.consecutiveErrors++;
+        this.error = 'Failed to load chart data';
+        
+        if (this.consecutiveErrors >= 3) {
+          this.connectionLost = true;
+          console.log('Connection marked as lost after 3 consecutive errors');
+        }
+        
         this.setDefaultChartData();
         
       } catch (error) {
         console.error("❌ Error in getTopChartItems:", error);
+        
+        // ✅ ADD ERROR TRACKING
+        this.consecutiveErrors++;
+        this.error = `Failed to load chart data: ${error.message}`;
+        
+        if (this.consecutiveErrors >= 3) {
+          this.connectionLost = true;
+          console.log('Connection marked as lost after 3 consecutive errors');
+        }
+        
         this.setDefaultChartData();
       }
     },
@@ -689,13 +801,29 @@ export default {
             has_next: false,
             has_prev: false
           };
+          
+          // ✅ ADD CONNECTION HEALTH TRACKING
+          this.connectionLost = false;
+          this.consecutiveErrors = 0;
+          this.lastSuccessfulLoad = Date.now();
+          this.error = null;
+          
           console.log("Loaded transactions:", this.transactions.length);
         } else {
           throw new Error(response?.message || 'Failed to load transaction history');
         }
       } catch (error) {
         console.error("Error loading transaction history:", error);
-        this.showError(`Failed to load transaction history: ${error.message}`);
+        
+        // ✅ ADD ERROR TRACKING
+        this.consecutiveErrors++;
+        this.error = `Failed to load transaction history: ${error.message}`;
+        
+        if (this.consecutiveErrors >= 3) {
+          this.connectionLost = true;
+          console.log('Connection marked as lost after 3 consecutive errors');
+        }
+        
         this.transactions = [];
       } finally {
         this.loading = false;
@@ -855,12 +983,35 @@ export default {
         console.log("Modal is open, preventing data refresh");
         return;
       }
-      
-      await Promise.all([
-        this.loadTransactionHistory(this.pagination.current_page, this.pagination.page_size),
-        this.getTopItems(),
-        this.getTopChartItems()
-      ]);
+
+      try {
+        this.error = null; // Clear any previous errors
+        
+        await Promise.all([
+          this.loadTransactionHistory(this.pagination.current_page, this.pagination.page_size),
+          this.getTopItems(),
+          this.getTopChartItems()
+        ]);
+        
+        // Connection health tracking - SUCCESS
+        this.connectionLost = false;
+        this.consecutiveErrors = 0;
+        this.lastSuccessfulLoad = Date.now();
+        
+        console.log('✅ Data refresh completed successfully');
+        
+      } catch (error) {
+        console.error('❌ Error refreshing data:', error);
+        
+        // Handle connection errors
+        this.consecutiveErrors++;
+        this.error = `Failed to refresh data: ${error.message}`;
+        
+        if (this.consecutiveErrors >= 3) {
+          this.connectionLost = true;
+          console.log('Connection marked as lost after 3 consecutive errors');
+        }
+      }
     },
 
     // ================================================================
@@ -1212,7 +1363,94 @@ export default {
     showError(message) {
       console.error('Error:', message);
       alert(message); // Replace with your notification system
+    },
+
+    toggleAutoRefresh() {
+      if (this.autoRefreshEnabled) {
+        this.autoRefreshEnabled = false
+        this.stopAutoRefresh()
+        console.log('Auto-refresh disabled by user')
+      } else {
+        this.autoRefreshEnabled = true
+        this.startAutoRefresh()
+        console.log('Auto-refresh enabled by user')
+      }
+    },
+    
+    startAutoRefresh() {
+      this.stopAutoRefresh() // Clear any existing timers
+      
+      // Start countdown
+      this.countdown = this.autoRefreshInterval / 1000
+      this.countdownTimer = setInterval(() => {
+        this.countdown--
+        if (this.countdown <= 0) {
+          this.countdown = this.autoRefreshInterval / 1000
+        }
+      }, 1000)
+      
+      // Start auto-refresh timer
+      this.autoRefreshTimer = setInterval(() => {
+        this.refreshData() // Use your existing refresh method
+      }, this.autoRefreshInterval)
+      
+      console.log(`Auto-refresh started (${this.autoRefreshInterval / 1000}s interval)`)
+    },
+    
+    stopAutoRefresh() {
+      if (this.autoRefreshTimer) {
+        clearInterval(this.autoRefreshTimer)
+        this.autoRefreshTimer = null
+      }
+      
+      if (this.countdownTimer) {
+        clearInterval(this.countdownTimer)
+        this.countdownTimer = null
+      }
+      
+      console.log('Auto-refresh stopped')
+    },
+
+    // Emergency reconnect method
+    async emergencyReconnect() {
+      console.log('Emergency reconnect initiated')
+      this.consecutiveErrors = 0
+      this.connectionLost = false
+      this.error = null
+      await this.refreshData()
+      
+      if (!this.autoRefreshEnabled) {
+        this.autoRefreshEnabled = true
+        this.startAutoRefresh()
+      }
+    },
+
+    // Connection status methods
+    getConnectionStatus() {
+      if (this.connectionLost) return 'connection-lost'
+      if (this.consecutiveErrors > 0) return 'connection-unstable'
+      if (this.lastSuccessfulLoad && (Date.now() - this.lastSuccessfulLoad < 60000)) return 'connection-good'
+      return 'connection-unknown'
+    },
+
+    getConnectionIcon() {
+      switch (this.getConnectionStatus()) {
+        case 'connection-good': return 'bi bi-wifi text-success'
+        case 'connection-unstable': return 'bi bi-wifi-1 text-warning'
+        case 'connection-lost': return 'bi bi-wifi-off text-danger'
+        default: return 'bi bi-wifi text-muted'
+      }
+    },
+
+    getConnectionText() {
+      switch (this.getConnectionStatus()) {
+        case 'connection-good': return 'Connected'
+        case 'connection-unstable': return 'Unstable'
+        case 'connection-lost': return 'Connection Lost'
+        default: return 'Connecting...'
+      }
     }
+
   }
 }
 </script>
@@ -2146,4 +2384,118 @@ export default {
     font-size: 13px;
   }
 }
+
+/* Auto-refresh status indicator */
+.auto-refresh-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #f0fdf4;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #bbf7d0;
+  min-width: 280px;
+}
+
+.status-text {
+  font-size: 0.875rem;
+  color: #16a34a;
+  font-weight: 500;
+  flex: 1;
+}
+
+/* Connection indicator */
+.connection-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.connection-good {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #16a34a;
+}
+
+.connection-unstable {
+  background: #fefce8;
+  border: 1px solid #fde047;
+  color: #ca8a04;
+}
+
+.connection-lost {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.connection-unknown {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+  border-radius: 0.25rem;
+}
+
+.btn-outline-secondary {
+  color: #6c757d;
+  border: 1px solid #6c757d;
+  background-color: transparent;
+}
+
+.btn-outline-secondary:hover:not(:disabled) {
+  color: #fff;
+  background-color: #6c757d;
+  border-color: #6c757d;
+}
+
+.btn-outline-success {
+  color: #10b981;
+  border: 1px solid #10b981;
+  background-color: transparent;
+}
+
+.btn-outline-success:hover:not(:disabled) {
+  color: #fff;
+  background-color: #10b981;
+  border-color: #10b981;
+}
+
+/* Spinning icon animation */
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .auto-refresh-status {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.25rem;
+    min-width: auto;
+  }
+
+  .connection-indicator {
+    order: -1;
+  }
+  
+  .header-actions {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+}
+
 </style>

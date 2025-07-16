@@ -17,7 +17,9 @@ import CategoryDetails from '@/pages/inventory/CategoryDetails.vue'
 import Promotions from '@/pages/Promotions.vue'
 import SalesByItem from '@/pages/reports/SalesByItem.vue'
 import SalesByCategory from '@/pages/reports/SalesByCategory.vue'
+import UncategorizedProducts from '@/components/categories/UncategorizedProducts.vue'
 import Logs from '@/pages/Logs.vue'
+import AllNotifications from '@/pages/notifications/AllNotifications.vue'
 
 // Auth guard function
 function requireAuth(to, from, next) {
@@ -97,9 +99,10 @@ const router = createRouter({
           component: Categories
         },
         {
-          path: 'categorydetails', // To be changed to category/:id when backend is integrated
+          path: 'category/:id', // Change this line
           name: 'Category Details',
-          component: CategoryDetails
+          component: CategoryDetails,
+          props: true
         },
         {
           path: 'home',
@@ -117,7 +120,7 @@ const router = createRouter({
           component: SalesByItem
         },
         {
-          path: 'sales-by-category',
+          path: 'salesbycategory',
           name: 'SalesByCategory',
           component: SalesByCategory
         },
@@ -130,6 +133,16 @@ const router = createRouter({
           path: 'logs',
           name: 'Logs',
           component: Logs
+        },
+        {
+          path: 'uncategorized',
+          name: 'UncategorizedProducts',
+          component: UncategorizedProducts
+        },
+        {
+          path: 'allNotifications',
+          name: 'AllNotifications',
+          component: AllNotifications
         },
       ]
     },

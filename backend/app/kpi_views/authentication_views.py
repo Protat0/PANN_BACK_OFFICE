@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.http import HttpResponse
 from ..services.auth_services import AuthService
+from ..services.session_services import SessionLogService 
 import logging
 
 # ================ AUTHENTICATION VIEWS ================
@@ -32,9 +33,13 @@ class LoginView(APIView):
 
 class LogoutView(APIView):
     def post(self, request):
-        """User logout"""
+        print("\n" + "="*50)
+        print("LOGOUT VIEW CALLED - LOOK HERE!")
+        print("="*50)
+        """User logout with session logging"""
         try:
             auth_service = AuthService()
+            session_service = SessionLogService()  # ✅ ADD THIS
             
             authorization = request.headers.get("Authorization")
             if not authorization or not authorization.startswith("Bearer "):
@@ -44,10 +49,38 @@ class LogoutView(APIView):
                 )
             
             token = authorization.split(" ")[1]
+            
+            # ✅ NEW: Get user info from token BEFORE logout
+            try:
+                # Get current user from token to get user_id
+                current_user = auth_service.get_current_user(token)
+                print(f"🔍 LOGOUT: Current user from token: {current_user}")
+                
+                if current_user and current_user.get('user_id'):
+                    user_id = str(current_user.get('user_id'))
+                    print(f"🔍 LOGOUT: Extracted user_id: {user_id}")
+                    
+                    # ✅ NEW: Log session logout BEFORE auth logout
+                    try:
+                        print(f"🔍 LOGOUT: About to call session_service.log_logout({user_id})")
+                        session_result = session_service.log_logout(user_id)
+                        print(f"✅ LOGOUT: Session logout result: {session_result}")
+                    except Exception as session_error:
+                        print(f"❌ LOGOUT: Session logout failed: {session_error}")
+                        # Continue with auth logout even if session logout fails
+                else:
+                    print(f"⚠️ LOGOUT: Could not extract user_id from token")
+                    
+            except Exception as user_error:
+                print(f"❌ LOGOUT: Could not get current user: {user_error}")
+                # Continue with auth logout even if we can't get user info
+            
+            # Do the original auth logout
             result = auth_service.logout(token)
             return Response(result, status=status.HTTP_200_OK)
         
         except Exception as e:
+            print(f"❌ LOGOUT: Auth logout failed: {str(e)}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
