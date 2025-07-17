@@ -9,7 +9,7 @@ class ProductService:
     def __init__(self):
         self.db = db_manager.get_database()
         self.product_collection = self.db.products
-        self.category_collection = self.db.categories
+        self.category_collection = self.db.category
         self.supplier_collection = self.db.suppliers
         self.branch_collection = self.db.branches
     
@@ -123,7 +123,7 @@ class ProductService:
             if category_id and ObjectId.is_valid(category_id):
                 category = self.category_collection.find_one({'_id': ObjectId(category_id)})
                 if category:
-                    category_prefix = category.get('name', 'PROD')[:4].upper()
+                    category_prefix = category.get('category_name', 'PROD')[:4].upper()
             
             # Get product name prefix
             name_prefix = ''.join(product_name.split()[:2])[:4].upper()
@@ -1008,9 +1008,13 @@ class ProductService:
                         if field in product_data:
                             try:
                                 if field in ['stock', 'low_stock_threshold']:
-                                    product_data[field] = int(product_data[field])
+                                        product_data[field] = int(product_data[field])
                                 else:
-                                    product_data[field] = float(product_data[field])
+                                        # Handle price fields with currency symbols
+                                        price_str = str(product_data[field])
+                                        # Remove peso symbol, commas, and whitespace
+                                        clean_price = price_str.replace('₱', '').replace(',', '').strip()
+                                        product_data[field] = float(clean_price)
                             except (ValueError, TypeError):
                                 product_data[field] = 0
                     
@@ -1143,7 +1147,7 @@ class ProductService:
                         # Handle category/supplier name to ID conversion
                         if expected_field == 'category_id' and not ObjectId.is_valid(str(value)):
                             # Look up category by name
-                            category = self.category_collection.find_one({'name': {'$regex': f'^{value}$', '$options': 'i'}})
+                            category = self.category_collection.find_one({'category_name': {'$regex': f'^{value}$', '$options': 'i'}})
                             product_data[expected_field] = str(category['_id']) if category else None
                         elif expected_field == 'supplier_id' and not ObjectId.is_valid(str(value)):
                             # Look up supplier by name

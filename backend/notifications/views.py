@@ -392,7 +392,7 @@ def user_notifications(request, user_id):
 
 @api_view(['GET'])
 def recent_notifications(request):
-    """Get recent notifications (last 24 hours or last 10 notifications)"""
+    """Get recent notifications with archive support"""
     try:
         # Get last 10 recent notifications by default
         limit = int(request.query_params.get('limit', 10))
@@ -400,9 +400,13 @@ def recent_notifications(request):
         # Optional: filter by time (last 24 hours)
         hours = request.query_params.get('hours')
         
+        # Archive parameter - ADDED archive support
+        include_archived = request.query_params.get('include_archived', 'false').lower() == 'true'
+        
         notifications = notification_service.get_recent_notifications(
             limit=limit,
-            hours=int(hours) if hours else None
+            hours=int(hours) if hours else None,
+            include_archived=include_archived  # ✅ ADDED: Archive support
         )
         
         return Response({
@@ -420,7 +424,7 @@ def recent_notifications(request):
 
 @api_view(['GET'])
 def all_notifications(request):
-    """Get all notifications (paginated)"""
+    """Get all notifications (paginated) with archive support"""
     try:
         print("🔄 All notifications endpoint called")
         
@@ -428,15 +432,18 @@ def all_notifications(request):
         page = int(request.query_params.get('page', 1))
         limit = int(request.query_params.get('limit', 50))
         
+        # Archive parameter - FIXED to support archived notifications
+        include_archived = request.query_params.get('include_archived', 'false').lower() == 'true'
+        
         # Calculate skip for pagination
         skip = (page - 1) * limit
         
-        print(f"📊 Fetching page {page}, limit {limit}, skip {skip}")
+        print(f"📊 Fetching page {page}, limit {limit}, skip {skip}, include_archived: {include_archived}")
         
         notifications, total_count = notification_service.get_all_notifications(
             skip=skip,
             limit=limit,
-            include_archived=False  # Add this parameter
+            include_archived=include_archived  # ✅ FIXED: Now properly passes the parameter
         )
         
         print(f"✅ Found {len(notifications)} notifications, total: {total_count}")
@@ -466,6 +473,7 @@ def all_notifications(request):
             'success': False,
             'message': f'Error retrieving all notifications: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     
 @api_view(['DELETE'])
 def delete_notification(request, notification_id):

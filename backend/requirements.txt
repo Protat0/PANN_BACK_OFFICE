@@ -54,3 +54,19 @@ openpyxl>=3.0.0
 # pytest-django==4.8.0
 # black==23.12.1
 # flake8==7.0.0
+
+# Production Server (Optional)
+# Uncomment for production deployment
+# gunicorn==21.2.0
+ whitenoise==6.6.0
+
+# Payment Integration (Future)
+# Add when implementing PayMongo/HitPay
+# requests==2.31.0
+# stripe==7.12.0
+
+# Email & SMS (Future)
+# Add when implementing notifications
+# sendgrid==6.11.0
+# twilio==8.12.0
+

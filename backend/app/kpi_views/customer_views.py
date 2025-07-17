@@ -5,9 +5,53 @@ from django.http import HttpResponse
 from ..services.customer_service import CustomerService
 import logging
 
+def get_authenticated_user_from_jwt(request):
+    """Helper function to get authenticated user with proper username from JWT token"""
+    try:
+        authorization = request.headers.get("Authorization")
+        if not authorization or not authorization.startswith("Bearer "):
+            return None
+        
+        token = authorization.split(" ")[1]
+        
+        from ..services.auth_services import AuthService
+        from bson import ObjectId
+        
+        auth_service = AuthService()
+        user_data = auth_service.get_current_user(token)
+        
+        if not user_data:
+            return None
+        
+        user_id = user_data.get('user_id')
+        user_doc = auth_service.user_collection.find_one({"_id": ObjectId(user_id)})
+        
+        if not user_doc:
+            return None
+        
+        actual_username = user_doc.get('username')
+        if actual_username and actual_username.strip():
+            display_username = actual_username
+        else:
+            display_username = user_doc.get('email', 'unknown')
+        
+        return {
+            "user_id": user_id,
+            "username": display_username,
+            "email": user_doc.get('email'),
+            "branch_id": 1,
+            "role": user_doc.get('role', 'admin'),
+            "ip_address": request.META.get('REMOTE_ADDR'),
+            "user_agent": request.META.get('HTTP_USER_AGENT')
+        }
+        
+    except Exception as e:
+        print(f"JWT Auth helper error: {e}")
+        return None
+
 class CustomerListView(APIView):
     def get(self, request):
-        """Get all customers"""
+        """Get all customers - No changes needed"""
         try:
             customer_service = CustomerService()
             customers = customer_service.get_all_customers()
@@ -19,11 +63,23 @@ class CustomerListView(APIView):
             )
     
     def post(self, request):
-        """Create new customer"""
+        """Create new customer - UPDATED with JWT auth"""
         try:
+            # ✅ ADD: Get authenticated user from JWT
+            current_user = get_authenticated_user_from_jwt(request)
+            
+            if not current_user:
+                return Response(
+                    {"error": "Authentication required"}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
             customer_service = CustomerService()
             customer_data = request.data
-            new_customer = customer_service.create_customer(customer_data)
+            
+            # ✅ UPDATED: Pass current_user to service
+            new_customer = customer_service.create_customer(customer_data, current_user)
+            
             return Response(new_customer, status=status.HTTP_201_CREATED)
         except Exception as e:
             return Response(
@@ -33,7 +89,7 @@ class CustomerListView(APIView):
 
 class CustomerDetailView(APIView):
     def get(self, request, customer_id):
-        """Get customer by ID"""
+        """Get customer by ID - No changes needed"""
         try:
             customer_service = CustomerService()
             customer = customer_service.get_customer_by_id(customer_id)
@@ -50,11 +106,23 @@ class CustomerDetailView(APIView):
             )
     
     def put(self, request, customer_id):
-        """Update customer"""
+        """Update customer - UPDATED with JWT auth"""
         try:
+            # ✅ ADD: Get authenticated user from JWT
+            current_user = get_authenticated_user_from_jwt(request)
+            
+            if not current_user:
+                return Response(
+                    {"error": "Authentication required"}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
             customer_service = CustomerService()
             customer_data = request.data
-            updated_customer = customer_service.update_customer(customer_id, customer_data)
+            
+            # ✅ UPDATED: Pass current_user to service
+            updated_customer = customer_service.update_customer(customer_id, customer_data, current_user)
+            
             if updated_customer:
                 return Response(updated_customer, status=status.HTTP_200_OK)
             return Response(
@@ -68,10 +136,22 @@ class CustomerDetailView(APIView):
             )
     
     def delete(self, request, customer_id):
-        """Delete customer"""
+        """Delete customer - UPDATED with JWT auth"""
         try:
+            # ✅ ADD: Get authenticated user from JWT
+            current_user = get_authenticated_user_from_jwt(request)
+            
+            if not current_user:
+                return Response(
+                    {"error": "Authentication required"}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
             customer_service = CustomerService()
-            deleted = customer_service.delete_customer(customer_id)
+            
+            # ✅ UPDATED: Pass current_user to service
+            deleted = customer_service.delete_customer(customer_id, current_user)
+            
             if deleted:
                 return Response(
                     {"message": "Customer deleted successfully"}, 
@@ -86,6 +166,7 @@ class CustomerDetailView(APIView):
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
 
 # ================ Customer KPI Views ================
 class ActiveCustomerKPIView(APIView):

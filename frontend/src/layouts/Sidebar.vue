@@ -174,13 +174,13 @@
           <!-- Reports Submenu -->
           <ul class="nav-submenu" v-if="showReportsSubmenu && !isCollapsed">
             <li class="nav-subitem">
-              <router-link to="/reports/sales-by-items" class="nav-sublink">
+              <router-link to="/salesbyitem" class="nav-sublink">
                 <TrendingUp :size="16" class="nav-subicon" />
                 Sales By Items
               </router-link>
             </li>
             <li class="nav-subitem">
-              <router-link to="/reports/sales-by-categories" class="nav-sublink">
+              <router-link to="/salesbycategory" class="nav-sublink">
                 <PieChart :size="16" class="nav-subicon" />
                 Sales By Categories
               </router-link>
@@ -208,24 +208,29 @@
       <button 
         class="btn btn-delete btn-md w-100"
         @click="handleLogout"
+        :disabled="isLoggingOut"
         v-if="!isCollapsed"
       >
-        <LogOut :size="16" />
-        Logout
+        <div v-if="isLoggingOut" class="loading-spinner"></div>
+        <LogOut :size="16" v-else />
+        {{ isLoggingOut ? 'Logging out...' : 'Logout' }}
       </button>
       <button 
         class="btn btn-delete btn-icon-only btn-md"
         @click="handleLogout"
+        :disabled="isLoggingOut"
         v-else
         title="Logout"
       >
-        <LogOut :size="16" />
+        <div v-if="isLoggingOut" class="loading-spinner"></div>
+        <LogOut :size="16" v-else />
       </button>
     </div>
   </div>
 </template>
 
 <script>
+import apiService from '../services/api.js'
 import { 
   LayoutDashboard,
   Package,
@@ -273,7 +278,8 @@ export default {
     return {
       isCollapsed: false,
       showInventorySubmenu: false,
-      showReportsSubmenu: false
+      showReportsSubmenu: false,
+      isLoggingOut: false
     }
   },
   methods: {
@@ -295,15 +301,145 @@ export default {
       return this.$route.path.startsWith(route)
     },
     
-    handleLogout() {
-      // Add your logout logic here
+    async handleLogout() {
       const confirmed = confirm('Are you sure you want to logout?')
       if (confirmed) {
-        // Clear authentication
-        localStorage.removeItem('auth_token')
-        // Redirect to login
-        this.$router.push('/login')
+        this.isLoggingOut = true
+        
+        try {
+          await this.callLogoutAPI()
+          console.log('Logout API call successful')
+        } catch (error) {
+          console.error('Logout API error:', error)
+          // Continue with local logout even if API fails
+        } finally {
+          this.performLocalLogout()
+        }
       }
+    },
+    
+    async callLogoutAPI() {
+      const token = this.getStoredToken()
+      
+      if (!token) {
+        console.warn('No token found for logout')
+        return
+      }
+      
+      console.log('Calling logout API using apiService...')
+      
+      try {
+        // ✅ Use the API service (same pattern as login)
+        const result = await apiService.logout()
+        console.log('Logout successful via apiService:', result)
+        return result
+      } catch (error) {
+        console.error('API service logout error:', error)
+        throw error
+      }
+    },
+    
+    getStoredToken() {
+      // Debug: Log all localStorage keys to see what's actually stored
+      console.log('All localStorage keys:', Object.keys(localStorage))
+      console.log('All sessionStorage keys:', Object.keys(sessionStorage))
+      
+      // Try different possible token storage keys (reordered to match login)
+      const possibleKeys = [
+        'authToken',        // Login.vue uses this
+        'access_token',
+        'auth_token', 
+        'token',
+        'accessToken',
+        'jwt_token',
+        'bearer_token',
+        'user_token'
+      ]
+      
+      for (const key of possibleKeys) {
+        const token = localStorage.getItem(key) || sessionStorage.getItem(key)
+        if (token) {
+          console.log(`Found token with key: ${key}`, token.substring(0, 20) + '...')
+          return token
+        }
+      }
+      
+      console.log('No token found in any storage location')
+      return null
+    },
+    
+    performLocalLogout() {
+      console.log('Performing local logout...')
+      
+      // Clear ALL localStorage and sessionStorage to be absolutely sure
+      console.log('Before clearing - localStorage length:', localStorage.length)
+      console.log('Before clearing - sessionStorage length:', sessionStorage.length)
+      
+      // Method 1: Clear specific auth keys
+      const authKeys = [
+        'access_token', 'refresh_token', 'auth_token', 'token',
+        'accessToken', 'refreshToken', 'authToken', 'userToken',
+        'jwt_token', 'bearer_token', 'user_token',
+        'user_data', 'user_info', 'user', 'userData', 'userInfo',
+        'isAuthenticated', 'isLoggedIn', 'authState'
+      ]
+      
+      authKeys.forEach(key => {
+        const hadLocal = localStorage.getItem(key) !== null
+        const hadSession = sessionStorage.getItem(key) !== null
+        
+        localStorage.removeItem(key)
+        sessionStorage.removeItem(key)
+        
+        if (hadLocal || hadSession) {
+          console.log(`Cleared key: ${key}`)
+        }
+      })
+      
+      // Method 2: Nuclear option - clear everything (comment out if too aggressive)
+      // localStorage.clear()
+      // sessionStorage.clear()
+      
+      console.log('After clearing - localStorage length:', localStorage.length)
+      console.log('After clearing - sessionStorage length:', sessionStorage.length)
+      
+      // Clear any global state if using Vuex/Pinia
+      if (this.$store && this.$store.dispatch) {
+        try {
+          this.$store.dispatch('auth/logout')
+          this.$store.dispatch('auth/clearAuth')
+          this.$store.dispatch('user/logout')
+          console.log('Cleared store state')
+        } catch (e) {
+          console.log('No auth store found or dispatch failed:', e.message)
+        }
+      }
+      
+      // Reset component state
+      this.isLoggingOut = false
+      
+      // Use Vue router for smooth navigation
+      console.log('Redirecting to login...')
+      this.$router.push('/login').catch(err => {
+        // Handle navigation failures (e.g., already on login page)
+        console.log('Navigation to login:', err.message)
+      })
+    },
+    
+    // Helper method to get CSRF token if needed
+    getCsrfToken() {
+      // Get CSRF token from meta tag or cookie
+      const metaToken = document.querySelector('meta[name="csrf-token"]')
+      if (metaToken) {
+        return metaToken.getAttribute('content')
+      }
+      
+      // Alternative: get from cookie
+      const cookieValue = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('csrftoken='))
+      
+      return cookieValue ? cookieValue.split('=')[1] : null
     }
   },
   
@@ -643,6 +779,32 @@ export default {
   border-top: 1px solid var(--neutral);
   background-color: white;
   flex-shrink: 0;
+}
+
+/* Loading Spinner */
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Disabled state for logout button */
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn:disabled:hover {
+  transform: none;
+  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.08);
 }
 
 /* Collapsed State Adjustments */

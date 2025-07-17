@@ -37,6 +37,24 @@ class NotificationsAPI {
     }
   }
 
+  async DisplayNotifs(params = {}) {
+    try {
+        console.log("This API call is getting All the Notifications");
+        
+        // Add include_archived=true to get ALL notifications for total count
+        const response = await api.get('/notifications/all/?include_archived=true');
+        
+        // Log the response structure for debugging
+        console.log('API response structure:', response);
+        
+        // Return the response directly since it already has the correct structure
+        return response.data;
+        
+    } catch (error) {
+        console.error("Error fetching all notifications:", error);
+        throw error;
+    }
+  }
 
 
 }
