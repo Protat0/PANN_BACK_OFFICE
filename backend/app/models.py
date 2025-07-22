@@ -410,3 +410,60 @@ class SalesLog:
     
     def __repr__(self):
         return f"SalesLog(_id={self._id}, total_amount={self.total_amount}, status={self.status})"
+    
+class Promotions:
+    def __init__(self, **kwargs):
+        self._id = kwargs.get('_id', ObjectId())
+        self.promotion_name = kwargs.get('promotion_name', '')
+        self.discount_type = kwargs.get('discount_type', '')
+        self.discount_value = kwargs.get('discount_value', 0)
+        self.applicable_products = kwargs.get('applicable_products', [])  
+        self.start_date = kwargs.get('start_date', None)
+        self.end_date = kwargs.get('end_date', None)
+        self.status = kwargs.get('status', 'active')
+        self.date_created = kwargs.get('date_created', datetime.utcnow())
+        self.last_updated = kwargs.get('last_updated', datetime.utcnow())
+        
+        # ✅ ADD: Soft delete fields
+        self.isDeleted = kwargs.get('isDeleted', False)
+        self.deleted_at = kwargs.get('deleted_at', None)
+        self.restored_at = kwargs.get('restored_at', None)
+
+    def to_dict(self):
+        return {
+            '_id': self._id,
+            'promotion_name': self.promotion_name,
+            'discount_type': self.discount_type,
+            'discount_value': self.discount_value,
+            'applicable_products': self.applicable_products,
+            'start_date': self.start_date,
+            'end_date': self.end_date,
+            'status': self.status,
+            'date_created': self.date_created,
+            'last_updated': self.last_updated,
+            'isDeleted': self.isDeleted,
+            'deleted_at': self.deleted_at,
+            'restored_at': self.restored_at
+        }
+
+    # ✅ ADD: Helper methods for soft delete functionality
+    def soft_delete(self):
+        """Mark promotion as soft deleted"""
+        self.isDeleted = True
+        self.deleted_at = datetime.utcnow()
+        self.last_updated = datetime.utcnow()
+
+    def restore(self):
+        """Restore soft deleted promotion"""
+        self.isDeleted = False
+        self.deleted_at = None
+        self.restored_at = datetime.utcnow()
+        self.last_updated = datetime.utcnow()
+
+    def is_deleted(self):
+        """Check if promotion is soft deleted"""
+        return self.isDeleted
+
+    def is_active(self):
+        """Check if promotion is active (not deleted and status is active)"""
+        return not self.isDeleted and self.status == 'active'

@@ -115,6 +115,16 @@ from .views import (
     
 )
 
+from .kpi_views.promotion_views import (
+    PromotionHealthCheckView,
+    PromotionListView,
+    PromotionDetailView,
+    PromotionByNameView,
+    PromotionRestoreView,
+    PromotionDeletedListView,
+    PromotionHardDeleteView,
+)
+
 urlpatterns = [
     path('', SystemStatusView.as_view(), name='system-status'),  # Root endpoint
     path('health/', HealthCheckView.as_view(), name='health-check'),
@@ -244,6 +254,15 @@ urlpatterns = [
     path('reports/top-chart-item/', SalesTopItemChartView.as_view(), name='top-chart-items'), 
     path('reports/item-history/', SalesItemHistoryView.as_view(), name='item-history'),
 
+    # Promotion
+    path('promotions/health/', PromotionHealthCheckView.as_view(), name='promotion-health'),  # ✅ CHANGED: promotions/health/
+    path('promotions/', PromotionListView.as_view(), name='promotion-list'),  # ✅ CHANGED: promotions/
+    path('promotions/<str:promotion_id>/', PromotionDetailView.as_view(), name='promotion-detail'),  # ✅ CHANGED: promotions/
+    path('promotions/<str:promotion_id>/hard-delete/', PromotionHardDeleteView.as_view(), name='promotion-hard-delete'),  # ✅ CHANGED: promotions/
+    path('promotions/<str:promotion_id>/restore/', PromotionRestoreView.as_view(), name='promotion-restore'),  # ✅ CHANGED: promotions/
+    path('promotions/deleted/', PromotionDeletedListView.as_view(), name='promotion-deleted-list'),  # ✅ CHANGED: promotions/deleted/
+    path('promotions/by-name/<str:promotion_name>/', PromotionByNameView.as_view(), name='promotion-by-name'),  # ✅ CHANGED: promotions/by-name/
+    
     # API Documentation
     path('docs/', APIDocumentationView.as_view(), name='api-documentation'),
 ]

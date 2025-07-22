@@ -1,279 +1,349 @@
 <template>
   <div class="modal fade" id="addPromoModal" tabindex="-1" aria-labelledby="addPromoModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="addPromoModalLabel">{{ modalTitle }}</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addPromoModalLabel">{{ modalTitle }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Error Alert -->
+        <div v-if="error" class="alert alert-danger" role="alert">
+          <strong>Error:</strong> {{ error }}
         </div>
-        <div class="modal-body">
-          <!-- Modal content based on mode -->
-          <div v-if="mode === 'add'" class="add-mode">
-            <form @submit.prevent="savePromotion">
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Promotion Name <span class="text-danger">*</span></label>
+
+        <!-- Loading Overlay -->
+        <div v-if="loading" class="loading-overlay">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+
+        <!-- Modal content based on mode -->
+        <div v-if="mode === 'add'" class="add-mode">
+          <form @submit.prevent="savePromotion">
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Promotion Name <span class="text-danger">*</span></label>
+                <input 
+                  type="text" 
+                  class="form-control" 
+                  v-model="formData.promotion_name"
+                  :disabled="loading"
+                  placeholder="Enter promotion name"
+                  required
+                >
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Discount Type <span class="text-danger">*</span></label>
+                <select class="form-select" v-model="formData.discount_type" :disabled="loading" required>
+                  <option value="">Select discount type</option>
+                  <option value="percentage">Percentage</option>
+                  <option value="fixed">Fixed Amount</option>
+                  <option value="buy_one_get_one">Buy One Get One (BOGO)</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Discount Value <span class="text-danger">*</span></label>
+                <div class="input-group">
                   <input 
-                    type="text" 
+                    type="number" 
                     class="form-control" 
-                    v-model="formData.promotion_name"
-                    placeholder="Enter promotion name"
+                    v-model="formData.discount_value"
+                    :disabled="loading"
+                    :placeholder="formData.discount_type === 'percentage' ? 'Enter percentage (e.g., 20)' : 'Enter amount (e.g., 50)'"
+                    :min="formData.discount_type === 'percentage' ? 1 : 0"
+                    :max="formData.discount_type === 'percentage' ? 100 : undefined"
+                    step="0.01"
                     required
                   >
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Discount Type <span class="text-danger">*</span></label>
-                  <select class="form-select" v-model="formData.discount_type" required>
-                    <option value="">Select discount type</option>
-                    <option value="percentage">Percentage</option>
-                    <option value="fixed">Fixed Amount</option>
-                    <option value="buy_one_get_one">Buy One Get One (BOGO)</option>
-                  </select>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Discount Value <span class="text-danger">*</span></label>
-                  <div class="input-group">
-                    <input 
-                      type="number" 
-                      class="form-control" 
-                      v-model="formData.discount_value"
-                      :placeholder="formData.discount_type === 'percentage' ? 'Enter percentage (e.g., 20)' : 'Enter amount (e.g., 50)'"
-                      :min="formData.discount_type === 'percentage' ? 1 : 0"
-                      :max="formData.discount_type === 'percentage' ? 100 : undefined"
-                      step="0.01"
-                      required
-                    >
-                    <span class="input-group-text">
-                      {{ formData.discount_type === 'percentage' ? '%' : '₱' }}
-                    </span>
-                  </div>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Status</label>
-                  <select class="form-select" v-model="formData.status">
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="scheduled">Scheduled</option>
-                  </select>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Start Date <span class="text-danger">*</span></label>
-                  <div class="date-picker-wrapper">
-                    <VueDatePicker 
-                      v-model="formData.start_date"
-                      :enable-time-picker="false"
-                      format="MM/dd/yyyy"
-                      placeholder="Select start date"
-                      :min-date="new Date()"
-                      class="custom-datepicker"
-                      required
-                    />
-                  </div>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">End Date <span class="text-danger">*</span></label>
-                  <div class="date-picker-wrapper">
-                    <VueDatePicker 
-                      v-model="formData.end_date"
-                      :enable-time-picker="false"
-                      format="MM/dd/yyyy"
-                      placeholder="Select end date"
-                      :min-date="formData.start_date || new Date()"
-                      class="custom-datepicker"
-                      required
-                    />
-                  </div>
-                </div>
-                <div class="col-12 mb-3">
-                  <label class="form-label">Affected Products <span class="text-danger">*</span></label>
-                  <select class="form-select" v-model="formData.affected_products" required>
-                    <option value="">Select product category</option>
-                    <option value="all">All Products</option>
-                    <option value="noodles">Noodles</option>
-                    <option value="drinks">Drinks</option>
-                    <option value="toppings">Toppings</option>
-                  </select>
-                  <small class="form-text text-muted">Choose which category of products this promotion applies to</small>
+                  <span class="input-group-text">
+                    {{ formData.discount_type === 'percentage' ? '%' : '₱' }}
+                  </span>
                 </div>
               </div>
-            </form>
-          </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Status</label>
+                <select class="form-select" v-model="formData.status" :disabled="loading">
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="scheduled">Scheduled</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                <div class="date-picker-wrapper">
+                  <VueDatePicker 
+                    v-model="formData.start_date"
+                    :enable-time-picker="false"
+                    :disabled="loading"
+                    format="MM/dd/yyyy"
+                    placeholder="Select start date"
+                    :min-date="new Date()"
+                    class="custom-datepicker"
+                    required
+                  />
+                </div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">End Date <span class="text-danger">*</span></label>
+                <div class="date-picker-wrapper">
+                  <VueDatePicker 
+                    v-model="formData.end_date"
+                    :enable-time-picker="false"
+                    :disabled="loading"
+                    format="MM/dd/yyyy"
+                    placeholder="Select end date"
+                    :min-date="formData.start_date || new Date()"
+                    class="custom-datepicker"
+                    required
+                  />
+                </div>
+              </div>
+              <div class="col-12 mb-3">
+                <label class="form-label">Affected Products <span class="text-danger">*</span></label>
+                <select class="form-select" v-model="formData.affected_products" :disabled="loading" required>
+                  <option value="">Select product category</option>
+                  <option value="all">All Products</option>
+                  <option 
+                    v-for="category in availableCategories" 
+                    :key="category._id" 
+                    :value="category._id"
+                  >
+                    {{ category.category_name }}
+                    <small v-if="category.description"> - {{ category.description }}</small>
+                  </option>
+                </select>
+                <small class="form-text text-muted">
+                  Choose which category of products this promotion applies to
+                  <span v-if="availableCategories.length === 0" class="text-warning">
+                    (Loading categories...)
+                  </span>
+                </small>
+              </div>
+            </div>
+          </form>
+        </div>
 
-          <div v-if="mode === 'edit'" class="edit-mode">
-            <form @submit.prevent="updatePromotion">
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Promotion Name <span class="text-danger">*</span></label>
+        <div v-if="mode === 'edit'" class="edit-mode">
+          <form @submit.prevent="updatePromotion">
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Promotion Name <span class="text-danger">*</span></label>
+                <input 
+                  type="text" 
+                  class="form-control" 
+                  v-model="formData.promotion_name"
+                  :disabled="loading"
+                  placeholder="Enter promotion name"
+                  required
+                >
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Discount Type <span class="text-danger">*</span></label>
+                <select class="form-select" v-model="formData.discount_type" :disabled="loading" required>
+                  <option value="">Select discount type</option>
+                  <option value="percentage">Percentage</option>
+                  <option value="fixed">Fixed Amount</option>
+                  <option value="buy_one_get_one">Buy One Get One (BOGO)</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Discount Value <span class="text-danger">*</span></label>
+                <div class="input-group">
                   <input 
-                    type="text" 
+                    type="number" 
                     class="form-control" 
-                    v-model="formData.promotion_name"
-                    placeholder="Enter promotion name"
+                    v-model="formData.discount_value"
+                    :disabled="loading"
+                    :placeholder="formData.discount_type === 'percentage' ? 'Enter percentage (e.g., 20)' : 'Enter amount (e.g., 50)'"
+                    :min="formData.discount_type === 'percentage' ? 1 : 0"
+                    :max="formData.discount_type === 'percentage' ? 100 : undefined"
+                    step="0.01"
                     required
                   >
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Discount Type <span class="text-danger">*</span></label>
-                  <select class="form-select" v-model="formData.discount_type" required>
-                    <option value="">Select discount type</option>
-                    <option value="percentage">Percentage</option>
-                    <option value="fixed">Fixed Amount</option>
-                    <option value="buy_one_get_one">Buy One Get One (BOGO)</option>
-                  </select>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Discount Value <span class="text-danger">*</span></label>
-                  <div class="input-group">
-                    <input 
-                      type="number" 
-                      class="form-control" 
-                      v-model="formData.discount_value"
-                      :placeholder="formData.discount_type === 'percentage' ? 'Enter percentage (e.g., 20)' : 'Enter amount (e.g., 50)'"
-                      :min="formData.discount_type === 'percentage' ? 1 : 0"
-                      :max="formData.discount_type === 'percentage' ? 100 : undefined"
-                      step="0.01"
-                      required
-                    >
-                    <span class="input-group-text">
-                      {{ formData.discount_type === 'percentage' ? '%' : '₱' }}
-                    </span>
-                  </div>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Status</label>
-                  <select class="form-select" v-model="formData.status">
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="expired">Expired</option>
-                    <option value="scheduled">Scheduled</option>
-                  </select>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Start Date <span class="text-danger">*</span></label>
-                  <div class="date-picker-wrapper">
-                    <VueDatePicker 
-                      v-model="formData.start_date"
-                      :enable-time-picker="false"
-                      format="MM/dd/yyyy"
-                      placeholder="Select start date"
-                      :min-date="new Date()"
-                      class="custom-datepicker"
-                      required
-                    />
-                  </div>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">End Date <span class="text-danger">*</span></label>
-                  <div class="date-picker-wrapper">
-                    <VueDatePicker 
-                      v-model="formData.end_date"
-                      :enable-time-picker="false"
-                      format="MM/dd/yyyy"
-                      placeholder="Select end date"
-                      :min-date="formData.start_date || new Date()"
-                      class="custom-datepicker"
-                      required
-                    />
-                  </div>
+                  <span class="input-group-text">
+                    {{ formData.discount_type === 'percentage' ? '%' : '₱' }}
+                  </span>
                 </div>
               </div>
-            </form>
-          </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Status</label>
+                <select class="form-select" v-model="formData.status" :disabled="loading">
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                  <option value="expired">Expired</option>
+                  <option value="scheduled">Scheduled</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                <div class="date-picker-wrapper">
+                  <VueDatePicker 
+                    v-model="formData.start_date"
+                    :enable-time-picker="false"
+                    :disabled="loading"
+                    format="MM/dd/yyyy"
+                    placeholder="Select start date"
+                    :min-date="new Date()"
+                    class="custom-datepicker"
+                    required
+                  />
+                </div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">End Date <span class="text-danger">*</span></label>
+                <div class="date-picker-wrapper">
+                  <VueDatePicker 
+                    v-model="formData.end_date"
+                    :enable-time-picker="false"
+                    :disabled="loading"
+                    format="MM/dd/yyyy"
+                    placeholder="Select end date"
+                    :min-date="formData.start_date || new Date()"
+                    class="custom-datepicker"
+                    required
+                  />
+                </div>
+              </div>
+              <div class="col-12 mb-3">
+                <label class="form-label">Affected Products <span class="text-danger">*</span></label>
+                <select class="form-select" v-model="formData.affected_products" :disabled="loading" required>
+                  <option value="">Select product category</option>
+                  <option value="all">All Products</option>
+                  <option 
+                    v-for="category in availableCategories" 
+                    :key="category._id" 
+                    :value="category._id"
+                  >
+                    {{ category.category_name }}
+                    <small v-if="category.description"> - {{ category.description }}</small>
+                  </option>
+                </select>
+                <small class="form-text text-muted">
+                  Choose which category of products this promotion applies to
+                  <span v-if="availableCategories.length === 0" class="text-warning">
+                    (Loading categories...)
+                  </span>
+                </small>
+              </div>
+            </div>
+          </form>
+        </div>
 
-          <div v-if="mode === 'view'" class="view-mode">
-            <p class="text-tertiary-medium">View promotion details...</p>
-            <div class="promotion-details" v-if="selectedPromotion">
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">Promotion Name</label>
-                  <div class="form-control-plaintext">{{ selectedPromotion.promotion_name }}</div>
+        <div v-if="mode === 'view'" class="view-mode">
+          <p class="text-tertiary-medium">View promotion details...</p>
+          <div class="promotion-details" v-if="selectedPromotion">
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label text-tertiary-dark fw-semibold">Promotion Name</label>
+                <div class="form-control-plaintext">{{ selectedPromotion.promotion_name }}</div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label text-tertiary-dark fw-semibold">Discount Type</label>
+                <div class="form-control-plaintext">
+                  <span :class="getDiscountTypeBadgeClass(selectedPromotion.discount_type)" class="badge">
+                    {{ formatDiscountType(selectedPromotion.discount_type) }}
+                  </span>
                 </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">Discount Type</label>
-                  <div class="form-control-plaintext">
-                    <span :class="getDiscountTypeBadgeClass(selectedPromotion.discount_type)" class="badge">
-                      {{ formatDiscountType(selectedPromotion.discount_type) }}
-                    </span>
-                  </div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label text-tertiary-dark fw-semibold">Discount Value</label>
+                <div class="form-control-plaintext">{{ formatDiscountValue(selectedPromotion.discount_value, selectedPromotion.discount_type) }}</div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label text-tertiary-dark fw-semibold">Status</label>
+                <div class="form-control-plaintext">
+                  <span :class="getStatusBadgeClass(selectedPromotion.status)" class="badge">
+                    {{ formatStatus(selectedPromotion.status) }}
+                  </span>
                 </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">Discount Value</label>
-                  <div class="form-control-plaintext">{{ formatDiscountValue(selectedPromotion.discount_value, selectedPromotion.discount_type) }}</div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label text-tertiary-dark fw-semibold">Start Date</label>
+                <div class="form-control-plaintext">{{ formatDate(selectedPromotion.start_date) }}</div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label text-tertiary-dark fw-semibold">End Date</label>
+                <div class="form-control-plaintext">{{ formatDate(selectedPromotion.end_date) }}</div>
+              </div>
+              <div class="col-12 mb-3">
+                <label class="form-label text-tertiary-dark fw-semibold">Affected Products</label>
+                <div class="form-control-plaintext">
+                  <span class="badge bg-info text-white">
+                    {{ formatAffectedProducts(selectedPromotion.applicable_products) }}
+                  </span>
                 </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">Status</label>
-                  <div class="form-control-plaintext">
-                    <span :class="getStatusBadgeClass(selectedPromotion.status)" class="badge">
-                      {{ formatStatus(selectedPromotion.status) }}
-                    </span>
-                  </div>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">Start Date</label>
-                  <div class="form-control-plaintext">{{ formatDate(selectedPromotion.start_date) }}</div>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">End Date</label>
-                  <div class="form-control-plaintext">{{ formatDate(selectedPromotion.end_date) }}</div>
-                </div>
-                <div class="col-12 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">Affected Products</label>
-                  <div class="form-control-plaintext">
-                    <span class="badge bg-info text-white">
-                      {{ formatAffectedProducts(selectedPromotion.applicable_products) }}
-                    </span>
-                  </div>
-                </div>
-                <div class="col-12 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">Last Updated</label>
-                  <div class="form-control-plaintext">{{ formatDateTime(selectedPromotion.last_updated) }}</div>
-                </div>
+              </div>
+              <div class="col-12 mb-3">
+                <label class="form-label text-tertiary-dark fw-semibold">Last Updated</label>
+                <div class="form-control-plaintext">{{ formatDateTime(selectedPromotion.last_updated) }}</div>
               </div>
             </div>
           </div>
         </div>
-        <div class="modal-footer">
-          <!-- Add Mode Footer -->
-          <template v-if="mode === 'add'">
-            <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Cancel</button>
-            <button type="button" class="btn btn-save" @click="savePromotion">Save Promotion</button>
-          </template>
+      </div>
+      <div class="modal-footer">
+        <!-- Add Mode Footer -->
+        <template v-if="mode === 'add'">
+          <button type="button" class="btn btn-cancel" :disabled="loading" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-save" :disabled="loading" @click="savePromotion">
+            <span v-if="loading" class="spinner-border spinner-border-sm me-2" role="status"></span>
+            {{ loading ? 'Saving...' : 'Save Promotion' }}
+          </button>
+        </template>
 
-          <!-- Edit Mode Footer -->
-          <template v-if="mode === 'edit'">
-            <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Cancel</button>
-            <button type="button" class="btn btn-save" @click="updatePromotion">Update Promotion</button>
-          </template>
+        <!-- Edit Mode Footer -->
+        <template v-if="mode === 'edit'">
+          <button type="button" class="btn btn-cancel" :disabled="loading" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-save" :disabled="loading" @click="updatePromotion">
+            <span v-if="loading" class="spinner-border spinner-border-sm me-2" role="status"></span>
+            {{ loading ? 'Updating...' : 'Update Promotion' }}
+          </button>
+        </template>
 
-          <!-- View Mode Footer -->
-          <template v-if="mode === 'view'">
-            <button type="button" class="btn btn-secondary" @click="switchToEdit">
-              <Edit :size="14" class="me-1" />
-              Edit
-            </button>
-            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-          </template>
-        </div>
+        <!-- View Mode Footer -->
+        <template v-if="mode === 'view'">
+          <button type="button" class="btn btn-secondary" @click="switchToEdit">
+            <Edit :size="14" class="me-1" />
+            Edit
+          </button>
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        </template>
       </div>
     </div>
   </div>
+</div>
 </template>
 
 <script>
+import categoryApiService from '@/services/apiCategory'
+
 export default {
   name: 'AddPromoModal',
+  props: {
+    productCategories: {
+      type: Array,
+      default: () => []
+    }
+  },
   data() {
     return {
-      mode: 'add', // 'add', 'edit', 'view'
+      mode: 'add',
       selectedPromotion: null,
+      loading: false,
+      error: null,
+      categories: [], // Store fetched categories
       formData: {
+        promotion_id: null,
         promotion_name: '',
         discount_type: '',
         discount_value: '',
         status: 'active',
         start_date: '',
         end_date: '',
-        affected_products: ''
+        affected_products: '',
+        applicable_products: []
       }
     }
   },
@@ -285,9 +355,64 @@ export default {
         'view': 'View Promotion'
       }
       return titles[this.mode] || 'Promotion'
+    },
+    
+    // CHANGED: Display ALL categories without any filtering
+    availableCategories() {
+      // Return all categories without any filtering
+      return this.categories || []
     }
   },
+  
+  async mounted() {
+    // Fetch categories when component is mounted
+    await this.fetchCategories()
+  },
+  
   methods: {
+    // Add method to fetch categories
+    async fetchCategories() {
+      try {
+        // console.log('Fetching categories...') // Debug log
+        const response = await categoryApiService.CategoryData()
+        // console.log('Categories response:', response) // Debug log
+        
+        // ✅ FIXED: Handle the correct response structure
+        if (response && response.categories) {
+          // Filter out deleted categories and map to the format we need
+          this.categories = response.categories
+            .filter(category => !category.isDeleted) // Only show active categories
+            .map(category => ({
+              _id: category._id,
+              category_name: category.category_name,
+              description: category.description || '',
+              status: category.status
+            }))
+          
+          // console.log('Categories processed:', this.categories) // Debug log
+        } else if (response && Array.isArray(response)) {
+          // Handle case where response is directly an array
+          this.categories = response
+            .filter(category => !category.isDeleted)
+            .map(category => ({
+              _id: category._id,
+              category_name: category.category_name,
+              description: category.description || '',
+              status: category.status
+            }))
+        } else {
+          // console.log('No categories found in response')
+          this.categories = []
+        }
+        
+        // console.log('Final categories available:', this.categories.length)
+        
+      } catch (error) {
+        console.error('Error fetching categories:', error)
+        this.categories = []
+      }
+    },
+
     // Mode switching methods
     openAdd() {
       this.mode = 'add'
@@ -314,59 +439,69 @@ export default {
     // Form management methods
     resetForm() {
       this.formData = {
+        promotion_id: null,
         promotion_name: '',
         discount_type: '',
         discount_value: '',
         status: 'active',
         start_date: '',
         end_date: '',
-        affected_products: ''
+        affected_products: '',
+        applicable_products: []
       }
+      this.error = null
     },
+    
     populateForm(promotion) {
       this.formData = {
+        promotion_id: promotion.promotion_id,
         promotion_name: promotion.promotion_name || '',
         discount_type: promotion.discount_type || '',
         discount_value: promotion.discount_value || '',
         status: promotion.status || 'active',
         start_date: promotion.start_date || '',
         end_date: promotion.end_date || '',
-        affected_products: this.mapApplicableProductsToCategory(promotion.applicable_products) || ''
+        affected_products: this.mapApplicableProductsToCategory(promotion.applicable_products) || '',
+        applicable_products: promotion.applicable_products || []
       }
+      this.error = null
     },
+    
     validateForm() {
       if (!this.formData.promotion_name.trim()) {
-        alert('Please enter a promotion name')
+        this.error = 'Please enter a promotion name'
         return false
       }
       if (!this.formData.discount_type) {
-        alert('Please select a discount type')
+        this.error = 'Please select a discount type'
         return false
       }
       if (!this.formData.discount_value || this.formData.discount_value <= 0) {
-        alert('Please enter a valid discount value')
+        this.error = 'Please enter a valid discount value'
         return false
       }
       if (this.formData.discount_type === 'percentage' && this.formData.discount_value > 100) {
-        alert('Percentage discount cannot exceed 100%')
+        this.error = 'Percentage discount cannot exceed 100%'
         return false
       }
       if (!this.formData.affected_products) {
-        alert('Please select which products this promotion affects')
+        this.error = 'Please select which products this promotion affects'
         return false
       }
       if (!this.formData.start_date) {
-        alert('Please select a start date')
+        this.error = 'Please select a start date'
         return false
       }
       if (!this.formData.end_date) {
-        alert('Please select an end date')
+        this.error = 'Please select an end date'
         return false
       }
       if (this.formData.start_date && this.formData.end_date && new Date(this.formData.end_date) <= new Date(this.formData.start_date)) {
-        alert('End date must be after start date')
+        this.error = 'End date must be after start date'
         return false
       }
+      
+      this.error = null
       return true
     },
 
@@ -386,44 +521,154 @@ export default {
           modal.hide()
         }
       }
+      this.resetForm()
     },
 
-    // Action methods
-    savePromotion() {
+    // Action methods - Updated for API integration
+    async savePromotion() {
       if (!this.validateForm()) return
       
-      console.log('Save new promotion:', this.formData)
-      // Implement save logic here
-      // Example: API call to save promotion
-      
-      // Emit success event to parent
-      this.$emit('promotion-saved', {
-        action: 'add',
-        data: this.formData
-      })
-      
-      this.closeModal()
+      try {
+        this.loading = true
+        this.error = null
+        
+        // Map category selection to applicable_products array
+        const applicableProducts = this.mapCategoryToApplicableProducts(this.formData.affected_products)
+        
+        // Prepare data for API
+        const promotionData = {
+          promotion_name: this.formData.promotion_name,
+          discount_type: this.formData.discount_type,
+          discount_value: this.formData.discount_value,
+          start_date: this.formatDateForAPI(this.formData.start_date),
+          end_date: this.formatDateForAPI(this.formData.end_date),
+          status: this.formData.status,
+          applicable_products: applicableProducts
+        }
+        
+        // console.log('Saving new promotion:', promotionData)
+        
+        // Emit to parent component to handle API call
+        this.$emit('promotion-saved', promotionData)
+        
+      } catch (error) {
+        this.error = error.message || 'Failed to save promotion'
+      } finally {
+        this.loading = false
+      }
     },
-    updatePromotion() {
+    
+    async updatePromotion() {
       if (!this.validateForm()) return
       
-      console.log('Update promotion:', {
-        id: this.selectedPromotion.promotion_id,
-        data: this.formData
-      })
-      // Implement update logic here
+      try {
+        this.loading = true
+        this.error = null
+        
+        // Map category selection to applicable_products array
+        const applicableProducts = this.mapCategoryToApplicableProducts(this.formData.affected_products)
+        
+        // Prepare data for API
+        const promotionData = {
+          promotion_id: this.formData.promotion_id,
+          promotion_name: this.formData.promotion_name,
+          discount_type: this.formData.discount_type,
+          discount_value: this.formData.discount_value,
+          start_date: this.formatDateForAPI(this.formData.start_date),
+          end_date: this.formatDateForAPI(this.formData.end_date),
+          status: this.formData.status,
+          applicable_products: applicableProducts
+        }
+        
+        // console.log('Updating promotion:', promotionData)
+        
+        // Emit to parent component to handle API call
+        this.$emit('promotion-updated', promotionData)
+        
+      } catch (error) {
+        this.error = error.message || 'Failed to update promotion'
+      } finally {
+        this.loading = false
+      }
+    },
+
+    // Helper methods for data transformation - Updated for new data structure
+    formatDateForAPI(dateValue) {
+      if (!dateValue) return ''
       
-      // Emit success event to parent
-      this.$emit('promotion-updated', {
-        action: 'edit',
-        id: this.selectedPromotion.promotion_id,
-        data: this.formData
-      })
+      if (dateValue instanceof Date) {
+        return dateValue.toISOString().split('T')[0]
+      }
       
+      if (typeof dateValue === 'string') {
+        if (dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          return dateValue
+        }
+        const date = new Date(dateValue)
+        return date.toISOString().split('T')[0]
+      }
+      
+      return dateValue
+    },
+    
+    mapCategoryToApplicableProducts(categoryId) {
+      // console.log('🔍 Mapping category to applicable products:', categoryId);
+      // console.log('🔍 Available categories:', this.categories);
+      
+      // If "all" is selected, return all category names (not IDs)
+      if (categoryId === 'all') {
+        const allCategoryNames = this.categories.map(cat => cat.category_name);
+        // console.log('🔍 All category names:', allCategoryNames);
+        return allCategoryNames;
+      }
+      
+      // For specific category, find the category name
+      const selectedCategory = this.categories.find(cat => cat._id === categoryId);
+      if (selectedCategory) {
+        // console.log('🔍 Selected category name:', selectedCategory.category_name);
+        return [selectedCategory.category_name];
+      }
+      
+      // console.log('🔍 No matching category found for ID:', categoryId);
+      return [];
+    },
+
+    mapApplicableProductsToCategory(applicableProducts) {
+      // console.log('🔍 Mapping applicable products to category:', applicableProducts);
+      
+      if (!applicableProducts || applicableProducts.length === 0) {
+        return '';
+      }
+      
+      // Check if all categories are selected by comparing category names
+      const allCategoryNames = this.categories.map(cat => cat.category_name);
+      const isAllSelected = allCategoryNames.every(catName => 
+        applicableProducts.includes(catName)
+      );
+      
+      if (isAllSelected || applicableProducts.length === allCategoryNames.length) {
+        return 'all';
+      }
+      
+      // Find the category ID for the first applicable product (category name)
+      const firstProductName = applicableProducts[0];
+      const matchingCategory = this.categories.find(cat => cat.category_name === firstProductName);
+      
+      if (matchingCategory) {
+        // console.log('🔍 Found matching category ID:', matchingCategory._id);
+        return matchingCategory._id;
+      }
+      
+      // console.log('🔍 No matching category found for:', firstProductName);
+      return '';
+    },
+
+    // Add method to handle successful operations from parent
+    onOperationSuccess() {
       this.closeModal()
     },
 
-    // Formatting methods (same as Promotions page)
+    // Formatting methods - Updated for new data structure
     formatDiscountType(type) {
       const types = {
         'percentage': 'Percentage',
@@ -432,6 +677,7 @@ export default {
       }
       return types[type] || type
     },
+    
     formatDiscountValue(value, type) {
       if (type === 'percentage') {
         return `${value}%`
@@ -440,6 +686,7 @@ export default {
       }
       return value
     },
+    
     formatStatus(status) {
       const statuses = {
         'active': 'Active',
@@ -449,6 +696,7 @@ export default {
       }
       return statuses[status] || status
     },
+    
     formatDate(dateString) {
       if (!dateString) return '—'
       return new Date(dateString).toLocaleDateString('en-US', {
@@ -457,7 +705,9 @@ export default {
         day: 'numeric'
       })
     },
+    
     formatDateTime(dateString) {
+      if (!dateString) return '—'
       return new Date(dateString).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
@@ -466,6 +716,7 @@ export default {
         minute: '2-digit'
       })
     },
+    
     getDiscountTypeBadgeClass(type) {
       const classes = {
         'percentage': 'bg-primary text-white',
@@ -474,6 +725,7 @@ export default {
       }
       return classes[type] || 'bg-secondary text-white'
     },
+    
     getStatusBadgeClass(status) {
       const classes = {
         'active': 'bg-success text-white',
@@ -483,59 +735,26 @@ export default {
       }
       return classes[status] || 'bg-secondary text-white'
     },
+    
     formatAffectedProducts(applicableProducts) {
+      // console.log('🔍 Formatting affected products:', applicableProducts);
+      
       if (!applicableProducts || applicableProducts.length === 0) {
-        return 'No products selected'
+        return 'No products selected';
       }
       
-      // For demo purposes, map product IDs to categories
-      // This would typically come from your product data
-      const categoryMap = {
-        'prod1': 'Noodles',
-        'prod2': 'Noodles', 
-        'prod3': 'Drinks',
-        'prod4': 'Toppings'
-      }
-      
-      const categories = [...new Set(applicableProducts.map(id => categoryMap[id] || 'Unknown'))]
-      
-      if (categories.length === 1) {
-        return categories[0]
-      } else if (categories.length <= 3) {
-        return categories.join(', ')
+      // Since applicable_products contains category names, display them directly
+      if (applicableProducts.length === 1) {
+        return applicableProducts[0];
+      } else if (applicableProducts.length <= 3) {
+        return applicableProducts.join(', ');
       } else {
-        return `${categories.length} Categories`
-      }
-    },
-    mapApplicableProductsToCategory(applicableProducts) {
-      if (!applicableProducts || applicableProducts.length === 0) {
-        return ''
-      }
-      
-      // For demo purposes - this would be more sophisticated in a real app
-      // Map the first product ID to determine category selection
-      const categoryMap = {
-        'prod1': 'noodles',
-        'prod2': 'noodles',
-        'prod3': 'drinks', 
-        'prod4': 'toppings'
-      }
-      
-      const firstProductCategory = categoryMap[applicableProducts[0]]
-      
-      // Check if all products are from the same category
-      const allSameCategory = applicableProducts.every(id => categoryMap[id] === firstProductCategory)
-      
-      if (allSameCategory) {
-        return firstProductCategory || 'all'
-      } else {
-        return 'all' // Mixed categories = all products
+        return `${applicableProducts.length} Categories`;
       }
     }
   }
 }
 </script>
-
 <style scoped>
 .modal-content {
   border-radius: 0.75rem;
@@ -772,4 +991,84 @@ export default {
     margin-bottom: 1rem;
   }
 }
+
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  border-radius: 0.75rem;
+}
+
+/* Error alert styling */
+.alert-danger {
+  margin-bottom: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #f5c6cb;
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+}
+
+/* Button loading states */
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+  border-width: 0.1rem;
+}
+
+/* Enhanced form disabled states */
+.form-control:disabled,
+.form-select:disabled {
+  background-color: var(--neutral-light);
+  border-color: var(--neutral-medium);
+  color: var(--tertiary-medium);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+.action-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.375rem;
+  transition: all 0.2s ease;
+}
+
+.btn-outline-success:hover {
+  background-color: #198754;
+  border-color: #198754;
+  color: white;
+}
+
+.btn-outline-danger:hover {
+  background-color: #dc3545;
+  border-color: #dc3545;
+  color: white;
+}
+
+/* Status badge for deleted items */
+.badge.bg-dark {
+  background-color: #495057 !important;
+}
+
+/* Ensure consistent spacing for action buttons */
+.d-flex.gap-1 {
+  gap: 0.25rem !important;
+}
+
 </style>
