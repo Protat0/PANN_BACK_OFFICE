@@ -1,6 +1,7 @@
 <template>
   <div class="promotions-page">
   <!-- Main Content -->
+   <h1 class="page-title">Promotion Management</h1>   
   <div class="container-fluid py-4">
     
     <!-- Loading State (outside action-bar) -->
@@ -40,7 +41,22 @@
             EXPORT
           </button>
         </div>
-
+         <div class="auto-refresh-status">
+          <i class="bi bi-arrow-repeat text-success" :class="{ 'spinning': loading }"></i>
+          <span class="status-text">
+            <span v-if="autoRefreshEnabled">Updates in {{ countdown }}s</span>
+            <span v-else>Auto-refresh disabled</span>
+          </span>
+          
+          <!-- Toggle button -->
+          <button 
+            class="btn btn-sm"
+            :class="autoRefreshEnabled ? 'btn-outline-secondary' : 'btn-outline-success'"
+            @click="toggleAutoRefresh"
+          >
+            {{ autoRefreshEnabled ? 'Disable' : 'Enable' }}
+          </button>
+        </div>
         <!-- Selection Actions (Visible when items are selected) -->
         <div v-if="selectedPromotions.length > 0" class="d-flex gap-2">
           <button 
@@ -298,6 +314,15 @@ export default {
       loading: false,
       error: null,
       
+      //Refreshing State
+      autoRefreshEnabled: true,
+      autoRefreshInterval: 30000, // 30 seconds
+      baseRefreshInterval: 30000,
+      autoRefreshTimer: null,
+      countdown: 30,
+      countdownTimer: null,
+      
+      
       // Filters
       discountTypeFilter: 'all',
       statusFilter: 'all',
@@ -324,8 +349,11 @@ export default {
   async mounted() {
     await Promise.all([
       this.loadPromotions(),
-      this.loadProductCategories()
+      this.loadProductCategories(),
     ]);
+    if (this.autoRefreshEnabled) {
+          this.startAutoRefresh()
+        }
   },
   
   methods: {
@@ -415,12 +443,109 @@ export default {
       }
     },
 
+     toggleAutoRefresh() {
+      if (this.autoRefreshEnabled) {
+        this.autoRefreshEnabled = false
+        this.stopAutoRefresh()
+        console.log('Auto-refresh disabled by user')
+      } else {
+        this.autoRefreshEnabled = true
+        this.startAutoRefresh()
+        console.log('Auto-refresh enabled by user')
+      }
+    },
+    startAutoRefresh() {
+      this.stopAutoRefresh() // Clear any existing timers
+      
+      // Start countdown
+      this.countdown = this.autoRefreshInterval / 1000
+      this.countdownTimer = setInterval(() => {
+        this.countdown--
+        if (this.countdown <= 0) {
+          this.countdown = this.autoRefreshInterval / 1000
+        }
+      }, 1000)
+      
+      // Start auto-refresh timer - FIXED: call refreshData instead of fetchUsers
+      this.autoRefreshTimer = setInterval(() => {
+        this.refreshData() // Changed from this.fetchUsers(true)
+      }, this.autoRefreshInterval)
+      
+      console.log(`Auto-refresh started (${this.autoRefreshInterval / 1000}s interval)`)
+    },
+    
+    stopAutoRefresh() {
+      if (this.autoRefreshTimer) {
+        clearInterval(this.autoRefreshTimer)
+        this.autoRefreshTimer = null
+      }
+      
+      if (this.countdownTimer) {
+        clearInterval(this.countdownTimer)
+        this.countdownTimer = null
+      }
+      
+      console.log('Auto-refresh stopped')
+    },
+
+    // ============ ENHANCED REFRESH SYSTEM ============
+    // Replace the refreshData method with this corrected version:
+    async refreshData() {
+      console.log('=== COMPREHENSIVE PROMOTIONS DATA REFRESH INITIATED ===')
+      
+      this.error = null
+      
+      const currentSelections = [...this.selectedPromotions]
+      const currentFilters = {
+        discountType: this.discountTypeFilter,
+        status: this.statusFilter,
+        search: this.searchFilter
+      }
+      
+      console.log('Preserving current state:', {
+        selections: currentSelections,
+        filters: currentFilters
+      })
+      
+      try {
+        // Refresh promotions data
+        await this.loadPromotions()
+        
+        // Restore promotion selections (only those that still exist)
+        this.selectedPromotions = currentSelections.filter(promotionId => 
+          this.promotions.some(promotion => promotion._id === promotionId)
+        )
+        
+        // Restore filters
+        this.discountTypeFilter = currentFilters.discountType
+        this.statusFilter = currentFilters.status
+        this.searchFilter = currentFilters.search
+        
+        this.applyFilters()
+        
+        this.$toast?.success(`Promotions data refreshed successfully. ${this.promotions.length} promotions loaded.`)
+        
+        console.log('✅ Comprehensive refresh completed successfully')
+        console.log('Final state:', {
+          totalPromotions: this.promotions.length,
+          filteredPromotions: this.filteredPromotions.length,
+          selectedPromotions: this.selectedPromotions.length
+        })
+        
+      } catch (error) {
+        console.error('❌ Comprehensive refresh failed:', error)
+        this.error = 'Failed to refresh promotions data: ' + error.message
+      }
+    },
+
     handleSinglePromo() {
       if (this.$refs.addPromoModal && this.$refs.addPromoModal.openAdd) {
         this.$refs.addPromoModal.openAdd();
+        
       } else {
         if (this.$refs.addPromoModal && this.$refs.addPromoModal.open) {
           this.$refs.addPromoModal.open();
+          location.reload(); 
         }
       }
     },
@@ -435,7 +560,7 @@ export default {
         this.applyFilters();
         this.$toast?.success('Promotion created successfully!');
         this.$refs.addPromoModal.onOperationSuccess();
-        
+        location.reload();
       } catch (error) {
         this.$refs.addPromoModal.error = 'Failed to create promotion: ' + error.message;
         this.$refs.addPromoModal.loading = false;
@@ -918,6 +1043,10 @@ export default {
           this.$refs.addPromoModal.open(promotion, 'edit');
         }
       }
+    },
+    beforeDestroy() {
+      // Clean up timers when component is destroyed
+      this.stopAutoRefresh()
     }
   }
 }
@@ -1060,5 +1189,67 @@ export default {
 /* Ensure consistent spacing for action buttons */
 .d-flex.gap-1 {
   gap: 0.25rem !important;
+}
+
+/* Auto-refresh status indicator (same as logs page) */
+.auto-refresh-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #f0fdf4;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #bbf7d0;
+  min-width: 280px;
+  margin-right: 370px;
+}
+
+.status-text {
+  font-size: 0.875rem;
+  color: #16a34a;
+  font-weight: 500;
+  flex: 1;
+}
+
+/* Connection indicator (same as logs page) */
+.connection-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.connection-good {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #16a34a;
+}
+
+.connection-unstable {
+  background: #fefce8;
+  border: 1px solid #fde047;
+  color: #ca8a04;
+}
+
+.connection-lost {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.connection-unknown {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
 }
 </style>

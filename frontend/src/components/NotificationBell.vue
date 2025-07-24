@@ -108,7 +108,8 @@
 </template>
 
 <script>
-import apijs from '../services/api'
+import apiNotif from '../services/apiNotifications'
+
 export default {
   name: 'NotificationBell',
   data() {
@@ -226,21 +227,15 @@ export default {
       }
     },
 
-    async markAllAsRead() {
+   async markAllAsRead() {
       if (this.unreadCount === 0) return
       
       this.markingAllAsRead = true
       try {
-        const response = await fetch('http://localhost:8000/api/notifications/mark-all-read/', {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        })
-
-        if (response.ok) {
-          const result = await response.json()
-          console.log('Mark all as read response:', result)
+        const response = await apiNotif.markAllReadNotif()
+        
+        if (response) {
+          console.log('Mark all as read response:', response)
           
           // Update all notifications to read status
           this.notifications.forEach(notification => {
@@ -250,9 +245,6 @@ export default {
           // Update counts
           this.unreadCount = 0
           
-        } else {
-          console.error('Failed to mark all as read:', await response.text())
-          await this.fallbackMarkAllAsRead()
         }
       } catch (error) {
         console.error('Error marking all notifications as read:', error)

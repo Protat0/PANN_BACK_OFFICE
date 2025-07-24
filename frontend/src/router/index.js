@@ -115,7 +115,7 @@ const router = createRouter({
           component: Promotions
         },
         {
-          path: 'sales-by-item',
+          path: 'salesbyitem',
           name: 'SalesByItem',
           component: SalesByItem
         },

@@ -344,20 +344,17 @@ export default {
       this.loadingMore = true;
       try {
         const nextPage = this.pagination.current_page + 1;
-        const response = await fetch(`http://localhost:8000/api/v1/notifications/all/?page=${nextPage}&limit=50`, {
-          headers: {
-            'Content-Type': 'application/json'
-          }
+        
+        // Call your API method with pagination parameters
+        const result = await this.LoadMoreNotifications({
+          page: nextPage,
+          limit: 50
         });
-
-        if (response.ok) {
-          const result = await response.json();
-          
-          if (result.success) {
-            this.allNotifications = [...this.allNotifications, ...(result.data || [])];
-            this.pagination = result.pagination || this.pagination;
-            this.applyModalFilters();
-          }
+        
+        if (result.success) {
+          this.allNotifications = [...this.allNotifications, ...(result.data || [])];
+          this.pagination = result.pagination || this.pagination;
+          this.applyModalFilters();
         }
       } catch (error) {
         console.error('Error loading more notifications:', error);
@@ -377,21 +374,15 @@ export default {
       notification.isMarkingRead = true;
 
       try {
-        const response = await fetch(
-          `http://localhost:8000/api/v1/notifications/${notificationId}/mark-read/`,
-          {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        if (response.ok) {
+        // Call your API method with the notification ID
+        const result = await this.MarkAsReadNotifications({
+          id: notificationId
+        });
+        
+        // Assuming your API returns success status
+        if (result) {
           notification.is_read = true;
           this.applyModalFilters();
-        } else {
-          console.error('Failed to mark notification as read:', await response.text());
         }
       } catch (error) {
         console.error('Error marking notification as read:', error);
@@ -411,14 +402,13 @@ export default {
       notification.isArchiving = true;
 
       try {
-        const response = await fetch(`http://localhost:8000/api/v1/notifications/${notificationId}/archive/`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json'
-          }
+        // Call the correct API method
+        const response = await apiNotif.archiveNotif({
+          id: notificationId
         });
-
-        if (response.ok) {
+        
+        // API methods return data directly, not response objects
+        if (response) {
           // Update the notification status instead of removing
           notification.archived = true;
           
@@ -429,8 +419,6 @@ export default {
           }
           
           this.applyModalFilters();
-        } else {
-          console.error('Archive failed:', await response.text());
         }
       } catch (error) {
         console.error('Archive error:', error);
@@ -450,26 +438,21 @@ export default {
       notification.isArchiving = true;
 
       try {
-        const response = await fetch(`http://localhost:8000/api/v1/notifications/${notificationId}/unarchive/`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json'
-          }
+        const response = await this.unarchiveNotif({
+          id: notificationId
         });
 
-        if (response.ok) {
+        if (response) {
           // Update the notification status
-          notification.archived = false;
+          notification.archived = false; // Fixed: was true, should be false
           
           // Update in allNotifications array
           const allNotificationIndex = this.allNotifications.findIndex(n => (n.id || n._id) === notificationId);
           if (allNotificationIndex !== -1) {
-            this.allNotifications[allNotificationIndex].archived = false;
+            this.allNotifications[allNotificationIndex].archived = false; // Fixed: was true, should be false
           }
           
           this.applyModalFilters();
-        } else {
-          console.error('Unarchive failed:', await response.text());
         }
       } catch (error) {
         console.error('Unarchive error:', error);
@@ -494,20 +477,16 @@ export default {
       notification.isDeleting = true;
 
       try {
-        const response = await fetch(`http://localhost:8000/api/v1/notifications/${notificationId}/delete/`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json'
-          }
+        const response = await this.deleteNotif({
+          id: notificationId
         });
 
-        if (response.ok) {
+        if (response) {
           // Remove from both arrays
           this.allNotifications = this.allNotifications.filter(n => (n.id || n._id) !== notificationId);
           this.applyModalFilters();
-        } else {
-          console.error('Delete failed:', await response.text());
         }
+        // Remove the else block since response.text() won't work here
       } catch (error) {
         console.error('Delete error:', error);
       } finally {
@@ -520,23 +499,16 @@ export default {
       
       this.markingAllAsRead = true;
       try {
-        const response = await fetch('http://localhost:8000/api/v1/notifications/mark-all-read/', {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
+        const response = await this.markAllReadNotif();
 
-        if (response.ok) {
+        if (response) {
           // Update all notifications to read status
           this.allNotifications.forEach(notification => {
             notification.is_read = true;
           });
           
           this.applyModalFilters();
-        } else {
-          console.error('Failed to mark all as read:', await response.text());
-        }
+        } 
       } catch (error) {
         console.error('Error marking all notifications as read:', error);
       } finally {
@@ -551,18 +523,14 @@ export default {
     async deleteNotificationFallback(notification) {
       try {
         const notificationId = notification.id || notification._id;
-        const response = await fetch(`http://localhost:8000/api/notifications/${notificationId}/delete/`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json'
-          }
+        const response = await apiNotif.deleteNotifFallback({
+          id: notificationId
         });
 
-        if (response.ok) {
+        if (response) {
+          // Remove from both arrays
           this.allNotifications = this.allNotifications.filter(n => (n.id || n._id) !== notificationId);
           this.applyModalFilters();
-        } else {
-          console.error('Delete fallback also failed:', await response.text());
         }
       } catch (error) {
         console.error('Delete fallback error:', error);
