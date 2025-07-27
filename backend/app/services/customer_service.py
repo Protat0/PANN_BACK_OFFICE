@@ -668,3 +668,118 @@ class CustomerService:
         
         except Exception as e:
             raise Exception(f"Error bulk deleting customers: {str(e)}")
+        
+def check_low_stock_warnings(self, checkout_data, current_user=None):
+    """Check if any products will go below low stock threshold and send notifications"""
+    warnings = []
+    
+    for item in checkout_data:
+        product = self.products_collection.find_one({'_id': ObjectId(item['product_id'])})
+        
+        if product:
+            current_stock = product.get('stock', 0)
+            quantity_sold = item['quantity']
+            low_stock_threshold = product.get('low_stock_threshold', 5)
+            
+            new_stock = current_stock - quantity_sold
+            product_name = product.get('product_name', 'Unknown Product')
+            
+            # Check for different stock warning levels
+            if new_stock <= 0:
+                warning_msg = f"⚠️ {product_name} will be OUT OF STOCK!"
+                warnings.append(warning_msg)
+                
+                # Send OUT OF STOCK notification
+                self._send_stock_notification(
+                    'out_of_stock', 
+                    product, 
+                    current_stock, 
+                    new_stock, 
+                    quantity_sold,
+                    current_user
+                )
+                
+            elif new_stock <= low_stock_threshold:
+                warning_msg = f"🔶 {product_name} will be LOW STOCK ({new_stock} remaining)"
+                warnings.append(warning_msg)
+                
+                # Send LOW STOCK notification
+                self._send_stock_notification(
+                    'low_stock', 
+                    product, 
+                    current_stock, 
+                    new_stock, 
+                    quantity_sold,
+                    current_user
+                )
+    
+    return warnings
+
+def _send_stock_notification(self, alert_type, product, current_stock, new_stock, quantity_sold, current_user=None):
+    """
+    Send notification for stock-related alerts
+    
+    Args:
+        alert_type (str): 'low_stock' or 'out_of_stock'
+        product (dict): Product data
+        current_stock (int): Current stock level
+        new_stock (int): Stock level after sale
+        quantity_sold (int): Quantity being sold
+        current_user (dict): User performing the transaction
+    """
+    try:
+        product_name = product.get('product_name', 'Unknown Product')
+        product_id = str(product.get('_id', ''))
+        low_stock_threshold = product.get('low_stock_threshold', 5)
+        
+        # Configure notification based on alert type
+        if alert_type == 'out_of_stock':
+            title = "⚠️ PRODUCT OUT OF STOCK"
+            message = f"'{product_name}' is now OUT OF STOCK after selling {quantity_sold} units"
+            priority = "urgent"
+            
+        elif alert_type == 'low_stock':
+            title = "🔶 LOW STOCK ALERT"
+            message = f"'{product_name}' is running low on stock. Only {new_stock} units remaining (threshold: {low_stock_threshold})"
+            priority = "high"
+            
+        else:
+            return  # Unknown alert type
+        
+        # Common metadata for both alert types
+        metadata = {
+            "product_id": product_id,
+            "product_name": product_name,
+            "sku": product.get('SKU', ''),
+            "category_id": product.get('category_id', ''),
+            "current_stock": current_stock,
+            "new_stock": new_stock,
+            "quantity_sold": quantity_sold,
+            "low_stock_threshold": low_stock_threshold,
+            "alert_type": alert_type,
+            "action_type": "stock_alert",
+            "cashier_id": current_user.get('_id') if current_user else None,
+            "cashier_name": current_user.get('username') if current_user else None,
+            "cost_price": product.get('cost_price', 0),
+            "selling_price": product.get('selling_price', 0),
+            "supplier_id": product.get('supplier_id'),
+            "reorder_suggested": new_stock <= low_stock_threshold
+        }
+        
+        # Import notification service (same as customer service)
+        from notifications.services import notification_service
+        
+        # Send the notification
+        notification_service.create_notification(
+            title=title,
+            message=message,
+            priority=priority,
+            notification_type="inventory",  # Different type for inventory alerts
+            metadata=metadata
+        )
+        
+        print(f"📢 Stock notification sent: {title} for {product_name}")
+        
+    except Exception as notification_error:
+        # Log the notification error but don't fail the main operation
+        print(f"❌ Failed to create {alert_type} notification for product {product.get('product_name', 'Unknown')}: {notification_error}")
