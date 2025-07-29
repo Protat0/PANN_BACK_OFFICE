@@ -1,35 +1,157 @@
+/* ==========================================================================
+   MAIN CSS FOR PANN POS SYSTEM
+   Import base styles and custom CSS files
+   ========================================================================== */
+
+/* Import base Vue styles first */
 @import './base.css';
 
+/* Import Bootstrap */
+@import 'bootstrap/dist/css/bootstrap.min.css';
+
+/* Import your custom CSS files in order */
+@import './assets/css/colors.css';
+@import './assets/css/theme-utilities.css';  /* NEW: Add theme utilities */
+@import './assets/css/global.css';
+@import './assets/css/buttons.css';
+
+/* ==========================================================================
+   OVERRIDE DEFAULT VUE APP STYLES FOR PANN
+   ========================================================================== */
+
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
+  /* Remove Vue's default constraints for full-screen app */
+  max-width: none;
+  margin: 0;
+  padding: 0;
   font-weight: normal;
+  min-height: 100vh;
+  width: 100vw;
+  
+  /* Apply semantic theme-aware background */
+  background-color: var(--surface-secondary);
+  color: var(--text-secondary);
+  
+  /* Remove Vue's grid layout for admin dashboard */
+  display: block;
+  grid-template-columns: none;
 }
+
+/* ==========================================================================
+   REMOVE/OVERRIDE VUE DEFAULT LINK STYLES
+   ========================================================================== */
 
 a,
 .green {
   text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
-  transition: 0.4s;
-  padding: 3px;
+  color: var(--text-accent); /* Use semantic accent color */
+  transition: color 0.3s ease;
+  padding: 0; /* Remove Vue's default padding */
 }
 
 @media (hover: hover) {
   a:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
+    background-color: transparent; /* Remove Vue's green hover */
+    color: var(--text-accent);
+    opacity: 0.8;
   }
 }
 
+/* ==========================================================================
+   RESPONSIVE OVERRIDES FOR ADMIN DASHBOARD
+   ========================================================================== */
+
 @media (min-width: 1024px) {
   body {
-    display: flex;
-    place-items: center;
+    /* Remove Vue's flex centering for admin layout */
+    display: block;
+    place-items: unset;
   }
 
   #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
+    /* Remove Vue's grid layout for full-screen admin */
+    display: block;
+    grid-template-columns: none;
+    padding: 0;
+  }
+}
+
+/* ==========================================================================
+   ENSURE FULL VIEWPORT COVERAGE
+   ========================================================================== */
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background-color: var(--surface-secondary);
+  color: var(--text-secondary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ==========================================================================
+   LEGACY COMPATIBILITY UTILITIES
+   Keep these for components that haven't been updated yet
+   ========================================================================== */
+
+.pann-container {
+  width: 100%;
+  min-height: 100vh;
+  background-color: var(--surface-secondary);
+  color: var(--text-secondary);
+}
+
+.pann-card {
+  background-color: var(--surface-primary);
+  border: 1px solid var(--border-secondary);
+  color: var(--text-primary);
+}
+
+.pann-text-primary {
+  color: var(--text-primary);
+}
+
+.pann-text-secondary {
+  color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   BACKWARD COMPATIBILITY ALIASES
+   For components still using old variable names
+   ========================================================================== */
+
+:root,
+.light-theme {
+  /* Legacy aliases - these will be removed in Step 4 */
+  --bg-primary: var(--surface-secondary);
+  --bg-secondary: var(--surface-primary);
+  --current-text-primary: var(--text-primary);
+  --current-text-secondary: var(--text-secondary);
+  --current-border: var(--border-primary);
+}
+
+.dark-theme {
+  /* Legacy aliases - these will be removed in Step 4 */
+  --bg-primary: var(--surface-secondary);
+  --bg-secondary: var(--surface-primary);
+  --current-text-primary: var(--text-primary);
+  --current-text-secondary: var(--text-secondary);
+  --current-border: var(--border-primary);
+}
+
+/* ==========================================================================
+   COMPONENT TRANSITIONS
+   ========================================================================== */
+
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Disable transitions for reduced motion users */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
   }
 }

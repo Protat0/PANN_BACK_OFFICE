@@ -1,5 +1,6 @@
-// services/apiProducts.js - UPDATED VERSION WITH ENHANCED CSV TEMPLATE
+// services/apiProducts.js - UPDATED VERSION WITH CATEGORY SERVICE REFERENCE
 import { api } from './api.js';
+import categoryApiService from './apiCategory.js'; // Import category service
 
 class ProductsApiService {
   // Helper method to handle responses
@@ -460,14 +461,96 @@ class ProductsApiService {
   }
 
   /**
-   * Get products by category - FIXED URL
+   * Get products by category - USES CATEGORY SERVICE
    * @param {string} categoryId - Category ID
    * @param {Object} params - Additional query parameters
    * @returns {Promise<Object>} Products in category
    */
   async getProductsByCategory(categoryId, params = {}) {
     try {
+      // First verify category exists and is active using category service
+      const category = await categoryApiService.getCategoryById(categoryId);
+      if (!category || category.status !== 'active') {
+        throw new Error('Category not found or inactive');
+      }
+
+      // Now get products for this category
       const response = await api.get(`/products/category/${categoryId}/`, { params });
+      const productsData = this.handleResponse(response);
+
+      // Enhance with category info
+      return {
+        ...productsData,
+        category_info: {
+          id: category._id,
+          name: category.category_name,
+          description: category.description,
+          status: category.status
+        }
+      };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Get products by subcategory - NEW METHOD USING CATEGORY SERVICE
+   * @param {string} categoryId - Category ID
+   * @param {string} subcategoryName - Subcategory name
+   * @param {Object} params - Additional query parameters
+   * @returns {Promise<Array>} Products in subcategory
+   */
+  async getProductsBySubcategory(categoryId, subcategoryName, params = {}) {
+    try {
+      // Use category service to get subcategories
+      const subcategories = await categoryApiService.getSubcategories(categoryId);
+      
+      // Verify subcategory exists
+      const subcategory = subcategories.find(sub => sub.name === subcategoryName);
+      if (!subcategory) {
+        throw new Error(`Subcategory '${subcategoryName}' not found in category`);
+      }
+
+      // Get products and filter by subcategory
+      const response = await api.get(`/products/category/${categoryId}/`, { 
+        params: { ...params, subcategory: subcategoryName } 
+      });
+      
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Update product's subcategory - NEW METHOD USING CATEGORY SERVICE
+   * @param {string} productId - Product ID
+   * @param {string} categoryId - Target category ID
+   * @param {string} subcategoryName - Target subcategory name
+   * @returns {Promise<Object>} Updated product
+   */
+  async updateProductSubcategory(productId, categoryId, subcategoryName) {
+    try {
+      // Use category service's ProductSubcategoryService functionality
+      const response = await api.put(`/products/${productId}/subcategory/`, {
+        category_id: categoryId,
+        subcategory: subcategoryName
+      });
+      
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Move product to uncategorized - NEW METHOD
+   * @param {string} productId - Product ID
+   * @returns {Promise<Object>} Updated product
+   */
+  async moveProductToUncategorized(productId) {
+    try {
+      const response = await api.post(`/products/${productId}/move-to-uncategorized/`);
       return this.handleResponse(response);
     } catch (error) {
       this.handleError(error);
@@ -567,6 +650,11 @@ class ProductsApiService {
       // Local validation since backend endpoint might not exist
       const validationErrors = [];
       
+      // Get all categories for validation
+      const categories = await categoryApiService.getAllCategories();
+      const categoryNames = categories.map(c => c.category_name.toLowerCase());
+      const categoryIds = categories.map(c => c._id);
+      
       productsData.forEach((product, index) => {
         // Required fields validation
         if (!product.product_name || product.product_name.trim() === '') {
@@ -575,6 +663,21 @@ class ProductsApiService {
             field: 'product_name',
             error: 'Product name is required'
           });
+        }
+        
+        // Category validation using category service data
+        if (product.category) {
+          const categoryLower = product.category.toLowerCase();
+          const isValidCategoryName = categoryNames.includes(categoryLower);
+          const isValidCategoryId = categoryIds.includes(product.category);
+          
+          if (!isValidCategoryName && !isValidCategoryId) {
+            validationErrors.push({
+              index,
+              field: 'category',
+              error: `Invalid category: ${product.category}`
+            });
+          }
         }
         
         // Numeric validation
@@ -824,74 +927,264 @@ class ProductsApiService {
 
   // BATCH PROCESSING HELPERS
 
-  /**
-   * Process products in batches to avoid overwhelming the server
-   * @param {Array<Object>} products - Array of products to process
-   * @param {Function} processFn - Function to process each batch
-   * @param {number} batchSize - Size of each batch (default: 20)
-   * @returns {Promise<Array>} Array of batch results
-   */
-  async processBatches(products, processFn, batchSize = 20) {
-    const results = [];
-    
-    for (let i = 0; i < products.length; i += batchSize) {
-      const batch = products.slice(i, i + batchSize);
-      
-      try {
-        console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(products.length/batchSize)}`);
-        const batchResult = await processFn(batch);
-        results.push({
-          batchIndex: Math.floor(i/batchSize),
-          success: true,
-          result: batchResult
-        });
-        
-        // Add small delay between batches to avoid overwhelming server
-        await new Promise(resolve => setTimeout(resolve, 250));
-        
-      } catch (error) {
-        console.error(`Error in batch ${Math.floor(i/batchSize) + 1}:`, error);
-        results.push({
-          batchIndex: Math.floor(i/batchSize),
-          success: false,
-          error: error.message
-        });
-      }
-    }
-    
-    return results;
-  }
+/**
+  * Process products in batches to avoid overwhelming the server
+  * @param {Array<Object>} products - Array of products to process
+  * @param {Function} processFn - Function to process each batch
+  * @param {number} batchSize - Size of each batch (default: 20)
+  * @returns {Promise<Array>} Array of batch results
+  */
+ async processBatches(products, processFn, batchSize = 20) {
+   const results = [];
+   
+   for (let i = 0; i < products.length; i += batchSize) {
+     const batch = products.slice(i, i + batchSize);
+     
+     try {
+       console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(products.length/batchSize)}`);
+       const batchResult = await processFn(batch);
+       results.push({
+         batchIndex: Math.floor(i/batchSize),
+         success: true,
+         result: batchResult
+       });
+       
+       // Add small delay between batches to avoid overwhelming server
+       await new Promise(resolve => setTimeout(resolve, 250));
+       
+     } catch (error) {
+       console.error(`Error in batch ${Math.floor(i/batchSize) + 1}:`, error);
+       results.push({
+         batchIndex: Math.floor(i/batchSize),
+         success: false,
+         error: error.message
+       });
+     }
+   }
+   
+   return results;
+ }
 
-  /**
-   * Create products in batches - FIXED METHOD
-   * @param {Array<Object>} products - Array of products to create
-   * @param {number} batchSize - Size of each batch
-   * @returns {Promise<Object>} Batch creation results
-   */
-  async createProductsInBatches(products, batchSize = 15) {
-    const batchResults = await this.processBatches(
-      products, 
-      (batch) => this.bulkCreateProducts(batch),
-      batchSize
-    );
-    
-    // Aggregate results
-    const successfulBatches = batchResults.filter(r => r.success);
-    const totalSuccessful = successfulBatches
-      .reduce((sum, r) => sum + (r.result?.results?.total_successful || 0), 0);
-      
-    const totalFailed = successfulBatches
-      .reduce((sum, r) => sum + (r.result?.results?.total_failed || 0), 0);
-    
-    return {
-      total_batches: batchResults.length,
-      successful_batches: successfulBatches.length,
-      failed_batches: batchResults.filter(r => !r.success).length,
-      total_successful: totalSuccessful,
-      total_failed: totalFailed,
-      batch_details: batchResults
-    };
-  }
+ /**
+  * Create products in batches - FIXED METHOD
+  * @param {Array<Object>} products - Array of products to create
+  * @param {number} batchSize - Size of each batch
+  * @returns {Promise<Object>} Batch creation results
+  */
+ async createProductsInBatches(products, batchSize = 15) {
+   const batchResults = await this.processBatches(
+     products, 
+     (batch) => this.bulkCreateProducts(batch),
+     batchSize
+   );
+   
+   // Aggregate results
+   const successfulBatches = batchResults.filter(r => r.success);
+   const totalSuccessful = successfulBatches
+     .reduce((sum, r) => sum + (r.result?.results?.total_successful || 0), 0);
+     
+   const totalFailed = successfulBatches
+     .reduce((sum, r) => sum + (r.result?.results?.total_failed || 0), 0);
+   
+   return {
+     total_batches: batchResults.length,
+     successful_batches: successfulBatches.length,
+     failed_batches: batchResults.filter(r => !r.success).length,
+     total_successful: totalSuccessful,
+     total_failed: totalFailed,
+     batch_details: batchResults
+   };
+ }
+
+ // CATEGORY-RELATED HELPER METHODS (Using Category Service)
+
+ /**
+  * Get all categories for product assignment
+  * @returns {Promise<Array>} Active categories
+  */
+ async getAvailableCategories() {
+   try {
+     // Use category service to get active categories
+     return await categoryApiService.getActiveCategories();
+   } catch (error) {
+     console.error('Error fetching available categories:', error);
+     return [];
+   }
+ }
+
+ /**
+  * Get subcategories for a specific category
+  * @param {string} categoryId - Category ID
+  * @returns {Promise<Array>} Subcategories
+  */
+ async getAvailableSubcategories(categoryId) {
+   try {
+     // Use category service to get subcategories
+     return await categoryApiService.getSubcategories(categoryId);
+   } catch (error) {
+     console.error('Error fetching subcategories:', error);
+     return [];
+   }
+ }
+
+ /**
+  * Validate category and subcategory before product creation/update
+  * @param {string} categoryId - Category ID
+  * @param {string} subcategoryName - Subcategory name (optional)
+  * @returns {Promise<Object>} Validation result
+  */
+ async validateCategoryAssignment(categoryId, subcategoryName = null) {
+   try {
+     // Check if category exists and is active
+     const category = await categoryApiService.getCategoryById(categoryId);
+     if (!category) {
+       return {
+         isValid: false,
+         error: 'Category not found'
+       };
+     }
+     
+     if (category.status !== 'active') {
+       return {
+         isValid: false,
+         error: 'Category is not active'
+       };
+     }
+     
+     // If subcategory is specified, validate it exists
+     if (subcategoryName) {
+       const subcategories = await categoryApiService.getSubcategories(categoryId);
+       const subcategoryExists = subcategories.some(sub => sub.name === subcategoryName);
+       
+       if (!subcategoryExists) {
+         return {
+           isValid: false,
+           error: `Subcategory '${subcategoryName}' not found in category '${category.category_name}'`
+         };
+       }
+     }
+     
+     return {
+       isValid: true,
+       category: category,
+       subcategory: subcategoryName
+     };
+   } catch (error) {
+     return {
+       isValid: false,
+       error: error.message || 'Category validation failed'
+     };
+   }
+ }
+
+ /**
+  * Get category name by ID (helper for display purposes)
+  * @param {string} categoryId - Category ID
+  * @returns {Promise<string>} Category name
+  */
+ async getCategoryName(categoryId) {
+   try {
+     const category = await categoryApiService.getCategoryById(categoryId);
+     return category ? category.category_name : 'Unknown Category';
+   } catch (error) {
+     console.error('Error fetching category name:', error);
+     return 'Unknown Category';
+   }
+ }
+
+ /**
+  * Enrich products with category information
+  * @param {Array<Object>} products - Array of products
+  * @returns {Promise<Array>} Products with category details
+  */
+ async enrichProductsWithCategoryInfo(products) {
+   try {
+     // Get all categories once to avoid multiple API calls
+     const allCategories = await categoryApiService.getAllCategories();
+     const categoryMap = new Map(allCategories.map(cat => [cat._id, cat]));
+     
+     // Enrich each product with category info
+     return products.map(product => {
+       const category = categoryMap.get(product.category_id);
+       return {
+         ...product,
+         category_name: category ? category.category_name : 'Unknown',
+         category_status: category ? category.status : 'unknown',
+         category_description: category ? category.description : ''
+       };
+     });
+   } catch (error) {
+     console.error('Error enriching products with category info:', error);
+     // Return products without enrichment if error occurs
+     return products;
+   }
+ }
+
+ /**
+  * Get products grouped by category
+  * @param {Object} params - Query parameters
+  * @returns {Promise<Object>} Products grouped by category
+  */
+ async getProductsGroupedByCategory(params = {}) {
+   try {
+     // Get all products
+     const productsResponse = await this.getProducts(params);
+     const products = productsResponse.data || productsResponse.products || [];
+     
+     // Get all categories
+     const categories = await categoryApiService.getAllCategories();
+     
+     // Group products by category
+     const grouped = {};
+     
+     // Initialize groups for each category
+     categories.forEach(category => {
+       grouped[category._id] = {
+         category_id: category._id,
+         category_name: category.category_name,
+         category_description: category.description,
+         category_status: category.status,
+         products: [],
+         product_count: 0
+       };
+     });
+     
+     // Add "Uncategorized" group
+     grouped['uncategorized'] = {
+       category_id: 'uncategorized',
+       category_name: 'Uncategorized',
+       category_description: 'Products without category assignment',
+       category_status: 'active',
+       products: [],
+       product_count: 0
+     };
+     
+     // Assign products to groups
+     products.forEach(product => {
+       const categoryId = product.category_id || 'uncategorized';
+       if (grouped[categoryId]) {
+         grouped[categoryId].products.push(product);
+         grouped[categoryId].product_count++;
+       } else {
+         // If category doesn't exist in our list, add to uncategorized
+         grouped['uncategorized'].products.push(product);
+         grouped['uncategorized'].product_count++;
+       }
+     });
+     
+     // Convert to array and filter out empty categories if needed
+     const groupedArray = Object.values(grouped);
+     
+     return {
+       total_categories: groupedArray.length,
+       total_products: products.length,
+       groups: groupedArray,
+       pagination: productsResponse.pagination || null
+     };
+   } catch (error) {
+     this.handleError(error);
+   }
+ }
 }
 
 // Create and export singleton instance

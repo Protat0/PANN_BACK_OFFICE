@@ -15,7 +15,7 @@
     <div v-if="showPagination && totalPages > 1" class="pagination-container">
       <div class="d-flex justify-content-between align-items-center">
         <div class="pagination-info">
-          <small style="color: var(--tertiary-medium);">
+          <small class="text-tertiary">
             Showing {{ startItem }}-{{ endItem }} of {{ totalItems }} items
           </small>
         </div>
@@ -137,16 +137,14 @@ export default {
 </script>
 
 <style scoped>
+/* ==========================================================================
+   TABLE CONTAINER - SEMANTIC THEME SYSTEM
+   ========================================================================== */
+
 .table-container {
-  background: white;
   border-radius: 0.75rem;
-  /* Much harder drop shadow on all sides */
-  box-shadow: 
-    0 20px 25px -5px rgba(0, 0, 0, 0.25),
-    0 10px 10px -5px rgba(0, 0, 0, 0.15),
-    0 0 0 1px rgba(0, 0, 0, 0.1);
   overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  @apply surface-card shadow-lg transition-theme;
 }
 
 .table-responsive {
@@ -157,12 +155,16 @@ export default {
   margin-bottom: 0;
   border-collapse: separate;
   border-spacing: 0;
+  @apply text-primary;
 }
 
-/* Header Styling */
+/* ==========================================================================
+   HEADER STYLING - SEMANTIC
+   ========================================================================== */
+
 .table-header {
-  background-color: var(--primary-medium) !important;
-  color: white !important;
+  background-color: var(--secondary) !important;
+  color: var(--text-inverse) !important;
 }
 
 .data-table :deep(.table-header th) {
@@ -171,10 +173,10 @@ export default {
   font-size: 0.875rem;
   letter-spacing: 0.025em;
   border: none !important;
-  color: white !important;
+  color: var(--text-inverse) !important;
   text-transform: uppercase;
   position: relative;
-  background-color: var(--primary-medium) !important;
+  background-color: var(--secondary) !important;
 }
 
 .data-table :deep(.table-header th:first-child) {
@@ -185,13 +187,15 @@ export default {
   border-top-right-radius: 0.75rem;
 }
 
-/* Body Styling */
+/* ==========================================================================
+   BODY STYLING - SEMANTIC
+   ========================================================================== */
+
 .data-table :deep(tbody td) {
   padding: 0.875rem 1rem;
-  border-bottom: 1px solid var(--neutral-light);
   font-size: 0.875rem;
-  color: var(--tertiary-dark);
   vertical-align: middle;
+  @apply border-bottom-theme text-primary surface-primary transition-theme;
 }
 
 .data-table :deep(tbody tr:last-child td) {
@@ -199,18 +203,25 @@ export default {
 }
 
 .data-table :deep(tbody tr:hover) {
-  background-color: var(--neutral-light);
+  @apply hover-surface;
+}
+
+.data-table :deep(tbody tr:hover td) {
+  @apply hover-surface;
 }
 
 .data-table :deep(tbody tr.table-primary) {
-  background-color: var(--primary-light);
+  @apply state-selected;
 }
 
 .data-table :deep(tbody tr.text-muted) {
   opacity: 0.6;
 }
 
-/* Action Button Base Styles */
+/* ==========================================================================
+   ACTION BUTTON STYLES - SEMANTIC
+   ========================================================================== */
+
 .data-table :deep(.action-btn) {
   width: 24px;
   height: 24px;
@@ -219,19 +230,16 @@ export default {
   justify-content: center;
   border-radius: 0.375rem;
   border-width: 1.5px;
-  transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
   padding: 0;
   margin: 0 1px;
-  /* Harder drop shadow for action buttons */
-  box-shadow: 0 3px 6px 0 rgba(0, 0, 0, 0.12);
+  @apply shadow-sm transition-all-theme;
 }
 
 .data-table :deep(.action-btn:hover) {
   transform: translateY(-2px);
-  /* Much harder shadow on hover */
-  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.25);
+  @apply shadow-md;
 }
 
 .data-table :deep(.action-btn:active) {
@@ -246,7 +254,7 @@ export default {
   transform: scale(1.1);
 }
 
-/* Action Button Color Overrides using colors.css */
+/* Action Button Color Variants - Semantic */
 .data-table :deep(.action-btn-edit) {
   --bs-btn-color: var(--secondary);
   --bs-btn-border-color: var(--secondary);
@@ -267,6 +275,17 @@ export default {
   --bs-btn-active-color: var(--primary-dark);
   --bs-btn-active-bg: var(--primary-medium);
   --bs-btn-active-border-color: var(--primary-dark);
+}
+
+.data-table :deep(.action-btn-delete) {
+  --bs-btn-color: var(--error);
+  --bs-btn-border-color: var(--error);
+  --bs-btn-hover-color: var(--error-dark);
+  --bs-btn-hover-bg: var(--error-light);
+  --bs-btn-hover-border-color: var(--error-dark);
+  --bs-btn-active-color: var(--error-dark);
+  --bs-btn-active-bg: var(--error-medium);
+  --bs-btn-active-border-color: var(--error-dark);
 }
 
 .data-table :deep(.action-btn-stock) {
@@ -291,206 +310,37 @@ export default {
   --bs-btn-active-border-color: var(--success-dark);
 }
 
-.data-table :deep(.action-btn-status-inactive) {
-  --bs-btn-color: var(--tertiary-medium);
-  --bs-btn-border-color: var(--tertiary-medium);
-  --bs-btn-hover-color: var(--tertiary-dark);
-  --bs-btn-hover-bg: var(--neutral-medium);
-  --bs-btn-hover-border-color: var(--tertiary-dark);
-  --bs-btn-active-color: var(--tertiary-dark);
-  --bs-btn-active-bg: var(--neutral-dark);
-  --bs-btn-active-border-color: var(--tertiary-dark);
-}
+/* ==========================================================================
+   BADGE AND STATUS STYLING - SEMANTIC
+   ========================================================================== */
 
-.data-table :deep(.action-btn-delete) {
-  --bs-btn-color: var(--error);
-  --bs-btn-border-color: var(--error);
-  --bs-btn-hover-color: var(--error-dark);
-  --bs-btn-hover-bg: var(--error-light);
-  --bs-btn-hover-border-color: var(--error-dark);
-  --bs-btn-active-color: var(--error-dark);
-  --bs-btn-active-bg: var(--error-medium);
-  --bs-btn-active-border-color: var(--error-dark);
-}
-
-.data-table :deep(.action-btn-duplicate) {
-  --bs-btn-color: var(--secondary-medium);
-  --bs-btn-border-color: var(--secondary-medium);
-  --bs-btn-hover-color: var(--secondary-dark);
-  --bs-btn-hover-bg: var(--secondary-light);
-  --bs-btn-hover-border-color: var(--secondary-dark);
-}
-
-.data-table :deep(.action-btn-archive) {
-  --bs-btn-color: var(--neutral-dark);
-  --bs-btn-border-color: var(--neutral-dark);
-  --bs-btn-hover-color: var(--tertiary-dark);
-  --bs-btn-hover-bg: var(--neutral-medium);
-  --bs-btn-hover-border-color: var(--tertiary-dark);
-}
-
-.data-table :deep(.action-btn-restore) {
-  --bs-btn-color: var(--success-medium);
-  --bs-btn-border-color: var(--success-medium);
-  --bs-btn-hover-color: var(--success-dark);
-  --bs-btn-hover-bg: var(--success-light);
-  --bs-btn-hover-border-color: var(--success-dark);
-}
-
-.data-table :deep(.action-btn-download) {
-  --bs-btn-color: var(--info-medium);
-  --bs-btn-border-color: var(--info-medium);
-  --bs-btn-hover-color: var(--info-dark);
-  --bs-btn-hover-bg: var(--info-light);
-  --bs-btn-hover-border-color: var(--info-dark);
-}
-
-.data-table :deep(.action-btn-share) {
-  --bs-btn-color: var(--primary-medium);
-  --bs-btn-border-color: var(--primary-medium);
-  --bs-btn-hover-color: var(--primary-dark);
-  --bs-btn-hover-bg: var(--primary-light);
-  --bs-btn-hover-border-color: var(--primary-dark);
-}
-
-.data-table :deep(.action-btn-settings) {
-  --bs-btn-color: var(--tertiary-dark);
-  --bs-btn-border-color: var(--tertiary-dark);
-  --bs-btn-hover-color: var(--tertiary-dark);
-  --bs-btn-hover-bg: var(--neutral-light);
-  --bs-btn-hover-border-color: var(--tertiary-dark);
-}
-
-.data-table :deep(.action-btn-history) {
-  --bs-btn-color: var(--info-dark);
-  --bs-btn-border-color: var(--info-dark);
-  --bs-btn-hover-color: var(--info-dark);
-  --bs-btn-hover-bg: var(--info-light);
-  --bs-btn-hover-border-color: var(--info-dark);
-}
-
-.data-table :deep(.action-btn-favorite) {
-  --bs-btn-color: #ffc107;
-  --bs-btn-border-color: #ffc107;
-  --bs-btn-hover-color: #f57c00;
-  --bs-btn-hover-bg: #fff3cd;
-  --bs-btn-hover-border-color: #f57c00;
-}
-
-.data-table :deep(.action-btn-print) {
-  --bs-btn-color: var(--neutral-dark);
-  --bs-btn-border-color: var(--neutral-dark);
-  --bs-btn-hover-color: var(--tertiary-dark);
-  --bs-btn-hover-bg: var(--neutral-light);
-  --bs-btn-hover-border-color: var(--tertiary-dark);
-}
-
-.data-table :deep(.action-btn-email) {
-  --bs-btn-color: #17a2b8;
-  --bs-btn-border-color: #17a2b8;
-  --bs-btn-hover-color: #138496;
-  --bs-btn-hover-bg: #d1ecf1;
-  --bs-btn-hover-border-color: #138496;
-}
-
-.data-table :deep(.action-btn-copy) {
-  --bs-btn-color: var(--secondary-dark);
-  --bs-btn-border-color: var(--secondary-dark);
-  --bs-btn-hover-color: var(--secondary-dark);
-  --bs-btn-hover-bg: var(--secondary-light);
-  --bs-btn-hover-border-color: var(--secondary-dark);
-}
-
-.data-table :deep(.action-btn-move) {
-  --bs-btn-color: var(--primary-dark);
-  --bs-btn-border-color: var(--primary-dark);
-  --bs-btn-hover-color: var(--primary-dark);
-  --bs-btn-hover-bg: var(--primary-light);
-  --bs-btn-hover-border-color: var(--primary-dark);
-}
-
-.data-table :deep(.action-btn-export) {
-  --bs-btn-color: var(--success-dark);
-  --bs-btn-border-color: var(--success-dark);
-  --bs-btn-hover-color: var(--success-dark);
-  --bs-btn-hover-bg: var(--success-light);
-  --bs-btn-hover-border-color: var(--success-dark);
-}
-
-.data-table :deep(.action-btn-import) {
-  --bs-btn-color: var(--info-dark);
-  --bs-btn-border-color: var(--info-dark);
-  --bs-btn-hover-color: var(--info-dark);
-  --bs-btn-hover-bg: var(--info-light);
-  --bs-btn-hover-border-color: var(--info-dark);
-}
-
-.data-table :deep(.action-btn-approve) {
-  --bs-btn-color: var(--success);
-  --bs-btn-border-color: var(--success);
-  --bs-btn-hover-color: var(--success-dark);
-  --bs-btn-hover-bg: var(--success-light);
-  --bs-btn-hover-border-color: var(--success-dark);
-}
-
-.data-table :deep(.action-btn-reject) {
-  --bs-btn-color: var(--error);
-  --bs-btn-border-color: var(--error);
-  --bs-btn-hover-color: var(--error-dark);
-  --bs-btn-hover-bg: var(--error-light);
-  --bs-btn-hover-border-color: var(--error-dark);
-}
-
-.data-table :deep(.action-btn-pause) {
-  --bs-btn-color: #ffc107;
-  --bs-btn-border-color: #ffc107;
-  --bs-btn-hover-color: #f57c00;
-  --bs-btn-hover-bg: #fff3cd;
-  --bs-btn-hover-border-color: #f57c00;
-}
-
-.data-table :deep(.action-btn-play) {
-  --bs-btn-color: var(--success);
-  --bs-btn-border-color: var(--success);
-  --bs-btn-hover-color: var(--success-dark);
-  --bs-btn-hover-bg: var(--success-light);
-  --bs-btn-hover-border-color: var(--success-dark);
-}
-
-.data-table :deep(.action-btn-stop) {
-  --bs-btn-color: var(--error);
-  --bs-btn-border-color: var(--error);
-  --bs-btn-hover-color: var(--error-dark);
-  --bs-btn-hover-bg: var(--error-light);
-  --bs-btn-hover-border-color: var(--error-dark);
-}
-
-/* Badge and Status Styling */
 .data-table :deep(.badge) {
   font-size: 0.75rem;
   font-weight: 600;
   padding: 0.375rem 0.75rem;
+  @apply surface-tertiary text-primary border-theme;
 }
 
 .data-table :deep(.text-tertiary-dark) {
-  color: var(--tertiary-dark) !important;
+  @apply text-primary;
 }
 
 .data-table :deep(.text-tertiary-medium) {
-  color: var(--tertiary-medium) !important;
+  @apply text-secondary;
 }
 
 .data-table :deep(.text-primary-dark) {
-  color: var(--primary-dark) !important;
+  @apply text-accent;
 }
 
-/* Pagination Container with Shadow */
+/* ==========================================================================
+   PAGINATION CONTAINER - SEMANTIC
+   ========================================================================== */
+
 .pagination-container {
   padding: 1rem;
-  border-top: 1px solid var(--neutral-light);
-  background-color: #FAFAFA; /* Lighter than global background */
-  /* Harder inner shadow for depth */
-  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.12);
+  @apply border-top-theme surface-secondary shadow-sm transition-theme;
+  box-shadow: inset 0 2px 4px 0 var(--shadow-sm);
 }
 
 .pagination-info {
@@ -498,35 +348,23 @@ export default {
 }
 
 .pagination .page-link {
-  color: var(--primary);
-  border-color: var(--neutral);
   padding: 0.375rem 0.75rem;
-  /* Harder shadow for pagination buttons */
-  box-shadow: 0 3px 6px 0 rgba(0, 0, 0, 0.12);
-  transition: all 0.2s ease;
+  @apply text-accent border-theme surface-primary shadow-sm transition-all-theme;
 }
 
 .pagination .page-link:hover {
-  color: var(--primary-dark);
-  background-color: var(--primary-light);
-  border-color: var(--primary);
-  /* Much harder shadow on hover */
-  box-shadow: 0 6px 12px 0 rgba(0, 0, 0, 0.18);
   transform: translateY(-2px);
+  @apply text-accent state-hover border-accent shadow-md;
 }
 
 .pagination .page-item.active .page-link {
-  background-color: var(--primary);
-  border-color: var(--primary);
-  color: white;
-  /* Hardest shadow for active state */
-  box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.25);
+  background-color: var(--secondary);
+  border-color: var(--secondary);
+  @apply text-inverse shadow-md;
 }
 
 .pagination .page-item.disabled .page-link {
-  color: var(--tertiary-medium);
-  background-color: var(--neutral-light);
-  border-color: var(--neutral);
+  @apply text-disabled surface-tertiary border-secondary;
   box-shadow: none;
 }
 
@@ -551,7 +389,78 @@ export default {
   transition: transform 0.2s ease;
 }
 
-/* Responsive Design */
+/* ==========================================================================
+   STICKY HEADER - SEMANTIC
+   ========================================================================== */
+
+.table-header-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: var(--secondary) !important;
+  @apply shadow-md;
+}
+
+.table-header-sticky th {
+  position: relative;
+  background-color: var(--secondary) !important;
+}
+
+/* Add shadow when scrolling for better visual separation */
+.table-header-sticky::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(to bottom, var(--shadow-lg), transparent);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* Enhanced scroll shadow effect */
+.table-responsive.scrolled .table-header-sticky::after {
+  opacity: 1;
+}
+
+/* ==========================================================================
+   CHECKBOX STYLING - SEMANTIC
+   ========================================================================== */
+
+.data-table :deep(.form-check-input) {
+  border-width: 2px !important;
+  width: 1.1em;
+  height: 1.1em;
+  @apply border-primary surface-primary shadow-sm transition-all-theme;
+}
+
+.data-table :deep(.form-check-input:hover) {
+  @apply border-accent shadow-md;
+}
+
+.data-table :deep(.form-check-input:focus) {
+  @apply border-accent focus-ring-theme;
+}
+
+.data-table :deep(.form-check-input:checked) {
+  background-color: var(--secondary) !important;
+  border-color: var(--secondary) !important;
+  border-width: 2px !important;
+  @apply shadow-md;
+}
+
+.data-table :deep(.form-check-input:indeterminate) {
+  background-color: var(--secondary) !important;
+  border-color: var(--secondary) !important;
+  border-width: 2px !important;
+  @apply shadow-md;
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN
+   ========================================================================== */
+
 @media (max-width: 1024px) {
   .table-responsive {
     border-radius: 0.75rem;
@@ -593,69 +502,21 @@ export default {
   }
 }
 
-.table-header-sticky {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background-color: var(--primary-medium) !important;
-  /* Harder shadow for sticky header */
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.15);
-}
+/* ==========================================================================
+   ACCESSIBILITY & REDUCED MOTION
+   ========================================================================== */
 
-.table-header-sticky th {
-  position: relative;
-  background-color: var(--primary-medium) !important;
-}
-
-/* Add shadow when scrolling for better visual separation */
-.table-header-sticky::after {
-  content: '';
-  position: absolute;
-  bottom: -3px;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.15), transparent);
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-/* Enhanced scroll shadow effect */
-.table-responsive.scrolled .table-header-sticky::after {
-  opacity: 1;
-}
-
-/* Checkbox Styling - Thicker Outlines for Better Clarity */
-.data-table :deep(.form-check-input) {
-  border-width: 2px !important;
-  border-color: var(--neutral-dark) !important;
-  width: 1.1em;
-  height: 1.1em;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.08);
-}
-
-.data-table :deep(.form-check-input:hover) {
-  border-color: var(--primary) !important;
-  box-shadow: 0 3px 6px 0 rgba(0, 0, 0, 0.12);
-}
-
-.data-table :deep(.form-check-input:focus) {
-  border-color: var(--primary) !important;
-  box-shadow: 0 0 0 3px rgba(115, 146, 226, 0.25) !important;
-}
-
-.data-table :deep(.form-check-input:checked) {
-  background-color: var(--primary) !important;
-  border-color: var(--primary) !important;
-  border-width: 2px !important;
-  box-shadow: 0 3px 6px 0 rgba(0, 0, 0, 0.15);
-}
-
-.data-table :deep(.form-check-input:indeterminate) {
-  background-color: var(--primary) !important;
-  border-color: var(--primary) !important;
-  border-width: 2px !important;
-  box-shadow: 0 3px 6px 0 rgba(0, 0, 0, 0.15);
+@media (prefers-reduced-motion: reduce) {
+  .data-table :deep(.action-btn),
+  .pagination .page-link,
+  .page-link-icon {
+    transition: none !important;
+  }
+  
+  .data-table :deep(.action-btn:hover),
+  .pagination .page-link:hover,
+  .page-link-icon:hover {
+    transform: none !important;
+  }
 }
 </style>

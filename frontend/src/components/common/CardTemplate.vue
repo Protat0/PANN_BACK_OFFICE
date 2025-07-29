@@ -34,7 +34,7 @@
 
     <!-- Loading Overlay -->
     <div v-if="loading" class="card-loading-overlay">
-      <div class="spinner-border text-primary" role="status">
+      <div class="spinner-border text-accent" role="status">
         <span class="visually-hidden">Loading...</span>
       </div>
     </div>
@@ -58,7 +58,7 @@ export default {
       default: 'none',
       validator: (value) => [
         'none', 'primary', 'secondary', 'success', 'info', 'warning', 
-        'danger', 'error', 'tertiary', 'neutral'
+        'danger', 'error', 'tertiary', 'neutral', 'accent'
       ].includes(value)
     },
     
@@ -104,7 +104,7 @@ export default {
     shadow: {
       type: String,
       default: 'sm',
-      validator: (value) => ['none', 'sm', 'md', 'lg'].includes(value)
+      validator: (value) => ['none', 'sm', 'md', 'lg', 'xl'].includes(value)
     },
     
     // Value formatting
@@ -116,10 +116,10 @@ export default {
     
     valueColor: {
       type: String,
-      default: 'primary',
+      default: 'accent',
       validator: (value) => [
         'primary', 'secondary', 'success', 'info', 'warning', 
-        'danger', 'error', 'tertiary', 'neutral'
+        'danger', 'error', 'tertiary', 'neutral', 'accent'
       ].includes(value)
     }
   },
@@ -167,7 +167,7 @@ export default {
     },
     
     titleClasses() {
-      const classes = ['card-title', 'text-tertiary-dark', 'mb-2']
+      const classes = ['card-title', 'text-primary', 'mb-2']
       
       // Size-based title classes
       if (this.size === 'mini') {
@@ -220,7 +220,7 @@ export default {
     },
     
     subtitleClasses() {
-      return ['card-subtitle', 'text-tertiary-medium']
+      return ['card-subtitle', 'text-tertiary']
     },
     
     formattedValue() {
@@ -251,15 +251,17 @@ export default {
 
 <style scoped>
 /* ==========================================================================
-   CARD TEMPLATE COMPONENT
+   CARD TEMPLATE COMPONENT - SEMANTIC THEME SYSTEM
    Reusable card component with size and border variants
    ========================================================================== */
 
 .card-template {
   position: relative;
-  transition: all 0.2s ease;
-  background-color: white;
   border-radius: 0.75rem;
+  background-color: var(--surface-primary);
+  border: 1px solid var(--border-secondary);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease;
 }
 
 /* ==========================================================================
@@ -295,6 +297,18 @@ export default {
 
 .card-xxl .card-body {
   padding: 2.5rem;
+}
+
+/* ==========================================================================
+   CARD HEADER & FOOTER - SEMANTIC STYLING
+   ========================================================================== */
+
+.card-header,
+.card-footer {
+  background-color: var(--surface-secondary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
 }
 
 /* ==========================================================================
@@ -353,8 +367,7 @@ export default {
 }
 
 /* ==========================================================================
-   BORDER COLOR VARIANTS
-   Using colors.css variables
+   BORDER COLOR VARIANTS - SEMANTIC WITH DARK MODE GRADIENTS
    ========================================================================== */
 
 .border-primary {
@@ -363,6 +376,10 @@ export default {
 
 .border-secondary {
   border-color: var(--secondary) !important;
+}
+
+.border-accent {
+  border-color: var(--text-accent) !important;
 }
 
 .border-success {
@@ -374,7 +391,7 @@ export default {
 }
 
 .border-warning {
-  border-color: var(--warning, #ffc107) !important;
+  border-color: var(--status-warning) !important;
 }
 
 .border-danger,
@@ -391,15 +408,105 @@ export default {
 }
 
 /* ==========================================================================
-   VALUE COLOR VARIANTS
+   DARK MODE FILLED CARD VARIANTS WITH SOFT GRADIENTS
+   ========================================================================== */
+
+/* Dark mode filled backgrounds with gradients */
+:root.dark-theme .card-template.border-primary,
+.dark-theme .card-template.border-primary {
+  background: linear-gradient(135deg, 
+    rgba(143, 164, 232, 0.15) 0%, 
+    rgba(115, 146, 226, 0.08) 100%);
+  border-color: rgba(143, 164, 232, 0.3) !important;
+  box-shadow: 0 4px 6px -1px rgba(143, 164, 232, 0.1);
+}
+
+:root.dark-theme .card-template.border-secondary,
+.dark-theme .card-template.border-secondary {
+  background: linear-gradient(135deg, 
+    rgba(192, 153, 236, 0.15) 0%, 
+    rgba(160, 123, 227, 0.08) 100%);
+  border-color: rgba(192, 153, 236, 0.3) !important;
+  box-shadow: 0 4px 6px -1px rgba(192, 153, 236, 0.1);
+}
+
+:root.dark-theme .card-template.border-accent,
+.dark-theme .card-template.border-accent {
+  background: linear-gradient(135deg, 
+    rgba(176, 136, 228, 0.15) 0%, 
+    rgba(160, 123, 227, 0.08) 100%);
+  border-color: rgba(176, 136, 228, 0.3) !important;
+  box-shadow: 0 4px 6px -1px rgba(176, 136, 228, 0.1);
+}
+
+:root.dark-theme .card-template.border-success,
+.dark-theme .card-template.border-success {
+  background: linear-gradient(135deg, 
+    rgba(125, 209, 165, 0.15) 0%, 
+    rgba(107, 196, 151, 0.08) 100%);
+  border-color: rgba(125, 209, 165, 0.3) !important;
+  box-shadow: 0 4px 6px -1px rgba(125, 209, 165, 0.1);
+}
+
+:root.dark-theme .card-template.border-info,
+.dark-theme .card-template.border-info {
+  background: linear-gradient(135deg, 
+    rgba(157, 123, 169, 0.15) 0%, 
+    rgba(139, 107, 151, 0.08) 100%);
+  border-color: rgba(157, 123, 169, 0.3) !important;
+  box-shadow: 0 4px 6px -1px rgba(157, 123, 169, 0.1);
+}
+
+:root.dark-theme .card-template.border-warning,
+.dark-theme .card-template.border-warning {
+  background: linear-gradient(135deg, 
+    rgba(255, 183, 77, 0.15) 0%, 
+    rgba(255, 152, 0, 0.08) 100%);
+  border-color: rgba(255, 183, 77, 0.3) !important;
+  box-shadow: 0 4px 6px -1px rgba(255, 183, 77, 0.1);
+}
+
+:root.dark-theme .card-template.border-error,
+.dark-theme .card-template.border-danger {
+  background: linear-gradient(135deg, 
+    rgba(242, 107, 103, 0.15) 0%, 
+    rgba(239, 83, 80, 0.08) 100%);
+  border-color: rgba(242, 107, 103, 0.3) !important;
+  box-shadow: 0 4px 6px -1px rgba(242, 107, 103, 0.1);
+}
+
+:root.dark-theme .card-template.border-tertiary,
+.dark-theme .card-template.border-tertiary {
+  background: linear-gradient(135deg, 
+    rgba(180, 168, 180, 0.15) 0%, 
+    rgba(153, 137, 154, 0.08) 100%);
+  border-color: rgba(180, 168, 180, 0.3) !important;
+  box-shadow: 0 4px 6px -1px rgba(180, 168, 180, 0.1);
+}
+
+:root.dark-theme .card-template.border-neutral,
+.dark-theme .card-template.border-neutral {
+  background: linear-gradient(135deg, 
+    rgba(188, 188, 188, 0.15) 0%, 
+    rgba(146, 146, 146, 0.08) 100%);
+  border-color: rgba(188, 188, 188, 0.3) !important;
+  box-shadow: 0 4px 6px -1px rgba(188, 188, 188, 0.1);
+}
+
+/* ==========================================================================
+   VALUE COLOR VARIANTS - SEMANTIC
    ========================================================================== */
 
 .text-primary {
-  color: var(--primary) !important;
+  color: var(--text-primary) !important;
 }
 
 .text-secondary {
   color: var(--secondary) !important;
+}
+
+.text-accent {
+  color: var(--text-accent) !important;
 }
 
 .text-success {
@@ -411,7 +518,7 @@ export default {
 }
 
 .text-warning {
-  color: var(--warning, #ffc107) !important;
+  color: var(--status-warning) !important;
 }
 
 .text-danger,
@@ -420,7 +527,7 @@ export default {
 }
 
 .text-tertiary {
-  color: var(--tertiary) !important;
+  color: var(--text-tertiary) !important;
 }
 
 .text-neutral {
@@ -428,16 +535,17 @@ export default {
 }
 
 /* ==========================================================================
-   INTERACTIVE STATES
+   INTERACTIVE STATES - SEMANTIC
    ========================================================================== */
 
 .card-clickable {
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .card-clickable:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15) !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
 .card-clickable:active {
@@ -445,12 +553,13 @@ export default {
 }
 
 /* ==========================================================================
-   LOADING STATE
+   LOADING STATE - SEMANTIC
    ========================================================================== */
 
 .card-loading {
   pointer-events: none;
-  opacity: 0.8;
+  background-color: var(--state-disabled);
+  opacity: 0.6;
 }
 
 .card-loading-overlay {
@@ -462,13 +571,13 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(255, 255, 255, 0.8);
   border-radius: inherit;
   z-index: 10;
+  background-color: var(--surface-overlay);
 }
 
 /* ==========================================================================
-   SHADOW VARIANTS
+   SHADOW VARIANTS - SEMANTIC
    ========================================================================== */
 
 .shadow-sm {
@@ -476,23 +585,15 @@ export default {
 }
 
 .shadow-md {
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
-}
-
-.shadow-lg {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
 }
 
-/* ==========================================================================
-   CUSTOM TEXT COLORS USING COLORS.CSS VARIABLES
-   ========================================================================== */
-
-.text-tertiary-dark {
-  color: var(--tertiary-dark) !important;
+.shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
 }
 
-.text-tertiary-medium {
-  color: var(--tertiary-medium) !important;
+.shadow-xl {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
 }
 
 /* ==========================================================================
@@ -520,7 +621,7 @@ export default {
     padding: 0.75rem;
   }
 
-    .card-mini .card-body {
+  .card-mini .card-body {
     padding: 0.375rem 0.5rem;
   }
   
@@ -534,22 +635,99 @@ export default {
 }
 
 /* ==========================================================================
-   ACCESSIBILITY ENHANCEMENTS
+   ACCESSIBILITY ENHANCEMENTS - SEMANTIC
    ========================================================================== */
 
 .card-clickable:focus {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--border-accent);
   outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .card-template,
   .card-clickable {
-    transition: none;
+    transition: none !important;
   }
   
   .card-clickable:hover {
     transform: none;
   }
+}
+
+/* ==========================================================================
+   ENHANCED VISUAL EFFECTS
+   ========================================================================== */
+
+/* Subtle gradient background for elevated cards */
+.card-template {
+  background: linear-gradient(
+    145deg,
+    var(--surface-primary) 0%,
+    var(--surface-elevated) 100%
+  );
+}
+
+/* Enhanced hover state for clickable cards */
+.card-clickable:hover {
+  background: linear-gradient(
+    145deg,
+    var(--surface-elevated) 0%,
+    var(--surface-primary) 100%
+  );
+}
+
+/* Card content text hierarchy */
+.card-body {
+  @apply text-secondary;
+}
+
+/* Enhanced loading spinner */
+.card-loading-overlay .spinner-border {
+  width: 2rem;
+  height: 2rem;
+  border-width: 0.25rem;
+}
+
+/* Border position variants with better visual impact */
+.border-start.border-4 {
+  border-left-width: 4px !important;
+  border-left-style: solid !important;
+}
+
+.border-end.border-4 {
+  border-right-width: 4px !important;
+  border-right-style: solid !important;
+}
+
+.border-top.border-4 {
+  border-top-width: 4px !important;
+  border-top-style: solid !important;
+}
+
+.border-bottom.border-4 {
+  border-bottom-width: 4px !important;
+  border-bottom-style: solid !important;
+}
+
+/* Enhanced typography spacing */
+.card-title + .card-value {
+  margin-top: 0.5rem;
+}
+
+.card-value + .card-subtitle {
+  margin-top: 0.25rem;
+}
+
+/* Status indicator styling */
+.card-template[class*="border-success"] {
+  box-shadow: 0 4px 6px -1px rgba(94, 180, 136, 0.1), 0 2px 4px -1px rgba(94, 180, 136, 0.06);
+}
+
+.card-template[class*="border-error"] {
+  box-shadow: 0 4px 6px -1px rgba(229, 57, 53, 0.1), 0 2px 4px -1px rgba(229, 57, 53, 0.06);
+}
+
+.card-template[class*="border-warning"] {
+  box-shadow: 0 4px 6px -1px rgba(255, 193, 7, 0.1), 0 2px 4px -1px rgba(255, 193, 7, 0.06);
 }
 </style>
