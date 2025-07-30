@@ -33,6 +33,17 @@ export function useCustomers() {
   const monthlyUsersCount = ref('Loading...')
   const dailyUsersCount = ref('Loading...')
 
+  // Auto-refresh and connection state
+  const autoRefreshEnabled = ref(true)
+  const countdown = ref(30)
+  const connectionLost = ref(false)
+  const exporting = ref(false)
+  const refreshProgress = ref('')
+
+  // Auto-refresh timer
+  let refreshTimer = null
+  let countdownTimer = null
+
   // Computed properties
   const allSelected = computed(() => {
     return filteredCustomers.value.length > 0 && 
@@ -71,10 +82,94 @@ export function useCustomers() {
     return Math.round(totalLoyaltyPoints.value / customers.value.length)
   })
 
+  // Auto-refresh functionality
+  const startAutoRefresh = () => {
+    if (!autoRefreshEnabled.value) return
+    
+    refreshTimer = setTimeout(async () => {
+      if (autoRefreshEnabled.value) {
+        await refreshData()
+        startAutoRefresh() // Restart the timer
+      }
+    }, 30000) // 30 seconds
+    
+    startCountdown()
+  }
+
+  const startCountdown = () => {
+    countdown.value = 30
+    countdownTimer = setInterval(() => {
+      countdown.value--
+      if (countdown.value <= 0) {
+        clearInterval(countdownTimer)
+      }
+    }, 1000)
+  }
+
+  const stopAutoRefresh = () => {
+    if (refreshTimer) {
+      clearTimeout(refreshTimer)
+      refreshTimer = null
+    }
+    if (countdownTimer) {
+      clearInterval(countdownTimer)
+      countdownTimer = null
+    }
+  }
+
+  const toggleAutoRefresh = () => {
+    autoRefreshEnabled.value = !autoRefreshEnabled.value
+    
+    if (autoRefreshEnabled.value) {
+      startAutoRefresh()
+    } else {
+      stopAutoRefresh()
+    }
+  }
+
+  // Connection status methods
+  const getConnectionStatus = () => {
+    if (connectionLost.value) return 'connection-lost'
+    if (error.value) return 'connection-unstable'
+    return 'connection-good'
+  }
+
+  const getConnectionIcon = () => {
+    if (connectionLost.value) return 'bi bi-wifi-off'
+    if (error.value) return 'bi bi-exclamation-triangle'
+    return 'bi bi-wifi'
+  }
+
+  const getConnectionText = () => {
+    if (connectionLost.value) return 'Connection Lost'
+    if (error.value) return 'Unstable'
+    return 'Connected'
+  }
+
+  // Emergency reconnect functionality
+  const emergencyReconnect = async () => {
+    connectionLost.value = false
+    error.value = null
+    refreshProgress.value = 'Reconnecting...'
+    
+    try {
+      await refreshData()
+      successMessage.value = 'Connection restored successfully'
+      clearSuccessMessage()
+    } catch (err) {
+      connectionLost.value = true
+      error.value = 'Failed to reconnect. Please check your internet connection.'
+    } finally {
+      refreshProgress.value = ''
+    }
+  }
+
   // Core data fetching methods
   const fetchCustomers = async () => {
     loading.value = true
     error.value = null
+    connectionLost.value = false
+    refreshProgress.value = 'Loading customers...'
     
     try {
       console.log('Fetching customers from API...')
@@ -82,11 +177,22 @@ export function useCustomers() {
       customers.value = data
       applyFilters()
       console.log('Customers loaded:', data)
+      
+      // Reset connection status on successful fetch
+      connectionLost.value = false
     } catch (err) {
       console.error('Error fetching customers:', err)
-      error.value = `Failed to load customers: ${err.message}`
+      
+      // Determine if it's a connection issue
+      if (err.message.includes('network') || err.message.includes('fetch')) {
+        connectionLost.value = true
+        error.value = 'Connection lost. Check your internet connection.'
+      } else {
+        error.value = `Failed to load customers: ${err.message}`
+      }
     } finally {
       loading.value = false
+      refreshProgress.value = ''
     }
   }
 
@@ -280,7 +386,7 @@ export function useCustomers() {
     }
   }
 
-  const deleteSelectedCustomers = async () => {
+  const deleteSelected = async () => {
     if (selectedCustomers.value.length === 0) return
     
     const confirmed = confirm(`Are you sure you want to delete ${selectedCustomers.value.length} customer(s)?`)
@@ -375,31 +481,50 @@ export function useCustomers() {
     goToPage(currentPage.value + 1)
   }
 
-  // Utility methods
-  const exportData = () => {
-    const headers = ['ID', 'Name', 'Email', 'Phone', 'Address', 'Loyalty Points', 'Date Created']
-    const csvContent = [
-      headers.join(','),
-      ...filteredCustomers.value.map(customer => [
-        customer.customer_id || customer._id,
-        customer.full_name,
-        customer.email,
-        customer.phone || '',
-        formatAddress(customer.delivery_address),
-        customer.loyalty_points || 0,
-        formatDate(customer.date_created)
-      ].join(','))
-    ].join('\n')
+  // Enhanced export with progress
+  const exportData = async () => {
+    exporting.value = true
+    
+    try {
+      // Simulate export progress for large datasets
+      if (filteredCustomers.value.length > 100) {
+        refreshProgress.value = 'Preparing export...'
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+      
+      const headers = ['ID', 'Name', 'Email', 'Phone', 'Address', 'Loyalty Points', 'Date Created']
+      const csvContent = [
+        headers.join(','),
+        ...filteredCustomers.value.map(customer => [
+          customer.customer_id || customer._id,
+          customer.full_name,
+          customer.email,
+          customer.phone || '',
+          formatAddress(customer.delivery_address),
+          customer.loyalty_points || 0,
+          formatDate(customer.date_created)
+        ].join(','))
+      ].join('\n')
 
-    const blob = new Blob([csvContent], { type: 'text/csv' })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `customers_${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    window.URL.revokeObjectURL(url)
+      const blob = new Blob([csvContent], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `customers_${new Date().toISOString().split('T')[0]}.csv`
+      a.click()
+      window.URL.revokeObjectURL(url)
+      
+      successMessage.value = `Exported ${filteredCustomers.value.length} customers successfully`
+      clearSuccessMessage()
+    } catch (err) {
+      error.value = 'Failed to export data'
+    } finally {
+      exporting.value = false
+      refreshProgress.value = ''
+    }
   }
 
+  // Utility methods
   const formatAddress = (address) => {
     if (!address) return 'N/A'
     if (typeof address === 'string') return address
@@ -435,12 +560,22 @@ export function useCustomers() {
     }, 3000)
   }
 
+  // Cleanup function
+  const cleanup = () => {
+    stopAutoRefresh()
+  }
+
   // Initialize data on composable creation
   const initialize = async () => {
     await Promise.all([
       fetchCustomers(),
       fetchKPIData()
     ])
+    
+    // Start auto-refresh after initial load
+    if (autoRefreshEnabled.value) {
+      startAutoRefresh()
+    }
   }
 
   // Return reactive state and methods
@@ -475,6 +610,13 @@ export function useCustomers() {
     monthlyUsersCount: readonly(monthlyUsersCount),
     dailyUsersCount: readonly(dailyUsersCount),
 
+    // Auto-refresh and connection state
+    autoRefreshEnabled: readonly(autoRefreshEnabled),
+    countdown: readonly(countdown),
+    connectionLost: readonly(connectionLost),
+    exporting: readonly(exporting),
+    refreshProgress: readonly(refreshProgress),
+
     // Computed properties
     allSelected,
     someSelected,
@@ -500,7 +642,7 @@ export function useCustomers() {
     createCustomer,
     updateCustomer,
     deleteCustomer,
-    deleteSelectedCustomers,
+    deleteSelected,
     showAddCustomerModal,
     editCustomer,
     viewCustomer,
@@ -514,6 +656,12 @@ export function useCustomers() {
     exportData,
     formatAddress,
     formatDate,
-    highlightMatch
+    highlightMatch,
+    toggleAutoRefresh,
+    getConnectionStatus,
+    getConnectionIcon,
+    getConnectionText,
+    emergencyReconnect,
+    cleanup
   }
 }

@@ -1,6 +1,6 @@
 from datetime import datetime
 from bson import ObjectId
-from ..database import db_manager
+from ...database import db_manager
 
 class PromoConnection:
     def __init__(self):

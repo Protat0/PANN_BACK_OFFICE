@@ -1,8 +1,8 @@
 from datetime import datetime
 from bson import ObjectId
-from ..database import db_manager
+from ...database import db_manager
 from notifications.services import notification_service
-from promotionCon import PromoConnection
+from backend.app.services.pos.promotionCon import PromoConnection
 
 class SalesService:
     """

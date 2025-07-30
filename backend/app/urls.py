@@ -125,6 +125,15 @@ from .kpi_views.promotion_views import (
     PromotionHardDeleteView,
 )
 
+from .kpi_views.pos.salesReportView import (
+    SalesSummaryView,
+    SalesTransactionsView,
+    SalesByPeriodView,
+    DashboardSummaryView,
+    SalesComparisonView,
+)
+
+
 urlpatterns = [
     path('', SystemStatusView.as_view(), name='system-status'),  # Root endpoint
     path('health/', HealthCheckView.as_view(), name='health-check'),
@@ -263,6 +272,18 @@ urlpatterns = [
     path('promotions/deleted/', PromotionDeletedListView.as_view(), name='promotion-deleted-list'),  # ✅ CHANGED: promotions/deleted/
     path('promotions/by-name/<str:promotion_name>/', PromotionByNameView.as_view(), name='promotion-by-name'),  # ✅ CHANGED: promotions/by-name/
     
+    #Sales Report
+     # Core API endpoints
+    path('sales-report/summary/', SalesSummaryView.as_view(), name='sales_summary'),
+    path('sales-report/transactions/', SalesTransactionsView.as_view(), name='sales_transactions'), 
+    path('sales-report/by-period/', SalesByPeriodView.as_view(), name='sales_by_period'),
+    
+    # Convenience endpoints
+    path('sales-report/dashboard/', DashboardSummaryView.as_view(), name='dashboard_summary'),
+    path('sales-report/comparison/', SalesComparisonView.as_view(), name='sales_comparison'),
+
+
+
     # API Documentation
     path('docs/', APIDocumentationView.as_view(), name='api-documentation'),
 ]

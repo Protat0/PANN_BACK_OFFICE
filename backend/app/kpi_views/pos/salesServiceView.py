@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import HttpResponse
-from services.SalesService import SalesService
+from ...services.pos.SalesService import SalesService
 import logging
 
 def get_authenticated_user_from_jwt(request):
@@ -14,7 +14,7 @@ def get_authenticated_user_from_jwt(request):
         
         token = authorization.split(" ")[1]
         
-        from ...app.services.auth_services import AuthService
+        from app.services.auth_services import AuthService
         from bson import ObjectId
         
         auth_service = AuthService()
