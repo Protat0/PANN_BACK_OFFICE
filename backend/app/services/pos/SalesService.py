@@ -2,7 +2,7 @@ from datetime import datetime
 from bson import ObjectId
 from ...database import db_manager
 from notifications.services import notification_service
-from backend.app.services.pos.promotionCon import PromoConnection
+from .promotionCon import PromoConnection
 
 class SalesService:
     """
@@ -18,9 +18,27 @@ class SalesService:
         self.promo_connection = PromoConnection()
 
     def convert_object_id(self, document):
-        """Convert ObjectId to string for JSON serialization"""
-        if document and '_id' in document:
-            document['_id'] = str(document['_id'])
+        """Convert ObjectId to string for JSON serialization - Enhanced version"""
+        if document is None:
+            return document
+        
+        if isinstance(document, list):
+            return [self.convert_object_id(item) for item in document]
+        
+        if isinstance(document, dict):
+            converted = {}
+            for key, value in document.items():
+                if isinstance(value, ObjectId):
+                    converted[key] = str(value)
+                elif isinstance(value, (dict, list)):
+                    converted[key] = self.convert_object_id(value)
+                else:
+                    converted[key] = value
+            return converted
+        
+        if isinstance(document, ObjectId):
+            return str(document)
+        
         return document
     
     def create_unified_sale(self, sale_data, source='pos'):
@@ -190,7 +208,7 @@ class SalesService:
             raise Exception(f"Error fetching POS sale by ID: {str(e)}")
     
     def get_recent_sales(self, limit=10):
-        """Get recent sales from both POS and sales_log"""
+        """Get recent sales from both POS and sales_log - Fixed version"""
         try:
             all_sales = []
             
@@ -198,13 +216,13 @@ class SalesService:
             pos_sales = list(self.sales_collection.find({}).sort('transaction_date', -1).limit(limit))
             for sale in pos_sales:
                 sale['collection_source'] = 'sales'
-                all_sales.append(self.convert_object_id(sale))
+                all_sales.append(self.convert_object_id(sale))  # ✅ Fix ObjectId
             
             # Get sales_log sales  
             log_sales = list(self.sales_log_collection.find({}).sort('transaction_date', -1).limit(limit))
             for sale in log_sales:
                 sale['collection_source'] = 'sales_log'
-                all_sales.append(self.convert_object_id(sale))
+                all_sales.append(self.convert_object_id(sale))  # ✅ Fix ObjectId
             
             # Sort by date and limit
             all_sales.sort(key=lambda x: x['transaction_date'], reverse=True)
@@ -221,3 +239,234 @@ class SalesService:
 
         except Exception as e:
             raise Exception(f"Error Fetching sale by ID: {str(e)}")
+        
+    def get_sales_log_by_id(self, log_id):
+        """
+        ✅ MISSING METHOD: Get sales log by ID from sales_log collection
+        This is what SalesLogService.get_invoice_by_id() is trying to call
+        """
+        try:
+            if isinstance(log_id, str):
+                log_id = ObjectId(log_id)
+            
+            log_doc = self.sales_log_collection.find_one({"_id": log_id})
+            
+            if log_doc:
+                return self.convert_object_id(log_doc)
+            return None
+            
+        except Exception as e:
+            raise Exception(f"Error retrieving sales log by ID: {str(e)}")
+
+    def update_sales_log(self, log_id, update_data):
+        """
+        ✅ MISSING METHOD: Update an existing sales log
+        """
+        try:
+            if isinstance(log_id, str):
+                log_id = ObjectId(log_id)
+            
+            # Remove _id from update_data if present
+            update_data.pop('_id', None)
+            
+            result = self.sales_log_collection.update_one(
+                {"_id": log_id},
+                {"$set": update_data}
+            )
+            
+            if result.modified_count > 0:
+                return self.get_sales_log_by_id(log_id)
+            else:
+                return None
+                
+        except Exception as e:
+            raise Exception(f"Error updating sales log: {str(e)}")
+
+    def delete_sales_log(self, log_id):
+        """
+        ✅ MISSING METHOD: Delete a sales log
+        """
+        try:
+            if isinstance(log_id, str):
+                log_id = ObjectId(log_id)
+            
+            result = self.sales_log_collection.delete_one({"_id": log_id})
+            
+            return result.deleted_count > 0
+            
+        except Exception as e:
+            raise Exception(f"Error deleting sales log: {str(e)}")
+
+    def get_all_sales_logs(self, limit=100, skip=0):
+        """
+        ✅ MISSING METHOD: Get all sales logs with pagination
+        """
+        try:
+            logs = list(self.sales_log_collection.find().skip(skip).limit(limit))
+            
+            # Convert ObjectIds to strings
+            for log in logs:
+                self.convert_object_id(log)
+            
+            return logs
+            
+        except Exception as e:
+            raise Exception(f"Error retrieving sales logs: {str(e)}")
+
+    def get_sales_logs_paginated(self, page=1, page_size=50, filters=None):
+        """
+        ✅ MISSING METHOD: Get sales logs with advanced pagination and filtering
+        """
+        try:
+            skip = (page - 1) * page_size
+            query = {}
+            
+            # Apply filters if provided
+            if filters:
+                if filters.get('start_date') and filters.get('end_date'):
+                    query['transaction_date'] = {
+                        '$gte': filters['start_date'],
+                        '$lte': filters['end_date']
+                    }
+                if filters.get('sales_type'):
+                    query['sales_type'] = filters['sales_type']
+                if filters.get('source'):
+                    query['source'] = filters['source']
+                if filters.get('payment_method'):
+                    query['payment_method'] = filters['payment_method']
+                if filters.get('customer_id'):
+                    try:
+                        query['customer_id'] = ObjectId(filters['customer_id'])
+                    except:
+                        pass  # Skip invalid customer_id
+            
+            # Get logs with pagination
+            logs = list(self.sales_log_collection.find(query).skip(skip).limit(page_size))
+            total_count = self.sales_log_collection.count_documents(query)
+            total_pages = (total_count + page_size - 1) // page_size
+            
+            # Convert ObjectIds
+            for log in logs:
+                self.convert_object_id(log)
+            
+            return {
+                "data": logs,
+                "pagination": {
+                    "current_page": page,
+                    "page_size": page_size,
+                    "total_records": total_count,
+                    "total_pages": total_pages,
+                    "has_next": page < total_pages,
+                    "has_prev": page > 1
+                },
+                "filters_applied": filters or {}
+            }
+            
+        except Exception as e:
+            raise Exception(f"Error retrieving paginated sales logs: {str(e)}")
+
+    def get_sales_logs_for_export(self, filters=None):
+        """
+        ✅ MISSING METHOD: Get sales logs for export with filtering
+        """
+        try:
+            query = {}
+            
+            # Apply filters if provided
+            if filters:
+                # Date range filtering
+                if filters.get('start_date') and filters.get('end_date'):
+                    try:
+                        from django.utils.dateparse import parse_date
+                        from datetime import time
+                        
+                        # Parse dates
+                        if isinstance(filters['start_date'], str):
+                            start_date = parse_date(filters['start_date'])
+                        else:
+                            start_date = filters['start_date']
+                        
+                        if isinstance(filters['end_date'], str):
+                            end_date = parse_date(filters['end_date'])
+                        else:
+                            end_date = filters['end_date']
+                        
+                        if start_date and end_date:
+                            start_datetime = datetime.combine(start_date, time.min)
+                            end_datetime = datetime.combine(end_date, time.max)
+                            query['transaction_date'] = {
+                                '$gte': start_datetime, 
+                                '$lte': end_datetime
+                            }
+                    except Exception as date_error:
+                        print(f"Date parsing error: {date_error}")
+                
+                # Other filters
+                if filters.get('sales_type'):
+                    query['sales_type'] = filters['sales_type']
+                if filters.get('payment_method'):
+                    query['payment_method'] = filters['payment_method']
+                if filters.get('status'):
+                    query['status'] = filters['status']
+                if filters.get('source'):
+                    query['source'] = filters['source']
+                if filters.get('customer_id'):
+                    try:
+                        query['customer_id'] = ObjectId(filters['customer_id'])
+                    except:
+                        pass
+            
+            print(f"Export query: {query}")
+            
+            # Get transactions with a reasonable limit for export
+            transactions = list(self.sales_log_collection.find(query).limit(10000))
+            
+            print(f"Found {len(transactions)} transactions for export")
+            
+            # Convert ObjectIds to strings
+            for transaction in transactions:
+                self.convert_object_id(transaction)
+            
+            return transactions
+            
+        except Exception as e:
+            print(f"Error in get_sales_logs_for_export: {str(e)}")
+            raise Exception(f"Error retrieving sales logs for export: {str(e)}")
+
+    def get_sales_by_date_range(self, start_date, end_date, source=None):
+        """
+        ✅ COMPLETE THIS METHOD: Get sales by date range
+        """
+        try:
+            query = {
+                'transaction_date': {
+                    '$gte': start_date,
+                    '$lte': end_date
+                }
+            }
+            
+            if source:
+                query['source'] = source
+            
+            # Get from both collections
+            pos_sales = list(self.sales_collection.find(query))
+            log_sales = list(self.sales_log_collection.find(query))
+            
+            # Combine and convert
+            all_sales = []
+            
+            for sale in pos_sales:
+                sale['collection_source'] = 'sales'
+                all_sales.append(self.convert_object_id(sale))
+            
+            for sale in log_sales:
+                sale['collection_source'] = 'sales_log'
+                all_sales.append(self.convert_object_id(sale))
+            
+            # Sort by date
+            all_sales.sort(key=lambda x: x['transaction_date'], reverse=True)
+            
+            return all_sales
+            
+        except Exception as e:
+            raise Exception(f"Error fetching sales by date range: {str(e)}")

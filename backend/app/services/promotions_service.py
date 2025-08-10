@@ -3,22 +3,15 @@ from datetime import datetime
 from ..database import db_manager 
 from ..models import Promotions
 from notifications.services import notification_service
+from .audit_service import AuditLogService
 
 class PromotionService:
     def __init__(self):
         """Initialize PromotionService with audit logging"""
         self.db = db_manager.get_database()
         self.collection = self.db.promotions
+        self.audit_service = AuditLogService()
         
-        # ✅ FIXED: Initialize audit service like CategoryService
-        try:
-            from .audit_service import AuditLogService
-            self.audit_service = AuditLogService()
-            print("✅ Audit service initialized for PromotionService")
-        except Exception as e:
-            print(f"⚠️ Could not initialize audit service: {e}")
-            self.audit_service = None
-    
     # ================================================================
     # UTILITY METHODS
     # ================================================================

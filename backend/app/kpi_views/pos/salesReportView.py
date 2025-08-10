@@ -163,7 +163,7 @@ class SalesByPeriodView(APIView):
 
     def get(self,request):
         try:
-             #current_user = get_authenticated_user_from_jwt(request)
+            #current_user = get_authenticated_user_from_jwt(request)
 
            # if not current_user:
            #     return Response(

@@ -1,15 +1,15 @@
 from django.urls import path
 
 from .kpi_views.session_views import (
-    # Session management views
     SessionLogsView,
-    SystemStatusView,
-    SessionManagementView,
+    SessionDisplayView, 
+    CombinedLogsView,
     ActiveSessionsView,
     UserSessionsView,
     SessionStatisticsView,
-    SessionDisplayView,
-    CombinedLogsView,
+    SessionCleanupView,
+    ForceLogoutView,
+    SystemStatusView
 )
 
 from .kpi_views.user_views import (
@@ -23,13 +23,13 @@ from .kpi_views.user_views import (
 from .kpi_views.customer_views import (
     CustomerListView,
     CustomerDetailView,
-
-    #Customer KPI Views
-    ActiveCustomerKPIView,
-    MonthlyCustomerKPIView,
-    DailyCustomerKPIView,
+    CustomerRestoreView,
+    CustomerHardDeleteView,
+    CustomerSearchView,
+    CustomerByEmailView,
+    CustomerStatisticsView,
+    CustomerLoyaltyView,
 )
-
 from .kpi_views.authentication_views import (
     # Authentication views
     LoginView,
@@ -133,20 +133,45 @@ from .kpi_views.pos.salesReportView import (
     SalesComparisonView,
 )
 
+from .kpi_views.pos.promotionConView import (
+   POSTransactionView,
+   StockValidationView,
+   StockWarningsView,
+   PromotionCheckoutView,
+   POSTransactionKPIView,
+   InventoryKPIView,
+   StockAlertKPIView,
+   POSHealthCheckView
+)
+
+from .kpi_views.pos.salesServiceView import (
+    SalesServiceView,
+    CreatePOSSale,
+    CreateSalesLog,
+    GetSaleID,
+    FetchRecentSales,
+)
+
 
 urlpatterns = [
     path('', SystemStatusView.as_view(), name='system-status'),  # Root endpoint
     path('health/', HealthCheckView.as_view(), name='health-check'),
     
-    # User endpoints
+   # User endpoints
     path('users/', UserListView.as_view(), name='user-list'),
-    path('users/<str:user_id>/', UserDetailView.as_view(), name='user-detail'),
     path('users/email/<str:email>/', UserByEmailView.as_view(), name='user-by-email'),
     path('users/username/<str:username>/', UserByUsernameView.as_view(), name='user-by-username'),
-    
+    path('users/<str:user_id>/', UserDetailView.as_view(), name='user-detail'),
+   
     # Customer endpoints
     path('customers/', CustomerListView.as_view(), name='customer-list'),
+    path('customers/search/', CustomerSearchView.as_view(), name='customer-search'),
+    path('customers/statistics/', CustomerStatisticsView.as_view(), name='customer-statistics'),
+    path('customers/email/<str:email>/', CustomerByEmailView.as_view(), name='customer-by-email'),
     path('customers/<str:customer_id>/', CustomerDetailView.as_view(), name='customer-detail'),
+    path('customers/<str:customer_id>/restore/', CustomerRestoreView.as_view(), name='customer-restore'),
+    path('customers/<str:customer_id>/hard-delete/', CustomerHardDeleteView.as_view(), name='customer-hard-delete'),
+    path('customers/<str:customer_id>/loyalty/', CustomerLoyaltyView.as_view(), name='customer-loyalty'),
     
     # Product CRUD endpoints - REORGANIZED FOR BETTER ROUTING
     path('products/', ProductListView.as_view(), name='product-list'),  # GET (list), POST (create)
@@ -194,21 +219,22 @@ urlpatterns = [
     path('auth/me/', CurrentUserView.as_view(), name='current-user'),
     path('auth/verify-token/', VerifyTokenView.as_view(), name='verify-token'),
     
-    # Session logs endpoint
+    # Session logs endpoints
     path('session-logs/', SessionLogsView.as_view(), name='session-logs'),
-    path('session-logs/display/', SessionDisplayView.as_view(), name='session-logs-display'), #Data View
+    path('session-logs/display/', SessionDisplayView.as_view(), name='session-logs-display'),
     path('session-logs/combined/', CombinedLogsView.as_view(), name='combined-logs'),
-
+    
     # Session management endpoints
-    path('sessions/', SessionManagementView.as_view(), name='session-management'),
     path('sessions/active/', ActiveSessionsView.as_view(), name='active-sessions'),
     path('sessions/user/<str:user_id>/', UserSessionsView.as_view(), name='user-sessions'),
     path('sessions/statistics/', SessionStatisticsView.as_view(), name='session-statistics'),
-
-    # Customer KPI Views
-    path('customerkpi/', ActiveCustomerKPIView.as_view(), name="get-active-users"), #Gets Active Users
-    path('customerkpimonthly/', MonthlyCustomerKPIView.as_view(), name="get-monthly-users"),
-     path('customerkpidaily/', DailyCustomerKPIView.as_view(), name="get-daily-users"),
+    
+    # NEW: Admin session management endpoints
+    path('sessions/cleanup/', SessionCleanupView.as_view(), name='session-cleanup'),
+    path('sessions/force-logout/<str:user_id>/', ForceLogoutView.as_view(), name='force-logout'),
+    
+    # System status endpoint (if you want to keep it)
+    path('system/status/', SystemStatusView.as_view(), name='system-status'),
 
     # Category endpoints  
     path('category/', CategoryKPIView.as_view(), name="category-operations"),
@@ -282,6 +308,23 @@ urlpatterns = [
     path('sales-report/dashboard/', DashboardSummaryView.as_view(), name='dashboard_summary'),
     path('sales-report/comparison/', SalesComparisonView.as_view(), name='sales_comparison'),
 
+    ##PromotionCon Services/ POS
+    path('pos/transaction/', POSTransactionView.as_view(), name='pos_transaction'),
+    path('pos/stock-validation/', StockValidationView.as_view(), name='stock_validation'),
+    path('pos/stock-warnings/', StockWarningsView.as_view(), name='stock_warnings'),
+    path('pos/promotion-preview/', PromotionCheckoutView.as_view(), name='promotion_preview'),
+    path('pos/kpi/transactions/', POSTransactionKPIView.as_view(), name='pos_transaction_kpi'),
+    path('pos/kpi/inventory/', InventoryKPIView.as_view(), name='inventory_kpi'),
+    path('pos/kpi/stock-alerts/', StockAlertKPIView.as_view(), name='stock_alert_kpi'),
+    path('pos/health/', POSHealthCheckView.as_view(), name='pos_health_check'),
+
+    ##Sales Services
+     # Core sales endpoints
+    path('sales/create/', SalesServiceView.as_view(), name='create_unified_sale'),
+    path('sales/pos/create/', CreatePOSSale.as_view(), name='create_pos_sale'),
+    path('sales/log/create/', CreateSalesLog.as_view(), name='create_sales_log'),
+    path('sales/recent/', FetchRecentSales.as_view(), name='recent_sales'),
+    path('sales/get/<str:sale_id>/', GetSaleID.as_view(), name='get_sale_by_id'),
 
 
     # API Documentation

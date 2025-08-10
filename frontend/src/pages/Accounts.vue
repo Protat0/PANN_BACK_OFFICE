@@ -50,7 +50,7 @@
           Add User
         </button>
         <button class="btn btn-primary" @click="exportData" :disabled="loading || exporting">
-          <i class="bi bi-download"></i> {{ exporting ? 'Exporting...' : 'Export' }}
+           {{ exporting ? 'Exporting...' : 'Export' }}
         </button>
       </div>
     </div>
@@ -301,7 +301,7 @@
                 v-model="userForm.username" 
                 type="text" 
                 required 
-                :disabled="formLoading || isEditMode"
+                :disabled="formLoading"
                 placeholder="Enter username"
                 :class="{ 'error': validationErrors.username }"
                 @input="validateField('username', $event.target.value)"
@@ -1318,6 +1318,7 @@ export default {
 
         if (this.isEditMode) {
           const updateData = {
+            username: this.userForm.username,
             email: this.userForm.email,
             full_name: this.userForm.full_name,
             role: this.userForm.role,

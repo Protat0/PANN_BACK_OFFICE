@@ -1056,26 +1056,7 @@ export default {
 .promotions-page {
   min-height: 100vh;
   background-color: var(--neutral-light);
-}
-
-@media (max-width: 768px) {
-  .action-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 1rem;
-  }
-  
-  .filters-section {
-    justify-content: flex-start;
-  }
-  
-  .filter-group {
-    min-width: 120px;
-  }
-  
-  .search-container {
-    min-width: 100%;
-  }
+  padding: 1rem;
 }
 
 /* Action Bar Styles */
@@ -1085,30 +1066,113 @@ export default {
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   overflow: hidden;
   padding: 1rem;
+  margin-bottom: 1rem;
 }
 
-/* Single Row Layout */
+/* Header Row - Separate from action controls */
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* Auto-refresh and Connection Status Container */
+.status-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Auto-refresh status indicator */
+.auto-refresh-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #f0fdf4;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #bbf7d0;
+  min-width: 200px;
+  flex-shrink: 0;
+}
+
+.status-text {
+  font-size: 0.875rem;
+  color: #16a34a;
+  font-weight: 500;
+  flex: 1;
+  white-space: nowrap;
+}
+
+/* Connection indicator */
+.connection-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.connection-good {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #16a34a;
+}
+
+.connection-unstable {
+  background: #fefce8;
+  border: 1px solid #fde047;
+  color: #ca8a04;
+}
+
+.connection-lost {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.connection-unknown {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+}
+
+/* Action Row Layout */
 .action-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 /* Filters Section */
 .filters-section {
+  display: flex;
+  align-items: end;
+  gap: 1rem;
   flex-shrink: 0;
 }
 
-/* Search Toggle Button */
-.search-toggle-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+/* Action Buttons Section */
+.action-buttons {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 0;
+  gap: 0.5rem;
   flex-shrink: 0;
 }
 
@@ -1128,6 +1192,8 @@ export default {
 /* Search Container */
 .search-container {
   min-width: 300px;
+  max-width: 400px;
+  flex: 1;
 }
 
 .search-input {
@@ -1140,6 +1206,18 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Search Toggle Button */
+.search-toggle-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
 }
 
 /* Button States */
@@ -1191,65 +1269,121 @@ export default {
   gap: 0.25rem !important;
 }
 
-/* Auto-refresh status indicator (same as logs page) */
-.auto-refresh-status {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  background: #f0fdf4;
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  border: 1px solid #bbf7d0;
-  min-width: 280px;
-  margin-right: 370px;
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .auto-refresh-status {
+    min-width: 180px;
+  }
+  
+  .status-text {
+    font-size: 0.8125rem;
+  }
+  
+  .search-container {
+    min-width: 250px;
+  }
 }
 
-.status-text {
-  font-size: 0.875rem;
-  color: #16a34a;
-  font-weight: 500;
-  flex: 1;
+@media (max-width: 992px) {
+  .header-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  
+  .status-container {
+    justify-content: center;
+  }
+  
+  .action-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  
+  .filters-section {
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  
+  .action-buttons {
+    justify-content: center;
+  }
 }
 
-/* Connection indicator (same as logs page) */
-.connection-indicator {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 500;
+@media (max-width: 768px) {
+  .promotions-page {
+    padding: 0.5rem;
+  }
+  
+  .action-bar-container {
+    padding: 0.75rem;
+  }
+  
+  .page-title {
+    font-size: 1.5rem;
+    text-align: center;
+  }
+  
+  .status-container {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .auto-refresh-status {
+    min-width: auto;
+    justify-content: center;
+  }
+  
+  .connection-indicator {
+    justify-content: center;
+  }
+  
+  .filters-section {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .filter-group {
+    min-width: auto;
+  }
+  
+  .search-container {
+    min-width: auto;
+  }
+  
+  .action-buttons {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
 }
 
-.connection-good {
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #16a34a;
-}
-
-.connection-unstable {
-  background: #fefce8;
-  border: 1px solid #fde047;
-  color: #ca8a04;
-}
-
-.connection-lost {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
-}
-
-.connection-unknown {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  color: #64748b;
-}
-
-.page-title {
-  font-size: 2rem;
-  font-weight: 600;
-  color: #1e293b;
-  margin: 0;
+@media (max-width: 576px) {
+  .header-row {
+    gap: 0.75rem;
+  }
+  
+  .action-row {
+    gap: 0.75rem;
+  }
+  
+  .page-title {
+    font-size: 1.25rem;
+  }
+  
+  .auto-refresh-status {
+    padding: 0.5rem 0.75rem;
+    flex-direction: column;
+    text-align: center;
+    gap: 0.25rem;
+  }
+  
+  .connection-indicator {
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .status-text {
+    font-size: 0.8125rem;
+  }
 }
 </style>

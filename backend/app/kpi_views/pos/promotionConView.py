@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.http import HttpResponse
 from ...services.pos.promotionCon import PromoConnection
+from ...services.pos.salesReport import SalesReport
 import logging
 
 def get_authenticated_user_from_jwt(request):
@@ -48,6 +49,10 @@ def get_authenticated_user_from_jwt(request):
     except Exception as e:
         print(f"JWT Auth helper error: {e}")
         return None
+
+# ================================================================
+# CORE POS TRANSACTION VIEWS
+# ================================================================
 
 class POSTransactionView(APIView):
     """Handle complete POS transactions with promotions and inventory management"""
@@ -104,6 +109,10 @@ class POSTransactionView(APIView):
                 {"error": f"Error processing transaction: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+# ================================================================
+# STOCK VALIDATION AND WARNING VIEWS
+# ================================================================
 
 class StockValidationView(APIView):
     """Validate stock availability before transaction"""
@@ -188,11 +197,15 @@ class StockWarningsView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+# ================================================================
+# PROMOTION VIEWS
+# ================================================================
+
 class PromotionCheckoutView(APIView):
-    """Handle promotion application to checkout"""
+    """Handle promotion application to checkout - For preview only"""
     
     def post(self, request):
-        """Apply promotion to checkout and calculate discounts"""
+        """Apply promotion to checkout and calculate discounts (preview only)"""
         try:
             promo_service = PromoConnection()
             checkout_data = request.data.get('checkout_data', [])
@@ -210,10 +223,14 @@ class PromotionCheckoutView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Apply promotion
+            # Apply promotion (preview only - doesn't save transaction)
             result = promo_service.checkout_list(checkout_data, promotion_name)
             
-            return Response(result, status=status.HTTP_200_OK)
+            return Response({
+                "success": True,
+                "promotion_preview": result,
+                "note": "This is a preview only. Use POSTransactionView to complete the transaction."
+            }, status=status.HTTP_200_OK)
             
         except Exception as e:
             logging.error(f"Error applying promotion: {str(e)}")
@@ -222,163 +239,51 @@ class PromotionCheckoutView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-class SalesTransactionView(APIView):
-    """Handle individual sales transaction creation"""
-    
-    def post(self, request):
-        """Create a sales transaction record"""
-        try:
-            # Get authenticated user from JWT
-            current_user = get_authenticated_user_from_jwt(request)
-            
-            if not current_user:
-                return Response(
-                    {"error": "Authentication required"}, 
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
-            
-            promo_service = PromoConnection()
-            sales_data = request.data
-            
-            # Add cashier_id from authenticated user
-            sales_data['cashier_id'] = current_user.get('user_id')
-            
-            # Create sales record
-            result = promo_service.create_sales(sales_data)
-            
-            if result['success']:
-                return Response(result, status=status.HTTP_201_CREATED)
-            else:
-                return Response(result, status=status.HTTP_400_BAD_REQUEST)
-                
-        except Exception as e:
-            logging.error(f"Error creating sales transaction: {str(e)}")
-            return Response(
-                {"error": f"Error creating sales transaction: {str(e)}"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+# ================================================================
+# KPI AND ANALYTICS VIEWS
+# ================================================================
 
-class InventoryUpdateView(APIView):
-    """Handle inventory updates after sales"""
-    
-    def post(self, request):
-        """Update inventory after sale (reduce stock quantities)"""
-        try:
-            # Get authenticated user from JWT
-            current_user = get_authenticated_user_from_jwt(request)
-            
-            if not current_user:
-                return Response(
-                    {"error": "Authentication required"}, 
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
-            
-            promo_service = PromoConnection()
-            checkout_data = request.data.get('checkout_data', [])
-            
-            if not checkout_data:
-                return Response(
-                    {"error": "Checkout data is required"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Update inventory
-            promo_service.update_inventory(checkout_data)
-            
-            return Response({
-                "success": True,
-                "message": "Inventory updated successfully"
-            }, status=status.HTTP_200_OK)
-            
-        except Exception as e:
-            logging.error(f"Error updating inventory: {str(e)}")
-            return Response(
-                {"error": f"Error updating inventory: {str(e)}"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-class ReceiptGenerationView(APIView):
-    """Generate receipt for completed transactions"""
-    
-    def post(self, request):
-        """Generate receipt from sales record"""
-        try:
-            promo_service = PromoConnection()
-            sales_record = request.data.get('sales_record')
-            
-            if not sales_record:
-                return Response(
-                    {"error": "Sales record is required"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Generate receipt
-            receipt = promo_service.generate_receipt(sales_record)
-            
-            return Response({
-                "success": True,
-                "receipt": receipt
-            }, status=status.HTTP_200_OK)
-            
-        except Exception as e:
-            logging.error(f"Error generating receipt: {str(e)}")
-            return Response(
-                {"error": f"Error generating receipt: {str(e)}"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-class PromotionConnectionView(APIView):
-    """Handle promotion-category connections"""
-    
-    def post(self, request):
-        """Create promotion-category connection"""
-        try:
-            promo_service = PromoConnection()
-            promotion_data = request.data
-            
-            if not promotion_data:
-                return Response(
-                    {"error": "Promotion data is required"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Create promotion connection
-            result = promo_service.promotion_product_category_connection(promotion_data)
-            
-            if result['success']:
-                return Response(result, status=status.HTTP_201_CREATED)
-            else:
-                return Response(result, status=status.HTTP_400_BAD_REQUEST)
-                
-        except Exception as e:
-            logging.error(f"Error creating promotion connection: {str(e)}")
-            return Response(
-                {"error": f"Error creating promotion connection: {str(e)}"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-# ================ POS KPI Views ================
 class POSTransactionKPIView(APIView):
-    """Get POS transaction statistics"""
+    """Get POS transaction statistics using SalesReport service"""
     
     def get(self, request):
         try:
-            promo_service = PromoConnection()
+            sales_report = SalesReport()
             
-            # Get basic transaction count (you'll need to add this method to PromoConnection)
-            # For now, returning a placeholder response
+            # Get comprehensive dashboard data
+            dashboard = sales_report.get_dashboard_summary()
+            today_data = sales_report.get_todays_sales()
+            week_data = sales_report.get_weekly_sales()
+            month_data = sales_report.get_monthly_sales()
+            
             return Response({
-                "message": "POS Transaction KPI - Add get_transaction_statistics method to PromoConnection service",
-                "total_transactions": 0,
-                "daily_transactions": 0,
-                "monthly_transactions": 0
+                "success": True,
+                "kpis": {
+                    "today": {
+                        "transactions": dashboard['today']['total_transactions'],
+                        "revenue": dashboard['today']['total_revenue'],
+                        "average_transaction": dashboard['today']['average_transaction']
+                    },
+                    "this_week": {
+                        "transactions": dashboard['this_week']['total_transactions'],
+                        "revenue": dashboard['this_week']['total_revenue'],
+                        "average_transaction": dashboard['this_week']['average_transaction']
+                    },
+                    "this_month": {
+                        "transactions": dashboard['this_month']['total_transactions'],
+                        "revenue": dashboard['this_month']['total_revenue'],
+                        "average_transaction": dashboard['this_month']['average_transaction']
+                    },
+                    "week_comparison": dashboard['week_vs_last_week'],
+                    "source_breakdown": dashboard['source_breakdown_today']
+                },
+                "generated_at": dashboard['generated_at']
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
             logging.error(f"POS Transaction KPI error: {str(e)}")
-            print(f"POS Transaction KPI error: {str(e)}")
             return Response(
-                {"error": str(e)}, 
+                {"error": f"Error getting POS KPIs: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -391,15 +296,15 @@ class InventoryKPIView(APIView):
             low_stock_products = promo_service.check_all_low_stock_products()
             
             return Response({
+                "success": True,
                 "low_stock_count": len(low_stock_products),
                 "low_stock_products": low_stock_products
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
             logging.error(f"Inventory KPI error: {str(e)}")
-            print(f"Inventory KPI error: {str(e)}")
             return Response(
-                {"error": str(e)}, 
+                {"error": f"Error getting inventory KPIs: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -420,17 +325,65 @@ class StockAlertKPIView(APIView):
             low_stock_count = len(low_stock_products)
             
             return Response({
-                "total_products": total_products,
-                "out_of_stock": out_of_stock,
-                "low_stock": low_stock_count,
-                "stock_health_percentage": round(((total_products - low_stock_count) / total_products * 100), 2) if total_products > 0 else 0
+                "success": True,
+                "stock_health": {
+                    "total_products": total_products,
+                    "out_of_stock": out_of_stock,
+                    "low_stock": low_stock_count,
+                    "healthy_stock": total_products - low_stock_count - out_of_stock,
+                    "stock_health_percentage": round(((total_products - low_stock_count) / total_products * 100), 2) if total_products > 0 else 0
+                },
+                "alerts": {
+                    "critical": out_of_stock,
+                    "warning": low_stock_count,
+                    "total_alerts": out_of_stock + low_stock_count
+                }
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
             logging.error(f"Stock Alert KPI error: {str(e)}")
-            print(f"Stock Alert KPI error: {str(e)}")
             return Response(
-                {"error": str(e)}, 
+                {"error": f"Error getting stock alert KPIs: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+# ================================================================
+# UTILITY VIEWS
+# ================================================================
+
+class POSHealthCheckView(APIView):
+    """Check POS system health and database connections"""
+    
+    def get(self, request):
+        try:
+            # Test PromoConnection (inventory/products)
+            promo_service = PromoConnection()
+            product_count = promo_service.products_collection.count_documents({"isDeleted": {"$ne": True}})
+            
+            # Test SalesReport (sales data)
+            sales_report = SalesReport()
+            today_summary = sales_report.get_todays_sales()
+            
+            return Response({
+                "success": True,
+                "system_health": "healthy",
+                "connections": {
+                    "inventory_db": "connected",
+                    "sales_db": "connected"
+                },
+                "stats": {
+                    "total_products": product_count,
+                    "today_transactions": today_summary['summary']['total_transactions'],
+                    "today_revenue": today_summary['summary']['total_revenue']
+                },
+                "timestamp": today_summary.get('generated_at')
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logging.error(f"POS Health Check error: {str(e)}")
+            return Response({
+                "success": False,
+                "system_health": "unhealthy",
+                "error": str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        

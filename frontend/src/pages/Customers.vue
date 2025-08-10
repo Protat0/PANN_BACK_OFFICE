@@ -558,7 +558,7 @@ export default {
   padding: 0.75rem 1rem;
   border-radius: 0.5rem;
   border: 1px solid #bbf7d0;
-  min-width: 280px;
+  min-width: 220px;
 }
 
 .status-text {

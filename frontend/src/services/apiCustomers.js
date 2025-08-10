@@ -475,6 +475,16 @@ class CustomerApiService {
       this.handleError(error);
     }
   }
+
+  async getCustomerStatistics() {
+    try {
+      const response = await api.get('/customers/statistics/')
+      return this.handleResponse(response)
+    } catch (error) {
+      this.handleError(error)
+    }
+  }
+
 }
 
 // Create and export singleton instance

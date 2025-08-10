@@ -204,29 +204,24 @@ export function useCustomers() {
   // KPI data fetching
   const fetchKPIData = async () => {
     try {
-      // Fetch active users
-      const activeResult = await CustomerApiService.ActiveUser()
-      activeUsersCount.value = activeResult.active_customers.toString()
+      // Single call to get all statistics
+      const stats = await CustomerApiService.getCustomerStatistics()
+      
+      // Extract individual KPI values
+      activeUsersCount.value = stats.active_customers?.toString() || '0'
+      monthlyUsersCount.value = stats.monthly_registrations?.toString() || '0'
+      dailyUsersCount.value = stats.daily_logins?.toString() || '0'
+      
+      console.log('KPI data loaded:', {
+        active: stats.active_customers,
+        monthly: stats.monthly_registrations, 
+        daily: stats.daily_logins
+      })
+      
     } catch (error) {
-      console.error('Failed to load active users:', error)
+      console.error('Failed to load KPI data:', error)
       activeUsersCount.value = 'Error'
-    }
-
-    try {
-      // Fetch monthly users
-      const monthlyResult = await CustomerApiService.MonthlyUser()
-      monthlyUsersCount.value = monthlyResult.monthly_customers.toString()
-    } catch (error) {
-      console.error('Failed to load monthly users:', error)
       monthlyUsersCount.value = 'Error'
-    }
-
-    try {
-      // Fetch daily users
-      const dailyResult = await CustomerApiService.DailyUser()
-      dailyUsersCount.value = dailyResult.daily_customers.toString()
-    } catch (error) {
-      console.error('Failed to load daily users:', error)
       dailyUsersCount.value = 'Error'
     }
   }

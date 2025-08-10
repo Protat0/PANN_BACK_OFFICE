@@ -48,3 +48,190 @@ def get_authenticated_user_from_jwt(request):
     except Exception as e:
         print(f"JWT Auth helper error: {e}")
         return None
+
+class SalesServiceView(APIView):
+    
+    def post(self,request):
+        try:
+
+            #current_user = get_authenticated_user_from_jwt(request)
+
+           # if not current_user:
+           #     return Response(
+            #        {"error": "Authentication required"}, 
+            #        status=status.HTTP_401_UNAUTHORIZED
+            #    )
+
+            sale_data = request.data.get('sale_data',{})
+            source = request.data.get("source",'pos') 
+
+            if not sale_data:
+                return Response(
+                    {"error": "Sale Data is required"},
+                    status = status.HTTP_400_BAD_REQUEST
+                )
+
+            if 'total_amount' not in sale_data:
+                return Response(
+                    {"error": "Sale Data is required"},
+                    status = status.HTTP_400_BAD_REQUEST
+                )
+
+            sales_service = SalesService()
+            result = sales_service.create_unified_sale(sale_data,source)
+
+            return Response(result, status = status.HTTP_201_CREATED)
+
+        except Exception as e:
+            logging.error(f"Error creating the sale: {str(e)}")
+            return Response(
+                {"error": f"Error creating the sale: {str(e)}"},
+                status = status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class CreatePOSSale(APIView):
+
+    def post(self, request):
+        try: 
+
+            #current_user = get_authenticated_user_from_jwt(request)
+
+           # if not current_user:
+           #     return Response(
+            #        {"error": "Authentication required"}, 
+            #        status=status.HTTP_401_UNAUTHORIZED
+            #    )
+
+            sale_data = request.data
+
+            if not sale_data:
+                return Response(
+                    {"error": "Sale Data is required"},
+                    status = status.HTTP_400_BAD_REQUEST
+                )
+
+            required_fields = ['items','total_amount']
+            for field in required_fields:
+                if field not in sale_data:
+                    return Response(
+                        {"error": f"{field} is required"}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            sales_service = SalesService()
+            result = sales_service._create_pos_sale(sale_data)
+
+            return Response(result, status = status.HTTP_200_OK)
+        
+        except Exception as e:
+            logging.error(f"Error creating the sale: {str(e)}")
+            return Response(
+                {"error": f"Error creating the sale: {str(e)}"},
+                status = status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+class CreateSalesLog(APIView):
+    
+    def post(self,request):
+        try: 
+
+            #current_user = get_authenticated_user_from_jwt(request)
+
+           # if not current_user:
+           #     return Response(
+            #        {"error": "Authentication required"}, 
+            #        status=status.HTTP_401_UNAUTHORIZED
+            #    )
+
+            sale_data = request.data.get('sale_data',{})
+            source = request.data.get("source",'pos') 
+
+            if not sale_data:
+                return Response(
+                    {"error": "Sale Data is required"},
+                    status = status.HTTP_400_BAD_REQUEST
+                )
+
+            sales_service = SalesService()
+            result = sales_service._create_sales_log(sale_data,source)
+
+            return Response(result, status = status.HTTP_200_OK)
+        
+        except Exception as e:
+            logging.error(f"Error creating the sales log: {str(e)}")
+            return Response(
+                {"error": f"Error creating the sales log: {str(e)}"},
+                status = status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class GetSaleID(APIView):
+
+    def get(self, sale_id, request):
+        try:
+            #current_user = get_authenticated_user_from_jwt(request)
+
+           # if not current_user:
+           #     return Response(
+            #        {"error": "Authentication required"}, 
+            #        status=status.HTTP_401_UNAUTHORIZED
+            #    )
+
+            if not sale_id:
+                return Response(
+                    {"error": "Sale Data is required"},
+                    status = status.HTTP_400_BAD_REQUEST
+                )
+
+            sales_service = SalesService()
+            result = sales_service.get_pos_sale_by_id(sale_id)
+
+            if result:
+                return Response(result, status = status.HTTP_200_OK)
+            else:
+                return Response(result, status = status.HTTP_404_NOT_FOUND)
+        
+        except Exception as e:
+            logging.error(f"Error fetching data of ${sale_id}: {str(e)}")
+            return Response(
+                {"error": f"Error fetching data of ${sale_id}: {str(e)}"},
+                status = status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class FetchRecentSales(APIView):
+
+    def get(self,request):
+        try: 
+
+            #current_user = get_authenticated_user_from_jwt(request)
+
+           # if not current_user:
+           #     return Response(
+            #        {"error": "Authentication required"}, 
+            #        status=status.HTTP_401_UNAUTHORIZED
+            #    )
+
+            limit = min(int(request.GET.get('limit', 10)), 50)  # Max 50 for safety
+            
+            sales_service = SalesService()
+            result = sales_service.get_recent_sales(limit)
+            
+            return Response({
+                "success": True,
+                "data": result,
+                "count": len(result),
+                "limit_applied": limit
+            }, status=status.HTTP_200_OK)
+            
+        except ValueError:  # Handle invalid limit values
+            limit = 10
+            sales_service = SalesService()
+            result = sales_service.get_recent_sales(limit)
+            
+
+            return Response(result, status = status.HTTP_200_OK)
+        
+        except Exception as e:
+            logging.error(f"Error Fetching recent sales: {str(e)}")
+            return Response(
+                {"error": f"Error Fetching recent sales: {str(e)}"},
+                status = status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

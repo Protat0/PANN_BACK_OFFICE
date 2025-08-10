@@ -11,9 +11,27 @@ class PromoConnection:
         self.sales_collection = self.db.sales
 
     def convert_object_id(self, document):
-        """Convert ObjectId to string for JSON serialization"""
-        if document and '_id' in document:
-            document['_id'] = str(document['_id'])
+        """Convert ObjectId to string for JSON serialization - Enhanced version"""
+        if document is None:
+            return document
+        
+        if isinstance(document, list):
+            return [self.convert_object_id(item) for item in document]
+        
+        if isinstance(document, dict):
+            converted = {}
+            for key, value in document.items():
+                if isinstance(value, ObjectId):
+                    converted[key] = str(value)
+                elif isinstance(value, (dict, list)):
+                    converted[key] = self.convert_object_id(value)
+                else:
+                    converted[key] = value
+            return converted
+        
+        if isinstance(document, ObjectId):
+            return str(document)
+        
         return document
 
     # ================================================================
@@ -126,7 +144,7 @@ class PromoConnection:
             print(f"❌ Failed to create {alert_type} notification for product {product.get('product_name', 'Unknown')}: {notification_error}")
 
     def check_all_low_stock_products(self):
-        """Check all products for low stock and send batch notification"""
+        """Check all products for low stock and send batch notification - Fixed version"""
         try:
             # Find all products that are at or below their low stock threshold
             low_stock_products = list(self.products_collection.find({
@@ -136,26 +154,33 @@ class PromoConnection:
                 "isDeleted": {"$ne": True}
             }))
             
+            # 🔧 FIX: Convert ObjectIds to strings
+            low_stock_products = [self.convert_object_id(product) for product in low_stock_products]
+            
             if low_stock_products:
                 # Send batch notification
                 product_names = [p.get('product_name', 'Unknown') for p in low_stock_products]
                 
-                from notifications.services import notification_service
-                
-                notification_service.create_notification(
-                    title=f"📊 INVENTORY REPORT: {len(low_stock_products)} Products Need Restocking",
-                    message=f"The following products are running low: {', '.join(product_names[:5])}{'...' if len(product_names) > 5 else ''}",
-                    priority="medium",
-                    notification_type="inventory",
-                    metadata={
-                        "alert_type": "batch_low_stock_report",
-                        "low_stock_count": len(low_stock_products),
-                        "product_ids": [str(p['_id']) for p in low_stock_products],
-                        "product_names": product_names,
-                        "action_type": "inventory_report"
-                    }
-                )
-                
+                try:
+                    from notifications.services import notification_service
+                    
+                    notification_service.create_notification(
+                        title=f"📊 INVENTORY REPORT: {len(low_stock_products)} Products Need Restocking",
+                        message=f"The following products are running low: {', '.join(product_names[:5])}{'...' if len(product_names) > 5 else ''}",
+                        priority="medium",
+                        notification_type="inventory",
+                        metadata={
+                            "alert_type": "batch_low_stock_report",
+                            "low_stock_count": len(low_stock_products),
+                            "product_ids": [str(p['_id']) for p in low_stock_products],
+                            "product_names": product_names,
+                            "action_type": "inventory_report"
+                        }
+                    )
+                except Exception as notification_error:
+                    print(f"❌ Failed to send notification: {notification_error}")
+                    # Continue without notification
+                    
             return low_stock_products
             
         except Exception as e:
