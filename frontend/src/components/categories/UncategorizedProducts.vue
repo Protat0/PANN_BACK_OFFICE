@@ -250,6 +250,24 @@
         </div>
       </div>
     </div>
+    <!-- Success/Error Messages -->
+    <div 
+      v-if="successMessage" 
+      class="alert alert-success alert-dismissible fade show fixed-top mt-3 mx-3" 
+      style="z-index: 1060;"
+    >
+      {{ successMessage }}
+      <button type="button" class="btn-close" @click="successMessage = ''"></button>
+    </div>
+
+    <div 
+      v-if="errorMessage" 
+      class="alert alert-danger alert-dismissible fade show fixed-top mt-3 mx-3" 
+      style="z-index: 1060;"
+    >
+      {{ errorMessage }}
+      <button type="button" class="btn-close" @click="errorMessage = ''"></button>
+    </div>
   </div>
 </template>
 
@@ -292,6 +310,9 @@ export default {
       // Bulk operations
       bulkTargetCategory: '',
       
+      successMessage: '',
+      errorMessage: '',
+
       // Constants
       UNCATEGORIZED_CATEGORY_ID: '686a4de143821e2b21f725c6'
     }
@@ -362,21 +383,31 @@ export default {
 
     async loadAvailableCategories() {
       try {
-        console.log('🔄 Starting to load available categories...')
+        console.log('🔄 Loading available categories...')
         
-        let categories = []
         const response = await categoryApiService.CategoryData()
-        for (const X of response.categories)
-          if (X.category_name != "Uncategorized"){
-              categories.push(X)
-          }
-
-        this.availableCategories = categories
+        
+        // Handle different response structures
+        let allCategories = []
+        if (response.data && Array.isArray(response.data)) {
+          allCategories = response.data
+        } else if (response.categories && Array.isArray(response.categories)) {
+          allCategories = response.categories
+        } else if (Array.isArray(response)) {
+          allCategories = response
+        }
+        
+        // Filter out Uncategorized category
+        this.availableCategories = allCategories.filter(category => 
+          category.category_name !== "Uncategorized" && 
+          category._id !== this.UNCATEGORIZED_CATEGORY_ID &&
+          !category.isDeleted
+        )
+        
+        console.log(`✅ Loaded ${this.availableCategories.length} available categories`)
 
       } catch (error) {
         console.error('❌ Error loading categories:', error)
-        console.error('❌ Error details:', error.message)
-        console.error('❌ Full error:', error)
         this.availableCategories = []
       }
     },
@@ -590,12 +621,30 @@ export default {
 
     showSuccessMessage(message) {
       console.log('✅ Success:', message)
-      // Replace with your notification system
+      this.successMessage = message
+      this.errorMessage = ''
+      
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        this.successMessage = ''
+      }, 5000)
     },
 
     showErrorMessage(message) {
       console.error('❌ Error:', message)
-      alert(message)
+      this.errorMessage = message
+      this.successMessage = ''
+      
+      // Auto-hide after 7 seconds
+      setTimeout(() => {
+        this.errorMessage = ''
+      }, 7000)
+    },
+    async retryLoad() {
+      await Promise.all([
+        this.loadUncategorizedProducts(),
+        this.loadAvailableCategories()
+      ])
     }
   },
   
@@ -702,5 +751,28 @@ export default {
     margin-left: 0 !important;
     margin-top: 1rem;
   }
+}
+
+.alert {
+  border-radius: 0.5rem;
+  border: none;
+}
+
+.alert-success {
+  background-color: #d1edff;
+  color: #0f5132;
+}
+
+.alert-danger {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.btn-close {
+  filter: brightness(0.8);
+}
+
+.btn-close:hover {
+  filter: brightness(0.6);
 }
 </style>

@@ -289,7 +289,10 @@ export default {
           this.categoryId,
           subcategoryData
         )
-        
+        if (!result || !result.success) {
+          throw new Error(result?.message || 'Failed to add subcategory')
+        }
+
         console.log('✅ Subcategory added successfully:', result)
         
         // Emit success event to parent component
@@ -299,8 +302,7 @@ export default {
           result: result
         })
         
-        // Show success message
-        this.showSuccessMessage(`Subcategory "${subcategoryData.name}" added successfully!`)
+       
         
         // Close modal
         this.closeModal()
@@ -311,31 +313,12 @@ export default {
         // Show error
         this.generalError = error.message || 'Failed to add subcategory. Please try again.'
         
-        // Show error message
-        this.showErrorMessage(`Failed to add subcategory: ${error.message}`)
+
         
       } finally {
         this.isSubmitting = false
       }
     },
-
-    /**
-     * Show success message (you can customize this based on your notification system)
-     */
-    showSuccessMessage(message) {
-      console.log('✅ Success:', message)
-      // Replace with your notification system
-      // this.$toast.success(message)
-    },
-
-    /**
-     * Show error message (you can customize this based on your notification system)
-     */
-    showErrorMessage(message) {
-      console.error('❌ Error:', message)
-      // Replace with your notification system
-      // this.$toast.error(message)
-    }
   }
 }
 </script>

@@ -13,14 +13,15 @@ class CategoryApiService {
   // ================ CORE CATEGORY METHODS ================
   
   /**
-   * Get all categories with sales data
+   * Get all categories with sales data (UPDATED URL)
    * @param {Object} params - Query parameters (include_deleted, etc.)
    * @returns {Promise<Object>} Categories list with sales data
    */
   async CategoryData(params = {}) {
     try {
         console.log("This API call is getting all Category");
-        const response = await api.get('/category/dataview', { params });
+        // ✅ UPDATED: Changed from /category/dataview to /category/display
+        const response = await api.get('/category/display/', { params });
         return response.data;
     } catch (error) {
         console.error("Error fetching all category data:", error);
@@ -29,7 +30,7 @@ class CategoryApiService {
   }
 
   /**
-   * Add new category
+   * Add new category (URL UNCHANGED)
    * @param {Object} params - Category data
    * @returns {Promise<Object>} Created category
    */
@@ -66,7 +67,7 @@ class CategoryApiService {
   }
 
   /**
-   * Update an existing category
+   * Update an existing category (URL UNCHANGED)
    * @param {Object} params - Parameters including id and update data
    * @returns {Promise<Object>} Updated category data
    */
@@ -118,7 +119,7 @@ class CategoryApiService {
   }
 
   /**
-   * Find specific category by ID
+   * Find specific category by ID (URL UNCHANGED)
    * @param {Object} params - Parameters including id and include_deleted
    * @returns {Promise<Object>} Category data
    */
@@ -131,7 +132,7 @@ class CategoryApiService {
             queryParams.include_deleted = params.include_deleted;
         }
         
-        const response = await api.get(`/category/${params.id}`, { params: queryParams });
+        const response = await api.get(`/category/${params.id}/`, { params: queryParams });
         return response.data;
         
     } catch (error) {
@@ -141,14 +142,14 @@ class CategoryApiService {
   }
 
   /**
-   * Find products under a category
+   * Find products under a category (URL UNCHANGED)
    * @param {Object} params - Parameters including category id
    * @returns {Promise<Array>} List of products with subcategory info
    */
   async FindProdcategory(params = {}) {
       try {
           console.log(`This API call will fetch the products under the category`);
-          const response = await api.get(`/category/${params.id}`);
+          const response = await api.get(`/category/${params.id}/`);
           
           // Validate response structure
           if (!response.data || !response.data.category) {
@@ -233,7 +234,7 @@ class CategoryApiService {
   // ================ SUBCATEGORY MANAGEMENT ================
 
   /**
-   * Add a new subcategory to a category
+   * Add a new subcategory to a category (URL UNCHANGED)
    * @param {string} categoryId - Category ID
    * @param {Object} subcategoryData - Subcategory data
    * @returns {Promise<Object>} API response
@@ -257,7 +258,7 @@ class CategoryApiService {
   }
 
   /**
-   * Update a product's subcategory
+   * Update a product's subcategory (UPDATED URL)
    * @param {Object} params - Update parameters
    * @param {string} params.product_id - Product ID to update
    * @param {string|null} params.new_subcategory - New subcategory name
@@ -282,7 +283,8 @@ class CategoryApiService {
         category_id: params.category_id
       };
 
-      const response = await api.put('/category/product/subcategory/update/', payload);
+      // ✅ UPDATED: Changed from /category/product/subcategory/update/ to /product/subcategory/update/
+      const response = await api.put('/product/subcategory/update/', payload);
 
       console.log('✅ SubCatChangeTab: Subcategory update successful:', response.data);
       return response.data;
@@ -293,6 +295,7 @@ class CategoryApiService {
     }
   }
 
+  // ❌ DEPRECATED: This method has an incorrect URL
   async CatChangeTab(params = {}) {
     try {
       console.log('🔄 CatChangeTab: Updating product category:', params);
@@ -305,29 +308,29 @@ class CategoryApiService {
         throw new Error('Category ID is required');
       }
 
+      // ❌ This URL is incorrect and should be updated or removed
       const payload = {
         product_id: params.product_id,
         new_category: params.category || null,
         category_id: params.category_id
       };
 
-      const response = await api.put('category/<str:category_id>/', payload);
+      // This should probably use the subcategory update endpoint
+      const response = await api.put('/product/subcategory/update/', payload);
 
       console.log('✅ CatChangeTab: Category update successful:', response.data);
       return response.data;
 
     } catch (error) {
-      console.error('❌ SubCatChangeTab: Error updating product subcategory:', error);
+      console.error('❌ CatChangeTab: Error updating product category:', error);
       this.handleError(error);
     }
   }
 
-
-
-  // ================ DELETE METHODS ================
+  // ================ DELETE METHODS (UPDATED URLs) ================
 
   /**
-   * Soft delete a category
+   * Soft delete a category (UPDATED - now uses CategoryDetailView.delete())
    * @param {string} categoryId - Category ID to soft delete
    * @returns {Promise<Object>} Delete result
    */
@@ -335,7 +338,9 @@ class CategoryApiService {
     try {
       console.log(`🗑️ Soft deleting category: ${categoryId}`);
       
-      const response = await api.delete(`/category/${categoryId}/soft-delete/`);
+      // ✅ UPDATED: Changed from /category/{id}/soft-delete/ to /category/{id}/
+      // The soft delete is now handled by the DELETE method on CategoryDetailView
+      const response = await api.delete(`/category/${categoryId}/`);
       
       console.log('✅ Category soft deleted successfully:', response.data);
       return response.data;
@@ -347,7 +352,7 @@ class CategoryApiService {
   }
 
   /**
-   * Hard delete a category (Admin only)
+   * Hard delete a category (URL UNCHANGED)
    * @param {string} categoryId - Category ID to hard delete
    * @returns {Promise<Object>} Delete result
    */
@@ -367,7 +372,7 @@ class CategoryApiService {
   }
 
   /**
-   * Restore a soft-deleted category
+   * Restore a soft-deleted category (URL UNCHANGED)
    * @param {string} categoryId - Category ID to restore
    * @returns {Promise<Object>} Restore result
    */
@@ -387,7 +392,7 @@ class CategoryApiService {
   }
 
   /**
-   * Get category deletion impact information
+   * Get category deletion impact information (URL UNCHANGED)
    * @param {string} categoryId - Category ID to check
    * @returns {Promise<Object>} Deletion impact info
    */
@@ -406,10 +411,54 @@ class CategoryApiService {
     }
   }
 
-  // ================ EXPORT METHODS ================
+  // ================ BULK OPERATIONS (NEW METHOD) ================
 
   /**
-   * Export categories data
+   * Perform bulk operations on categories
+   * @param {Object} params - Bulk operation parameters
+   * @param {string} params.operation - Operation type ('soft_delete', 'update_status')
+   * @param {Array} params.category_ids - Array of category IDs
+   * @param {string} params.new_status - New status (for update_status operation)
+   * @returns {Promise<Object>} Bulk operation result
+   */
+  async BulkOperations(params = {}) {
+    try {
+      console.log('🔄 Performing bulk operations:', params);
+      
+      if (!params.operation) {
+        throw new Error('Operation type is required');
+      }
+      
+      if (!params.category_ids || !Array.isArray(params.category_ids)) {
+        throw new Error('Category IDs array is required');
+      }
+
+      const payload = {
+        operation: params.operation,
+        category_ids: params.category_ids
+      };
+
+      // Add new_status for update_status operation
+      if (params.operation === 'update_status' && params.new_status) {
+        payload.new_status = params.new_status;
+      }
+
+      // ✅ NEW: Use centralized bulk operations endpoint
+      const response = await api.post('/category/bulk/', payload);
+
+      console.log('✅ Bulk operations completed successfully:', response.data);
+      return response.data;
+
+    } catch (error) {
+      console.error('❌ Error in bulk operations:', error);
+      this.handleError(error);
+    }
+  }
+
+  // ================ EXPORT METHODS (UPDATED URL) ================
+
+  /**
+   * Export categories data (UPDATED URL)
    * @param {Object} params - Export parameters (format, include_sales_data, include_deleted)
    * @returns {Promise<Blob>} Export file blob
    */
@@ -417,22 +466,25 @@ class CategoryApiService {
       try {
           console.log('🚀 Starting export with params:', params);
           
-          const queryParams = {
+          const queryParams = new URLSearchParams({
               format: params.format || 'csv',
-              include_sales_data: params.include_sales_data !== false,
-              include_deleted: params.include_deleted || false
-          };
+              include_sales_data: params.include_sales_data !== false ? 'true' : 'false',
+              include_deleted: params.include_deleted ? 'true' : 'false'
+          });
           
-          console.log('📤 Request params:', queryParams);
+          console.log('📤 Query params:', queryParams.toString());
           
-          const baseURL = 'http://localhost:8000/api/v1/category/exportcat/';
+          // ✅ UPDATED: Changed from /category/exportcat/ to /category/export/
+          const baseURL = `${api.defaults.baseURL}/category/export/?${queryParams}`;
           
           console.log('🔍 Full URL:', baseURL);
           
           const response = await fetch(baseURL, {
               method: 'GET',
               headers: {
-                  'Accept': 'text/csv, application/json, application/octet-stream, */*'
+                  'Accept': 'text/csv, application/json, application/octet-stream, */*',
+                  'Authorization': localStorage.getItem('auth_token') ? 
+                    `Bearer ${localStorage.getItem('auth_token')}` : ''
               }
           });
           
@@ -454,7 +506,160 @@ class CategoryApiService {
       }
   }
 
-  // ================ UTILITY METHODS ================
+  /**
+   * Get category statistics (NEW METHOD)
+   * @returns {Promise<Object>} Category statistics
+   */
+  async GetCategoryStats() {
+    try {
+      console.log('📊 Getting category statistics');
+      
+      // ✅ NEW: Use new stats endpoint
+      const response = await api.get('/category/stats/');
+      
+      console.log('✅ Category stats fetched successfully:', response.data);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ Error fetching category stats:', error);
+      this.handleError(error);
+    }
+  }
+
+  // ================ PRODUCT MOVEMENT METHODS (UPDATED URLs) ================
+
+  /**
+   * Move a product to Uncategorized category (UPDATED URL)
+   * @param {Object} params - Parameters
+   * @param {string} params.product_id - Product ID to move
+   * @param {string} params.current_category_id - Current category ID
+   * @returns {Promise<Object>} Move result
+   */
+  async MoveProductToUncategorized(params = {}) {
+    try {
+      console.log('🔄 Moving product to Uncategorized category:', params);
+      
+      if (!params.product_id) {
+        throw new Error('Product ID is required');
+      }
+
+      const payload = {
+        product_id: params.product_id,
+        current_category_id: params.current_category_id || null
+      };
+
+      // ✅ UPDATED: Changed from /category/product/move-to-uncategorized/ to /product/move-to-uncategorized/
+      const response = await api.put('/product/move-to-uncategorized/', payload);
+
+      console.log('✅ Product moved to Uncategorized successfully:', response.data);
+      return response.data;
+
+    } catch (error) {
+      console.error('❌ Error moving product to Uncategorized:', error);
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Bulk move multiple products to Uncategorized category (UPDATED URL)
+   * @param {Object} params - Parameters
+   * @param {Array} params.product_ids - Array of product IDs to move
+   * @param {string} params.current_category_id - Current category ID
+   * @returns {Promise<Object>} Bulk move result
+   */
+  async BulkMoveProductsToUncategorized(params = {}) {
+    try {
+      console.log('🔄 Bulk moving products to Uncategorized:', params);
+      
+      if (!params.product_ids || !Array.isArray(params.product_ids)) {
+        throw new Error('Product IDs array is required');
+      }
+
+      const payload = {
+        product_ids: params.product_ids,
+        current_category_id: params.current_category_id || null
+      };
+
+      // ✅ UPDATED: Changed from /category/product/bulk-move-to-uncategorized/ to /product/bulk-move-to-uncategorized/
+      const response = await api.put('/product/bulk-move-to-uncategorized/', payload);
+
+      console.log('✅ Products bulk moved to Uncategorized successfully:', response.data);
+      return response.data;
+
+    } catch (error) {
+      console.error('❌ Error in bulk move to Uncategorized:', error);
+      this.handleError(error);
+    }
+  }
+
+  // ================ UNCATEGORIZED CATEGORY METHODS (UPDATED URL) ================
+
+  /**
+   * Get uncategorized category information (UPDATED URL)
+   * @returns {Promise<Object>} Uncategorized category info
+   */
+  async GetUncategorizedInfo() {
+    try {
+      console.log('ℹ️ Getting uncategorized category info');
+      
+      // ✅ UPDATED: Use new uncategorized endpoint
+      const response = await api.get('/category/uncategorized/');
+      
+      console.log('✅ Uncategorized info fetched successfully:', response.data);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ Error fetching uncategorized info:', error);
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Ensure uncategorized category exists (NEW METHOD)
+   * @returns {Promise<Object>} Uncategorized category
+   */
+  async EnsureUncategorizedExists() {
+    try {
+      console.log('🔧 Ensuring uncategorized category exists');
+      
+      // ✅ NEW: Create/ensure uncategorized category
+      const response = await api.post('/category/uncategorized/');
+      
+      console.log('✅ Uncategorized category ensured:', response.data);
+      return response.data;
+      
+    } catch (error) {
+      console.error('❌ Error ensuring uncategorized category:', error);
+      this.handleError(error);
+    }
+  }
+
+  // ================ DEPRECATED METHODS (TO BE REMOVED) ================
+
+  /**
+   * @deprecated This method is no longer used with the new bulk operations
+   * Use BulkOperations instead
+   */
+  async UncategorizedData(params = {}) {
+    console.warn('⚠️ UncategorizedData method is deprecated. Use BulkOperations instead.');
+    
+    try {
+      console.log('🔄 Moving product to a category:', params);
+      
+      // This method doesn't seem to have a clear purpose in the original code
+      // Recommend removing it or replacing with a specific method
+      
+      const result = { success: false, message: 'Method deprecated' };
+      console.log('❌ UncategorizedData method is deprecated');
+      return result;
+
+    } catch (error) {
+      console.error('❌ Error in deprecated method:', error);
+      this.handleError(error);
+    }
+  }
+
+  // ================ UTILITY METHODS (UNCHANGED) ================
 
   /**
    * Format deletion date
@@ -476,120 +681,6 @@ class CategoryApiService {
       return 'Invalid Date';
     }
   }
-
-   /**
-   * Remove a product from current category and move to Uncategorized
-   * @param {Object} params - Parameters
-   * @param {string} params.product_id - Product ID to move
-   * @param {string} params.current_category_id - Current category ID
-   * @param {string} params.uncategorized_category_id - Uncategorized category ID
-   * @returns {Promise<Object>} Move result
-   */
-  async MoveProductToUncategorized(params = {}) {
-    try {
-      console.log('🔄 Moving product to Uncategorized category:', params);
-      
-      if (!params.product_id) {
-        throw new Error('Product ID is required');
-      }
-
-      const payload = {
-        product_id: params.product_id,
-        current_category_id: params.current_category_id || null
-      };
-
-      // Use the new dedicated endpoint
-      const response = await api.put('/category/product/move-to-uncategorized/', payload);
-
-      console.log('✅ Product moved to Uncategorized successfully:', response.data);
-      return response.data;
-
-    } catch (error) {
-      console.error('❌ Error moving product to Uncategorized:', error);
-      this.handleError(error);
-    }
-  }
-
-  async UncategorizedData(params = {}) {
-    try {
-      console.log('🔄 Moving product to a category:', params);
-      
-      
-
-      console.log('✅ Product moved to uncategorized successfully:', result);
-      return result;
-
-    } catch (error) {
-      console.error('❌ Error moving product to another category:', error);
-      this.handleError(error);
-    }
-  }
-
-    /**
-   * Move a product from current category back to Uncategorized category
-   * @param {Object} params - Parameters
-   * @param {string} params.product_id - Product ID to move
-   * @param {string} params.current_category_id - Current category ID (optional, for logging)
-   * @returns {Promise<Object>} Move result
-   */
-  async MoveProductToUncategorized(params = {}) {
-    try {
-      console.log('🔄 Moving product back to Uncategorized category:', params);
-      
-      if (!params.product_id) {
-        throw new Error('Product ID is required');
-      }
-
-      const payload = {
-        product_id: params.product_id,
-        current_category_id: params.current_category_id || null,
-        action: "move_to_uncategorized"
-      };
-
-      // Use a dedicated endpoint for moving to uncategorized
-      const response = await api.put('/category/product/move-to-uncategorized/', payload);
-
-      console.log('✅ Product moved to Uncategorized successfully:', response.data);
-      return response.data;
-
-    } catch (error) {
-      console.error('❌ Error moving product to Uncategorized:', error);
-      this.handleError(error);
-    }
-  }
-
-  /**
-   * Bulk move multiple products to Uncategorized category
-   * @param {Object} params - Parameters
-   * @param {Array} params.product_ids - Array of product IDs to move
-   * @param {string} params.current_category_id - Current category ID
-   * @returns {Promise<Object>} Bulk move result
-   */
-  async BulkMoveProductsToUncategorized(params = {}) {
-    try {
-      console.log('🔄 Bulk moving products to Uncategorized:', params);
-      
-      if (!params.product_ids || !Array.isArray(params.product_ids)) {
-        throw new Error('Product IDs array is required');
-      }
-
-      const payload = {
-        product_ids: params.product_ids,
-        current_category_id: params.current_category_id || null
-      };
-
-      // Use the new dedicated endpoint
-      const response = await api.put('/category/product/bulk-move-to-uncategorized/', payload);
-
-      console.log('✅ Products bulk moved to Uncategorized successfully:', response.data);
-      return response.data;
-
-    } catch (error) {
-      console.error('❌ Error in bulk move to Uncategorized:', error);
-      this.handleError(error);
-    }
-  }
-
 }
 
 const categoryApiService = new CategoryApiService();

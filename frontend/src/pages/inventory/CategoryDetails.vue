@@ -210,7 +210,7 @@
             <td>
                <select 
                   class="form-select form-select-sm"
-                  :value="product.subcategory || 'None'"  
+                  :value="product.subcategory || product.subcategory_name || 'None'"  
                   @change="updateProductSubcategory(product._id, $event.target.value)"
                 >
                   <option 
@@ -270,6 +270,24 @@
     
     <!-- Add Subcategory Modal -->
     <AddSubcategoryModal ref="addSubcategoryModal" @subcategory-added="onSubcategoryAdded" />
+
+    <div 
+      v-if="successMessage" 
+      class="alert alert-success alert-dismissible fade show fixed-top mt-3 mx-3" 
+      style="z-index: 1060;"
+    >
+      {{ successMessage }}
+      <button type="button" class="btn-close" @click="successMessage = ''"></button>
+    </div>
+
+    <div 
+      v-if="errorMessage" 
+      class="alert alert-danger alert-dismissible fade show fixed-top mt-3 mx-3" 
+      style="z-index: 1060;"
+    >
+      {{ errorMessage }}
+      <button type="button" class="btn-close" @click="errorMessage = ''"></button>
+    </div>
   </div>
 </template>
 
@@ -309,7 +327,9 @@ export default {
       categoryId: null,
       categoryData: {},
       products: [],
-      isExporting: false
+      isExporting: false,
+      successMessage: '',
+      errorMessage: '',
     }
   },
   computed: {
@@ -568,6 +588,9 @@ export default {
     async removeSelectedFromCategory() {
       if (this.selectedProducts.length === 0) return
       
+      // Store the count FIRST, before any modifications
+      const selectedCount = this.selectedProducts.length;
+      
       const productNames = this.selectedProducts
         .map(id => {
           const product = this.products.find(p => p._id === id)
@@ -576,13 +599,13 @@ export default {
         .filter(Boolean)
         .slice(0, 3)
       
-      let confirmMessage = `Are you sure you want to remove ${this.selectedProducts.length} product(s) from the "${this.categoryData.category_name}" category?\n\n` +
+      let confirmMessage = `Are you sure you want to remove ${selectedCount} product(s) from the "${this.categoryData.category_name}" category?\n\n` +
                           `The products will be moved back to the "Uncategorized" category.`
       
       if (productNames.length > 0) {
         confirmMessage += `\n\nProducts to be removed:\n${productNames.join(', ')}`
-        if (this.selectedProducts.length > 3) {
-          confirmMessage += `\n...and ${this.selectedProducts.length - 3} more`
+        if (selectedCount > 3) {
+          confirmMessage += `\n...and ${selectedCount - 3} more`
         }
       }
       
@@ -605,11 +628,11 @@ export default {
           !this.selectedProducts.includes(product._id)
         );
         
-        // Clear selections
+        // Clear selections (only once)
         this.selectedProducts = []
-        
+
         this.showSuccessMessage(
-          `${this.selectedProducts.length} product(s) moved to Uncategorized category successfully!`
+          `${selectedCount} product(s) moved to Uncategorized category successfully!`
         );
         
       } catch (error) {
@@ -749,11 +772,24 @@ export default {
 
     showSuccessMessage(message) {
       console.log('✅ Success:', message);
+      this.successMessage = message;
+      this.errorMessage = '';
+      
+      // Auto-hide after 5 seconds
+      setTimeout(() => {
+        this.successMessage = '';
+      }, 5000);
     },
 
     showErrorMessage(message) {
-      alert(message);
       console.error('❌ Error:', message);
+      this.errorMessage = message;
+      this.successMessage = '';
+      
+      // Auto-hide after 7 seconds
+      setTimeout(() => {
+        this.errorMessage = '';
+      }, 7000);
     },
 
     getExportButtonText() {
@@ -919,5 +955,27 @@ export default {
   .filter-dropdown {
     min-width: 100%;
   }
+}
+.alert {
+  border-radius: 0.5rem;
+  border: none;
+}
+
+.alert-success {
+  background-color: #d1edff;
+  color: #0f5132;
+}
+
+.alert-danger {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.btn-close {
+  filter: brightness(0.8);
+}
+
+.btn-close:hover {
+  filter: brightness(0.6);
 }
 </style>

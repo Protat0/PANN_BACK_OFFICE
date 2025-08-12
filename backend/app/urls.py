@@ -75,25 +75,21 @@ from .kpi_views.product_views import (
 )
 
 from .kpi_views.category_views import (
-    CategoryDetailView,
-    CategoryKPIView,
-    CategorySubcategoryView,
-    CategoryDataView,
-    CategoryExportView,      
-    CategoryExportStatsView,
-    CategorySoftDeleteView,
-    CategoryHardDeleteView,
-    CategoryRestoreView,
-    CategoryDeletedListView,
-    CategoryDeleteInfoView,
-    ProductSubcategoryUpdateView,
-    ProductCategoryInfoView, 
-    CategorySubcategoriesListView,
-    UncategorizedCategoryProductsView,
-    UncategorizedCategoryView, 
-    MigrateUncategorizedProductsView,
-    ProductBulkMoveToUncategorizedView,
-    ProductMoveToUncategorizedView
+    CategoryKPIView,                    # Create & List categories
+    CategoryDetailView,                 # Get, Update, Soft Delete individual category
+    CategoryDataView,                   # Categories with sales data
+    CategoryExportView,                 # Export categories (CSV/JSON)
+    CategoryStatsView,                  # Category statistics ()
+    CategoryHardDeleteView,             # Hard delete (Admin only)
+    CategoryRestoreView,                # Restore deleted (Admin only) 
+    CategoryDeletedListView,            # List deleted categories (Admin only)
+    CategoryDeleteInfoView,             # Pre-delete information
+    CategoryBulkOperationsView,         # Bulk operations (centralized)
+    CategorySubcategoryView,            # Add/Remove/Get subcategories
+    ProductSubcategoryUpdateView,       # Update product subcategory
+    ProductMoveToUncategorizedView,     # Move single product to uncategorized
+    ProductBulkMoveToUncategorizedView, # Bulk move products to uncategorized
+    UncategorizedCategoryView,  # Uncategorized Category Management
 )
 
 from .kpi_views.saleslog_views import (
@@ -236,43 +232,45 @@ urlpatterns = [
     # System status endpoint (if you want to keep it)
     path('system/status/', SystemStatusView.as_view(), name='system-status'),
 
-    # Category endpoints  
-    path('category/', CategoryKPIView.as_view(), name="category-operations"),
-    path('category/dataview/', CategoryDataView.as_view(), name="category-dataview"),
-    path('category/exportcat/', CategoryExportView.as_view(), name='export_categories'),  
-    path('category/export/stats/', CategoryExportStatsView.as_view(), name='export_categories_stats'),  
-
-    # Product movement endpoints 
-    path('category/product/subcategory/update/', ProductSubcategoryUpdateView.as_view(), name='product-subcategory-update'),
-    path('category/product/move-to-uncategorized/', ProductMoveToUncategorizedView.as_view(), name='product-move-to-uncategorized'), # NEW
-    path('category/product/bulk-move-to-uncategorized/', ProductBulkMoveToUncategorizedView.as_view(), name='product-bulk-move-to-uncategorized'), # NEW
-    path('category/product/<str:product_id>/info/', ProductCategoryInfoView.as_view(), name='product-category-info'),
-
-    # Category detail endpoints  
-    path('category/<str:category_id>/', CategoryDetailView.as_view(), name="category-detail"),
-    path('category/<str:category_id>/subcategories/', CategorySubcategoryView.as_view(), name="category-subcategories"),
-    path('category/<str:category_id>/subcategories/list/', CategorySubcategoriesListView.as_view(), name='category-subcategories-list'),
-
-    # Soft Delete Operations
-    path('category/<str:category_id>/soft-delete/', CategorySoftDeleteView.as_view(), name='category-soft-delete'),
-    path('category/bulk-soft-delete/', CategorySoftDeleteView.as_view(), name='category-bulk-soft-delete'), 
-
-    # Hard Delete Operations (Admin only)
-    path('category/<str:category_id>/hard-delete/', CategoryHardDeleteView.as_view(), name='category-hard-delete'),
-
-    # Restore Operations
-    path('category/<str:category_id>/restore/', CategoryRestoreView.as_view(), name='category-restore'),
-
-    # Deleted Categories Management
-    path('category/deleted/list/', CategoryDeletedListView.as_view(), name='category-deleted-list'),
-
-    # Delete Information (for confirmation dialogs)
+    path('category/', CategoryKPIView.as_view(), name='category-operations'),
+    
+    # Individual category operations (Get, Update, Soft Delete)
+    path('category/<str:category_id>/', CategoryDetailView.as_view(), name='category-detail'),
+    
+    # Category statistics and info
+    path('category/stats/', CategoryStatsView.as_view(), name='category-stats'),
     path('category/<str:category_id>/delete-info/', CategoryDeleteInfoView.as_view(), name='category-delete-info'),
-
+    
+    # Categories with sales data
+    path('category/display/', CategoryDataView.as_view(), name='category-display'),
+    
+    # Export operations
+    path('category/export/', CategoryExportView.as_view(), name='category-export'),
+    
+    # Hard delete (Admin only)
+    path('category/<str:category_id>/hard-delete/', CategoryHardDeleteView.as_view(), name='category-hard-delete'),
+    
+    # Restore operations (Admin only)
+    path('category/<str:category_id>/restore/', CategoryRestoreView.as_view(), name='category-restore'), 
+    
+    # Deleted categories management (Admin only)
+    path('category/deleted/', CategoryDeletedListView.as_view(), name='category-deleted-list'),
+    
+    # Centralized bulk operations (soft delete, status update)
+    path('category/bulk/', CategoryBulkOperationsView.as_view(), name='category-bulk-operations'),
+    
+    # Subcategory operations (Add, Remove, Get)
+    path('category/<str:category_id>/subcategories/', CategorySubcategoryView.as_view(), name='category-subcategories'),
+    
+    # Update product subcategory
+    path('product/subcategory/update/', ProductSubcategoryUpdateView.as_view(), name='product-subcategory-update'),
+    
+    # Move products to uncategorized
+    path('product/move-to-uncategorized/', ProductMoveToUncategorizedView.as_view(), name='product-move-to-uncategorized'),
+    path('product/bulk-move-to-uncategorized/', ProductBulkMoveToUncategorizedView.as_view(), name='product-bulk-move-to-uncategorized'),
+    
     # Uncategorized category management
-    path('category/uncategorized/', UncategorizedCategoryView.as_view(), name='uncategorized-category'),
-    path('category/uncategorized/products/', UncategorizedCategoryProductsView.as_view(), name='uncategorized-category-products'),
-    path('category/uncategorized/migrate/', MigrateUncategorizedProductsView.as_view(), name='migrate-uncategorized-products'),
+    path('category/uncategorized/', UncategorizedCategoryView.as_view(), name='uncategorized-category'), 
 
    # Bulk import and template endpoints (MUST be first)
     path('invoices/bulk-import/', SalesLogBulkImportView.as_view(), name='invoice-bulk-import'),

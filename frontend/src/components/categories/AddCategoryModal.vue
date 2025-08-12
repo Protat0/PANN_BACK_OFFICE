@@ -384,16 +384,27 @@ export default {
             ...categoryData
           })
           
+           if (!updatedCategory || !updatedCategory.success) {
+              throw new Error(updatedCategory?.message || 'Update failed')
+            }
+            
+            console.log('✅ Category updated successfully:', updatedCategory)
           console.log('✅ Category updated successfully:', updatedCategory)
           this.$emit('category-updated', updatedCategory)
-          alert(`Category "${categoryData.category_name}" updated successfully!`)
+          this.$emit('category-updated', { 
+            ...updatedCategory, 
+            category_name: categoryData.category_name 
+          })
           
         } else {
           const newCategory = await categoryApiService.AddCategoryData(categoryData)
           
           console.log('✅ Category created successfully:', newCategory)
           this.$emit('category-added', newCategory)
-          alert(`Category "${categoryData.category_name}" created successfully!`)
+          this.$emit('category-added', { 
+            ...newCategory, 
+            category_name: categoryData.category_name 
+          })
         }
         
         this.resetForm()
@@ -402,7 +413,12 @@ export default {
       } catch (error) {
         console.error('❌ Error in handleSubmit:', error)
         const action = this.isEditMode ? 'update' : 'create'
-        alert(`Failed to ${action} category. Please try again.\n\nError: ${error.message || 'Unknown error'}`)
+        console.error(`Failed to ${action} category:`, error)
+        this.$emit('category-error', {
+          action,
+          error: error.message || 'Unknown error',
+          categoryName: categoryData.category_name
+        })
       } finally {
         this.isLoading = false
       }
