@@ -283,15 +283,34 @@ class CategoryApiService {
         category_id: params.category_id
       };
 
-      // ✅ UPDATED: Changed from /category/product/subcategory/update/ to /product/subcategory/update/
       const response = await api.put('/product/subcategory/update/', payload);
 
       console.log('✅ SubCatChangeTab: Subcategory update successful:', response.data);
-      return response.data;
+      
+      // Return standardized response format
+      return {
+        success: true,
+        message: response.data.message || 'Subcategory updated successfully',
+        result: {
+          success: true,
+          message: response.data.message || 'Subcategory updated successfully',
+          ...response.data.result
+        },
+        ...response.data
+      };
 
     } catch (error) {
       console.error('❌ SubCatChangeTab: Error updating product subcategory:', error);
-      this.handleError(error);
+      
+      // Return error in standardized format instead of throwing
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to update subcategory',
+        result: {
+          success: false,
+          message: error.response?.data?.error || error.message || 'Failed to update subcategory'
+        }
+      };
     }
   }
 
@@ -529,10 +548,10 @@ class CategoryApiService {
   // ================ PRODUCT MOVEMENT METHODS (UPDATED URLs) ================
 
   /**
-   * Move a product to Uncategorized category (UPDATED URL)
+   * Move a product to Uncategorized category
    * @param {Object} params - Parameters
    * @param {string} params.product_id - Product ID to move
-   * @param {string} params.current_category_id - Current category ID
+   * @param {string} params.current_category_id - Current category ID (optional)
    * @returns {Promise<Object>} Move result
    */
   async MoveProductToUncategorized(params = {}) {
@@ -548,15 +567,28 @@ class CategoryApiService {
         current_category_id: params.current_category_id || null
       };
 
-      // ✅ UPDATED: Changed from /category/product/move-to-uncategorized/ to /product/move-to-uncategorized/
       const response = await api.put('/product/move-to-uncategorized/', payload);
 
       console.log('✅ Product moved to Uncategorized successfully:', response.data);
-      return response.data;
+      
+      // Return standardized response format
+      return {
+        success: true,
+        message: response.data.message || 'Product moved successfully',
+        result: response.data.result || response.data,
+        product_id: params.product_id,
+        ...response.data
+      };
 
     } catch (error) {
       console.error('❌ Error moving product to Uncategorized:', error);
-      this.handleError(error);
+      
+      // Return error in standardized format instead of throwing
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to move product',
+        product_id: params.product_id
+      };
     }
   }
 
@@ -575,20 +607,41 @@ class CategoryApiService {
         throw new Error('Product IDs array is required');
       }
 
+      if (params.product_ids.length === 0) {
+        throw new Error('At least one product ID is required');
+      }
+
       const payload = {
         product_ids: params.product_ids,
         current_category_id: params.current_category_id || null
       };
 
-      // ✅ UPDATED: Changed from /category/product/bulk-move-to-uncategorized/ to /product/bulk-move-to-uncategorized/
       const response = await api.put('/product/bulk-move-to-uncategorized/', payload);
 
       console.log('✅ Products bulk moved to Uncategorized successfully:', response.data);
-      return response.data;
+      
+      // Return standardized response format
+      return {
+        success: true,
+        message: response.data.message || 'Products moved successfully',
+        successful: response.data.result?.successful || 0,
+        failed: response.data.result?.failed || 0,
+        total_requested: params.product_ids.length,
+        results: response.data.result?.results || [],
+        ...response.data
+      };
 
     } catch (error) {
       console.error('❌ Error in bulk move to Uncategorized:', error);
-      this.handleError(error);
+      
+      // Return error in standardized format instead of throwing
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to bulk move products',
+        successful: 0,
+        failed: params.product_ids?.length || 0,
+        total_requested: params.product_ids?.length || 0
+      };
     }
   }
 

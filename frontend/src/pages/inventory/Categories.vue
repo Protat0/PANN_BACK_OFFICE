@@ -4,7 +4,6 @@
     <div class="d-flex justify-content-between align-items-start mb-3">
       <div>
         <h1 class="h3 fw-semibold text-primary-dark mb-0">Category Management</h1>
-        <p class="text-muted small mb-0">Manage your product categories and subcategories</p>
       </div>
       <div>
         <router-link 
@@ -17,40 +16,12 @@
       </div>
     </div>
 
-    <!-- Stats Overview (NEW FEATURE) -->
-    <div v-if="categoryStats && !loading" class="row g-3 mb-4">
-      <div class="col-6 col-md-3">
-        <div class="stat-card bg-primary-light text-primary-dark">
-          <div class="stat-number">{{ categoryStats.total_categories || 0 }}</div>
-          <div class="stat-label">Total Categories</div>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="stat-card bg-success-light text-success-dark">
-          <div class="stat-number">{{ categoryStats.active_categories || 0 }}</div>
-          <div class="stat-label">Active Categories</div>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="stat-card bg-info-light text-info-dark">
-          <div class="stat-number">{{ categoryStats.total_subcategories || 0 }}</div>
-          <div class="stat-label">Subcategories</div>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="stat-card bg-warning-light text-warning-dark">
-          <div class="stat-number">{{ categoryStats.deleted_categories || 0 }}</div>
-          <div class="stat-label">Deleted Categories</div>
-        </div>
-      </div>
-    </div>
-
     <!-- Action Bar and Filters -->
     <div class="action-bar-container mb-3">
       <div class="action-bar-controls">
         <div class="action-row">
           <!-- Left Side: Main Actions -->
-          <div v-if="selectedCategories.length === 0" class="d-flex gap-2 flex-wrap">
+          <div v-if="selectedCategories.length === 0" class="d-flex gap-2">
             <button 
               class="btn btn-success btn-sm btn-with-icon-sm"
               @click="handleAddCategory"
@@ -59,24 +30,23 @@
               <div v-if="isCreatingCategory" class="spinner-border spinner-border-sm me-2" role="status">
                 <span class="visually-hidden">Loading...</span>
               </div>
-              <Plus v-else :size="14" class="me-1" />
+              <Plus v-else :size="14" />
               {{ isCreatingCategory ? 'CREATING...' : 'ADD CATEGORY' }}
             </button>
 
             <button 
-              class="btn btn-outline-secondary btn-sm btn-with-icon-sm"
+              class="btn btn-outline-secondary btn-sm"
               @click="exportData" 
               :disabled="exporting || categories.length === 0"
             >
-              <div v-if="exporting" class="spinner-border spinner-border-sm me-1" role="status">
+              EXPORT
+              <div v-if="exporting" class="spinner-border spinner-border-sm me-2" role="status">
                 <span class="visually-hidden">Exporting...</span>
               </div>
-              <Download v-else :size="14" class="me-1" />
-              {{ exporting ? 'EXPORTING...' : 'EXPORT' }}
             </button>
 
             <button 
-              class="btn btn-outline-info btn-sm btn-with-icon-sm"
+              class="btn btn-outline-info btn-sm"
               @click="refreshData"
               :disabled="refreshing"
             >
@@ -89,13 +59,13 @@
           </div>
 
           <!-- Bulk Actions (when categories are selected) -->
-          <div v-if="selectedCategories.length > 0" class="d-flex gap-2 flex-wrap">
+          <div v-if="selectedCategories.length > 0" class="d-flex gap-2">
             <span class="badge bg-primary fs-6 px-3 py-2">
               {{ selectedCategories.length }} selected
             </span>
             
             <button 
-              class="btn btn-outline-danger btn-sm btn-with-icon-sm"
+              class="btn btn-outline-danger btn-sm"
               @click="bulkSoftDelete"
               :disabled="bulkOperating"
             >
@@ -113,7 +83,7 @@
           </div>
 
           <!-- Right Side: Filters and Search -->
-          <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="d-flex align-items-center gap-2">
             <button 
               class="btn btn-secondary btn-sm"
               @click="toggleSearchMode"
@@ -182,22 +152,17 @@
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" class="text-center py-5">
+    <div v-if="loading" class="text-center py-4">
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Loading categories...</span>
       </div>
-      <p class="mt-3 text-muted">Loading categories and statistics...</p>
+      <p class="mt-2 text-muted">Loading categories...</p>
     </div>
 
     <!-- Error State -->
     <div v-if="error" class="alert alert-danger" role="alert">
-      <div class="d-flex align-items-center">
-        <AlertCircle :size="20" class="me-2" />
-        <div>
-          <strong>Error:</strong> {{ error }}
-        </div>
-      </div>
-      <button @click="refreshData" class="btn btn-sm btn-outline-danger mt-2">
+      <strong>Error:</strong> {{ error }}
+      <button @click="refreshData" class="btn btn-sm btn-outline-danger ms-2">
         <RefreshCw :size="14" class="me-1" />
         Retry
       </button>
@@ -208,7 +173,7 @@
       <div 
         v-for="category in sortedAndFilteredCategories" 
         :key="category.id || category._id || category.name"
-        class="col-6 col-md-4 col-lg-3"
+        class="col-6 col-md-3"
       >
         <CardTemplate
           size="compact"
@@ -243,7 +208,6 @@
               </small>
             </div>
 
-            <!-- Category metrics -->
             <div class="d-flex justify-content-between align-items-center mb-2">
               <div>
                 <div class="text-primary fw-bold h5 mb-1">
@@ -251,40 +215,25 @@
                 </div>
                 <small class="text-tertiary-medium">Products</small>
               </div>
-              <div class="d-flex flex-column align-items-end">
-                <div class="text-muted small mb-1">
-                  {{ getCategorySubcategoryCount(category) }} subcategories
-                </div>
-                <div :class="getCategoryIconClass(category, categories.indexOf(category))">
-                  <component 
-                    :is="getCategoryIcon(category, categories.indexOf(category))" 
-                    :size="20" 
-                    :class="getCategoryIconColor(category, categories.indexOf(category))"
-                  />
-                </div>
+              <div :class="getCategoryIconClass(category, categories.indexOf(category))">
+                <component 
+                  :is="getCategoryIcon(category, categories.indexOf(category))" 
+                  :size="20" 
+                  :class="getCategoryIconColor(category, categories.indexOf(category))"
+                />
               </div>
             </div>
 
-            <!-- Status indicator -->
-            <div class="mb-2">
-              <span 
-                class="badge"
-                :class="getCategoryStatusBadge(category)"
-              >
-                {{ category.status || 'active' }}
-              </span>
-            </div>
-
             <!-- Action buttons -->
-            <div class="d-flex gap-1 mt-2 flex-wrap">
+            <div class="d-flex gap-1 mt-2">
               <button 
                 v-if="!category.isDeleted"
-                class="btn btn-view btn-sm btn-with-icon-sm flex-fill"
+                class="btn btn-view btn-sm btn-with-icon-sm"
                 @click.stop="viewCategory(category)"
                 data-bs-toggle="tooltip"
                 title="View Category Details"
               >
-                <Eye :size="14" class="me-1" />
+                <Eye :size="14" />
                 <span class="btn-text">View</span>
               </button>
 
@@ -296,17 +245,18 @@
                   title="Soft Delete Category"
                 >
                   <Trash2 :size="14" />
+                  Delete
                 </button>
               </template>
               
               <template v-else>
                 <button 
-                  class="btn btn-success btn-sm btn-with-icon-sm flex-fill"
+                  class="btn btn-success btn-sm btn-with-icon-sm"
                   @click.stop="restoreCategory(category)"
                   data-bs-toggle="tooltip"
                   title="Restore Category"
                 >
-                  <RotateCcw :size="14" class="me-1" />
+                  <RotateCcw :size="14" />
                   Restore
                 </button>
                 
@@ -318,6 +268,7 @@
                   title="Permanently Delete Category"
                 >
                   <X :size="14" />
+                  Hard Delete
                 </button>
               </template>
             </div>
@@ -346,25 +297,37 @@
     <!-- Add Category Modal -->
     <AddCategoryModal ref="addCategoryModal" @category-added="onCategoryAdded" />
 
-    <!-- Success/Error Messages -->
+    <!-- Success Messages -->
     <div 
       v-if="successMessage" 
-      class="alert alert-success alert-dismissible fade show fixed-top mt-3 mx-3" 
-      style="z-index: 1060;"
+      class="alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3" 
+      style="z-index: 1060; min-width: 300px;"
     >
       <CheckCircle :size="20" class="me-2" />
       {{ successMessage }}
       <button type="button" class="btn-close" @click="successMessage = ''"></button>
     </div>
 
+    <!-- Error Messages -->
     <div 
       v-if="errorMessage" 
-      class="alert alert-danger alert-dismissible fade show fixed-top mt-3 mx-3" 
-      style="z-index: 1060;"
+      class="alert alert-danger alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3" 
+      style="z-index: 1060; min-width: 300px;"
     >
       <AlertCircle :size="20" class="me-2" />
       {{ errorMessage }}
       <button type="button" class="btn-close" @click="errorMessage = ''"></button>
+    </div>
+
+    <!-- Warning Messages -->
+    <div 
+      v-if="warningMessage" 
+      class="alert alert-warning alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3" 
+      style="z-index: 1060; min-width: 300px;"
+    >
+      <AlertTriangle :size="20" class="me-2" />
+      {{ warningMessage }}
+      <button type="button" class="btn-close" @click="warningMessage = ''"></button>
     </div>
   </div>
 </template>
@@ -387,10 +350,10 @@ import {
   ShoppingBag,
   Grid3x3,
   RotateCcw,
-  Download,
   RefreshCw,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  AlertTriangle
 } from 'lucide-vue-next'
 
 export default {
@@ -411,10 +374,10 @@ export default {
     ShoppingBag,
     Grid3x3,
     RotateCcw,
-    Download,
     RefreshCw,
     AlertCircle,
-    CheckCircle
+    CheckCircle,
+    AlertTriangle
   },
   data() {
     return {
@@ -425,6 +388,7 @@ export default {
       error: null,
       successMessage: '',
       errorMessage: '',
+      warningMessage: '',
       
       // Operation states
       isCreatingCategory: false,
@@ -481,7 +445,6 @@ export default {
           return true
         })
       } else {
-        // When showing "all", exclude deleted unless specifically searching for deleted
         if (this.statusFilter !== 'deleted') {
           filtered = filtered.filter(category => !category.isDeleted)
         }
@@ -518,18 +481,46 @@ export default {
     await this.initializePage()
   },
   methods: {
-    // INITIALIZATION METHODS
+    // ========== INITIALIZATION METHODS ==========
     async initializePage() {
       this.loading = true
       this.error = null
       
       try {
-        // Load all data in parallel
-        await Promise.all([
+        // Use Promise.allSettled to handle partial failures gracefully
+        const results = await Promise.allSettled([
           this.fetchCategories(),
           this.fetchCategoryStats(),
           this.fetchUncategorizedCount()
         ])
+        
+        // Check each operation result
+        const operations = ['categories', 'stats', 'uncategorized count']
+        let hasErrors = false
+        let criticalError = false
+        
+        results.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            console.warn(`Failed to load ${operations[index]}:`, result.reason)
+            hasErrors = true
+            
+            // Categories are critical, others are optional
+            if (index === 0) {
+              criticalError = true
+            }
+          }
+        })
+        
+        // Only show error if categories failed to load
+        if (criticalError) {
+          throw new Error('Failed to load categories. Please check your backend server and URL configuration.')
+        }
+        
+        // Show warning if optional operations failed
+        if (hasErrors && !criticalError) {
+          this.showWarning('Some data could not be loaded. Core functionality is available.')
+        }
+        
       } catch (error) {
         console.error('Error initializing page:', error)
         this.error = error.message || 'Failed to load page data'
@@ -551,7 +542,7 @@ export default {
       }
     },
 
-    // CORE CATEGORY METHODS
+    // ========== CORE CATEGORY METHODS ==========
     async fetchCategories() {
       try {
         const params = { include_deleted: true }
@@ -571,11 +562,23 @@ export default {
         
       } catch (error) {
         console.error('Error fetching categories:', error)
+        
+        // Provide helpful error messages based on error type
+        if (error.message && error.message.includes('404')) {
+          console.warn('Categories endpoint not found - check backend URL configuration')
+          this.categories = []
+          throw new Error('Categories service not available. Please check your backend URL configuration.')
+        } else if (error.message && error.message.includes('Category not found')) {
+          console.warn('No categories exist in database')
+          this.categories = []
+          // Don't throw error for empty database - this is normal for new installations
+          return
+        }
+        
         throw error
       }
     },
 
-    // NEW: Fetch category statistics
     async fetchCategoryStats() {
       try {
         console.log('Fetching category statistics...')
@@ -583,13 +586,17 @@ export default {
         this.categoryStats = response.data || response
         console.log('Category stats:', this.categoryStats)
       } catch (error) {
-        console.error('Error fetching category stats:', error)
-        // Don't throw error - stats are optional
-        this.categoryStats = null
+        console.warn('Category stats not available:', error.message)
+        // Calculate basic stats from available data instead of failing
+        this.categoryStats = {
+          total_categories: this.categories ? this.categories.length : 0,
+          active_categories: this.categories ? this.categories.filter(c => !c.isDeleted && (c.status === 'active' || !c.status)).length : 0,
+          total_subcategories: this.categories ? this.categories.reduce((sum, cat) => sum + this.getCategorySubcategoryCount(cat), 0) : 0,
+          deleted_categories: this.categories ? this.categories.filter(c => c.isDeleted).length : 0
+        }
       }
     },
 
-    // Fetch uncategorized products count
     async fetchUncategorizedCount() {
       try {
         console.log('Fetching uncategorized products count...')
@@ -602,12 +609,12 @@ export default {
         console.log(`Found ${this.uncategorizedCount} uncategorized products`)
         
       } catch (error) {
-        console.error('Error fetching uncategorized count:', error)
+        console.warn('Error fetching uncategorized count:', error.message)
         this.uncategorizedCount = 0
       }
     },
 
-    // CATEGORY CRUD METHODS
+    // ========== CATEGORY CRUD METHODS ==========
     async handleAddCategory() {
       console.log('Add Category button clicked')
       this.isCreatingCategory = true
@@ -623,7 +630,7 @@ export default {
     async onCategoryAdded(newCategory) {
       try {
         console.log('New category added:', newCategory)
-        await this.initializePage() // Refresh all data
+        await this.initializePage()
         this.showSuccess(`Category "${newCategory.category_name}" added successfully!`)
       } catch (error) {
         console.error('Error refreshing categories after add:', error)
@@ -651,7 +658,7 @@ export default {
       })
     },
 
-    // DELETE METHODS
+    // ========== DELETE METHODS ==========
     async softDeleteCategory(category) {
       try {
         const deleteInfo = await categoryApiService.GetCategoryDeleteInfo(category._id)
@@ -664,8 +671,8 @@ export default {
         
         if (productCount > 0 || subcategoryCount > 0) {
           confirmMessage += `\n\nThis category contains:`
-          if (subcategoryCount > 0) confirmMessage += `\n• ${subcategoryCount} subcategories`
-          if (productCount > 0) confirmMessage += `\n• ${productCount} products`
+          if (subcategoryCount > 0) confirmMessage += `\n• ${subcategoryCount} subcategory`
+          if (productCount > 0) confirmMessage += `\n• ${productCount} product(s)`
           confirmMessage += `\n\nProducts will be moved to Uncategorized.`
         }
         
@@ -675,7 +682,7 @@ export default {
         console.log('Soft deleting category:', category)
         
         await categoryApiService.SoftDeleteCategory(category._id)
-        await this.initializePage() // Refresh all data
+        await this.initializePage()
         
         console.log('✅ Category soft deleted successfully')
         this.showSuccess(`Category "${categoryName}" has been deleted.`)
@@ -694,7 +701,7 @@ export default {
         console.log('Restoring category:', category)
         
         await categoryApiService.RestoreCategory(category._id)
-        await this.initializePage() // Refresh all data
+        await this.initializePage()
         
         console.log('✅ Category restored successfully')
         this.showSuccess(`Category "${category.category_name}" has been restored.`)
@@ -730,7 +737,7 @@ export default {
         console.log('Hard deleting category:', category)
         
         await categoryApiService.HardDeleteCategory(category._id)
-        await this.initializePage() // Refresh all data
+        await this.initializePage()
         
         console.log('✅ Category permanently deleted')
         this.showSuccess(`Category "${categoryName}" has been permanently deleted.`)
@@ -741,7 +748,7 @@ export default {
       }
     },
 
-    // BULK OPERATIONS
+    // ========== BULK OPERATIONS ==========
     toggleCategorySelection(category) {
       const categoryId = category._id || category.id
       const index = this.selectedCategories.indexOf(categoryId)
@@ -769,12 +776,12 @@ export default {
 
         this.bulkOperating = true
         
-        const result = await categoryApiService.BulkOperations({
+        await categoryApiService.BulkOperations({
           operation: 'soft_delete',
           category_ids: this.selectedCategories
         })
 
-        await this.initializePage() // Refresh all data
+        await this.initializePage()
         this.clearSelection()
         
         this.showSuccess(`Successfully deleted ${this.selectedCategories.length} categories.`)
@@ -787,55 +794,55 @@ export default {
       }
     },
 
-    // EXPORT METHODS
+    // ========== EXPORT METHODS ==========
     async exportData() {
-      this.exporting = true;
+      this.exporting = true
       
       try {
-        console.log('🚀 Starting category export...');
+        console.log('🚀 Starting category export...')
         
         const exportParams = {
           format: 'csv',
           include_sales_data: true,
           include_deleted: this.statusFilter === 'deleted'
-        };
+        }
         
-        const blobData = await categoryApiService.ExportCategoryData(exportParams);
+        const blobData = await categoryApiService.ExportCategoryData(exportParams)
         
         if (!(blobData instanceof Blob)) {
-          throw new Error('Invalid response: expected file data');
+          throw new Error('Invalid response: expected file data')
         }
         
         if (blobData.size === 0) {
-          throw new Error('Export file is empty. No data to export.');
+          throw new Error('Export file is empty. No data to export.')
         }
         
-        const url = window.URL.createObjectURL(blobData);
-        const link = document.createElement('a');
-        link.href = url;
+        const url = window.URL.createObjectURL(blobData)
+        const link = document.createElement('a')
+        link.href = url
         
-        const timestamp = new Date().toISOString().split('T')[0];
-        const deletedSuffix = this.statusFilter === 'deleted' ? '_with_deleted' : '';
-        link.download = `categories_export${deletedSuffix}_${timestamp}.csv`;
+        const timestamp = new Date().toISOString().split('T')[0]
+        const deletedSuffix = this.statusFilter === 'deleted' ? '_with_deleted' : ''
+        link.download = `categories_export${deletedSuffix}_${timestamp}.csv`
         
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
         
-        console.log('✅ Export completed successfully');
-        this.showSuccess('Categories exported successfully!');
+        console.log('✅ Export completed successfully')
+        this.showSuccess('Categories exported successfully!')
         
       } catch (error) {
-        console.error('❌ Export error:', error);
-        const errorMessage = error.message || 'Export failed. Please try again.';
-        this.showError(`Export failed: ${errorMessage}`);
+        console.error('❌ Export error:', error)
+        const errorMessage = error.message || 'Export failed. Please try again.'
+        this.showError(`Export failed: ${errorMessage}`)
       } finally {
-        this.exporting = false;
+        this.exporting = false
       }
     },
 
-    // UI UTILITY METHODS
+    // ========== UI UTILITY METHODS ==========
     toggleSearchMode() {
       this.searchMode = !this.searchMode
       
@@ -863,15 +870,15 @@ export default {
       })
       
       this.showDeleted = this.statusFilter === 'deleted'
-      this.clearSelection() // Clear selection when filters change
+      this.clearSelection()
     },
 
     applySorting() {
       console.log('Sorting applied:', this.sortBy)
-      this.clearSelection() // Clear selection when sorting changes
+      this.clearSelection()
     },
 
-    // CATEGORY DATA HELPERS
+    // ========== CATEGORY DATA HELPERS ==========
     getCategoryProductCount(category) {
       if (!category) return 0
       
@@ -929,21 +936,6 @@ export default {
       return `${subcategoryCount} subcategory, ${productCount} product${productCount !== 1 ? 's' : ''}`
     },
 
-    getCategoryStatusBadge(category) {
-      if (category.isDeleted) {
-        return 'badge bg-warning text-dark'
-      }
-      
-      switch (category.status) {
-        case 'active':
-          return 'badge bg-success'
-        case 'inactive':
-          return 'badge bg-secondary'
-        default:
-          return 'badge bg-primary'
-      }
-    },
-
     formatDeletionDate(dateString) {
       return categoryApiService.formatDeletionDate(dateString)
     },
@@ -960,13 +952,13 @@ export default {
       }
     },
 
-    // MESSAGE METHODS
+    // ========== MESSAGE METHODS ==========
     showSuccess(message) {
       console.log('✅ Success:', message)
       this.successMessage = message
       this.errorMessage = ''
+      this.warningMessage = ''
       
-      // Auto-hide after 5 seconds
       setTimeout(() => {
         this.successMessage = ''
       }, 5000)
@@ -976,14 +968,25 @@ export default {
       console.error('❌ Error:', message)
       this.errorMessage = message
       this.successMessage = ''
+      this.warningMessage = ''
       
-      // Auto-hide after 7 seconds
       setTimeout(() => {
         this.errorMessage = ''
       }, 7000)
     },
 
-    // ICON AND STYLING METHODS
+    showWarning(message) {
+      console.warn('⚠️ Warning:', message)
+      this.warningMessage = message
+      this.successMessage = ''
+      this.errorMessage = ''
+      
+      setTimeout(() => {
+        this.warningMessage = ''
+      }, 6000)
+    },
+
+    // ========== ICON AND STYLING METHODS ==========
     getCategoryIcon(category, index) {
       const categoryName = (category.category_name || '').toLowerCase()
       
@@ -1153,6 +1156,23 @@ export default {
 
 .deleted-category:hover {
   opacity: 1;
+}
+
+.selected-category {
+  border: 2px solid var(--primary) !important;
+  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
+}
+
+.selection-checkbox {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 10;
+}
+
+.selection-checkbox .form-check-input {
+  width: 1.2rem;
+  height: 1.2rem;
 }
 
 @media (max-width: 768px) {

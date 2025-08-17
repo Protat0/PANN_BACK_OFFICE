@@ -109,6 +109,65 @@ class CategoryService:
         
         return subcategories_list
 
+
+    def get_category_stats(self):
+        """Get comprehensive category statistics"""
+        try:
+            pipeline = [
+                {
+                    '$group': {
+                        '_id': None,
+                        'total_categories': {'$sum': 1},
+                        'active_categories': {
+                            '$sum': {
+                                '$cond': [
+                                    {'$and': [
+                                        {'$eq': ['$status', 'active']},
+                                        {'$ne': ['$isDeleted', True]}
+                                    ]},
+                                    1, 0
+                                ]
+                            }
+                        },
+                        'deleted_categories': {
+                            '$sum': {'$cond': [{'$eq': ['$isDeleted', True]}, 1, 0]}
+                        },
+                        'total_subcategories': {
+                            '$sum': {'$size': {'$ifNull': ['$sub_categories', []]}}
+                        },
+                        'total_products': {
+                            '$sum': {
+                                '$sum': {
+                                    '$map': {
+                                        'input': {'$ifNull': ['$sub_categories', []]},
+                                        'as': 'sub',
+                                        'in': {'$size': {'$ifNull': ['$$sub.products', []]}}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            ]
+            
+            result = list(self.category_collection.aggregate(pipeline))
+            return result[0] if result else {
+                'total_categories': 0,
+                'active_categories': 0,
+                'deleted_categories': 0,
+                'total_subcategories': 0,
+                'total_products': 0
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting category stats: {e}")
+            return {
+                'total_categories': 0,
+                'active_categories': 0,
+                'deleted_categories': 0,
+                'total_subcategories': 0,
+                'total_products': 0
+            }
     # ================================================================
     # NOTIFICATION METHODS
     # ================================================================
@@ -1038,31 +1097,45 @@ class CategoryDisplayService:
             logger.warning(f"Could not create sales indexes: {e}")
 
     def get_categories_display_optimized(self, include_deleted=False, limit=50):
-        """OPTIMIZED: Use aggregation pipeline for better performance"""
+        """SIMPLIFIED: Remove problematic null checks"""
         try:
             # Build category filter
             category_match = {}
             if not include_deleted:
                 category_match['isDeleted'] = {'$ne': True}
             
-            # Use aggregation pipeline for efficient data retrieval
+            # SIMPLIFIED: Remove the problematic null checks - $ifNull handles this
             pipeline = [
                 {"$match": category_match},
                 {"$limit": limit},
                 
-                # Lookup sales data efficiently
+                # Add field to safely handle sub_categories.products
+                {"$addFields": {
+                    "safe_products": {
+                        "$reduce": {
+                            "input": {
+                                "$ifNull": ["$sub_categories", []]
+                            },
+                            "initialValue": [],
+                            "in": {
+                                "$concatArrays": [
+                                    "$$value", 
+                                    {"$ifNull": ["$$this.products", []]}
+                                ]
+                            }
+                        }
+                    }
+                }},
+                
+                # Lookup sales data - simplified without problematic null checks
                 {"$lookup": {
                     "from": "sales_log",
-                    "let": {"category_products": "$sub_categories.products"},
+                    "let": {"category_products": "$safe_products"},
                     "pipeline": [
                         {"$unwind": "$item_list"},
                         {"$match": {
                             "$expr": {
-                                "$in": ["$item_list.item_name", {"$reduce": {
-                                    "input": "$category_products", 
-                                    "initialValue": [], 
-                                    "in": {"$concatArrays": ["$value", "$this"]}
-                                }}]
+                                "$in": ["$item_list.item_name", "$$category_products"]
                             }
                         }},
                         {"$group": {
@@ -1079,7 +1152,10 @@ class CategoryDisplayService:
                     "total_sales": {"$sum": "$sales_data.total_sales"},
                     "total_quantity": {"$sum": "$sales_data.total_quantity"},
                     "_id": {"$toString": "$_id"}
-                }}
+                }},
+                
+                # Remove the temporary safe_products field
+                {"$unset": "safe_products"}
             ]
             
             results = list(self.category_collection.aggregate(pipeline))
@@ -1089,21 +1165,25 @@ class CategoryDisplayService:
                 subcategories_data = []
                 sales_lookup = {item["_id"]: item for item in category.get("sales_data", [])}
                 
-                for subcategory in category.get('sub_categories', []):
+                sub_categories = category.get('sub_categories', []) or []
+                
+                for subcategory in sub_categories:
                     subcategory_sales = 0
                     subcategory_quantity = 0
                     
-                    for product_name in subcategory.get('products', []):
-                        if product_name in sales_lookup:
+                    products = subcategory.get('products', []) or []
+                    
+                    for product_name in products:
+                        if product_name and product_name in sales_lookup:
                             product_data = sales_lookup[product_name]
                             subcategory_quantity += product_data['total_quantity']
                             subcategory_sales += product_data['total_sales']
                     
                     subcategories_data.append({
-                        'name': subcategory['name'],
+                        'name': subcategory.get('name', 'Unknown'),
                         'quantity_sold': subcategory_quantity,
                         'total_sales': round(subcategory_sales, 2),
-                        'product_count': len(subcategory.get('products', []))
+                        'product_count': len(products)
                     })
                 
                 category['subcategories'] = subcategories_data
@@ -1113,7 +1193,7 @@ class CategoryDisplayService:
                 if 'sales_data' in category:
                     del category['sales_data']
             
-            logger.info(f"Processed {len(results)} categories with optimized pipeline")
+            logger.info(f"Processed {len(results)} categories with simplified pipeline")
             return results
             
         except Exception as e:
@@ -1213,7 +1293,395 @@ class CategoryDisplayService:
             logger.error(f"ERROR in fallback categories display: {e}", exc_info=True)
             raise Exception(f"Error getting categories: {str(e)}")
 
+    def export_categories_csv(self, include_sales_data=True, date_filter=None, include_deleted=False):
+        """
+        Export categories to CSV format with optional sales data
+        """
+        try:
+            import csv
+            from io import StringIO
+            
+            # Get categories data
+            if include_sales_data:
+                # Use the display service for enriched data
+                if date_filter:
+                    result = self.get_categories_display_with_date_filter(
+                        start_date=date_filter.get('start_date'),
+                        end_date=date_filter.get('end_date'),
+                        frequency=date_filter.get('frequency', 'monthly'),
+                        include_deleted=include_deleted
+                    )
+                    categories = result.get('categories', [])
+                else:
+                    categories = self.get_categories_display(include_deleted=include_deleted)
+            else:
+                # Basic category data only
+                category_service = CategoryService()
+                categories = category_service.get_all_categories(include_deleted=include_deleted)
+            
+            # Create CSV content
+            output = StringIO()
+            writer = csv.writer(output)
+            
+            # Define headers
+            if include_sales_data:
+                headers = [
+                    'ID',
+                    'Category Name', 
+                    'Description', 
+                    'Status',
+                    'Is Deleted',
+                    'Deleted At',
+                    'Sub-Categories Count', 
+                    'Sub-Categories', 
+                    'Total Products',
+                    'Total Quantity Sold',
+                    'Total Sales (₱)',
+                    'Date Created', 
+                    'Last Updated'
+                ]
+            else:
+                headers = [
+                    'ID',
+                    'Category Name', 
+                    'Description', 
+                    'Status',
+                    'Is Deleted',
+                    'Deleted At',
+                    'Sub-Categories Count', 
+                    'Sub-Categories', 
+                    'Total Products',
+                    'Date Created', 
+                    'Last Updated'
+                ]
+            
+            writer.writerow(headers)
+            
+            # Write category data
+            for category in categories:
+                # Calculate sub-categories info
+                sub_categories = category.get('sub_categories', []) or category.get('subcategories', [])
+                sub_categories_count = len(sub_categories)
+                
+                # Format sub-categories names
+                if sub_categories_count > 0:
+                    sub_category_names = '; '.join([sub.get('name', 'Unknown') for sub in sub_categories])
+                else:
+                    sub_category_names = 'None'
+                
+                # Calculate total products
+                total_products = 0
+                if include_sales_data and 'subcategories' in category:
+                    # From display service data
+                    total_products = sum(sub.get('product_count', 0) for sub in category.get('subcategories', []))
+                elif 'sub_categories' in category:
+                    # From basic category data
+                    total_products = sum(len(sub.get('products', [])) for sub in category.get('sub_categories', []))
+                
+                # Format dates
+                date_created = self._format_export_date(category.get('date_created'))
+                last_updated = self._format_export_date(category.get('last_updated'))
+                deleted_at = self._format_export_date(category.get('deleted_at')) if category.get('deleted_at') else 'N/A'
+                
+                # Build row data
+                if include_sales_data:
+                    row = [
+                        category.get('_id', '')[-6:] if category.get('_id') else 'N/A',
+                        category.get('category_name', ''),
+                        category.get('description', ''),
+                        category.get('status', 'active'),
+                        'Yes' if category.get('isDeleted', False) else 'No',
+                        deleted_at,
+                        sub_categories_count,
+                        sub_category_names,
+                        total_products,
+                        category.get('total_quantity_sold', 0),
+                        f"{category.get('total_sales', 0):.2f}",
+                        date_created,
+                        last_updated
+                    ]
+                else:
+                    row = [
+                        category.get('_id', '')[-6:] if category.get('_id') else 'N/A',
+                        category.get('category_name', ''),
+                        category.get('description', ''),
+                        category.get('status', 'active'),
+                        'Yes' if category.get('isDeleted', False) else 'No',
+                        deleted_at,
+                        sub_categories_count,
+                        sub_category_names,
+                        total_products,
+                        date_created,
+                        last_updated
+                    ]
+                
+                writer.writerow(row)
+            
+            # Get CSV content
+            csv_content = output.getvalue()
+            output.close()
+            
+            return {
+                'content': csv_content,
+                'filename': f"categories_export_{datetime.utcnow().strftime('%Y-%m-%d')}.csv",
+                'content_type': 'text/csv',
+                'total_records': len(categories),
+                'include_deleted': include_deleted
+            }
+            
+        except Exception as e:
+            raise Exception(f"Error exporting categories to CSV: {str(e)}")
 
+    def export_categories_json(self, include_sales_data=True, date_filter=None, include_deleted=False):
+        """
+        Export categories to JSON format with optional sales data
+        """
+        try:
+            import json
+            
+            # Get categories data (same logic as CSV export)
+            if include_sales_data:
+                if date_filter:
+                    result = self.get_categories_display_with_date_filter(
+                        start_date=date_filter.get('start_date'),
+                        end_date=date_filter.get('end_date'),
+                        frequency=date_filter.get('frequency', 'monthly'),
+                        include_deleted=include_deleted
+                    )
+                    categories = result.get('categories', [])
+                    export_metadata = {
+                        'total_categories': result.get('total_categories', 0),
+                        'date_filter_applied': result.get('date_filter_applied', False),
+                        'frequency': result.get('frequency', 'monthly'),
+                        'total_invoices': result.get('total_invoices', 0),
+                        'include_deleted': result.get('include_deleted', False)
+                    }
+                else:
+                    categories = self.get_categories_display(include_deleted=include_deleted)
+                    export_metadata = {
+                        'total_categories': len(categories),
+                        'date_filter_applied': False,
+                        'include_deleted': include_deleted
+                    }
+            else:
+                category_service = CategoryService()
+                categories = category_service.get_all_categories(include_deleted=include_deleted)
+                export_metadata = {
+                    'total_categories': len(categories),
+                    'date_filter_applied': False,
+                    'include_deleted': include_deleted
+                }
+            
+            # Prepare export data
+            export_data = {
+                'export_info': {
+                    'exported_at': datetime.utcnow().isoformat(),
+                    'format': 'json',
+                    'include_sales_data': include_sales_data,
+                    **export_metadata
+                },
+                'categories': categories
+            }
+            
+            # Convert to JSON
+            json_content = json.dumps(export_data, indent=2, default=str)
+            
+            return {
+                'content': json_content,
+                'filename': f"categories_export_{datetime.utcnow().strftime('%Y-%m-%d')}.json",
+                'content_type': 'application/json',
+                'total_records': len(categories),
+                'include_deleted': include_deleted
+            }
+            
+        except Exception as e:
+            raise Exception(f"Error exporting categories to JSON: {str(e)}")
+
+    def validate_export_params(self, format_type, include_sales_data, date_filter, include_deleted=False):
+        """
+        Validate export parameters
+        """
+        try:
+            # Validate format
+            valid_formats = ['csv', 'json']
+            if format_type not in valid_formats:
+                raise ValueError(f"Invalid format. Must be one of: {', '.join(valid_formats)}")
+            
+            # Validate include_sales_data
+            if not isinstance(include_sales_data, bool):
+                raise ValueError("include_sales_data must be a boolean")
+            
+            # Validate include_deleted
+            if not isinstance(include_deleted, bool):
+                raise ValueError("include_deleted must be a boolean")
+            
+            # Validate date_filter if provided
+            if date_filter:
+                if not isinstance(date_filter, dict):
+                    raise ValueError("date_filter must be a dictionary")
+                
+                # Check date format if dates are provided
+                for date_key in ['start_date', 'end_date']:
+                    if date_key in date_filter and date_filter[date_key]:
+                        try:
+                            if isinstance(date_filter[date_key], str):
+                                datetime.fromisoformat(date_filter[date_key])
+                        except ValueError:
+                            raise ValueError(f"Invalid {date_key} format. Use ISO format (YYYY-MM-DD)")
+            
+            return True
+            
+        except Exception as e:
+            raise Exception(f"Export parameter validation failed: {str(e)}")
+
+    def _format_export_date(self, date_value):
+        """Helper method to format dates for export"""
+        if not date_value:
+            return 'N/A'
+        
+        try:
+            if isinstance(date_value, str):
+                # Try to parse string date
+                try:
+                    date_obj = datetime.fromisoformat(date_value.replace('Z', '+00:00'))
+                except:
+                    return date_value  # Return as-is if parsing fails
+            elif isinstance(date_value, datetime):
+                date_obj = date_value
+            else:
+                return 'Invalid Date'
+            
+            # Format as: "27-Jun-2025 09:00 AM"
+            return date_obj.strftime('%d-%b-%Y %I:%M %p')
+            
+        except Exception:
+            return 'Invalid Date'
+
+    def get_categories_display_with_date_filter(self, start_date=None, end_date=None, frequency='monthly', include_deleted=False):
+        """
+        Get categories with sales data filtered by date range
+        """
+        try:
+            logger.info(f"=== Starting get_categories_display with date filter: {start_date} to {end_date} ===")
+            
+            # Build date filter query
+            date_filter = {}
+            if start_date or end_date:
+                date_filter["transaction_date"] = {}
+                if start_date:
+                    from datetime import datetime, time
+                    if isinstance(start_date, str):
+                        from django.utils.dateparse import parse_date
+                        start_date = parse_date(start_date)
+                    if start_date:
+                        start_datetime = datetime.combine(start_date, time.min)
+                        date_filter["transaction_date"]["$gte"] = start_datetime
+                if end_date:
+                    if isinstance(end_date, str):
+                        from django.utils.dateparse import parse_date
+                        end_date = parse_date(end_date)
+                    if end_date:
+                        end_datetime = datetime.combine(end_date, time.max)
+                        date_filter["transaction_date"]["$lte"] = end_datetime
+            
+            # Apply the filter to the query
+            query_filter = date_filter if date_filter else {}
+            logger.info(f"MongoDB Query Filter: {query_filter}")
+            
+            # Use same logic as get_categories_display but with date filter
+            projection = {
+                "_id": 1,
+                "item_list.item_name": 1,
+                "customer_id": 1,
+                "transaction_date": 1,
+                "payment_method": 1,
+                "sales_type": 1,
+                "total_amount": 1,
+                "item_list.quantity": 1,
+                "item_list.unit_price": 1, 
+            }
+            
+            invoices = list(self.sales_collection.find(query_filter, projection))
+            logger.info(f"Fetched {len(invoices)} invoices for date range")
+
+            # Build sales lookup from filtered invoices
+            item_sales_lookup = {}
+            for invoice in invoices:
+                for item in invoice.get('item_list', []):
+                    item_name = item['item_name']
+                    if item_name not in item_sales_lookup:
+                        item_sales_lookup[item_name] = {'quantity': 0, 'total_sales': 0}
+                    
+                    item_total = item['quantity'] * item['unit_price']
+                    item_sales_lookup[item_name]['quantity'] += item['quantity']
+                    item_sales_lookup[item_name]['total_sales'] += item_total
+
+            # Process categories with delete filter
+            category_filter = {}
+            if not include_deleted:
+                category_filter['isDeleted'] = {'$ne': True}
+                
+            categories = list(self.category_collection.find(category_filter))
+            categories_with_sales = []
+
+            for category in categories:
+                category_name = category['category_name']
+                category_total_sales = 0
+                category_total_quantity = 0
+                subcategories_data = []
+                
+                for subcategory in category.get('sub_categories', []):
+                    subcategory_name = subcategory['name']
+                    subcategory_total_quantity = 0
+                    subcategory_total_sales = 0
+                    
+                    products_in_subcategory = subcategory.get('products', [])
+                    
+                    for product_name in products_in_subcategory:
+                        if product_name in item_sales_lookup:
+                            product_data = item_sales_lookup[product_name]
+                            subcategory_total_quantity += product_data['quantity']
+                            subcategory_total_sales += product_data['total_sales']
+                    
+                    category_total_sales += subcategory_total_sales
+                    category_total_quantity += subcategory_total_quantity
+                    
+                    subcategories_data.append({
+                        'name': subcategory_name,
+                        'quantity_sold': subcategory_total_quantity,
+                        'total_sales': subcategory_total_sales,
+                        'product_count': len(products_in_subcategory)
+                    })
+                
+                categories_with_sales.append({
+                    '_id': str(category['_id']),
+                    'category_name': category_name,
+                    'description': category.get('description', ''),
+                    'status': category.get('status', ''),
+                    'isDeleted': category.get('isDeleted', False),
+                    'deleted_at': category.get('deleted_at'),
+                    'date_created': category.get('date_created'),
+                    'last_updated': category.get('last_updated'),
+                    'total_quantity_sold': category_total_quantity,
+                    'total_sales': category_total_sales,
+                    'subcategories': subcategories_data,
+                    'subcategory_count': len(subcategories_data),
+                    'date_filter_applied': bool(start_date or end_date),
+                    'frequency': frequency
+                })
+
+            return {
+                'categories': categories_with_sales,
+                'total_categories': len(categories_with_sales),
+                'date_filter_applied': bool(start_date or end_date),
+                'frequency': frequency,
+                'total_invoices': len(invoices),
+                'include_deleted': include_deleted
+            }
+            
+        except Exception as e:
+            logger.error(f"ERROR in get_categories_display_with_date_filter: {e}")
+            raise Exception(f"Error getting categories with date filter: {str(e)}")
 # ================================================================
 # PRODUCT SUBCATEGORY SERVICE - Simplified and Aligned
 # ================================================================
@@ -1524,3 +1992,148 @@ class ProductSubcategoryService:
         except Exception as e:
             return {'is_valid': False, 'error': f'Validation error: {str(e)}'}
 
+    def move_product_to_uncategorized_category(self, product_id, current_category_id=None):
+        """
+        Public method to move a product to Uncategorized category
+        This is what your views.py is calling
+        """
+        try:
+            logger.info(f"Moving product {product_id} to Uncategorized category")
+            
+            # Get product first to get its name
+            if not ObjectId.is_valid(product_id):
+                raise ValueError("Invalid product ID")
+            
+            product = self.product_collection.find_one({'_id': ObjectId(product_id)})
+            if not product:
+                raise ValueError(f"Product with ID {product_id} not found")
+            
+            product_name = product.get('product_name')
+            if not product_name:
+                raise ValueError(f"Product {product_id} has no product_name")
+            
+            # Find current category if not provided
+            current_category = None
+            current_subcategory = None
+            
+            if current_category_id and ObjectId.is_valid(current_category_id):
+                current_category = self.category_collection.find_one({
+                    '_id': ObjectId(current_category_id),
+                    'isDeleted': {'$ne': True}
+                })
+            else:
+                # Find current category by product name
+                current_category = self.category_collection.find_one({
+                    'sub_categories.products': product_name,
+                    'isDeleted': {'$ne': True}
+                })
+            
+            if current_category:
+                # Find which subcategory contains the product
+                for subcategory in current_category.get('sub_categories', []):
+                    if product_name in subcategory.get('products', []):
+                        current_subcategory = subcategory['name']
+                        break
+            
+            # Use the existing private method
+            result = self._move_to_uncategorized_category(
+                product_id, 
+                product_name, 
+                current_category, 
+                current_subcategory
+            )
+            
+            return {
+                'success': result.get('success', False),
+                'action': 'moved_to_uncategorized',
+                'product_id': product_id,
+                'previous_category_id': current_category_id,
+                'new_category_id': self._get_uncategorized_category_id(),
+                'message': result.get('message', 'Product moved to Uncategorized category'),
+                'result': result  # Include the full result for compatibility
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in move_product_to_uncategorized_category: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'product_id': product_id
+            }
+
+    def bulk_move_products_to_uncategorized(self, product_ids, current_category_id=None):
+        """
+        Public method to bulk move products to Uncategorized category
+        This is what your views.py is calling
+        """
+        try:
+            logger.info(f"Bulk moving {len(product_ids)} products to Uncategorized")
+            
+            if not product_ids or not isinstance(product_ids, list):
+                raise ValueError("product_ids must be a non-empty list")
+            
+            results = []
+            successful = 0
+            failed = 0
+            
+            for product_id in product_ids:
+                try:
+                    result = self.move_product_to_uncategorized_category(
+                        product_id=product_id,
+                        current_category_id=current_category_id
+                    )
+                    
+                    if result.get('success'):
+                        successful += 1
+                    else:
+                        failed += 1
+                        
+                    results.append(result)
+                    
+                    # Small delay to prevent overwhelming the database
+                    import time
+                    time.sleep(0.01)  # 10ms delay
+                    
+                except Exception as e:
+                    failed += 1
+                    results.append({
+                        'success': False,
+                        'error': str(e),
+                        'product_id': product_id
+                    })
+            
+            return {
+                'success': successful > 0,
+                'message': f'Bulk move completed: {successful} successful, {failed} failed',
+                'successful': successful,
+                'failed': failed,
+                'results': results,
+                'total_requested': len(product_ids)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error in bulk_move_products_to_uncategorized: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'message': 'Bulk move to uncategorized failed'
+            }
+
+    def _get_uncategorized_category_id(self):
+        """Helper method to get the uncategorized category ID"""
+        try:
+            uncategorized_category = self.category_collection.find_one({
+                'category_name': self.UNCATEGORIZED_CATEGORY_NAME,
+                'isDeleted': {'$ne': True}
+            })
+            
+            if uncategorized_category:
+                return str(uncategorized_category['_id'])
+            
+            # If not found, create it and return ID
+            created_category = self._ensure_uncategorized_category_exists()
+            return created_category['_id']
+            
+        except Exception as e:
+            logger.error(f"Error getting uncategorized category ID: {e}")
+            return "686a4de143821e2b21f725c6"  # Fallback to your known ID

@@ -230,47 +230,38 @@ urlpatterns = [
     path('sessions/force-logout/<str:user_id>/', ForceLogoutView.as_view(), name='force-logout'),
     
     # System status endpoint (if you want to keep it)
-    path('system/status/', SystemStatusView.as_view(), name='system-status'),
+    path('category/stats/', CategoryStatsView.as_view(), name='category-stats'),
+    # Categories with sales data (MUST come before category/<str:category_id>/)
+    path('category/display/', CategoryDataView.as_view(), name='category-display'),  
+    # Export operations (MUST come before category/<str:category_id>/) - FIX: Add the actual path here
+    path('category/export/', CategoryExportView.as_view(), name='category-export'), 
+    # Deleted categories management (MUST come before category/<str:category_id>/)
+    path('category/deleted/', CategoryDeletedListView.as_view(), name='category-deleted-list'),
+    # Centralized bulk operations (MUST come before category/<str:category_id>/)
+    path('category/bulk/', CategoryBulkOperationsView.as_view(), name='category-bulk-operations'),
+    # Uncategorized category management (MUST come before category/<str:category_id>/)
+    path('category/uncategorized/', UncategorizedCategoryView.as_view(), name='uncategorized-category'),
 
+    # ========== MAIN CATEGORY OPERATIONS ==========
+    # Category list and create
     path('category/', CategoryKPIView.as_view(), name='category-operations'),
-    
+
+    # ========== PARAMETERIZED PATHS (MUST COME LAST) ==========
     # Individual category operations (Get, Update, Soft Delete)
     path('category/<str:category_id>/', CategoryDetailView.as_view(), name='category-detail'),
-    
-    # Category statistics and info
-    path('category/stats/', CategoryStatsView.as_view(), name='category-stats'),
+    # Category-specific operations with parameters
     path('category/<str:category_id>/delete-info/', CategoryDeleteInfoView.as_view(), name='category-delete-info'),
-    
-    # Categories with sales data
-    path('category/display/', CategoryDataView.as_view(), name='category-display'),
-    
-    # Export operations
-    path('category/export/', CategoryExportView.as_view(), name='category-export'),
-    
-    # Hard delete (Admin only)
     path('category/<str:category_id>/hard-delete/', CategoryHardDeleteView.as_view(), name='category-hard-delete'),
-    
-    # Restore operations (Admin only)
-    path('category/<str:category_id>/restore/', CategoryRestoreView.as_view(), name='category-restore'), 
-    
-    # Deleted categories management (Admin only)
-    path('category/deleted/', CategoryDeletedListView.as_view(), name='category-deleted-list'),
-    
-    # Centralized bulk operations (soft delete, status update)
-    path('category/bulk/', CategoryBulkOperationsView.as_view(), name='category-bulk-operations'),
-    
-    # Subcategory operations (Add, Remove, Get)
+    path('category/<str:category_id>/restore/', CategoryRestoreView.as_view(), name='category-restore'),
     path('category/<str:category_id>/subcategories/', CategorySubcategoryView.as_view(), name='category-subcategories'),
     
+    # ========== PRODUCT OPERATIONS ==========
     # Update product subcategory
     path('product/subcategory/update/', ProductSubcategoryUpdateView.as_view(), name='product-subcategory-update'),
-    
     # Move products to uncategorized
     path('product/move-to-uncategorized/', ProductMoveToUncategorizedView.as_view(), name='product-move-to-uncategorized'),
     path('product/bulk-move-to-uncategorized/', ProductBulkMoveToUncategorizedView.as_view(), name='product-bulk-move-to-uncategorized'),
-    
-    # Uncategorized category management
-    path('category/uncategorized/', UncategorizedCategoryView.as_view(), name='uncategorized-category'), 
+
 
    # Bulk import and template endpoints (MUST be first)
     path('invoices/bulk-import/', SalesLogBulkImportView.as_view(), name='invoice-bulk-import'),

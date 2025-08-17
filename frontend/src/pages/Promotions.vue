@@ -417,29 +417,27 @@ export default {
 
     async loadProductCategories() {
       try {
-        // console.log('Loading product categories...');
-        const response = await categoryApiService.CategoryData();
+        // TEMPORARY: Skip API call since categories DB is empty
+        console.log('Using fallback categories (DB is empty)');
         
-        const categories = response.data || response.categories || response;
+        // TODO: Uncomment when categories are added to database
+        // const response = await categoryApiService.CategoryData();
+        // const categories = response.data || response.categories || response;
         
-        this.productCategories = [
-          { value: 'all', label: 'All Products' },
-          ...categories.map(category => ({
-            value: category._id || category.category_id || category.id,
-            label: category.category_name || category.name
-          }))
-        ];
-        
-        // console.log('Product categories loaded:', this.productCategories);
-        
-      } catch (error) {
-        console.error('Error loading product categories:', error);
+        // Use fallback categories for now
         this.productCategories = [
           { value: 'all', label: 'All Products' },
           { value: 'noodles', label: 'Noodles' },
           { value: 'drinks', label: 'Drinks' },
-          { value: 'toppings', label: 'Toppings' }
+          { value: 'toppings', label: 'Toppings' },
+          { value: 'snacks', label: 'Snacks' }
         ];
+        
+        console.log('Product categories loaded (fallback):', this.productCategories);
+        
+      } catch (error) {
+        console.error('Error loading product categories:', error);
+        // Fallback is already set above
       }
     },
 

@@ -330,6 +330,8 @@ export default {
       isExporting: false,
       successMessage: '',
       errorMessage: '',
+      // Uncategorized category constant
+      UNCATEGORIZED_CATEGORY_ID: '686a4de143821e2b21f725c6'
     }
   },
   computed: {
@@ -337,16 +339,12 @@ export default {
       if (this.categoryFilter === 'all') {
         return this.products
       } else {
-        // Now treat "None" as a regular subcategory, not a special case
         return this.products.filter(product => {
           const productSubcategory = product.subcategory || product.subcategory_id || product.subcategory_name
           return productSubcategory === this.categoryFilter
         })
       }
     },
-    
-    // REMOVED: productsWithoutSubcategory computed property
-    // No longer needed since all products should have a subcategory
     
     paginatedProducts() {
       const start = (this.currentPage - 1) * this.itemsPerPage
@@ -367,7 +365,7 @@ export default {
     }
   },
   methods: {
-    // API METHODS
+    // ========== API METHODS ==========
     async fetchCategoryData(categoryId) {
       this.loading = true
       this.error = null
@@ -443,7 +441,7 @@ export default {
       }
     },
 
-    // UI INTERACTION METHODS
+    // ========== UI INTERACTION METHODS ==========
     applyFilter() {
       this.currentPage = 1
     },
@@ -465,13 +463,11 @@ export default {
     handleAddSubCategory() {
       console.log('Add sub-category button clicked')
       
-      // Check if we have category data
       if (!this.categoryData._id) {
         this.showErrorMessage('Category not loaded. Please refresh the page.')
         return
       }
       
-      // Open the modal
       if (this.$refs.addSubcategoryModal) {
         this.$refs.addSubcategoryModal.openModal(
           this.categoryData._id,
@@ -483,7 +479,7 @@ export default {
       }
     },
 
-    // PRODUCT SELECTION METHODS
+    // ========== PRODUCT SELECTION METHODS ==========
     toggleSelectAll() {
       const currentPageProductIds = this.paginatedProducts.map(p => p._id)
       
@@ -495,16 +491,15 @@ export default {
       }
     },
 
-    // PRODUCT MANAGEMENT METHODS
+    // ========== PRODUCT MANAGEMENT METHODS ==========
     async updateProductSubcategory(productId, newSubcategory) {
       try {
         console.log(`Updating ${productId} subcategory to:`, newSubcategory || 'None');
         
-        // When user selects "None", set subcategory to "None" (the actual subcategory)
         const result = await categoryApiService.SubCatChangeTab({
           product_id: productId,
-          new_subcategory: newSubcategory || "None", // Use "None" subcategory instead of null
-          category_id: this.categoryData._id // Keep in CURRENT category
+          new_subcategory: newSubcategory || "None",
+          category_id: this.categoryData._id
         });
         
         if (result.result.success) {
@@ -512,7 +507,6 @@ export default {
           
           const product = this.products.find(p => p._id === productId);
           if (product) {
-            // Update local product data
             product.subcategory = newSubcategory || "None";
             product.subcategory_name = newSubcategory || "None";
             product.subcategory_id = newSubcategory || "None";
@@ -534,10 +528,8 @@ export default {
       try {
         console.log('Subcategory added event received:', eventData)
         
-        // Refresh the category data to show the new subcategory
         await this.loadCategoryData(this.categoryData._id)
         
-        // Log success
         console.log(`✅ Category data refreshed after adding "${eventData.subcategory.name}"`)
         
       } catch (error) {
@@ -546,102 +538,237 @@ export default {
       }
     },
 
+    // ========== FIXED PRODUCT REMOVAL METHODS ==========
     async removeProductFromCategory(product) {
       try {
-        // Updated confirmation message
         const confirmed = confirm(
           `Are you sure you want to remove "${product.name || product.product_name}" from the "${this.categoryData.category_name}" category?\n\n` +
-          `The product will be moved back to the "Uncategorized" category.`
+          `The product will be moved to the "Uncategorized" category.\n\n` +
+          `Click OK to proceed.`
         );
         
         if (!confirmed) return;
         
-        console.log('Moving product back to Uncategorized category:', product._id);
+        console.log('🔍 === MOVING PRODUCT TO UNCATEGORIZED ===');
+        console.log('🔍 Product to move:', {
+          id: product._id,
+          name: product.product_name,
+          current_category: this.categoryData._id,
+          current_subcategory: product.subcategory
+        });
         
-        // Use the dedicated API method for moving to uncategorized
+        // Try the proper uncategorized API endpoint first
+        console.log('🔄 Using dedicated move-to-uncategorized API...');
+        
         const result = await categoryApiService.MoveProductToUncategorized({
           product_id: product._id,
           current_category_id: this.categoryData._id
         });
         
-        console.log('✅ Product moved to Uncategorized successfully:', result);
+        console.log('🔍 Move to uncategorized result:', result);
         
-        // Remove from local products array since it's no longer in this category
-        const productIndex = this.products.findIndex(p => p._id === product._id);
-        if (productIndex > -1) {
-          this.products.splice(productIndex, 1);
+        if (result.success) {
+          console.log('✅ Product successfully moved to uncategorized');
+          
+          // Remove from local products array
+          const productIndex = this.products.findIndex(p => p._id === product._id);
+          if (productIndex > -1) {
+            this.products.splice(productIndex, 1);
+          }
+          
+          this.selectedProducts = this.selectedProducts.filter(id => id !== product._id);
+          
+          this.showSuccessMessage(
+            `"${product.product_name}" has been moved to the Uncategorized category.`
+          );
+          
+          // Optional: Show uncategorized category after delay
+          setTimeout(() => {
+            const showUncategorized = confirm(
+              'Product moved successfully! Would you like to view the Uncategorized category now?'
+            );
+            if (showUncategorized) {
+              this.$router.push('/uncategorized');
+            }
+          }, 1500);
+          
+        } else {
+          console.log('❌ Primary API failed, trying fallback method...');
+          
+          // Fallback to SubCatChangeTab method
+          const fallbackResult = await categoryApiService.SubCatChangeTab({
+            product_id: product._id,
+            new_subcategory: "None",
+            category_id: this.UNCATEGORIZED_CATEGORY_ID
+          });
+          
+          if (fallbackResult.success && fallbackResult.result?.success) {
+            console.log('✅ Fallback method successful');
+            
+            // Remove from local products array
+            const productIndex = this.products.findIndex(p => p._id === product._id);
+            if (productIndex > -1) {
+              this.products.splice(productIndex, 1);
+            }
+            
+            this.selectedProducts = this.selectedProducts.filter(id => id !== product._id);
+            
+            this.showSuccessMessage(
+              `"${product.product_name}" has been moved to the Uncategorized category.`
+            );
+          } else {
+            this.showErrorMessage(result.error || 'Failed to move product to uncategorized');
+          }
         }
         
-        // Clear from selection if selected
-        this.selectedProducts = this.selectedProducts.filter(id => id !== product._id);
-        
-        this.showSuccessMessage(
-          `"${product.product_name}" has been moved to the Uncategorized category.`
-        );
-        
       } catch (error) {
-        console.error('❌ Error moving product to Uncategorized:', error);
+        console.error('❌ Error moving product:', error);
         this.showErrorMessage(`Failed to move product: ${error.message}`);
       }
     },
 
     async removeSelectedFromCategory() {
-      if (this.selectedProducts.length === 0) return
-      
-      // Store the count FIRST, before any modifications
-      const selectedCount = this.selectedProducts.length;
-      
-      const productNames = this.selectedProducts
-        .map(id => {
-          const product = this.products.find(p => p._id === id)
-          return product?.name || product?.product_name
-        })
-        .filter(Boolean)
-        .slice(0, 3)
-      
-      let confirmMessage = `Are you sure you want to remove ${selectedCount} product(s) from the "${this.categoryData.category_name}" category?\n\n` +
-                          `The products will be moved back to the "Uncategorized" category.`
-      
-      if (productNames.length > 0) {
-        confirmMessage += `\n\nProducts to be removed:\n${productNames.join(', ')}`
-        if (selectedCount > 3) {
-          confirmMessage += `\n...and ${selectedCount - 3} more`
-        }
+    if (this.selectedProducts.length === 0) return
+    
+    const selectedCount = this.selectedProducts.length;
+    
+    const productNames = this.selectedProducts
+      .map(id => {
+        const product = this.products.find(p => p._id === id)
+        return product?.name || product?.product_name
+      })
+      .filter(Boolean)
+      .slice(0, 3)
+    
+    let confirmMessage = `Are you sure you want to remove ${selectedCount} product(s) from the "${this.categoryData.category_name}" category?\n\n` +
+                        `The products will be moved to the "Uncategorized" category.\n\n` +
+                        `Click OK to proceed.`
+    
+    if (productNames.length > 0) {
+      confirmMessage += `\n\nProducts to be removed:\n${productNames.join(', ')}`
+      if (selectedCount > 3) {
+        confirmMessage += `\n...and ${selectedCount - 3} more`
       }
-      
-      const confirmed = confirm(confirmMessage)
+    }
+    
+    const confirmed = confirm(confirmMessage)
       if (!confirmed) return
-      
+
       try {
-        console.log('Bulk moving selected products to Uncategorized:', this.selectedProducts)
+        console.log('🔍 === BULK MOVING PRODUCTS TO UNCATEGORIZED ===');
+        console.log('🔄 Using dedicated bulk move API...');
         
-        // Use the bulk move API method
+        // Try the proper bulk uncategorized API endpoint first
         const result = await categoryApiService.BulkMoveProductsToUncategorized({
           product_ids: this.selectedProducts,
           current_category_id: this.categoryData._id
         });
         
-        console.log('✅ Products bulk moved to Uncategorized successfully:', result);
+        console.log('🔍 Bulk move result:', result);
         
-        // Remove all selected products from local array
-        this.products = this.products.filter(product => 
-          !this.selectedProducts.includes(product._id)
-        );
-        
-        // Clear selections (only once)
-        this.selectedProducts = []
+        if (result.success) {
+          const successCount = result.successful || 0;
+          const failureCount = result.failed || 0;
+          
+          console.log(`📊 Bulk move results: ${successCount} success, ${failureCount} failures`);
+          
+          // Remove successfully moved products from local array
+          // For bulk operations, if some succeeded, remove all selected (the API handles partial failures)
+          if (successCount > 0) {
+            this.products = this.products.filter(product => 
+              !this.selectedProducts.includes(product._id)
+            );
+          }
+          
+          // Clear selections
+          this.selectedProducts = []
 
-        this.showSuccessMessage(
-          `${selectedCount} product(s) moved to Uncategorized category successfully!`
-        );
+          if (successCount > 0) {
+            let message = `${successCount} product(s) moved to Uncategorized category successfully!`;
+            if (failureCount > 0) {
+              message += ` (${failureCount} failed - please try again for those)`;
+            }
+            
+            this.showSuccessMessage(message);
+            
+            // Option to view uncategorized after delay
+            setTimeout(() => {
+              const showUncategorized = confirm(
+                'Products moved successfully! Would you like to view the Uncategorized category now?'
+              );
+              if (showUncategorized) {
+                this.$router.push('/uncategorized');
+              }
+            }, 1500);
+          } else {
+            this.showErrorMessage(`Failed to move any products. Please try again.`);
+          }
+        } else {
+          console.log('❌ Primary bulk API failed, trying fallback method...');
+          
+          // Fallback to individual moves using SubCatChangeTab
+          let successCount = 0;
+          let failureCount = 0;
+          const failedProducts = [];
+          
+          for (const productId of this.selectedProducts) {
+            try {
+              console.log(`🔄 Moving product ${productId}...`);
+              
+              const moveResult = await categoryApiService.SubCatChangeTab({
+                product_id: productId,
+                new_subcategory: "None",
+                category_id: this.UNCATEGORIZED_CATEGORY_ID
+              });
+              
+              if (moveResult.success && moveResult.result?.success) {
+                successCount++;
+                console.log(`✅ Successfully moved product ${productId}`);
+              } else {
+                failureCount++;
+                failedProducts.push(productId);
+                console.error(`❌ Failed to move product ${productId}:`, moveResult);
+              }
+            } catch (moveError) {
+              failureCount++;
+              failedProducts.push(productId);
+              console.error(`❌ Error moving product ${productId}:`, moveError);
+            }
+            
+            // Small delay to prevent overwhelming the API
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          
+          console.log(`📊 Fallback results: ${successCount} success, ${failureCount} failures`);
+          
+          // Remove successfully moved products from local array
+          const successfullyMovedIds = this.selectedProducts.filter(id => !failedProducts.includes(id));
+          this.products = this.products.filter(product => 
+            !successfullyMovedIds.includes(product._id)
+          );
+          
+          // Clear selections
+          this.selectedProducts = []
+
+          if (successCount > 0) {
+            let message = `${successCount} product(s) moved to Uncategorized category successfully!`;
+            if (failureCount > 0) {
+              message += ` (${failureCount} failed - please try again for those)`;
+            }
+            
+            this.showSuccessMessage(message);
+          } else {
+            this.showErrorMessage(`Failed to move any products. Please try again.`);
+          }
+        }
         
       } catch (error) {
-        console.error('Error in bulk move to Uncategorized:', error)
-        this.showErrorMessage(`Bulk move failed: ${error.message}`)
+        console.error('❌ Error in bulk move to Uncategorized:', error);
+        this.showErrorMessage(`Bulk move failed: ${error.message}`);
       }
     },
 
-    // EXPORT METHODS
+    // ========== EXPORT METHODS ==========
     async exportFilteredProducts() {
       try {
         this.isExporting = true;
@@ -733,7 +860,7 @@ export default {
       }
     },
 
-    // UTILITY METHODS
+    // ========== UTILITY METHODS ==========
     formatPrice(price) {
       return parseFloat(price || 0).toFixed(2)
     },
@@ -775,7 +902,7 @@ export default {
       this.successMessage = message;
       this.errorMessage = '';
       
-      // Auto-hide after 5 seconds
+      // Auto-hide after 5 seconds (if not redirecting)
       setTimeout(() => {
         this.successMessage = '';
       }, 5000);
@@ -804,6 +931,36 @@ export default {
     getExportTooltip() {
       const filterText = this.getFilterDescription();
       return `Export ${filterText} as CSV file`;
+    },
+
+    // ========== DEBUG METHODS ==========
+    async debugCheckUncategorized() {
+      try {
+        console.log('🔍 === MANUAL UNCATEGORIZED CHECK ===');
+        
+        // Method 1: Check via FindProdcategory
+        const products1 = await categoryApiService.FindProdcategory({ 
+          id: this.UNCATEGORIZED_CATEGORY_ID 
+        });
+        console.log('🔍 Method 1 - FindProdcategory result:', products1);
+        
+        // Method 2: Check via direct category lookup
+        const categoryData = await categoryApiService.FindCategoryData({ 
+          id: this.UNCATEGORIZED_CATEGORY_ID 
+        });
+        console.log('🔍 Method 2 - Category data:', categoryData);
+        
+        // Method 3: Check uncategorized info endpoint
+        try {
+          const uncategorizedInfo = await categoryApiService.GetUncategorizedInfo();
+          console.log('🔍 Method 3 - Uncategorized info:', uncategorizedInfo);
+        } catch (e) {
+          console.log('🔍 Method 3 - GetUncategorizedInfo failed:', e.message);
+        }
+        
+      } catch (error) {
+        console.error('❌ Error in manual check:', error);
+      }
     }
   },
   

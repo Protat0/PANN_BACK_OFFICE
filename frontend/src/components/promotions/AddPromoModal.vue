@@ -317,7 +317,8 @@
 </template>
 
 <script>
-import categoryApiService from '@/services/apiCategory'
+// REMOVED: categoryApiService import since we're using parent's categories
+// import categoryApiService from '@/services/apiCategory'
 
 export default {
   name: 'AddPromoModal',
@@ -333,7 +334,7 @@ export default {
       selectedPromotion: null,
       loading: false,
       error: null,
-      categories: [], // Store fetched categories
+      categories: [], // Keep for backward compatibility, but use parent's data
       formData: {
         promotion_id: null,
         promotion_name: '',
@@ -357,62 +358,39 @@ export default {
       return titles[this.mode] || 'Promotion'
     },
     
-    // CHANGED: Display ALL categories without any filtering
+    // UPDATED: Use parent's productCategories directly
     availableCategories() {
-      // Return all categories without any filtering
-      return this.categories || []
+      if (this.productCategories && this.productCategories.length > 0) {
+        // Convert parent's format to modal's expected format
+        return this.productCategories
+          .filter(cat => cat.value !== 'all') // Remove "All Products" option
+          .map(cat => ({
+            _id: cat.value,
+            category_name: cat.label,
+            description: '',
+            status: 'active'
+          }));
+      }
+      
+      // Fallback categories if parent doesn't provide any
+      return [
+        { _id: 'noodles', category_name: 'Noodles', description: '', status: 'active' },
+        { _id: 'drinks', category_name: 'Drinks', description: '', status: 'active' },
+        { _id: 'toppings', category_name: 'Toppings', description: '', status: 'active' },
+        { _id: 'snacks', category_name: 'Snacks', description: '', status: 'active' }
+      ];
     }
   },
   
-  async mounted() {
-    // Fetch categories when component is mounted
-    await this.fetchCategories()
+  mounted() {
+    // REMOVED: No longer need to fetch categories from API
+    console.log('AddPromoModal: Using categories from parent component');
+    console.log('Available categories:', this.availableCategories);
   },
   
   methods: {
-    // Add method to fetch categories
-    async fetchCategories() {
-      try {
-        // console.log('Fetching categories...') // Debug log
-        const response = await categoryApiService.CategoryData()
-        // console.log('Categories response:', response) // Debug log
-        
-        // ✅ FIXED: Handle the correct response structure
-        if (response && response.categories) {
-          // Filter out deleted categories and map to the format we need
-          this.categories = response.categories
-            .filter(category => !category.isDeleted) // Only show active categories
-            .map(category => ({
-              _id: category._id,
-              category_name: category.category_name,
-              description: category.description || '',
-              status: category.status
-            }))
-          
-          // console.log('Categories processed:', this.categories) // Debug log
-        } else if (response && Array.isArray(response)) {
-          // Handle case where response is directly an array
-          this.categories = response
-            .filter(category => !category.isDeleted)
-            .map(category => ({
-              _id: category._id,
-              category_name: category.category_name,
-              description: category.description || '',
-              status: category.status
-            }))
-        } else {
-          // console.log('No categories found in response')
-          this.categories = []
-        }
-        
-        // console.log('Final categories available:', this.categories.length)
-        
-      } catch (error) {
-        console.error('Error fetching categories:', error)
-        this.categories = []
-      }
-    },
-
+    // REMOVED: fetchCategories method entirely
+    
     // Mode switching methods
     openAdd() {
       this.mode = 'add'
@@ -546,7 +524,7 @@ export default {
           applicable_products: applicableProducts
         }
         
-        // console.log('Saving new promotion:', promotionData)
+        console.log('Saving new promotion:', promotionData)
         
         // Emit to parent component to handle API call
         this.$emit('promotion-saved', promotionData)
@@ -580,7 +558,7 @@ export default {
           applicable_products: applicableProducts
         }
         
-        // console.log('Updating promotion:', promotionData)
+        console.log('Updating promotion:', promotionData)
         
         // Emit to parent component to handle API call
         this.$emit('promotion-updated', promotionData)
@@ -592,7 +570,7 @@ export default {
       }
     },
 
-    // Helper methods for data transformation - Updated for new data structure
+    // Helper methods for data transformation
     formatDateForAPI(dateValue) {
       if (!dateValue) return ''
       
@@ -612,36 +590,36 @@ export default {
     },
     
     mapCategoryToApplicableProducts(categoryId) {
-      // console.log('🔍 Mapping category to applicable products:', categoryId);
-      // console.log('🔍 Available categories:', this.categories);
+      console.log('🔍 Mapping category to applicable products:', categoryId);
+      console.log('🔍 Available categories:', this.availableCategories);
       
-      // If "all" is selected, return all category names (not IDs)
+      // If "all" is selected, return all category names
       if (categoryId === 'all') {
-        const allCategoryNames = this.categories.map(cat => cat.category_name);
-        // console.log('🔍 All category names:', allCategoryNames);
+        const allCategoryNames = this.availableCategories.map(cat => cat.category_name);
+        console.log('🔍 All category names:', allCategoryNames);
         return allCategoryNames;
       }
       
       // For specific category, find the category name
-      const selectedCategory = this.categories.find(cat => cat._id === categoryId);
+      const selectedCategory = this.availableCategories.find(cat => cat._id === categoryId);
       if (selectedCategory) {
-        // console.log('🔍 Selected category name:', selectedCategory.category_name);
+        console.log('🔍 Selected category name:', selectedCategory.category_name);
         return [selectedCategory.category_name];
       }
       
-      // console.log('🔍 No matching category found for ID:', categoryId);
+      console.log('🔍 No matching category found for ID:', categoryId);
       return [];
     },
 
     mapApplicableProductsToCategory(applicableProducts) {
-      // console.log('🔍 Mapping applicable products to category:', applicableProducts);
+      console.log('🔍 Mapping applicable products to category:', applicableProducts);
       
       if (!applicableProducts || applicableProducts.length === 0) {
         return '';
       }
       
       // Check if all categories are selected by comparing category names
-      const allCategoryNames = this.categories.map(cat => cat.category_name);
+      const allCategoryNames = this.availableCategories.map(cat => cat.category_name);
       const isAllSelected = allCategoryNames.every(catName => 
         applicableProducts.includes(catName)
       );
@@ -652,14 +630,14 @@ export default {
       
       // Find the category ID for the first applicable product (category name)
       const firstProductName = applicableProducts[0];
-      const matchingCategory = this.categories.find(cat => cat.category_name === firstProductName);
+      const matchingCategory = this.availableCategories.find(cat => cat.category_name === firstProductName);
       
       if (matchingCategory) {
-        // console.log('🔍 Found matching category ID:', matchingCategory._id);
+        console.log('🔍 Found matching category ID:', matchingCategory._id);
         return matchingCategory._id;
       }
       
-      // console.log('🔍 No matching category found for:', firstProductName);
+      console.log('🔍 No matching category found for:', firstProductName);
       return '';
     },
 
@@ -668,7 +646,7 @@ export default {
       this.closeModal()
     },
 
-    // Formatting methods - Updated for new data structure
+    // Formatting methods
     formatDiscountType(type) {
       const types = {
         'percentage': 'Percentage',
@@ -737,7 +715,7 @@ export default {
     },
     
     formatAffectedProducts(applicableProducts) {
-      // console.log('🔍 Formatting affected products:', applicableProducts);
+      console.log('🔍 Formatting affected products:', applicableProducts);
       
       if (!applicableProducts || applicableProducts.length === 0) {
         return 'No products selected';
@@ -755,6 +733,7 @@ export default {
   }
 }
 </script>
+
 <style scoped>
 .modal-content {
   border-radius: 0.75rem;

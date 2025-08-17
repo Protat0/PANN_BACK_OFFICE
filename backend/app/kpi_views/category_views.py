@@ -5,7 +5,7 @@ from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from ..services.category_service import CategoryService, CategoryDisplayService, ProductSubcategoryService
-from decorators.authenticationDecorator import require_authentication, require_admin, require_permission
+from ..decorators.authenticationDecorator import require_authentication, require_admin, require_permission
 import logging
 import json
 from datetime import datetime
@@ -702,12 +702,10 @@ class ProductMoveToUncategorizedView(APIView):
             
             service = ProductSubcategoryService()
             
-            # Use the service's move to uncategorized method
-            result = service._move_to_uncategorized_category(
-                product_id, 
-                None,  # We'll get product name from service
-                None, 
-                None
+            # FIXED: Use the public method instead of private method
+            result = service.move_product_to_uncategorized_category(
+                product_id=product_id,
+                current_category_id=current_category_id
             )
             
             if result.get('success'):
@@ -719,7 +717,7 @@ class ProductMoveToUncategorizedView(APIView):
                 }, status=status.HTTP_200_OK)
             else:
                 return Response(
-                    {"error": result.get('message', 'Move to uncategorized failed')}, 
+                    {"error": result.get('error', 'Move to uncategorized failed')}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
         

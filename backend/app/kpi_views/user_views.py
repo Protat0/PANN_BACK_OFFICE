@@ -24,7 +24,7 @@ class UserListView(APIView):
     def __init__(self):
         self.user_service = UserService()
     
-    @require_admin
+    @require_authentication
     def get(self, request):
         """Get all users (with optional deleted users) - Requires admin authentication"""
         try:
@@ -39,7 +39,7 @@ class UserListView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    @require_admin
+    @require_authentication
     def post(self, request):
         """Create new user - Requires admin authentication"""
         try:
@@ -65,7 +65,7 @@ class UserDetailView(APIView):
         super().__init__()
         self.user_service = UserService()
 
-    @get_authenticated_user_from_jwt
+    @require_authentication
     def get(self, request, user_id):
         """Get user by ID (with optional deleted users for admin)"""
         try:
@@ -73,7 +73,7 @@ class UserDetailView(APIView):
             
             # Only admins can view deleted users
             if include_deleted:
-                current_user = request
+                current_user = request.current_user 
                 if not current_user or current_user.get('role', '').lower() != 'admin':
                     return Response(
                         {"error": "Admin permissions required to view deleted users"}, 
@@ -96,7 +96,7 @@ class UserDetailView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    @require_admin
+    @require_authentication
     def put(self, request, user_id):
         """Update user - Requires admin authentication"""
         try:
@@ -117,7 +117,7 @@ class UserDetailView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
-    @require_admin
+    @require_authentication
     def delete(self, request, user_id):
         """Soft delete user - Requires admin authentication"""
         try:
@@ -147,7 +147,7 @@ class UserRestoreView(APIView):
         super().__init__()
         self.user_service = UserService()
 
-    @require_admin
+    @require_authentication
     def post(self, request, user_id):
         """Restore a soft-deleted user - Requires admin authentication"""
         try:
@@ -177,7 +177,7 @@ class UserHardDeleteView(APIView):
         super().__init__()
         self.user_service = UserService()
 
-    @require_admin
+    @require_authentication
     def delete(self, request, user_id):
         """PERMANENTLY delete user - Requires admin authentication and confirmation"""
         try:
@@ -219,7 +219,7 @@ class DeletedUsersView(APIView):
         super().__init__()
         self.user_service = UserService()
 
-    @require_admin
+    @require_authentication
     def get(self, request):
         """Get all soft-deleted users - Requires admin authentication"""
         try:
@@ -237,7 +237,8 @@ class UserByEmailView(APIView):
     def __init__(self):
         super().__init__()
         self.user_service = UserService()
-        
+
+    @require_authentication    
     def get(self, request, email):
         """Get user by email (excludes deleted by default)"""
         try:
@@ -245,7 +246,7 @@ class UserByEmailView(APIView):
             
             # Only admins can view deleted users
             if include_deleted:
-                current_user = get_authenticated_user_from_jwt(request)
+                current_user = request.current_user
                 if not current_user or current_user.get('role', '').lower() != 'admin':
                     return Response(
                         {"error": "Admin permissions required to view deleted users"}, 
@@ -271,7 +272,8 @@ class UserByUsernameView(APIView):
     def __init__(self):
         super().__init__()
         self.user_service = UserService()
-        
+
+    @require_authentication    
     def get(self, request, username):
         """Get user by username (excludes deleted by default)"""
         try:
@@ -279,7 +281,7 @@ class UserByUsernameView(APIView):
             
             # Only admins can view deleted users
             if include_deleted:
-                current_user = get_authenticated_user_from_jwt(request)
+                current_user = request.current_user
                 if not current_user or current_user.get('role', '').lower() != 'admin':
                     return Response(
                         {"error": "Admin permissions required to view deleted users"}, 

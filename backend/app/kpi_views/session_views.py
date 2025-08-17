@@ -5,7 +5,7 @@ from ..services.session_services import SessionLogService, SessionDisplayService
 from ..services.customer_service import CustomerService
 from ..services.product_service import ProductService
 from ..services.user_service import UserService
-from ..decorators import require_authentication, require_admin
+from ..decorators.authenticationDecorator import require_authentication, require_admin
 import logging
 
 logger = logging.getLogger(__name__)
