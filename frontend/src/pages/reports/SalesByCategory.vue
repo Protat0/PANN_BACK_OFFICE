@@ -99,6 +99,10 @@
             <i class="bi bi-arrow-clockwise" :class="{ 'spinning': loading }"></i>
             {{ loading ? 'Reconnecting...' : 'Reconnect' }}
           </button>
+
+          <button class="btn btn-success" @click="exportData" :disabled="loading || exporting">
+            <i class="bi bi-download"></i> {{ exporting ? 'Exporting...' : 'Export' }}
+          </button>
         </div>
       </div>
 
@@ -151,6 +155,7 @@
 <script>
 import PieChartView from '@/components/PieChartView.vue';
 import CategoryService from '@/services/apiCategory';
+import SalesAPIService from '@/services/apiReports.js';
 
 export default {
   name: 'SalesByCategory',
@@ -200,6 +205,11 @@ export default {
       
       // Smart refresh rate tracking
       recentActivity: [],
+      exporting: false,
+      
+      // Export messages
+      exportMessage: null,
+      exportMessageType: 'success', // 'success' or 'error'
     };
   },
 
@@ -246,10 +256,10 @@ export default {
     }
   },
 
-beforeUnmount() {
-  this.stopAutoRefresh();
-  console.log('🧹 Component cleanup complete');
-},
+  beforeUnmount() {
+    this.stopAutoRefresh();
+    console.log('🧹 Component cleanup complete');
+  },
   
   // ====================================================================
   // METHODS
@@ -983,6 +993,62 @@ beforeUnmount() {
         case 'connection-lost': return 'Connection Lost'
         default: return 'Connecting...'
       }
+    },
+
+    // ================================================================
+    // EXPORT FUNCTIONALITY
+    // ================================================================
+
+    /**
+     * Export data using same method as SalesByItem
+     */
+    async exportData() {
+      try {
+        this.exporting = true;
+        
+        const success = await SalesAPIService.exportTransactions({
+          group_by: 'category' // This tells backend to group by category instead of item
+        });
+        
+        if (success) {
+          this.showSuccess('Export completed successfully! Check your downloads folder.');
+        } else {
+          throw new Error('Export failed');
+        }
+        
+      } catch (error) {
+        console.error('Export failed:', error);
+        
+        if (error.message.includes('404') || error.message.includes('Not Found')) {
+          this.showError('Export feature is not yet configured on the server. Please contact support.');
+        } else {
+          this.showError(`Export failed: ${error.message}`);
+        }
+      } finally {
+        this.exporting = false;
+      }
+    },
+
+    /**
+     * Show success message
+     */
+    showSuccess(message) {
+      this.exportMessage = message;
+      this.exportMessageType = 'success';
+      setTimeout(() => {
+        this.exportMessage = null;
+      }, 5000);
+    },
+
+    /**
+     * Show error message
+     */
+    showError(message) {
+      this.exportMessage = message;
+      this.exportMessageType = 'error';
+      setTimeout(() => {
+        this.exportMessage = null;
+      }, 8000); // Error messages stay longer
     }
   }
 }

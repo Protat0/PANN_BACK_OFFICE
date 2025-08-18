@@ -494,7 +494,7 @@ class CategoryApiService {
           console.log('📤 Query params:', queryParams.toString());
           
           // ✅ UPDATED: Changed from /category/exportcat/ to /category/export/
-          const baseURL = `${api.defaults.baseURL}/category/export/?${queryParams}`;
+          const baseURL = `${api.defaults.baseURL}/category/export/`;
           
           console.log('🔍 Full URL:', baseURL);
           
