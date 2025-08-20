@@ -4,47 +4,37 @@
     <div class="kpi-grid">
       <KpiCard
         title="Total Profit"
-        value="₱78,452.23"
-        subtitle="From the last month"
-        change="+24%"
-        change-type="positive"
+        :value="totalProfit"
+        :subtitle="`Updated: ${currentDate}`"
         variant="profit"
         class="profit-card"
       />
       
       <KpiCard
         title="Total Products"
-        value="56"
-        subtitle="Updated: May 02, 2025"
-        change="+24%"
-        change-type="positive"
+        :value="totalProducts"
+        :subtitle="`Updated: ${currentDate}`"
         variant="products"
       />
       
       <KpiCard
         title="Monthly Income"
-        value="₱120,042"
-        subtitle="Updated: May 02, 2025"
-        change="+15%"
-        change-type="positive"
+        :value="formatCurrency(monthlyProfit)"
+        :subtitle="`Updated: ${currentMonth}`"
         variant="income"
       />
       
       <KpiCard
         title="Total Sold"
-        value="12,490"
-        subtitle="Updated: May 02, 2025"
-        change="+12%"
-        change-type="positive"
+        :value="totalSold"
+        :subtitle="`Updated: ${currentDate}`"
         variant="sold"
       />
       
       <KpiCard
         title="Total Orders"
-        value="123"
+        :value="totalOrders"
         subtitle="Updated: May 02, 2025"
-        change="+14%"
-        change-type="positive"
         variant="orders"
       />
     </div>
@@ -75,6 +65,7 @@
 <script>
 import KpiCard from '../components/dashboard/KpiCard.vue'
 import SalesChart from '../components/dashboard/SalesChart.vue'
+import dashboardApiService from '@/services/apiDashboard' 
 
 export default {
   name: 'Dashboard',
@@ -82,11 +73,150 @@ export default {
     KpiCard,
     SalesChart
   },
+  data(){
+     return {
+      totalProfit: '₱0.00',
+      loading: false,
+      error: null,
+      totalOrders: 0,
+      totalProducts: 0,
+      totalSold: 0,
+      monthlyProfit: 0,
+
+    }
+  },
+  async mounted() {
+    await this.getTotalProfit()
+    await this.getTotalOrders()
+    await this.getTotalProducts()
+    await this.getTotalSold()
+    await this.getMonthlyProfit()
+  },
+  computed: {
+    currentDate() {
+      const now = new Date()
+      return now.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short', 
+        day: '2-digit'
+      })
+    },
+    currentMonth() {
+      const now = new Date()
+      return now.toLocaleDateString('en-US', {
+        month: 'long', 
+      })
+    },
+  },
   methods: {
     handleTargetSalesClick() {
       console.log('Target sales button clicked')
+    },
+
+     async getTotalProfit() {
+      try {
+        this.loading = true
+        this.error = null
+
+        const Profit = await dashboardApiService.getTotalProfits()
+        
+        this.totalProfit = this.formatCurrency(Profit)
+        
+      } catch (error) {
+        console.error('Error fetching total profit:', error)
+        this.error = 'Failed to load total profit'
+        this.totalProfit = '₱0.00' // Fallback value
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async getTotalOrders() {
+      try {
+        this.loading = true
+        this.error = null
+        
+        const Orders = await dashboardApiService.getTotalOrders()
+        
+        this.totalOrders = Orders;
+        
+      } catch (error) {
+        console.error('Error fetching total Orders:', error)
+        this.error = 'Failed to load total Orders'
+        this.totalOrders = '0'
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async getTotalProducts() {
+      try {
+        this.loading = true
+        this.error = null
+        
+        const Products = await dashboardApiService.getTotalProducts()
+        
+        this.totalProducts = Products;
+        
+      } catch (error) {
+        console.error('Error fetching total Orders:', error)
+        this.error = 'Failed to load total Orders'
+        this.totalOrders = '0'
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async getTotalSold() {
+      try {
+        this.loading = true
+        this.error = null
+        
+        const Sold= await dashboardApiService.getTotalSold()
+        
+        this.totalSold = Sold;
+        
+      } catch (error) {
+        console.error('Error fetching total Orders:', error)
+        this.error = 'Failed to load total Orders'
+        this.totalOrders = '0'
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async getMonthlyProfit() {
+      try {
+        this.loading = true
+        this.error = null
+        
+        const monthly = await dashboardApiService.getMonthlyProfit()
+        this.monthlyProfit = monthly;
+        
+      } catch (error) {
+        console.error('Error fetching total Orders:', error)
+        this.error = 'Failed to load total Orders'
+        this.totalOrders = '0'
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    formatCurrency(amount) {
+      // Handle different response formats
+      if (typeof amount === 'string' && amount.includes('₱')) {
+        return amount // Already formatted
+      }
+      
+      const numericAmount = parseFloat(amount) || 0
+      return `₱${numericAmount.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })}`
     }
-  }
+  },
+  
+
 }
 </script>
 

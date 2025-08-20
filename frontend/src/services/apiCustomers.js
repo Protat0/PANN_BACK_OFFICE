@@ -16,34 +16,42 @@ class CustomerApiService {
     throw new Error(message);
   }
 
-  // KPI METHODS (existing)
-  
   /**
-   * Get active users count
-   * @param {Object} params - Query parameters
-   * @returns {Promise<Object>} Active users data
+   * Get active users count - UPDATED
    */
   async ActiveUser(params = {}) {
     try {
-        console.log("This API call is getting Active Users");
-        const response = await api.get('/customerkpi', { params });
-        return response.data;
+      console.log("This API call is getting Active Users");
+      const response = await this.getCustomerStatistics();
+      
+      // Extract active users from the statistics response
+      return {
+        success: true,
+        active_customers: response.active_customers,
+        total_customers: response.total_customers,
+        ...response
+      };
     } catch (error) {
-        console.error("Error fetching active users:", error);
-        throw error;
+      console.error("Error fetching active users:", error);
+      throw error;
     }
   }
 
   /**
-   * Get monthly users count
-   * @param {Object} params - Query parameters
-   * @returns {Promise<Object>} Monthly users data
+   * Get monthly users count - UPDATED  
    */
   async MonthlyUser(params = {}) {
     try {
-        console.log("This API calls the Monthly Users");
-        const response = await api.get('/customerkpimonthly', { params });
-        return response.data;
+      console.log("This API calls the Monthly Users");
+      const response = await this.getCustomerStatistics();
+      
+      // Extract monthly registrations from the statistics response
+      return {
+        success: true,
+        monthly_registrations: response.monthly_registrations,
+        total_customers: response.total_customers,
+        ...response
+      };
     } catch (error) {
       console.error("Error fetching monthly users:", error);
       throw error;
@@ -51,15 +59,20 @@ class CustomerApiService {
   }
 
   /**
-   * Get daily users count
-   * @param {Object} params - Query parameters
-   * @returns {Promise<Object>} Daily users data
+   * Get daily users count - UPDATED
    */
   async DailyUser(params = {}) {
     try {
-        console.log("This API calls the Daily Users");
-        const response = await api.get('/customerkpidaily', { params });
-        return response.data;
+      console.log("This API calls the Daily Users");
+      const response = await this.getCustomerStatistics();
+      
+      // Extract daily logins from the statistics response
+      return {
+        success: true,
+        daily_logins: response.daily_logins,
+        total_customers: response.total_customers,
+        ...response
+      };
     } catch (error) {
       console.error("Error fetching daily users:", error);
       throw error;

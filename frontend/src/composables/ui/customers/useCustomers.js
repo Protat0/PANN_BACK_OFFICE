@@ -198,31 +198,133 @@ export function useCustomers() {
 
   const refreshData = async () => {
     successMessage.value = null
-    await fetchCustomers()
+    
+    // Run both customer and KPI refresh in parallel for better performance
+    try {
+      await Promise.all([
+        fetchCustomers(),
+        fetchKPIData()
+      ])
+      console.log('✅ Full data refresh completed')
+    } catch (error) {
+      console.error('❌ Data refresh failed:', error)
+      // fetchCustomers and fetchKPIData handle their own error states
+    }
   }
 
   // KPI data fetching
   const fetchKPIData = async () => {
     try {
-      // Single call to get all statistics
-      const stats = await CustomerApiService.getCustomerStatistics()
+      console.log('Fetching KPI data...')
       
-      // Extract individual KPI values
-      activeUsersCount.value = stats.active_customers?.toString() || '0'
-      monthlyUsersCount.value = stats.monthly_registrations?.toString() || '0'
-      dailyUsersCount.value = stats.daily_logins?.toString() || '0'
-      
-      console.log('KPI data loaded:', {
-        active: stats.active_customers,
-        monthly: stats.monthly_registrations, 
-        daily: stats.daily_logins
-      })
+      // ✅ Method 1: Try the working statistics endpoint first
+      try {
+        const stats = await CustomerApiService.getCustomerStatistics()
+        console.log('✅ Statistics API response:', stats)
+        
+        // Extract individual KPI values
+        activeUsersCount.value = stats.active_customers?.toString() || '0'
+        monthlyUsersCount.value = stats.monthly_registrations?.toString() || '0'
+        dailyUsersCount.value = stats.daily_logins?.toString() || '0'
+        
+        console.log('KPI data loaded successfully:', {
+          active: stats.active_customers,
+          monthly: stats.monthly_registrations, 
+          daily: stats.daily_logins
+        })
+        
+        return // Success, exit early
+        
+      } catch (statsError) {
+        console.warn('Statistics endpoint failed:', statsError.message)
+        
+        // ✅ Method 2: Try the legacy KPI methods as fallback
+        console.log('Trying legacy KPI methods as fallback...')
+        
+        try {
+          // Try all three KPI methods in parallel
+          const [activeResult, monthlyResult, dailyResult] = await Promise.allSettled([
+            CustomerApiService.ActiveUser(),
+            CustomerApiService.MonthlyUser(), 
+            CustomerApiService.DailyUser()
+          ])
+          
+          // Process results with fallbacks
+          if (activeResult.status === 'fulfilled') {
+            activeUsersCount.value = activeResult.value.active_customers?.toString() || 
+                                    activeResult.value.total_customers?.toString() || '0'
+          } else {
+            console.warn('ActiveUser failed:', activeResult.reason)
+            activeUsersCount.value = 'N/A'
+          }
+          
+          if (monthlyResult.status === 'fulfilled') {
+            monthlyUsersCount.value = monthlyResult.value.monthly_registrations?.toString() || 
+                                      monthlyResult.value.count?.toString() || '0'
+          } else {
+            console.warn('MonthlyUser failed:', monthlyResult.reason)
+            monthlyUsersCount.value = 'N/A'
+          }
+          
+          if (dailyResult.status === 'fulfilled') {
+            dailyUsersCount.value = dailyResult.value.daily_logins?.toString() || 
+                                    dailyResult.value.count?.toString() || '0'
+          } else {
+            console.warn('DailyUser failed:', dailyResult.reason)
+            dailyUsersCount.value = 'N/A'
+          }
+          
+          console.log('Legacy KPI methods completed with mixed results')
+          return // Exit after processing legacy methods
+          
+        } catch (legacyError) {
+          console.error('Legacy KPI methods also failed:', legacyError)
+          throw legacyError // Will be caught by outer catch
+        }
+      }
       
     } catch (error) {
-      console.error('Failed to load KPI data:', error)
-      activeUsersCount.value = 'Error'
-      monthlyUsersCount.value = 'Error'
-      dailyUsersCount.value = 'Error'
+      console.error('❌ All KPI fetching methods failed:', error)
+      
+      // ✅ Method 3: Calculate from existing customer data as last resort
+      if (customers.value && customers.value.length > 0) {
+        console.log('📊 Calculating KPI from existing customer data...')
+        
+        const now = new Date()
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        
+        // Calculate active customers
+        const activeCount = customers.value.filter(c => 
+          (c.status || 'active') === 'active' && !c.isDeleted
+        ).length
+        
+        // Calculate monthly registrations (rough estimate)
+        const monthlyCount = customers.value.filter(c => {
+          if (!c.date_created) return false
+          const createdDate = new Date(c.date_created)
+          return createdDate >= startOfMonth && !c.isDeleted
+        }).length
+        
+        // Set calculated values
+        activeUsersCount.value = activeCount.toString()
+        monthlyUsersCount.value = monthlyCount.toString()
+        dailyUsersCount.value = '0' // Can't calculate daily logins from customer data
+        
+        console.log('✅ KPI calculated from customer data:', {
+          active: activeCount,
+          monthly: monthlyCount,
+          daily: 0
+        })
+        
+      } else {
+        // Final fallback - show error state
+        activeUsersCount.value = 'Error'
+        monthlyUsersCount.value = 'Error'
+        dailyUsersCount.value = 'Error'
+        
+        console.log('❌ No customer data available for KPI calculation')
+      }
     }
   }
 
@@ -558,23 +660,69 @@ export function useCustomers() {
   // Cleanup function
   const cleanup = () => {
     stopAutoRefresh()
+  } 
+
+  const refreshKPIData = async () => {
+    console.log('🔄 Manually refreshing KPI data...')
+    
+    // Show loading state
+    const originalValues = {
+      active: activeUsersCount.value,
+      monthly: monthlyUsersCount.value,
+      daily: dailyUsersCount.value
+    }
+    
+    activeUsersCount.value = 'Loading...'
+    monthlyUsersCount.value = 'Loading...'
+    dailyUsersCount.value = 'Loading...'
+    
+    try {
+      await fetchKPIData()
+      console.log('✅ KPI refresh completed')
+    } catch (error) {
+      console.error('❌ KPI refresh failed:', error)
+      
+      // Restore original values if refresh fails
+      activeUsersCount.value = originalValues.active
+      monthlyUsersCount.value = originalValues.monthly
+      dailyUsersCount.value = originalValues.daily
+      
+      // Set error message
+      error.value = 'Failed to refresh KPI data'
+    }
   }
 
   // Initialize data on composable creation
   const initialize = async () => {
-    await Promise.all([
-      fetchCustomers(),
-      fetchKPIData()
-    ])
+    console.log('🚀 Initializing customer composable...')
     
-    // Start auto-refresh after initial load
-    if (autoRefreshEnabled.value) {
-      startAutoRefresh()
+    try {
+      // Load customers first, then KPI data
+      await fetchCustomers()
+      await fetchKPIData()
+      
+      console.log('✅ Customer composable initialized successfully')
+      
+      // Start auto-refresh after successful initialization
+      if (autoRefreshEnabled.value) {
+        startAutoRefresh()
+      }
+      
+    } catch (error) {
+      console.error('❌ Customer composable initialization failed:', error)
+      
+      // Still start auto-refresh even if initial load fails
+      // This allows recovery through auto-refresh cycles
+      if (autoRefreshEnabled.value) {
+        startAutoRefresh()
+      }
     }
   }
 
   // Return reactive state and methods
   return {
+
+    refreshKPIData,
     // Reactive state (readonly to prevent direct mutation)
     customers: readonly(customers),
     filteredCustomers: readonly(filteredCustomers),

@@ -657,122 +657,70 @@ export default {
      */
     async getTopChartItems() {
       try {
-        console.log("=== Loading Chart Data Only ===");
-        
-        // Don't set loading for chart specifically, use separate flag
         const dateRange = this.calculateDateRange(this.selectedFrequency);
-        console.log("Date range for", this.selectedFrequency, ":", dateRange);
         
-        // Try the enhanced chart API first
-        if (SalesAPIService?.getTopChartItems) {
-          const requestParams = {
+        // 🔍 DEBUG: Log the actual date ranges being used
+        console.log(`=== DEBUGGING DATE RANGES ===`);
+        console.log(`Frequency: ${this.selectedFrequency}`);
+        console.log(`Start Date: ${dateRange.start_date}`);
+        console.log(`End Date: ${dateRange.end_date}`);
+        console.log(`Date Range Span: ${this.calculateDaysBetween(dateRange.start_date, dateRange.end_date)} days`);
+        
+        // ✅ FIX: Use existing method instead of non-existent one
+        const response = await SalesAPIService.getTopChartItems({
             limit: 10,
             start_date: dateRange.start_date,
             end_date: dateRange.end_date,
             frequency: this.selectedFrequency
-          };
-          
-          console.log("Request params for chart:", requestParams);
-          
-          try {
-            const response = await SalesAPIService.getTopChartItems(requestParams);
-            console.log("Chart API Response:", response);
-            
-            let items = [];
-            if (response?.success && response.data) {
-              items = response.data;
-            } else if (Array.isArray(response)) {
-              items = response;
-            }
-            
-            if (items && items.length > 0) {
-              this.updateChartData(items.slice(0, 10));
-              console.log("✅ Chart data updated successfully");
-              
-              // ✅ ADD CONNECTION HEALTH TRACKING
-              this.connectionLost = false;
-              this.consecutiveErrors = 0;
-              this.lastSuccessfulLoad = Date.now();
-              this.error = null;
-              
-              return; // Success, exit early
-            }
-          } catch (chartError) {
-            console.warn("Chart API failed, trying fallback:", chartError.message);
-            // Don't return, fall through to fallback
-          }
+        });
+        
+        // 🔍 DEBUG: Log what data is actually returned
+        console.log(`=== API RESPONSE DEBUG ===`);
+        console.log(`Response:`, response);
+        
+        // Handle different response structures
+        let items = [];
+        if (response?.items && Array.isArray(response.items)) {
+          items = response.items;
+        } else if (response?.data?.items && Array.isArray(response.data.items)) {
+          items = response.data.items;
+        } else if (response?.data?.data && Array.isArray(response.data.data)) {
+          items = response.data.data;
+        } else if (Array.isArray(response?.data)) {
+          items = response.data;
+        } else if (Array.isArray(response)) {
+          items = response;
         }
         
-        // Fallback: Use regular top items API for chart
-        console.log("🔄 Using fallback: regular top items API for chart");
-        if (SalesAPIService?.getTopItems) {
-          try {
-            const response = await SalesAPIService.getTopItems({ limit: 10 });
-            console.log("Fallback API Response:", response);
-            
-            let items = [];
-            if (response?.data?.items && Array.isArray(response.data.items)) {
-              items = response.data.items;
-            } else if (response?.data?.data && Array.isArray(response.data.data)) {
-              items = response.data.data;
-            } else if (Array.isArray(response?.data)) {
-              items = response.data;
-            } else if (Array.isArray(response)) {
-              items = response;
-            }
-            
-            if (items && items.length > 0) {
-              // Map the regular API response to chart format
-              const chartItems = items.map(item => ({
-                item_name: item.item_name || item.name || 'Unknown Item',
-                total_amount: item.total_amount || item.total_sales || item.revenue || 0
-              }));
-              
-              this.updateChartData(chartItems.slice(0, 10));
-              console.log("✅ Fallback chart data loaded successfully");
-              
-              // ✅ ADD CONNECTION HEALTH TRACKING
-              this.connectionLost = false;
-              this.consecutiveErrors = 0;
-              this.lastSuccessfulLoad = Date.now();
-              this.error = null;
-              
-              return;
-            }
-          } catch (fallbackError) {
-            console.error("❌ Fallback also failed:", fallbackError);
-          }
+        console.log(`Items extracted:`, items);
+        
+        if (items && items.length > 0) {
+            this.updateChartData(items);
+            console.log(`✅ Chart updated with ${items.length} items`);
+        } else {
+            console.log(`❌ No items found, setting default chart`);
+            this.setDefaultChartData();
         }
-        
-        // If we get here, both APIs failed
-        console.warn("Both chart APIs failed, using default chart");
-        
-        // ✅ ADD ERROR TRACKING
-        this.consecutiveErrors++;
-        this.error = 'Failed to load chart data';
-        
-        if (this.consecutiveErrors >= 3) {
-          this.connectionLost = true;
-          console.log('Connection marked as lost after 3 consecutive errors');
-        }
-        
-        this.setDefaultChartData();
         
       } catch (error) {
-        console.error("❌ Error in getTopChartItems:", error);
-        
-        // ✅ ADD ERROR TRACKING
-        this.consecutiveErrors++;
-        this.error = `Failed to load chart data: ${error.message}`;
-        
-        if (this.consecutiveErrors >= 3) {
-          this.connectionLost = true;
-          console.log('Connection marked as lost after 3 consecutive errors');
-        }
-        
+        console.error("Error loading chart data:", error);
+        console.error("Error details:", {
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data
+        });
         this.setDefaultChartData();
       }
     },
+
+  // Add this helper method to calculate days between dates
+  calculateDaysBetween(startDate, endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const diffTime = Math.abs(end - start);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays;
+  },
 
     /**
      * Load transaction history from API
@@ -843,32 +791,36 @@ export default {
       let start_date;
       
       switch (frequency) {
-        case 'daily':
-          start_date = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000))
-            .toISOString().split('T')[0];
-          break;
-        case 'weekly':
-          start_date = new Date(now.getTime() - (8 * 7 * 24 * 60 * 60 * 1000))
-            .toISOString().split('T')[0];
-          break;
-        case 'monthly':
-          const monthsAgo = new Date(now);
-          monthsAgo.setMonth(monthsAgo.getMonth() - 12);
-          start_date = monthsAgo.toISOString().split('T')[0];
-          break;
-        case 'yearly':
-          const yearsAgo = new Date(now);
-          yearsAgo.setFullYear(yearsAgo.getFullYear() - 5);
-          start_date = yearsAgo.toISOString().split('T')[0];
-          break;
-        default:
-          const defaultDate = new Date(now);
-          defaultDate.setMonth(defaultDate.getMonth() - 1);
-          start_date = defaultDate.toISOString().split('T')[0];
+          case 'daily':
+              // Last 30 days - optimal for daily trend analysis
+              start_date = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000))
+                  .toISOString().split('T')[0];
+              break;
+          case 'weekly':
+              // Last 12 weeks - captures quarterly patterns
+              start_date = new Date(now.getTime() - (12 * 7 * 24 * 60 * 60 * 1000))
+                  .toISOString().split('T')[0];
+              break;
+          case 'monthly':
+              // Last 12 months - full year for YoY comparison
+              const twelveMonthsAgo = new Date(now);
+              twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+              start_date = twelveMonthsAgo.toISOString().split('T')[0];
+              break;
+          case 'yearly':
+              // Last 5 years - proper yearly data range
+              const fiveYearsAgo = new Date(now);
+              fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+              start_date = fiveYearsAgo.toISOString().split('T')[0];
+              break;
+          default:
+              // Default 30 days for general analysis
+              start_date = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000))
+                  .toISOString().split('T')[0];
       }
       
-      return { start_date, end_date };
-    },
+      return { start_date, end_date };as
+  },
 
     /**
      * Update chart data with API response

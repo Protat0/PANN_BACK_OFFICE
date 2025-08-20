@@ -524,6 +524,52 @@ class SalesAPIService {
       return false;
     }
   }
+
+  /**
+   * Get top selling items by frequency with date filtering
+   * @param {Object} params - Query parameters (limit, start_date, end_date, frequency, etc.)
+   * @returns {Promise<Object>} Top items data with frequency-based filtering
+   */
+  async getTopItemsByFrequency(params = {}) {
+    try {
+      console.log("Getting top items by frequency with date filtering");
+      console.log("Params:", params);
+      
+      const queryParams = {
+        limit: params.limit || 10,
+        start_date: params.start_date,
+        end_date: params.end_date,
+        frequency: params.frequency || 'monthly',
+        ...params
+      };
+      
+      // Remove undefined values to clean up the query
+      Object.keys(queryParams).forEach(key => {
+        if (queryParams[key] === undefined || queryParams[key] === null) {
+          delete queryParams[key];
+        }
+      });
+      
+      console.log("Final query params:", queryParams);
+      
+      const response = await api.get('reports/top-items-by-frequency/', { 
+        params: queryParams 
+      });
+      
+      console.log("API Response:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching top items by frequency:", error);
+      
+      // If this specific endpoint doesn't exist, fall back to existing endpoint
+      if (error.response?.status === 404) {
+        console.log("Frequency endpoint not found, falling back to top-chart-item endpoint");
+        return this.getTopChartItems(params);
+      }
+      
+      throw error;
+    }
+  }
 }
 
 // ====================================================================

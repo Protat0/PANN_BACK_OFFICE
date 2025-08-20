@@ -262,8 +262,7 @@ urlpatterns = [
     path('product/move-to-uncategorized/', ProductMoveToUncategorizedView.as_view(), name='product-move-to-uncategorized'),
     path('product/bulk-move-to-uncategorized/', ProductBulkMoveToUncategorizedView.as_view(), name='product-bulk-move-to-uncategorized'),
 
-
-   # Bulk import and template endpoints
+    # Bulk import and template endpoints
     path('invoices/bulk-import/', SalesLogBulkImportView.as_view(), name='invoice-bulk-import'),
     path('invoices/export/', SalesLogExportView.as_view(), name='invoice-export'),
    # path('invoices/template/', SalesLogTemplateView.as_view(), name='invoice-template'), this is debugging
@@ -318,4 +317,4 @@ urlpatterns = [
 
     # API Documentation
     path('docs/', APIDocumentationView.as_view(), name='api-documentation'),
-]
+]       

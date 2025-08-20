@@ -734,6 +734,241 @@ class CategoryApiService {
       return 'Invalid Date';
     }
   }
+
+  // Add this method to your CategoryApiService class in the "CORE CATEGORY METHODS" section
+
+/**
+ * Get categories by frequency with date filtering - SIMILAR TO SALESBYITEM
+ * @param {Object} params - Query parameters (limit, start_date, end_date, frequency, etc.)
+ * @returns {Promise<Object>} Categories data with frequency-based filtering
+ */
+async getCategoriesByFrequency(params = {}) {
+  try {
+    console.log("Getting categories by frequency with date filtering");
+    console.log("Params:", params);
+    
+    const queryParams = {
+      limit: params.limit || 10,
+      start_date: params.start_date,
+      end_date: params.end_date,
+      frequency: params.frequency || 'monthly',
+      include_sales_data: true, // Always include sales data for reports
+      ...params
+    };
+    
+    // Remove undefined values to clean up the query
+    Object.keys(queryParams).forEach(key => {
+      if (queryParams[key] === undefined || queryParams[key] === null) {
+        delete queryParams[key];
+      }
+    });
+    
+    console.log("Final query params for categories:", queryParams);
+    
+    // Try the frequency-specific endpoint first
+    try {
+      const response = await api.get('/category/by-frequency/', { 
+        params: queryParams 
+      });
+      
+      console.log("Category Frequency API Response:", response.data);
+      return response.data;
+      
+    } catch (frequencyError) {
+      // If frequency endpoint doesn't exist (404), fall back to display endpoint
+      if (frequencyError.response?.status === 404) {
+        console.log("Frequency endpoint not found, falling back to /category/display/ endpoint");
+        
+        // Use the existing CategoryData method as fallback
+        const fallbackResponse = await this.CategoryData(queryParams);
+        
+        // Transform the response to match expected frequency response format
+        return {
+          success: true,
+          categories: this.extractCategoriesFromResponse(fallbackResponse),
+          date_filter_applied: false, // Indicate client-side filtering needed
+          frequency: params.frequency,
+          date_range: {
+            start_date: params.start_date,
+            end_date: params.end_date
+          }
+        };
+      } else {
+        throw frequencyError;
+      }
+    }
+    
+  } catch (error) {
+    console.error("Error fetching categories by frequency:", error);
+    
+    // Enhanced error handling - don't throw, return error info for graceful fallback
+    return {
+      success: false,
+      error: error.message,
+      categories: [],
+      fallback_needed: true
+    };
+  }
+}
+
+  /**
+   * Helper method to extract categories from various response formats
+   * @param {Object} response - API response
+   * @returns {Array} Array of categories
+   */
+  extractCategoriesFromResponse(response) {
+    // Handle different response structures
+    if (response?.data?.data && Array.isArray(response.data.data)) {
+      return response.data.data;
+    } else if (response?.data?.categories && Array.isArray(response.data.categories)) {
+      return response.data.categories;
+    } else if (Array.isArray(response?.data)) {
+      return response.data;
+    } else if (Array.isArray(response)) {
+      return response;
+    } else if (response?.success && response?.data) {
+      if (Array.isArray(response.data)) {
+        return response.data;
+      } else if (response.data.categories && Array.isArray(response.data.categories)) {
+        return response.data.categories;
+      }
+    }
+    
+    console.warn("Could not extract categories from response:", response);
+    return [];
+  }
+
+  /**
+   * Enhanced CategoryData method - ADD DATE FILTERING SUPPORT
+   * Update your existing CategoryData method to support date filtering:
+   */
+  async CategoryData(params = {}) {
+    try {
+      console.log("This API call is getting all Category with params:", params);
+      
+      // Build query parameters
+      const queryParams = { ...params };
+      
+      // Add date filtering if provided
+      if (params.start_date) {
+        queryParams.start_date = params.start_date;
+      }
+      if (params.end_date) {
+        queryParams.end_date = params.end_date;
+      }
+      if (params.frequency) {
+        queryParams.frequency = params.frequency;
+      }
+      if (params.include_sales_data !== undefined) {
+        queryParams.include_sales_data = params.include_sales_data;
+      }
+      
+      console.log("Sending query params to /category/display/:", queryParams);
+      
+      const response = await api.get('/category/display/', { params: queryParams });
+      
+      // Enhanced response logging
+      console.log("CategoryData response structure:", {
+        hasData: !!response.data,
+        dataType: Array.isArray(response.data) ? 'array' : typeof response.data,
+        dataLength: Array.isArray(response.data) ? response.data.length : 'N/A',
+        keys: response.data ? Object.keys(response.data) : []
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching all category data:", error);
+      
+      // Enhanced error logging
+      console.error("Error details:", {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Get category sales data for reporting - NEW METHOD
+   * @param {Object} params - Query parameters for sales data
+   * @returns {Promise<Object>} Category sales data
+   */
+  async getCategorySalesData(params = {}) {
+    try {
+      console.log("Getting category sales data:", params);
+      
+      const queryParams = {
+        include_sales_data: true,
+        sort_by: 'total_sales',
+        sort_order: 'desc',
+        ...params
+      };
+      
+      // Try sales-specific endpoint first
+      try {
+        const response = await api.get('/category/sales-data/', { params: queryParams });
+        console.log("Category sales data response:", response.data);
+        return response.data;
+      } catch (salesError) {
+        // If sales endpoint doesn't exist, use display endpoint
+        if (salesError.response?.status === 404) {
+          console.log("Sales endpoint not found, using display endpoint");
+          return await this.CategoryData(queryParams);
+        } else {
+          throw salesError;
+        }
+      }
+      
+    } catch (error) {
+      console.error("Error fetching category sales data:", error);
+      
+      // Return error info for graceful handling
+      return {
+        success: false,
+        error: error.message,
+        data: []
+      };
+    }
+  }
+
+  /**
+   * Get top categories by sales - NEW METHOD
+   * @param {Object} params - Query parameters (limit, date range, etc.)
+   * @returns {Promise<Object>} Top categories data
+   */
+  async getTopCategories(params = {}) {
+    try {
+      console.log("Getting top categories:", params);
+      
+      const queryParams = {
+        limit: params.limit || 5,
+        include_sales_data: true,
+        sort_by: 'total_sales',
+        sort_order: 'desc',
+        ...params
+      };
+      
+      // Use the frequency method if date filtering is needed
+      if (params.start_date || params.end_date || params.frequency) {
+        return await this.getCategoriesByFrequency(queryParams);
+      } else {
+        // Use basic CategoryData for general top categories
+        return await this.CategoryData(queryParams);
+      }
+      
+    } catch (error) {
+      console.error("Error fetching top categories:", error);
+      
+      return {
+        success: false,
+        error: error.message,
+        categories: []
+      };
+    }
+  }
 }
 
 const categoryApiService = new CategoryApiService();

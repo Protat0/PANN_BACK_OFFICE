@@ -155,7 +155,6 @@
 <script>
 import PieChartView from '@/components/PieChartView.vue';
 import CategoryService from '@/services/apiCategory';
-import SalesAPIService from '@/services/apiReports.js';
 
 export default {
   name: 'SalesByCategory',
@@ -206,10 +205,9 @@ export default {
       // Smart refresh rate tracking
       recentActivity: [],
       exporting: false,
-      
-      // Export messages
       exportMessage: null,
-      exportMessageType: 'success', // 'success' or 'error'
+      exportMessageType: 'success',
+      error: null,
     };
   },
 
@@ -256,10 +254,10 @@ export default {
     }
   },
 
-  beforeUnmount() {
-    this.stopAutoRefresh();
-    console.log('🧹 Component cleanup complete');
-  },
+beforeUnmount() {
+  this.stopAutoRefresh();
+  console.log('🧹 Component cleanup complete');
+},
   
   // ====================================================================
   // METHODS
@@ -272,6 +270,159 @@ export default {
     /**
      * Load all category data - SIMPLIFIED: No period filtering for top items
      */
+
+
+     async exportData() {
+        try {
+          this.exporting = true;
+          this.exportMessage = null;
+          
+          console.log("🚀 Starting category data export...");
+          
+          // ✅ Use your existing CategoryApiService export method
+          const exportParams = {
+            format: 'csv',
+            include_sales_data: true,  // Include sales data in export
+            include_deleted: false     // Exclude deleted categories by default
+          };
+          
+          console.log("Export parameters:", exportParams);
+          
+          // Call your CategoryApiService export method
+          const blob = await CategoryService.ExportCategoryData(exportParams);
+          
+          if (blob && blob.size > 0) {
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            
+            // Generate filename with timestamp
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+            link.setAttribute('download', `categories_export_${timestamp}.csv`);
+            
+            // Trigger download
+            document.body.appendChild(link);
+            link.click();
+            
+            // Cleanup
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            console.log("✅ Category export completed successfully");
+            this.showSuccess('Export completed successfully! Check your downloads folder.');
+          } else {
+            throw new Error('Export returned empty file');
+          }
+          
+        } catch (error) {
+          console.error('❌ Category export failed:', error);
+          
+          // Handle specific error cases
+          if (error.message.includes('404') || error.message.includes('Not Found')) {
+            this.showError('Export feature is not yet configured on the server. Please contact support.');
+          } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
+            this.showError('You do not have permission to export category data.');
+          } else if (error.message.includes('500')) {
+            this.showError('Server error during export. Please try again later.');
+          } else {
+            this.showError(`Export failed: ${error.message}`);
+          }
+        } finally {
+          this.exporting = false;
+        }
+      },
+
+      /**
+       * Export with custom options - Advanced export functionality
+       */
+      async exportDataWithOptions(options = {}) {
+        try {
+          this.exporting = true;
+          this.exportMessage = null;
+          
+          console.log("🚀 Starting advanced category export with options:", options);
+          
+          const exportParams = {
+            format: options.format || 'csv',
+            include_sales_data: options.include_sales_data !== false, // Default true
+            include_deleted: options.include_deleted || false,        // Default false
+            ...options
+          };
+          
+          const blob = await CategoryService.ExportCategoryData(exportParams);
+          
+          if (blob && blob.size > 0) {
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+            const filename = options.filename || `categories_export_${timestamp}.csv`;
+            link.setAttribute('download', filename);
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            
+            console.log("✅ Advanced export completed successfully");
+            this.showSuccess(`Export completed successfully! File: ${filename}`);
+            
+            return true;
+          } else {
+            throw new Error('Export returned empty file');
+          }
+          
+        } catch (error) {
+          console.error('❌ Advanced export failed:', error);
+          this.showError(`Export failed: ${error.message}`);
+          return false;
+        } finally {
+          this.exporting = false;
+        }
+      },
+
+      /**
+       * Export current filtered data - Export what's currently displayed
+       */
+      async exportCurrentData() {
+        try {
+          this.exporting = true;
+          
+          console.log("🚀 Exporting current filtered data...");
+          
+          // If we have a current date range (from frequency filtering), include it
+          const exportParams = {
+            format: 'csv',
+            include_sales_data: true,
+            include_deleted: false
+          };
+          
+          // Add date filtering if currently applied
+          if (this.currentDateRange) {
+            exportParams.start_date = this.currentDateRange.start_date;
+            exportParams.end_date = this.currentDateRange.end_date;
+            exportParams.frequency = this.selectedFrequency;
+            
+            console.log("Including current date filter:", this.currentDateRange);
+          }
+          
+          const success = await this.exportDataWithOptions({
+            ...exportParams,
+            filename: `categories_${this.selectedFrequency}_${new Date().toISOString().slice(0, 10)}.csv`
+          });
+          
+          if (success) {
+            console.log("✅ Current data export completed");
+          }
+          
+        } catch (error) {
+          console.error('❌ Current data export failed:', error);
+          this.showError(`Export failed: ${error.message}`);
+        }
+      },
+
     async loadAllCategoryData() {
       try {
         console.log("=== Loading All Category Data (Initial/Refresh) ===");
@@ -341,47 +492,8 @@ export default {
      * Update chart with current frequency (separate from top items and table)
      */
     async updateChartWithCurrentFrequency() {
-      try {
-        const dateRange = this.calculateDateRange(this.selectedFrequency);
-        this.currentDateRange = dateRange;
-        
-        // Try to get period-specific data for chart
-        const requestParams = {
-          start_date: dateRange.start_date,
-          end_date: dateRange.end_date,
-          frequency: this.selectedFrequency
-        };
-        
-        let response;
-        try {
-          response = await CategoryService.CategoryData(requestParams);
-        } catch (apiError) {
-          // If API doesn't support date filtering, use client-side filtering
-          response = await CategoryService.CategoryData();
-        }
-        
-        let chartData = this.extractCategoryData(response);
-        
-        if (chartData && chartData.length > 0) {
-          // Apply client-side filtering if API doesn't support it
-          if (!response?.date_filter_applied) {
-            chartData = this.filterCategoriesByDate(chartData, dateRange);
-          }
-          
-          // Update ONLY the chart
-          this.updateChartData(chartData.slice(0, 6));
-          console.log("✅ Chart updated with frequency data");
-        } else {
-          // Update chart label at minimum
-          if (this.chartData.datasets[0]) {
-            this.chartData.datasets[0].label = `Category Sales (${this.selectedFrequency})`;
-          }
-        }
-        
-      } catch (error) {
-        console.warn("Could not get period-specific chart data, using general data");
-        // Chart will use the default data
-      }
+      // Just call the new method
+      await this.getTopChartCategories();
     },
 
     /**
@@ -740,56 +852,90 @@ export default {
       return { start_date, end_date };
     },
 
+    async getTopChartCategories() {
+      try {
+        console.log(`=== LOADING CHART DATA WITH FREQUENCY ===`);
+        this.loadingChart = true;
+        
+        const dateRange = this.calculateDateRange(this.selectedFrequency);
+        this.currentDateRange = dateRange;
+        
+        console.log(`Frequency: ${this.selectedFrequency}, Date range: ${dateRange.start_date} to ${dateRange.end_date}`);
+        
+        // Try to get period-specific data for chart
+        const requestParams = {
+          start_date: dateRange.start_date,
+          end_date: dateRange.end_date,
+          frequency: this.selectedFrequency,
+          limit: 6 // For chart display
+        };
+        
+        let response;
+        try {
+          // Try enhanced API methods if available
+          if (CategoryService.getCategoriesByFrequency) {
+            console.log("🔍 Using getCategoriesByFrequency...");
+            response = await CategoryService.getCategoriesByFrequency(requestParams);
+          } else if (CategoryService.getTopCategories) {
+            console.log("🔍 Using getTopCategories...");
+            response = await CategoryService.getTopCategories(requestParams);
+          } else {
+            console.log("🔍 Using basic CategoryData with params...");
+            response = await CategoryService.CategoryData(requestParams);
+          }
+        } catch (apiError) {
+          console.warn("Enhanced API failed, using basic call:", apiError.message);
+          response = await CategoryService.CategoryData();
+        }
+        
+        // Extract data using your existing method
+        let chartData = this.extractCategoryData(response);
+        
+        if (chartData && chartData.length > 0) {
+          // Apply client-side filtering if API doesn't support it
+          if (!response?.date_filter_applied) {
+            console.log("Applying client-side date filtering for chart");
+            chartData = this.filterCategoriesByDate(chartData, dateRange);
+          }
+          
+          // Update ONLY the chart (top 6 categories)
+          this.updateChartData(chartData.slice(0, 6));
+          console.log(`✅ Chart updated with ${chartData.length} categories for frequency: ${this.selectedFrequency}`);
+        } else {
+          console.log("No chart data found, setting default");
+          this.setDefaultChartData();
+        }
+        
+      } catch (error) {
+        console.error("❌ Error loading chart data:", error);
+        this.setDefaultChartData();
+      } finally {
+        this.loadingChart = false;
+      }
+    },
+
+    // 2. ADD THIS HELPER METHOD
+    /**
+     * Calculate days between two dates
+     */
+    calculateDaysBetween(startDate, endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const diffTime = Math.abs(end - start);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays;
+    },
+
     /**
      * Handle frequency change - UPDATED: Only affects chart
      */
     async onFrequencyChange() {
       console.log("Frequency changed to:", this.selectedFrequency);
       
-      // Show loading state for chart only
-      this.loadingChart = true;
-      
       try {
-        // Calculate new date range
-        const dateRange = this.calculateDateRange(this.selectedFrequency);
-        this.currentDateRange = dateRange;
-        
-        console.log("Updating chart only for frequency:", this.selectedFrequency);
-        
-        // Call API with date parameters for chart data only
-        const requestParams = {
-          start_date: dateRange.start_date,
-          end_date: dateRange.end_date,
-          frequency: this.selectedFrequency
-        };
-        
-        let response;
-        try {
-          response = await CategoryService.CategoryData(requestParams);
-        } catch (apiError) {
-          console.warn("API doesn't support date filtering, using base call");
-          response = await CategoryService.CategoryData();
-        }
-        
-        // Extract and filter data for chart only
-        let categoryData = this.extractCategoryData(response);
-        
-        if (categoryData && categoryData.length > 0) {
-          // Apply client-side filtering if needed
-          if (!response?.date_filter_applied) {
-            categoryData = this.filterCategoriesByDate(categoryData, dateRange);
-          }
-          
-          // Update ONLY the chart (NOT top items or table)
-          this.updateChartData(categoryData.slice(0, 6));
-          
-          console.log("✅ Chart updated for frequency:", this.selectedFrequency);
-        } else {
-          // Update chart label at minimum
-          if (this.chartData.datasets[0]) {
-            this.chartData.datasets[0].label = `Category Sales (${this.selectedFrequency})`;
-          }
-        }
+        // Use the new chart loading method
+        await this.getTopChartCategories();
+        console.log("✅ Chart updated for frequency:", this.selectedFrequency);
         
       } catch (error) {
         console.error("❌ Error updating chart for frequency change:", error);
@@ -797,8 +943,6 @@ export default {
         if (this.chartData.datasets[0]) {
           this.chartData.datasets[0].label = `Category Sales (${this.selectedFrequency})`;
         }
-      } finally {
-        this.loadingChart = false;
       }
     },
 
@@ -995,43 +1139,6 @@ export default {
       }
     },
 
-    // ================================================================
-    // EXPORT FUNCTIONALITY
-    // ================================================================
-
-    /**
-     * Export data using same method as SalesByItem
-     */
-    async exportData() {
-      try {
-        this.exporting = true;
-        
-        const success = await SalesAPIService.exportTransactions({
-          group_by: 'category' // This tells backend to group by category instead of item
-        });
-        
-        if (success) {
-          this.showSuccess('Export completed successfully! Check your downloads folder.');
-        } else {
-          throw new Error('Export failed');
-        }
-        
-      } catch (error) {
-        console.error('Export failed:', error);
-        
-        if (error.message.includes('404') || error.message.includes('Not Found')) {
-          this.showError('Export feature is not yet configured on the server. Please contact support.');
-        } else {
-          this.showError(`Export failed: ${error.message}`);
-        }
-      } finally {
-        this.exporting = false;
-      }
-    },
-
-    /**
-     * Show success message
-     */
     showSuccess(message) {
       this.exportMessage = message;
       this.exportMessageType = 'success';
@@ -1040,16 +1147,28 @@ export default {
       }, 5000);
     },
 
-    /**
-     * Show error message
-     */
     showError(message) {
       this.exportMessage = message;
       this.exportMessageType = 'error';
       setTimeout(() => {
         this.exportMessage = null;
-      }, 8000); // Error messages stay longer
-    }
+      }, 8000);
+    },
+
+    getExportSummary() {
+      return {
+        total_categories: this.categories.length,
+        date_range: this.currentDateRange ? this.dateRangeDisplay : 'All time',
+        frequency: this.selectedFrequency
+      };
+    },
+    
+    canExport() {
+      if (this.loading || this.exporting) {
+        return false;
+      }
+      return this.categories.length > 0;
+    },
   }
 }
 </script>
