@@ -74,6 +74,7 @@ export function useAddProduct() {
     if (isEditMode.value && product.value) {
       form.value = {
         product_name: product.value.product_name || '',
+        // FIX: Ensure we always use category_id, not category_name
         category_id: product.value.category_id || '',
         SKU: product.value.SKU || '',
         unit: product.value.unit || '',

@@ -65,10 +65,22 @@ export function useProducts() {
   // Methods
   const fetchCategories = async () => {
     try {
+      console.log('Fetching categories for product enrichment...')
       const response = await categoryApiService.getAllCategories()
-      categories.value = response
+      
+      // Handle different response formats
+      if (Array.isArray(response)) {
+        categories.value = response
+      } else if (response.categories) {
+        categories.value = response.categories
+      } else {
+        categories.value = []
+      }
+      
+      console.log(`Fetched ${categories.value.length} categories:`, categories.value.map(c => c.category_name))
     } catch (err) {
       console.error('Error fetching categories:', err)
+      categories.value = [] // Fallback to empty array
     }
   }
   
@@ -87,10 +99,8 @@ export function useProducts() {
         products.value = data.products || []
       }
       
-      // Enrich products with category info
-      if (categories.value.length > 0) {
-        products.value = await productsApiService.enrichProductsWithCategoryInfo(products.value)
-      }
+      // ALWAYS enrich products with category info after fetching categories
+      await enrichProductsWithCategoryNames()
       
       applyFilters()
       await fetchReportCounts()
@@ -99,6 +109,35 @@ export function useProducts() {
       error.value = `Failed to load products: ${err.message}`
     } finally {
       loading.value = false
+    }
+  }
+
+  const enrichProductsWithCategoryNames = async () => {
+    try {
+      // Ensure we have categories first
+      if (categories.value.length === 0) {
+        await fetchCategories()
+      }
+      
+      // Create a map for faster lookups
+      const categoryMap = new Map(
+        categories.value.map(cat => [cat._id, cat.category_name])
+      )
+      
+      // Enrich each product with category name
+      products.value = products.value.map(product => ({
+        ...product,
+        category_name: categoryMap.get(product.category_id) || 'Uncategorized'
+      }))
+      
+      console.log('Products enriched with category names:', products.value.slice(0, 2))
+    } catch (err) {
+      console.error('Error enriching products with category names:', err)
+      // Fallback: add 'Uncategorized' to all products without breaking the flow
+      products.value = products.value.map(product => ({
+        ...product,
+        category_name: product.category_name || 'Uncategorized'
+      }))
     }
   }
   
@@ -347,16 +386,16 @@ export function useProducts() {
   const getCategoryName = (categoryId) => {
     if (!categoryId) return 'Uncategorized'
     
-    // First check if we have enriched category_name
+    // First check if the current product in context already has enriched category_name
     const product = products.value.find(p => p.category_id === categoryId)
     if (product?.category_name) return product.category_name
     
-    // Then check our categories array
+    // Then check our categories array as fallback
     const category = categories.value.find(c => c._id === categoryId)
     if (category) return category.category_name
     
-    // Fallback to ID
-    return categoryId
+    // Final fallback
+    return 'Uncategorized'
   }
   
   const getCategoryBadgeClass = (categoryId) => {
@@ -505,8 +544,8 @@ export function useProducts() {
   
   // Lifecycle
   const initializeProducts = async () => {
-    await fetchCategories()
-    await fetchProducts()
+    await fetchCategories() // Fetch categories first
+    await fetchProducts()   // Then fetch and enrich products
     document.addEventListener('click', handleClickOutside)
   }
   
@@ -562,6 +601,7 @@ export function useProducts() {
     deleteProduct,
     toggleProductStatus,
     exportData,
+    enrichProductsWithCategoryNames,
     
     // UI Methods
     toggleAddDropdown,

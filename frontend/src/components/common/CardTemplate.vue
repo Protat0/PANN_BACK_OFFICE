@@ -1,6 +1,7 @@
 <template>
   <div 
     :class="cardClasses"
+    :style="cardStyles"
     @click="handleClick"
   >
     <!-- Card Header (optional) -->
@@ -9,7 +10,7 @@
     </div>
 
     <!-- Card Body -->
-    <div class="card-body">
+    <div class="card-body" :style="bodyStyles">
       <!-- Title -->
       <h6 v-if="title" :class="titleClasses">{{ title }}</h6>
       
@@ -45,11 +46,48 @@
 export default {
   name: 'CardTemplate',
   props: {
-    // Size variants
+    // Size variants - now includes 'custom'
     size: {
       type: String,
       default: 'md',
-      validator: (value) => ['mini', 'xs', 'compact', 'sm', 'md', 'lg', 'xl', 'xxl'].includes(value)
+      validator: (value) => ['mini', 'xs', 'compact', 'sm', 'md', 'lg', 'xl', 'xxl', 'custom'].includes(value)
+    },
+    
+    // Custom dimensions (only used when size is 'custom')
+    width: {
+      type: [String, Number],
+      default: null
+    },
+    
+    height: {
+      type: [String, Number],
+      default: null
+    },
+    
+    minWidth: {
+      type: [String, Number],
+      default: null
+    },
+    
+    minHeight: {
+      type: [String, Number],
+      default: null
+    },
+    
+    maxWidth: {
+      type: [String, Number],
+      default: null
+    },
+    
+    maxHeight: {
+      type: [String, Number],
+      default: null
+    },
+    
+    // Custom padding (only used when size is 'custom')
+    padding: {
+      type: [String, Number],
+      default: null
     },
     
     // Border color variants
@@ -130,8 +168,10 @@ export default {
     cardClasses() {
       const classes = ['card', 'card-template']
       
-      // Size classes
-      classes.push(`card-${this.size}`)
+      // Size classes (only apply if not custom)
+      if (this.size !== 'custom') {
+        classes.push(`card-${this.size}`)
+      }
       
       // Border classes
       if (this.borderColor !== 'none') {
@@ -166,25 +206,64 @@ export default {
       return classes
     },
     
+    cardStyles() {
+      if (this.size !== 'custom') return {}
+      
+      const styles = {}
+      
+      // Convert numbers to px, keep strings as-is
+      const formatDimension = (value) => {
+        if (typeof value === 'number') return `${value}px`
+        return value
+      }
+      
+      if (this.width) styles.width = formatDimension(this.width)
+      if (this.height) styles.height = formatDimension(this.height)
+      if (this.minWidth) styles.minWidth = formatDimension(this.minWidth)
+      if (this.minHeight) styles.minHeight = formatDimension(this.minHeight)
+      if (this.maxWidth) styles.maxWidth = formatDimension(this.maxWidth)
+      if (this.maxHeight) styles.maxHeight = formatDimension(this.maxHeight)
+      
+      return styles
+    },
+    
+    bodyStyles() {
+      if (this.size !== 'custom' || !this.padding) return {}
+      
+      const formatDimension = (value) => {
+        if (typeof value === 'number') return `${value}px`
+        return value
+      }
+      
+      return {
+        padding: formatDimension(this.padding)
+      }
+    },
+    
     titleClasses() {
       const classes = ['card-title', 'text-primary', 'mb-2']
       
-      // Size-based title classes
-      if (this.size === 'mini') {
-        classes.push('small', 'fw-semibold')
-      } else if (this.size === 'xs') {
-        classes.push('small', 'fw-semibold')
-      } else if (this.size === 'compact') {
-        classes.push('h6', 'mb-1')
-      } else if (this.size === 'sm') {
-        classes.push('h6')
-      } else if (this.size === 'lg') {
-        classes.push('h5')
-      } else if (this.size === 'xl') {
-        classes.push('h4')
-      } else if (this.size === 'xxl') {
-        classes.push('h3')
+      // Size-based title classes (skip if custom size)
+      if (this.size !== 'custom') {
+        if (this.size === 'mini') {
+          classes.push('small', 'fw-semibold')
+        } else if (this.size === 'xs') {
+          classes.push('small', 'fw-semibold')
+        } else if (this.size === 'compact') {
+          classes.push('h6', 'mb-1')
+        } else if (this.size === 'sm') {
+          classes.push('h6')
+        } else if (this.size === 'lg') {
+          classes.push('h5')
+        } else if (this.size === 'xl') {
+          classes.push('h4')
+        } else if (this.size === 'xxl') {
+          classes.push('h3')
+        } else {
+          classes.push('h6')
+        }
       } else {
+        // Default title size for custom cards
         classes.push('h6')
       }
       
@@ -197,23 +276,28 @@ export default {
       // Color classes
       classes.push(`text-${this.valueColor}`)
       
-      // Size-based value classes
-      if (this.size === 'mini') {
-        classes.push('h6', 'mb-0')
-      } else if (this.size === 'xs') {
-        classes.push('h5', 'mb-0')
-      } else if (this.size === 'compact') {
-        classes.push('h4', 'mb-1')
-      } else if (this.size === 'sm') {
-        classes.push('h6')
-      } else if (this.size === 'lg') {
-        classes.push('h1')
-      } else if (this.size === 'xl') {
-        classes.push('display-6')
-      } else if (this.size === 'xxl') {
-        classes.push('display-4')
+      // Size-based value classes (skip if custom size)
+      if (this.size !== 'custom') {
+        if (this.size === 'mini') {
+          classes.push('h6', 'mb-0')
+        } else if (this.size === 'xs') {
+          classes.push('h5', 'mb-0')
+        } else if (this.size === 'compact') {
+          classes.push('h4', 'mb-1')
+        } else if (this.size === 'sm') {
+          classes.push('h6')
+        } else if (this.size === 'lg') {
+          classes.push('h1')
+        } else if (this.size === 'xl') {
+          classes.push('display-6')
+        } else if (this.size === 'xxl') {
+          classes.push('display-4')
+        } else {
+          classes.push('h2')
+        }
       } else {
-        classes.push('h2')
+        // Default value size for custom cards
+        classes.push('h4')
       }
       
       return classes
@@ -265,7 +349,7 @@ export default {
 }
 
 /* ==========================================================================
-   SIZE VARIANTS
+   SIZE VARIANTS (excluding custom)
    ========================================================================== */
 .card-mini .card-body {
   padding: 0.5rem 0.75rem;
@@ -297,6 +381,15 @@ export default {
 
 .card-xxl .card-body {
   padding: 2.5rem;
+}
+
+/* ==========================================================================
+   CUSTOM SIZE DEFAULT STYLING
+   When size="custom", apply sensible defaults
+   ========================================================================== */
+.card-template:not([class*="card-mini"]):not([class*="card-xs"]):not([class*="card-compact"]):not([class*="card-sm"]):not([class*="card-md"]):not([class*="card-lg"]):not([class*="card-xl"]):not([class*="card-xxl"]) .card-body {
+  /* Default padding for custom cards */
+  padding: 1rem;
 }
 
 /* ==========================================================================

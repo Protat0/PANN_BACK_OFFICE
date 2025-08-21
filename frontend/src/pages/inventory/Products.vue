@@ -68,8 +68,8 @@
     </div>
 
     <!-- Action Bar and Filters -->
-    <div v-if="!loading || products.length > 0" class="action-bar-container mb-3">
-      <div class="action-bar-controls">
+    <div v-if="!loading || products.length > 0" class="action-bar mb-3">
+      <div class="action-controls">
         <div class="action-row">
           <!-- Left Side: Main Actions -->
           <div v-if="selectedProducts.length === 0" class="d-flex gap-2">
@@ -86,10 +86,10 @@
               </button>
               
               <div 
-                class="dropdown-menu custom-dropdown-menu" 
+                class="dropdown-menu add-dropdown-menu" 
                 :class="{ 'show': showAddDropdown }"
               >
-                <button class="dropdown-item custom-dropdown-item" @click="handleSingleProduct">
+                <button class="dropdown-item" @click="handleSingleProduct">
                   <div class="d-flex align-items-center gap-3">
                     <Plus :size="16" class="text-accent" />
                     <div>
@@ -99,7 +99,7 @@
                   </div>
                 </button>
                 
-                <button class="dropdown-item custom-dropdown-item" @click="handleBulkAdd">
+                <button class="dropdown-item" @click="handleBulkAdd">
                   <div class="d-flex align-items-center gap-3">
                     <Package :size="16" class="text-accent" />
                     <div>
@@ -109,7 +109,7 @@
                   </div>
                 </button>
                 
-                <button class="dropdown-item custom-dropdown-item" @click="handleImport">
+                <button class="dropdown-item" @click="handleImport">
                   <div class="d-flex align-items-center gap-3">
                     <FileText :size="16" class="text-accent" />
                     <div>
@@ -125,10 +125,7 @@
               <Settings :size="14" class="me-1" />
               COLUMNS
             </button>
-            <button 
-              class="btn btn-export btn-sm"
-              @click="exportData"
-            >
+            <button class="btn btn-export btn-sm" @click="exportData">
               EXPORT
             </button>
           </div>
@@ -140,7 +137,7 @@
               @click="deleteSelected"
             >
               <Trash2 :size="14" />
-              DELETE
+              DELETE ({{ selectedProducts.length }})
             </button>
           </div>
 
@@ -160,7 +157,7 @@
               <div class="filter-dropdown">
                 <label class="filter-label">Category</label>
                 <select 
-                  class="form-select form-select-sm input-theme" 
+                  class="form-select form-select-sm" 
                   v-model="categoryFilter" 
                   @change="applyFilters"
                 >
@@ -174,7 +171,7 @@
               <div class="filter-dropdown">
                 <label class="filter-label">Stock alert</label>
                 <select 
-                  class="form-select form-select-sm input-theme" 
+                  class="form-select form-select-sm" 
                   v-model="stockFilter" 
                   @change="applyFilters"
                 >
@@ -194,8 +191,8 @@
                   v-model="searchFilter" 
                   @input="applyFilters"
                   type="text" 
-                  class="form-control form-control-sm input-theme search-input"
-                  placeholder="Search"
+                  class="form-control form-control-sm search-input"
+                  placeholder="Search products..."
                 />
                 <button 
                   class="btn btn-sm btn-link position-absolute end-0 top-50 translate-middle-y text-tertiary"
@@ -221,7 +218,6 @@
     >
       <template #header>
         <tr>
-          <!-- Checkbox Column -->
           <th style="width: 40px;">
             <input 
               type="checkbox" 
@@ -231,57 +227,16 @@
               :indeterminate="someSelected"
             />
           </th>
-          
-          <!-- Product Name Column -->
-          <th>
-            Item name
-            <ChevronUp :size="14" class="ms-1" />
-          </th>
-          
-          <!-- SKU Column -->
-          <th v-if="isColumnVisible('sku')" style="width: 100px;">
-            SKU
-          </th>
-          
-          <!-- Category Column -->
-          <th v-if="isColumnVisible('category')" style="width: 120px;">
-            Category
-          </th>
-          
-          <!-- Selling Price Column -->
-          <th v-if="isColumnVisible('sellingPrice')" style="width: 100px;">
-            Price
-          </th>
-          
-          <!-- Cost Price Column -->
-          <th v-if="isColumnVisible('costPrice')" style="width: 100px;">
-            Cost
-          </th>
-          
-          <!-- Margin Column -->
-          <th style="width: 80px;">
-            Margin
-          </th>
-          
-          <!-- Stock Column -->
-          <th v-if="isColumnVisible('stock')" style="width: 100px;">
-            In stock
-          </th>
-          
-          <!-- Status Column -->
-          <th v-if="isColumnVisible('status')" style="width: 80px;">
-            Status
-          </th>
-          
-          <!-- Expiry Date Column -->
-          <th v-if="isColumnVisible('expiryDate')" style="width: 110px;">
-            Expiry Date
-          </th>
-          
-          <!-- Actions Column -->
-          <th style="width: 160px;">
-            Actions
-          </th>
+          <th>Item name <ChevronUp :size="14" class="ms-1" /></th>
+          <th v-if="isColumnVisible('sku')" style="width: 100px;">SKU</th>
+          <th v-if="isColumnVisible('category')" style="width: 120px;">Category</th>
+          <th v-if="isColumnVisible('sellingPrice')" style="width: 100px;">Price</th>
+          <th v-if="isColumnVisible('costPrice')" style="width: 100px;">Cost</th>
+          <th style="width: 80px;">Margin</th>
+          <th v-if="isColumnVisible('stock')" style="width: 100px;">In stock</th>
+          <th v-if="isColumnVisible('status')" style="width: 80px;">Status</th>
+          <th v-if="isColumnVisible('expiryDate')" style="width: 110px;">Expiry Date</th>
+          <th style="width: 160px;">Actions</th>
         </tr>
       </template>
 
@@ -291,7 +246,6 @@
           :key="product._id"
           :class="getRowClass(product)"
         >
-          <!-- Checkbox Column -->
           <td>
             <input 
               type="checkbox" 
@@ -300,108 +254,82 @@
               v-model="selectedProducts"
             />
           </td>
-          
-          <!-- Product Name Column -->
           <td>
             <div :class="['fw-medium', getProductNameClass(product)]">
               {{ product.product_name }}
             </div>
           </td>
-          
-          <!-- SKU Column -->
           <td v-if="isColumnVisible('sku')" class="text-center">
-            <code class="text-primary surface-tertiary px-2 py-1 rounded">
+            <code class="text-primary px-2 py-1 rounded bg-light">
               {{ product.SKU || '—' }}
             </code>
           </td>
-          
-          <!-- Category Column -->
           <td v-if="isColumnVisible('category')">
             <span :class="['badge', 'rounded-pill', getCategoryBadgeClass(product.category_id)]">
               {{ getCategoryName(product.category_id) }}
             </span>
           </td>
-          
-          <!-- Selling Price Column -->
           <td v-if="isColumnVisible('sellingPrice')" class="text-end fw-medium">
             ₱{{ formatPrice(product.selling_price) }}
           </td>
-          
-          <!-- Cost Price Column -->
           <td v-if="isColumnVisible('costPrice')" class="text-end fw-medium">
             ₱{{ formatPrice(product.cost_price) }}
           </td>
-          
-          <!-- Margin Column -->
           <td class="text-center fw-medium">
             <span :class="getMarginClass(product.cost_price, product.selling_price)">
               {{ calculateMargin(product.cost_price, product.selling_price) }}%
             </span>
           </td>
-          
-          <!-- Stock Column -->
           <td v-if="isColumnVisible('stock')" class="text-end">
             <span :class="getStockDisplayClass(product)">
               {{ product.stock || '—' }}
             </span>
           </td>
-          
-          <!-- Status Column -->
           <td v-if="isColumnVisible('status')" class="text-center">
             <span :class="getStatusBadgeClass(product.status)">
               {{ getStatusText(product.status) }}
             </span>
           </td>
-          
-          <!-- Expiry Date Column -->
           <td v-if="isColumnVisible('expiryDate')" class="text-center">
             <small :class="getExpiryDateClass(product.expiry_date)">
               {{ formatExpiryDate(product.expiry_date) }}
             </small>
           </td>
-          
-          <!-- Actions Column -->
           <td>
             <div class="d-flex gap-1 justify-content-center">
               <button 
                 class="btn btn-outline-secondary btn-icon-only btn-xs action-btn action-btn-edit" 
                 @click="editProduct(product)"
-                data-bs-toggle="tooltip"
-                title="Edit Product"
+                title="Edit"
               >
                 <Edit :size="12" />
               </button>
               <button 
                 class="btn btn-outline-primary btn-icon-only btn-xs action-btn action-btn-view" 
                 @click="viewProduct(product)"
-                data-bs-toggle="tooltip"
-                title="View Details"
+                title="View"
               >
                 <Eye :size="12" />
               </button>
               <button 
                 class="btn btn-outline-info btn-icon-only btn-xs action-btn action-btn-stock" 
                 @click="restockProduct(product)"
-                data-bs-toggle="tooltip"
-                title="Update Stock"
+                title="Stock"
               >
                 <Package :size="12" />
               </button>
               <button 
-                class="btn btn-outline-success btn-icon-only btn-xs action-btn action-btn-status"
+                class="btn btn-outline-success btn-icon-only btn-xs action-btn"
                 @click="toggleProductStatus(product)"
-                data-bs-toggle="tooltip"
-                :title="product.status === 'active' ? 'Deactivate Product' : 'Activate Product'"
+                :title="product.status === 'active' ? 'Deactivate' : 'Activate'"
                 :class="{ 'action-btn-status-inactive': product.status !== 'active' }"
               >
-                <Lock v-if="product.status === 'active'" :size="12" />
-                <Unlock v-else :size="12" />
+                <component :is="product.status === 'active' ? 'Lock' : 'Unlock'" :size="12" />
               </button>
               <button 
                 class="btn btn-outline-danger btn-icon-only btn-xs action-btn action-btn-delete" 
                 @click="deleteProduct(product)"
-                data-bs-toggle="tooltip"
-                title="Delete Product"
+                title="Delete"
               >
                 <Trash2 :size="12" />
               </button>
@@ -413,7 +341,7 @@
 
     <!-- Empty State -->
     <div v-if="!loading && filteredProducts.length === 0 && !error" class="text-center py-5">
-      <div class="card card-theme">
+      <div class="card">
         <div class="card-body py-5">
           <Package :size="48" class="text-tertiary mb-3" />
           <p class="text-tertiary mb-3">
@@ -442,6 +370,7 @@
     <!-- Modular Components -->
     <AddProductModal
       ref="addProductModal"
+      :categories="categories"
       @success="handleProductSuccess"
     />
 
@@ -492,51 +421,23 @@ import CardTemplate from '@/components/common/CardTemplate.vue'
 import ImportModal from '../../components/products/ImportModal.vue'
 import ColumnFilterModal from '@/components/products/ColumnFilterModal.vue'
 import { 
-  Plus, 
-  Search,
-  X,
-  ChevronUp,
-  Package, 
-  Trash2,
-  RefreshCw,
-  FileText,
-  Edit,
-  Eye,
-  Lock,
-  Unlock,
-  Settings
+  Plus, Search, X, ChevronUp, Package, Trash2,
+  RefreshCw, FileText, Edit, Eye, Lock, Unlock, Settings
 } from 'lucide-vue-next'
 
 export default {
   name: 'Products',
   components: {
-    AddProductModal,
-    StockUpdateModal,
-    ViewProductModal,
-    ColumnFilterModal,
-    ImportModal,
-    ReportsModal,
-    DataTable,
-    CardTemplate,
-    Plus,
-    Search,
-    X,
-    ChevronUp,
-    Package,
-    Trash2,
-    RefreshCw,
-    FileText,
-    Edit,
-    Eye,
-    Lock,
-    Unlock,
-    Settings
+    AddProductModal, StockUpdateModal, ViewProductModal,
+    ColumnFilterModal, ImportModal, ReportsModal,
+    DataTable, CardTemplate,
+    Plus, Search, X, ChevronUp, Package, Trash2,
+    RefreshCw, FileText, Edit, Eye, Lock, Unlock, Settings
   },
   
   setup() {
     const productsComposable = useProducts()
     
-    // Lifecycle hooks
     onMounted(() => {
       productsComposable.initializeProducts()
     })
@@ -545,38 +446,30 @@ export default {
       productsComposable.cleanupProducts()
     })
     
-    return {
-      ...productsComposable
-    }
+    return { ...productsComposable }
   },
   
   methods: {
-    // Modal-specific methods (these stay in the component)
     showAddProductModal() {
-      if (this.$refs.addProductModal && this.$refs.addProductModal.openAdd) {
-        this.$refs.addProductModal.openAdd()
-      }
+      this.$refs.addProductModal?.openAdd?.()
     },
     
     editProduct(product) {
-      if (this.$refs.viewProductModal && this.$refs.viewProductModal.close) {
-        this.$refs.viewProductModal.close()
+      const enrichedProduct = {
+        ...product,
+        category_id: product.category_id || ''
       }
-      if (this.$refs.addProductModal && this.$refs.addProductModal.openEdit) {
-        this.$refs.addProductModal.openEdit(product)
-      }
+      
+      this.$refs.viewProductModal?.close?.()
+      this.$refs.addProductModal?.openEdit?.(enrichedProduct)
     },
     
     viewProduct(product) {
-      if (this.$refs.viewProductModal && this.$refs.viewProductModal.open) {
-        this.$refs.viewProductModal.open(product)
-      }
+      this.$refs.viewProductModal?.open?.(product)
     },
     
     restockProduct(product) {
-      if (this.$refs.stockUpdateModal && this.$refs.stockUpdateModal.openStock) {
-        this.$refs.stockUpdateModal.openStock(product)
-      }
+      this.$refs.stockUpdateModal?.openStock?.(product)
     },
     
     async generateProductBarcode(product) {
@@ -595,46 +488,36 @@ export default {
     },
     
     async showLowStockReport() {
-      if (this.$refs.reportsModal && this.$refs.reportsModal.showLowStockModal) {
-        await this.$refs.reportsModal.showLowStockModal()
-      }
+      await this.$refs.reportsModal?.showLowStockModal?.()
     },
     
     async showExpiringReport() {
-      if (this.$refs.reportsModal && this.$refs.reportsModal.showExpiringModal) {
-        await this.$refs.reportsModal.showExpiringModal()
-      }
+      await this.$refs.reportsModal?.showExpiringModal?.()
     },
     
-    // Override composable methods to handle modal triggers
     handleSingleProduct(event) {
-      if (event) event.stopPropagation()
+      event?.stopPropagation()
       this.showAddProductModal()
       this.closeAddDropdown()
     },
     
     handleImport(event) {
-      event.stopPropagation()
+      event?.stopPropagation()
       
       const importModalElement = document.getElementById('importModal')
-      
       if (importModalElement) {
         try {
           const modal = new bootstrap.Modal(importModalElement)
           modal.show()
         } catch (error) {
-          console.error('❌ Error creating/showing modal:', error)
+          console.error('Error showing modal:', error)
         }
-      } else {
-        console.error('❌ Modal element #importModal not found in DOM')
       }
       
       this.closeAddDropdown()
     },
     
-    // Handle selectAll event from template
     selectAll(event) {
-      // Call the composable's selectAll with the checkbox state
       this.$options.setup().selectAll(event.target.checked)
     }
   }
@@ -642,27 +525,27 @@ export default {
 </script>
 
 <style scoped>
-/* ==========================================================================
-   PRODUCTS PAGE - SEMANTIC THEME SYSTEM
-   ========================================================================== */
 
+/* Page Container */
 .products-page {
   min-height: 100vh;
-  @apply page-container;
+  background-color: var(--surface-secondary);
+  color: var(--text-secondary);
 }
 
-/* ==========================================================================
-   ACTION BAR - SEMANTIC STYLING
-   ========================================================================== */
-
-.action-bar-container {
-  @apply card-theme shadow-sm;
+/* Action Bar */
+.action-bar {
+  background-color: var(--surface-primary);
+  border: 1px solid var(--border-secondary);
+  box-shadow: var(--shadow-sm);
   border-radius: 0.75rem;
   overflow: hidden;
 }
 
-.action-bar-controls {
-  @apply border-bottom-theme surface-primary transition-theme;
+.action-controls {
+  background-color: var(--surface-primary);
+  border-bottom: 1px solid var(--border-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .action-row {
@@ -674,48 +557,27 @@ export default {
   gap: 1rem;
 }
 
-/* ==========================================================================
-   FILTERS - SEMANTIC STYLING
-   ========================================================================== */
-
-.filter-dropdown {
-  min-width: 120px;
+/* Dropdown - Fixed Z-Index */
+.dropdown {
+  position: relative;
 }
 
-.filter-label {
-  font-size: 0.75rem;
-  font-weight: 500;
-  margin-bottom: 0.25rem;
-  display: block;
-  @apply text-tertiary;
-}
-
-.search-container {
-  min-width: 300px;
-}
-
-.search-input {
-  padding-right: 2.5rem;
-  height: calc(1.5em + 0.75rem + 2px);
-}
-
-.search-toggle {
-  height: calc(1.5em + 0.75rem + 2px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 0.75rem;
-}
-
-/* ==========================================================================
-   DROPDOWN MENU - SEMANTIC STYLING
-   ========================================================================== */
-
-.custom-dropdown-menu {
+.add-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 9999 !important;
   min-width: 280px;
+  margin-top: 0.25rem;
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-primary);
   border-radius: 0.75rem;
+  box-shadow: var(--shadow-lg);
   animation: dropdownSlide 0.2s ease;
-  @apply surface-elevated border-theme shadow-lg;
+}
+
+.add-dropdown-menu.show {
+  display: block;
 }
 
 @keyframes dropdownSlide {
@@ -729,33 +591,85 @@ export default {
   }
 }
 
-.custom-dropdown-item {
+.dropdown-item {
   padding: 1rem 1.25rem;
-  @apply border-bottom-theme transition-theme;
+  border-bottom: 1px solid var(--border-primary);
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  transition: background-color 0.2s ease;
 }
 
-.custom-dropdown-item:last-child {
+.dropdown-item:last-child {
   border-bottom: none;
 }
 
-.custom-dropdown-item:hover {
-  @apply hover-surface;
+.dropdown-item:hover {
+  background-color: var(--state-hover);
 }
 
-/* ==========================================================================
-   BUTTON STATES - SEMANTIC
-   ========================================================================== */
+/* Filters */
+.filter-dropdown {
+  min-width: 120px;
+}
 
+.filter-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+  display: block;
+  color: var(--text-tertiary);
+}
+
+.form-select {
+  background-color: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--input-text);
+}
+
+.form-select:focus {
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 0.2rem rgba(160, 123, 227, 0.25);
+}
+
+/* Search */
+.search-container {
+  min-width: 300px;
+}
+
+.search-input {
+  padding-right: 2.5rem;
+  height: calc(1.5em + 0.75rem + 2px);
+  background-color: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--input-text);
+}
+
+.search-toggle {
+  height: calc(1.5em + 0.75rem + 2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.75rem;
+}
+
+/* Button States */
 .btn.active {
-  @apply text-inverse;
+  color: var(--text-inverse);
   background-color: var(--secondary);
   border-color: var(--secondary);
 }
 
-/* ==========================================================================
-   RESPONSIVE DESIGN
-   ========================================================================== */
+/* Card Styling */
+.card {
+  background-color: var(--surface-primary);
+  border: 1px solid var(--border-secondary);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
+}
 
+/* Responsive */
 @media (max-width: 768px) {
   .action-row {
     flex-direction: column;
@@ -766,13 +680,14 @@ export default {
     min-width: 100%;
   }
   
-  .custom-dropdown-menu {
+  .add-dropdown-menu {
     min-width: 250px;
     right: 0;
     left: auto;
   }
   
-  .custom-dropdown-item {
+  .dropdown-item {
     padding: 0.875rem 1rem;
   }
-}</style>
+}
+</style>

@@ -45,7 +45,7 @@ class ProductsApiService {
   async getProduct(productId, includeDeleted = false) {
     try {
       const params = includeDeleted ? { include_deleted: true } : {};
-      const response = await api.get(`/products/${productId}/`, { params });
+      const response = await api.get(`/products/${productId}`, { params });
       return this.handleResponse(response);
     } catch (error) {
       this.handleError(error);
@@ -61,7 +61,7 @@ class ProductsApiService {
   async getProductBySku(sku, includeDeleted = false) {
     try {
       const params = includeDeleted ? { include_deleted: true } : {};
-      const response = await api.get(`/products/sku/${sku}/`, { params });
+      const response = await api.get(`/products/sku/${sku}`, { params });
       return this.handleResponse(response);
     } catch (error) {
       this.handleError(error);

@@ -20,6 +20,7 @@ import SalesByCategory from '@/pages/reports/SalesByCategory.vue'
 import UncategorizedProducts from '@/components/categories/UncategorizedProducts.vue'
 import Logs from '@/pages/Logs.vue'
 import AllNotifications from '@/pages/notifications/AllNotifications.vue'
+import TesterPage from '@/pages/TesterPage.vue'
 
 // Auth guard function
 function requireAuth(to, from, next) {
@@ -144,6 +145,11 @@ const router = createRouter({
           name: 'AllNotifications',
           component: AllNotifications
         },
+        {
+          path: 'tester',
+          name: 'TesterPage',
+          component: TesterPage
+        }
       ]
     },
     // Catch all route - redirect to login

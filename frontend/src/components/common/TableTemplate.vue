@@ -396,7 +396,7 @@ export default {
 .table-header-sticky {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 2;
   background-color: var(--secondary) !important;
   @apply shadow-md;
 }
