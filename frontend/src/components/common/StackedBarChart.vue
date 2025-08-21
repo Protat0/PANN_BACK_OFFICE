@@ -1,6 +1,5 @@
-<!-- BarChart.vue -->
 <template>
-  <div class="chart-wrapper" :style="{ width: width + 'px', height: height + 'px' }">
+  <div class="chart-wrapper" :class="sizeClass" :style="dynamicStyle">
     <Bar :data="chartData" :options="options" />
   </div>
 </template>
@@ -20,7 +19,7 @@ import {
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 export default {
-  name: 'BarChart',
+  name: 'StackedGroupsBarChart',
   components: { Bar },
   props: {
     chartData: {
@@ -33,18 +32,36 @@ export default {
     },
     width: {
       type: Number,
-      default: 600
+      default: 800
     },
     height: {
       type: Number,
       default: 400
     },
-    stacked: {
+    size: {
+      type: String,
+      default: 'medium',
+      validator: value => ['small', 'medium', 'large', 'custom'].includes(value)
+    },
+    title: {
+      type: String,
+      default: ''
+    },
+    showLegend: {
       type: Boolean,
-      default: true // Enable stacked by default
+      default: true
     }
   },
   computed: {
+    sizeClass() {
+      return `chart-${this.size}`
+    },
+    dynamicStyle() {
+      if (this.size === 'custom') {
+        return { width: this.width + 'px', height: this.height + 'px' }
+      }
+      return {}
+    },
     options() {
       return {
         responsive: true,
@@ -55,18 +72,30 @@ export default {
         },
         plugins: {
           title: {
-            display: false,
-            text: `Sales by Category (${this.selectedFrequency})`
+            display: !!this.title,
+            text: this.title || `Sales Analysis (${this.selectedFrequency})`,
+            font: {
+              size: 16,
+              weight: 'bold'
+            },
+            color: '#374151',
+            padding: {
+              top: 10,
+              bottom: 20
+            }
           },
           legend: {
-            display: true, // Show legend for stacked chart
+            display: this.showLegend,
             position: 'top',
+            align: 'center',
             labels: {
               boxWidth: 12,
               padding: 15,
               font: {
                 size: 12
-              }
+              },
+              usePointStyle: true,
+              pointStyle: 'rect'
             }
           },
           tooltip: {
@@ -83,29 +112,39 @@ export default {
               },
               label: function(context) {
                 const label = context.dataset.label || ''
+                const stack = context.dataset.stack || ''
                 const value = new Intl.NumberFormat('en-PH', {
                   style: 'currency',
                   currency: 'PHP'
                 }).format(context.parsed.y)
-                return `${label}: ${value}`
+                
+                return `${label} (${stack}): ${value}`
               },
-              footer: function(tooltipItems) {
-                let total = 0
-                tooltipItems.forEach(function(tooltipItem) {
-                  total += tooltipItem.parsed.y
-                })
-                const formattedTotal = new Intl.NumberFormat('en-PH', {
-                  style: 'currency',
-                  currency: 'PHP'
-                }).format(total)
-                return `Total: ${formattedTotal}`
+              afterLabel: function(context) {
+                // Show stack group total
+                const stack = context.dataset.stack
+                if (stack) {
+                  const stackTotal = context.chart.data.datasets
+                    .filter(dataset => dataset.stack === stack)
+                    .reduce((total, dataset) => {
+                      return total + (dataset.data[context.dataIndex] || 0)
+                    }, 0)
+                  
+                  const formattedTotal = new Intl.NumberFormat('en-PH', {
+                    style: 'currency',
+                    currency: 'PHP'
+                  }).format(stackTotal)
+                  
+                  return `${stack} Total: ${formattedTotal}`
+                }
+                return ''
               }
             }
           }
         },
         scales: {
           x: {
-            stacked: this.stacked,
+            stacked: true,
             grid: {
               display: false
             },
@@ -120,7 +159,7 @@ export default {
             }
           },
           y: {
-            stacked: this.stacked,
+            stacked: true,
             beginAtZero: true,
             grid: {
               color: 'rgba(107, 114, 128, 0.1)',
@@ -148,8 +187,8 @@ export default {
         elements: {
           bar: {
             borderRadius: {
-              topLeft: 4,
-              topRight: 4,
+              topLeft: 2,
+              topRight: 2,
               bottomLeft: 0,
               bottomRight: 0
             },
@@ -171,12 +210,47 @@ export default {
   position: relative;
   background: white;
   border-radius: 8px;
-  padding: 10px;
+  padding: 15px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-/* Optional: Add some hover effects */
+/* Predefined sizes */
+.chart-small {
+  width: 500px;
+  height: 250px;
+}
+
+.chart-medium {
+  width: 700px;
+  height: 350px;
+}
+
+.chart-large {
+  width: 900px;
+  height: 450px;
+}
+
+/* .chart-custom { } */
+
+/* Responsive behavior */
+@media (max-width: 768px) {
+  .chart-wrapper {
+    width: 100% !important;
+    min-width: 300px;
+    max-width: 100%;
+    padding: 10px;
+  }
+  
+  .chart-small,
+  .chart-medium,
+  .chart-large {
+    width: 100%;
+    height: 280px;
+  }
+}
+
 .chart-wrapper:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   transition: box-shadow 0.3s ease;
 }
 </style>

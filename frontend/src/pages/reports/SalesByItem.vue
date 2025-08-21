@@ -50,7 +50,7 @@
             <div class="spinner-border text-primary"></div>
             <p>Loading chart data...</p>
           </div>
-          <BarChart v-else :chartData="chartData" :selectedFrequency="selectedFrequency" />
+          <BarChart v-else :chartData="chartData" :selectedFrequency="selectedFrequency" :width="900"  :height="350" />
         </div>
       </div>
     </div>

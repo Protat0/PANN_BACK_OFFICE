@@ -98,9 +98,17 @@ class DashboardAPIService{
         }
     }
 
-
+    async chartData(){
+         try {
+            const response = await api.get('/category/display'); 
+            
+             return response.data
+        } catch (error) {
+            console.error('Error fetching category data:', error)
+            throw error
+        }
+    }
 }
 
 const dashboardApiService = new DashboardAPIService();
-
 export default dashboardApiService;
