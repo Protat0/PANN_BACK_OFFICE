@@ -11,11 +11,11 @@
       </table>
     </div>
     
-    <!-- Add this pagination section -->
+    <!-- Pagination section -->
     <div v-if="showPagination && totalPages > 1" class="pagination-container">
       <div class="d-flex justify-content-between align-items-center">
         <div class="pagination-info">
-          <small class="text-tertiary">
+          <small style="color: var(--tertiary-medium);">
             Showing {{ startItem }}-{{ endItem }} of {{ totalItems }} items
           </small>
         </div>
@@ -90,20 +90,23 @@ export default {
       default: 1
     }
   },
+  
   emits: ['page-changed'],
+  
   computed: {
     totalPages() {
       return Math.ceil(this.totalItems / this.itemsPerPage)
     },
     startItem() {
+      if (this.totalItems === 0) return 0
       return (this.currentPage - 1) * this.itemsPerPage + 1
     },
     endItem() {
       return Math.min(this.currentPage * this.itemsPerPage, this.totalItems)
     }
   },
+  
   methods: {
-
     handleScroll(event) {
       const scrollTop = event.target.scrollTop
       const tableContainer = event.target
@@ -116,54 +119,56 @@ export default {
     },
 
     goToPage(page) {
-
-      console.log('goToPage called with:', page) // Add debug
-      console.log('Current page:', this.currentPage) // Add debug
-      console.log('Total pages:', this.totalPages) // Add debug
-
       if (page >= 1 && page <= this.totalPages && page !== this.currentPage) {
-        console.log('Emitting page-changed event') 
         this.$emit('page-changed', page)
       }
     },
+    
     previousPage() {
       this.goToPage(this.currentPage - 1)
     },
+    
     nextPage() {
       this.goToPage(this.currentPage + 1)
     }
   }
 }
+
+
 </script>
 
 <style scoped>
-/* ==========================================================================
-   TABLE CONTAINER - SEMANTIC THEME SYSTEM
-   ========================================================================== */
-
 .table-container {
+  background-color: var(--surface-primary);
   border-radius: 0.75rem;
-  overflow: hidden;
-  @apply surface-card shadow-lg transition-theme;
+  box-shadow: var(--shadow-lg);
+  /* Changed from overflow: hidden to overflow: visible for dropdown */
+  overflow: visible;
+  border: 1px solid var(--border-secondary);
+  position: relative;
+  z-index: 1;
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .table-responsive {
-  border-radius: 0.75rem;
+  border-radius: 0.75rem 0.75rem 0 0;
+  /* Only clip horizontal overflow, allow vertical overflow for dropdown */
+  overflow-x: auto;
+  overflow-y: visible;
+  position: relative;
+  max-width: 100%;
 }
 
 .data-table {
   margin-bottom: 0;
   border-collapse: separate;
   border-spacing: 0;
-  @apply text-primary;
+  width: 100%;
 }
 
-/* ==========================================================================
-   HEADER STYLING - SEMANTIC
-   ========================================================================== */
-
+/* Header Styling */
 .table-header {
-  background-color: var(--secondary) !important;
+  background-color: var(--primary-medium) !important;
   color: var(--text-inverse) !important;
 }
 
@@ -176,7 +181,7 @@ export default {
   color: var(--text-inverse) !important;
   text-transform: uppercase;
   position: relative;
-  background-color: var(--secondary) !important;
+  background-color: var(--primary-medium) !important;
 }
 
 .data-table :deep(.table-header th:first-child) {
@@ -187,15 +192,14 @@ export default {
   border-top-right-radius: 0.75rem;
 }
 
-/* ==========================================================================
-   BODY STYLING - SEMANTIC
-   ========================================================================== */
-
+/* Body Styling */
 .data-table :deep(tbody td) {
   padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--border-secondary);
   font-size: 0.875rem;
+  color: var(--text-secondary);
   vertical-align: middle;
-  @apply border-bottom-theme text-primary surface-primary transition-theme;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
 .data-table :deep(tbody tr:last-child td) {
@@ -203,25 +207,18 @@ export default {
 }
 
 .data-table :deep(tbody tr:hover) {
-  @apply hover-surface;
-}
-
-.data-table :deep(tbody tr:hover td) {
-  @apply hover-surface;
+  background-color: var(--state-hover);
 }
 
 .data-table :deep(tbody tr.table-primary) {
-  @apply state-selected;
+  background-color: var(--state-selected);
 }
 
 .data-table :deep(tbody tr.text-muted) {
   opacity: 0.6;
 }
 
-/* ==========================================================================
-   ACTION BUTTON STYLES - SEMANTIC
-   ========================================================================== */
-
+/* Action Button Base Styles */
 .data-table :deep(.action-btn) {
   width: 24px;
   height: 24px;
@@ -230,16 +227,17 @@ export default {
   justify-content: center;
   border-radius: 0.375rem;
   border-width: 1.5px;
+  transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
   padding: 0;
   margin: 0 1px;
-  @apply shadow-sm transition-all-theme;
+  box-shadow: 0 3px 6px 0 rgba(0, 0, 0, 0.12);
 }
 
 .data-table :deep(.action-btn:hover) {
   transform: translateY(-2px);
-  @apply shadow-md;
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.25);
 }
 
 .data-table :deep(.action-btn:active) {
@@ -254,7 +252,7 @@ export default {
   transform: scale(1.1);
 }
 
-/* Action Button Color Variants - Semantic */
+/* Action Button Color Overrides */
 .data-table :deep(.action-btn-edit) {
   --bs-btn-color: var(--secondary);
   --bs-btn-border-color: var(--secondary);
@@ -275,17 +273,6 @@ export default {
   --bs-btn-active-color: var(--primary-dark);
   --bs-btn-active-bg: var(--primary-medium);
   --bs-btn-active-border-color: var(--primary-dark);
-}
-
-.data-table :deep(.action-btn-delete) {
-  --bs-btn-color: var(--error);
-  --bs-btn-border-color: var(--error);
-  --bs-btn-hover-color: var(--error-dark);
-  --bs-btn-hover-bg: var(--error-light);
-  --bs-btn-hover-border-color: var(--error-dark);
-  --bs-btn-active-color: var(--error-dark);
-  --bs-btn-active-bg: var(--error-medium);
-  --bs-btn-active-border-color: var(--error-dark);
 }
 
 .data-table :deep(.action-btn-stock) {
@@ -310,37 +297,88 @@ export default {
   --bs-btn-active-border-color: var(--success-dark);
 }
 
-/* ==========================================================================
-   BADGE AND STATUS STYLING - SEMANTIC
-   ========================================================================== */
+.data-table :deep(.action-btn-status-inactive) {
+  --bs-btn-color: var(--tertiary-medium);
+  --bs-btn-border-color: var(--tertiary-medium);
+  --bs-btn-hover-color: var(--tertiary-dark);
+  --bs-btn-hover-bg: var(--neutral-medium);
+  --bs-btn-hover-border-color: var(--tertiary-dark);
+  --bs-btn-active-color: var(--tertiary-dark);
+  --bs-btn-active-bg: var(--neutral-dark);
+  --bs-btn-active-border-color: var(--tertiary-dark);
+}
 
+.data-table :deep(.action-btn-delete) {
+  --bs-btn-color: var(--error);
+  --bs-btn-border-color: var(--error);
+  --bs-btn-hover-color: var(--error-dark);
+  --bs-btn-hover-bg: var(--error-light);
+  --bs-btn-hover-border-color: var(--error-dark);
+  --bs-btn-active-color: var(--error-dark);
+  --bs-btn-active-bg: var(--error-medium);
+  --bs-btn-active-border-color: var(--error-dark);
+}
+
+/* Additional action button variants */
+.data-table :deep(.action-btn-duplicate) {
+  --bs-btn-color: var(--secondary-medium);
+  --bs-btn-border-color: var(--secondary-medium);
+  --bs-btn-hover-color: var(--secondary-dark);
+  --bs-btn-hover-bg: var(--secondary-light);
+  --bs-btn-hover-border-color: var(--secondary-dark);
+}
+
+.data-table :deep(.action-btn-archive) {
+  --bs-btn-color: var(--neutral-dark);
+  --bs-btn-border-color: var(--neutral-dark);
+  --bs-btn-hover-color: var(--tertiary-dark);
+  --bs-btn-hover-bg: var(--neutral-medium);
+  --bs-btn-hover-border-color: var(--tertiary-dark);
+}
+
+.data-table :deep(.action-btn-restore) {
+  --bs-btn-color: var(--success-medium);
+  --bs-btn-border-color: var(--success-medium);
+  --bs-btn-hover-color: var(--success-dark);
+  --bs-btn-hover-bg: var(--success-light);
+  --bs-btn-hover-border-color: var(--success-dark);
+}
+
+.data-table :deep(.action-btn-download) {
+  --bs-btn-color: var(--info-medium);
+  --bs-btn-border-color: var(--info-medium);
+  --bs-btn-hover-color: var(--info-dark);
+  --bs-btn-hover-bg: var(--info-light);
+  --bs-btn-hover-border-color: var(--info-dark);
+}
+
+/* Badge and Status Styling */
 .data-table :deep(.badge) {
   font-size: 0.75rem;
   font-weight: 600;
   padding: 0.375rem 0.75rem;
-  @apply surface-tertiary text-primary border-theme;
 }
 
 .data-table :deep(.text-tertiary-dark) {
-  @apply text-primary;
+  color: var(--tertiary-dark) !important;
 }
 
 .data-table :deep(.text-tertiary-medium) {
-  @apply text-secondary;
+  color: var(--tertiary-medium) !important;
 }
 
 .data-table :deep(.text-primary-dark) {
-  @apply text-accent;
+  color: var(--primary-dark) !important;
 }
 
-/* ==========================================================================
-   PAGINATION CONTAINER - SEMANTIC
-   ========================================================================== */
-
+/* Pagination Container with Shadow */
 .pagination-container {
   padding: 1rem;
-  @apply border-top-theme surface-secondary shadow-sm transition-theme;
+  border-top: 1px solid var(--border-secondary);
+  background-color: var(--surface-secondary);
   box-shadow: inset 0 2px 4px 0 var(--shadow-sm);
+  border-radius: 0 0 0.75rem 0.75rem;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .pagination-info {
@@ -348,23 +386,33 @@ export default {
 }
 
 .pagination .page-link {
+  color: var(--text-accent);
+  border-color: var(--border-primary);
   padding: 0.375rem 0.75rem;
-  @apply text-accent border-theme surface-primary shadow-sm transition-all-theme;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+  background-color: var(--surface-primary);
 }
 
 .pagination .page-link:hover {
+  color: var(--text-accent);
+  background-color: var(--state-hover);
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-md);
   transform: translateY(-2px);
-  @apply text-accent state-hover border-accent shadow-md;
 }
 
 .pagination .page-item.active .page-link {
-  background-color: var(--secondary);
-  border-color: var(--secondary);
-  @apply text-inverse shadow-md;
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: var(--text-inverse);
+  box-shadow: var(--shadow-lg);
 }
 
 .pagination .page-item.disabled .page-link {
-  @apply text-disabled surface-tertiary border-secondary;
+  color: var(--text-disabled);
+  background-color: var(--surface-tertiary);
+  border-color: var(--border-secondary);
   box-shadow: none;
 }
 
@@ -389,21 +437,18 @@ export default {
   transition: transform 0.2s ease;
 }
 
-/* ==========================================================================
-   STICKY HEADER - SEMANTIC
-   ========================================================================== */
-
+/* Sticky Header */
 .table-header-sticky {
   position: sticky;
   top: 0;
-  z-index: 2;
-  background-color: var(--secondary) !important;
-  @apply shadow-md;
+  z-index: 10; /* Lower than dropdown but above table content */
+  background-color: var(--primary-medium) !important;
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.15);
 }
 
 .table-header-sticky th {
   position: relative;
-  background-color: var(--secondary) !important;
+  background-color: var(--primary-medium) !important;
 }
 
 /* Add shadow when scrolling for better visual separation */
@@ -414,7 +459,7 @@ export default {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(to bottom, var(--shadow-lg), transparent);
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.15), transparent);
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -424,46 +469,45 @@ export default {
   opacity: 1;
 }
 
-/* ==========================================================================
-   CHECKBOX STYLING - SEMANTIC
-   ========================================================================== */
-
+/* Checkbox Styling */
 .data-table :deep(.form-check-input) {
   border-width: 2px !important;
+  border-color: var(--border-primary) !important;
+  background-color: var(--surface-primary);
   width: 1.1em;
   height: 1.1em;
-  @apply border-primary surface-primary shadow-sm transition-all-theme;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
 }
 
 .data-table :deep(.form-check-input:hover) {
-  @apply border-accent shadow-md;
+  border-color: var(--border-accent) !important;
+  box-shadow: var(--shadow-md);
 }
 
 .data-table :deep(.form-check-input:focus) {
-  @apply border-accent focus-ring-theme;
+  border-color: var(--border-accent) !important;
+  box-shadow: 0 0 0 3px rgba(160, 123, 227, 0.25) !important;
 }
 
 .data-table :deep(.form-check-input:checked) {
-  background-color: var(--secondary) !important;
-  border-color: var(--secondary) !important;
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
   border-width: 2px !important;
-  @apply shadow-md;
+  box-shadow: var(--shadow-md);
 }
 
 .data-table :deep(.form-check-input:indeterminate) {
-  background-color: var(--secondary) !important;
-  border-color: var(--secondary) !important;
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
   border-width: 2px !important;
-  @apply shadow-md;
+  box-shadow: var(--shadow-md);
 }
 
-/* ==========================================================================
-   RESPONSIVE DESIGN
-   ========================================================================== */
-
+/* Responsive Design */
 @media (max-width: 1024px) {
   .table-responsive {
-    border-radius: 0.75rem;
+    border-radius: 0.75rem 0.75rem 0 0;
   }
   
   .data-table {
@@ -502,14 +546,13 @@ export default {
   }
 }
 
-/* ==========================================================================
-   ACCESSIBILITY & REDUCED MOTION
-   ========================================================================== */
-
+/* Reduced Motion Preferences */
 @media (prefers-reduced-motion: reduce) {
   .data-table :deep(.action-btn),
   .pagination .page-link,
-  .page-link-icon {
+  .page-link-icon,
+  .data-table :deep(.action-btn svg),
+  .page-link-icon svg {
     transition: none !important;
   }
   
@@ -519,4 +562,5 @@ export default {
     transform: none !important;
   }
 }
+
 </style>

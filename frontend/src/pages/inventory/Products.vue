@@ -73,8 +73,8 @@
         <div class="action-row">
           <!-- Left Side: Main Actions -->
           <div v-if="selectedProducts.length === 0" class="d-flex gap-2">
-            <!-- Add Products Dropdown -->
-            <div class="dropdown" ref="addDropdown">
+            <!-- Add Products Dropdown - FIXED -->
+            <div class="dropdown dropdown-container" ref="addDropdown">
               <button 
                 class="btn btn-add btn-sm btn-with-icon-sm dropdown-toggle"
                 type="button"
@@ -208,136 +208,138 @@
       </div>
     </div>
 
-    <!-- Data Table -->
-    <DataTable
-      v-if="!loading || products.length > 0"
-      :total-items="filteredProducts.length"
-      :current-page="currentPage"
-      :items-per-page="itemsPerPage"
-      @page-changed="handlePageChange"
-    >
-      <template #header>
-        <tr>
-          <th style="width: 40px;">
-            <input 
-              type="checkbox" 
-              class="form-check-input" 
-              @change="selectAll" 
-              :checked="allSelected"
-              :indeterminate="someSelected"
-            />
-          </th>
-          <th>Item name <ChevronUp :size="14" class="ms-1" /></th>
-          <th v-if="isColumnVisible('sku')" style="width: 100px;">SKU</th>
-          <th v-if="isColumnVisible('category')" style="width: 120px;">Category</th>
-          <th v-if="isColumnVisible('sellingPrice')" style="width: 100px;">Price</th>
-          <th v-if="isColumnVisible('costPrice')" style="width: 100px;">Cost</th>
-          <th style="width: 80px;">Margin</th>
-          <th v-if="isColumnVisible('stock')" style="width: 100px;">In stock</th>
-          <th v-if="isColumnVisible('status')" style="width: 80px;">Status</th>
-          <th v-if="isColumnVisible('expiryDate')" style="width: 110px;">Expiry Date</th>
-          <th style="width: 160px;">Actions</th>
-        </tr>
-      </template>
+    <!-- Data Table with fixed overflow -->
+    <div class="table-wrapper">
+      <DataTable
+        v-if="!loading || products.length > 0"
+        :total-items="filteredProducts.length"
+        :current-page="currentPage"
+        :items-per-page="itemsPerPage"
+        @page-changed="handlePageChange"
+      >
+        <template #header>
+          <tr>
+            <th style="width: 40px;">
+              <input 
+                type="checkbox" 
+                class="form-check-input" 
+                @change="selectAll" 
+                :checked="allSelected"
+                :indeterminate="someSelected"
+              />
+            </th>
+            <th>Item name <ChevronUp :size="14" class="ms-1" /></th>
+            <th v-if="isColumnVisible('sku')" style="width: 100px;">SKU</th>
+            <th v-if="isColumnVisible('category')" style="width: 120px;">Category</th>
+            <th v-if="isColumnVisible('sellingPrice')" style="width: 100px;">Price</th>
+            <th v-if="isColumnVisible('costPrice')" style="width: 100px;">Cost</th>
+            <th style="width: 80px;">Margin</th>
+            <th v-if="isColumnVisible('stock')" style="width: 100px;">In stock</th>
+            <th v-if="isColumnVisible('status')" style="width: 80px;">Status</th>
+            <th v-if="isColumnVisible('expiryDate')" style="width: 110px;">Expiry Date</th>
+            <th style="width: 160px;">Actions</th>
+          </tr>
+        </template>
 
-      <template #body>
-        <tr 
-          v-for="product in paginatedProducts"
-          :key="product._id"
-          :class="getRowClass(product)"
-        >
-          <td>
-            <input 
-              type="checkbox" 
-              class="form-check-input"
-              :value="product._id"
-              v-model="selectedProducts"
-            />
-          </td>
-          <td>
-            <div :class="['fw-medium', getProductNameClass(product)]">
-              {{ product.product_name }}
-            </div>
-          </td>
-          <td v-if="isColumnVisible('sku')" class="text-center">
-            <code class="text-primary px-2 py-1 rounded bg-light">
-              {{ product.SKU || '—' }}
-            </code>
-          </td>
-          <td v-if="isColumnVisible('category')">
-            <span :class="['badge', 'rounded-pill', getCategoryBadgeClass(product.category_id)]">
-              {{ getCategoryName(product.category_id) }}
-            </span>
-          </td>
-          <td v-if="isColumnVisible('sellingPrice')" class="text-end fw-medium">
-            ₱{{ formatPrice(product.selling_price) }}
-          </td>
-          <td v-if="isColumnVisible('costPrice')" class="text-end fw-medium">
-            ₱{{ formatPrice(product.cost_price) }}
-          </td>
-          <td class="text-center fw-medium">
-            <span :class="getMarginClass(product.cost_price, product.selling_price)">
-              {{ calculateMargin(product.cost_price, product.selling_price) }}%
-            </span>
-          </td>
-          <td v-if="isColumnVisible('stock')" class="text-end">
-            <span :class="getStockDisplayClass(product)">
-              {{ product.stock || '—' }}
-            </span>
-          </td>
-          <td v-if="isColumnVisible('status')" class="text-center">
-            <span :class="getStatusBadgeClass(product.status)">
-              {{ getStatusText(product.status) }}
-            </span>
-          </td>
-          <td v-if="isColumnVisible('expiryDate')" class="text-center">
-            <small :class="getExpiryDateClass(product.expiry_date)">
-              {{ formatExpiryDate(product.expiry_date) }}
-            </small>
-          </td>
-          <td>
-            <div class="d-flex gap-1 justify-content-center">
-              <button 
-                class="btn btn-outline-secondary btn-icon-only btn-xs action-btn action-btn-edit" 
-                @click="editProduct(product)"
-                title="Edit"
-              >
-                <Edit :size="12" />
-              </button>
-              <button 
-                class="btn btn-outline-primary btn-icon-only btn-xs action-btn action-btn-view" 
-                @click="viewProduct(product)"
-                title="View"
-              >
-                <Eye :size="12" />
-              </button>
-              <button 
-                class="btn btn-outline-info btn-icon-only btn-xs action-btn action-btn-stock" 
-                @click="restockProduct(product)"
-                title="Stock"
-              >
-                <Package :size="12" />
-              </button>
-              <button 
-                class="btn btn-outline-success btn-icon-only btn-xs action-btn"
-                @click="toggleProductStatus(product)"
-                :title="product.status === 'active' ? 'Deactivate' : 'Activate'"
-                :class="{ 'action-btn-status-inactive': product.status !== 'active' }"
-              >
-                <component :is="product.status === 'active' ? 'Lock' : 'Unlock'" :size="12" />
-              </button>
-              <button 
-                class="btn btn-outline-danger btn-icon-only btn-xs action-btn action-btn-delete" 
-                @click="deleteProduct(product)"
-                title="Delete"
-              >
-                <Trash2 :size="12" />
-              </button>
-            </div>
-          </td>
-        </tr>
-      </template>
-    </DataTable>
+        <template #body>
+          <tr 
+            v-for="product in paginatedProducts"
+            :key="product._id"
+            :class="getRowClass(product)"
+          >
+            <td>
+              <input 
+                type="checkbox" 
+                class="form-check-input"
+                :value="product._id"
+                v-model="selectedProducts"
+              />
+            </td>
+            <td>
+              <div :class="['fw-medium', getProductNameClass(product)]">
+                {{ product.product_name }}
+              </div>
+            </td>
+            <td v-if="isColumnVisible('sku')" class="text-center">
+              <code class="text-primary px-2 py-1 rounded bg-light">
+                {{ product.SKU || '—' }}
+              </code>
+            </td>
+            <td v-if="isColumnVisible('category')">
+              <span :class="['badge', 'rounded-pill', getCategoryBadgeClass(product.category_id)]">
+                {{ getCategoryName(product.category_id) }}
+              </span>
+            </td>
+            <td v-if="isColumnVisible('sellingPrice')" class="text-end fw-medium">
+              ₱{{ formatPrice(product.selling_price) }}
+            </td>
+            <td v-if="isColumnVisible('costPrice')" class="text-end fw-medium">
+              ₱{{ formatPrice(product.cost_price) }}
+            </td>
+            <td class="text-center fw-medium">
+              <span :class="getMarginClass(product.cost_price, product.selling_price)">
+                {{ calculateMargin(product.cost_price, product.selling_price) }}%
+              </span>
+            </td>
+            <td v-if="isColumnVisible('stock')" class="text-end">
+              <span :class="getStockDisplayClass(product)">
+                {{ product.stock || '—' }}
+              </span>
+            </td>
+            <td v-if="isColumnVisible('status')" class="text-center">
+              <span :class="getStatusBadgeClass(product.status)">
+                {{ getStatusText(product.status) }}
+              </span>
+            </td>
+            <td v-if="isColumnVisible('expiryDate')" class="text-center">
+              <small :class="getExpiryDateClass(product.expiry_date)">
+                {{ formatExpiryDate(product.expiry_date) }}
+              </small>
+            </td>
+            <td>
+              <div class="d-flex gap-1 justify-content-center">
+                <button 
+                  class="btn btn-outline-secondary btn-icon-only btn-xs action-btn action-btn-edit" 
+                  @click="editProduct(product)"
+                  title="Edit"
+                >
+                  <Edit :size="12" />
+                </button>
+                <button 
+                  class="btn btn-outline-primary btn-icon-only btn-xs action-btn action-btn-view" 
+                  @click="viewProduct(product)"
+                  title="View"
+                >
+                  <Eye :size="12" />
+                </button>
+                <button 
+                  class="btn btn-outline-info btn-icon-only btn-xs action-btn action-btn-stock" 
+                  @click="restockProduct(product)"
+                  title="Stock"
+                >
+                  <Package :size="12" />
+                </button>
+                <button 
+                  class="btn btn-outline-success btn-icon-only btn-xs action-btn"
+                  @click="toggleProductStatus(product)"
+                  :title="product.status === 'active' ? 'Deactivate' : 'Activate'"
+                  :class="{ 'action-btn-status-inactive': product.status !== 'active' }"
+                >
+                  <component :is="product.status === 'active' ? 'Lock' : 'Unlock'" :size="12" />
+                </button>
+                <button 
+                  class="btn btn-outline-danger btn-icon-only btn-xs action-btn action-btn-delete" 
+                  @click="deleteProduct(product)"
+                  title="Delete"
+                >
+                  <Trash2 :size="12" />
+                </button>
+              </div>
+            </td>
+          </tr>
+        </template>
+      </DataTable>
+    </div>
 
     <!-- Empty State -->
     <div v-if="!loading && filteredProducts.length === 0 && !error" class="text-center py-5">
@@ -525,12 +527,12 @@ export default {
 </script>
 
 <style scoped>
-
 /* Page Container */
 .products-page {
   min-height: 100vh;
   background-color: var(--surface-secondary);
   color: var(--text-secondary);
+  position: relative; /* Establish positioning context */
 }
 
 /* Action Bar */
@@ -539,7 +541,9 @@ export default {
   border: 1px solid var(--border-secondary);
   box-shadow: var(--shadow-sm);
   border-radius: 0.75rem;
-  overflow: hidden;
+  /* Remove overflow: hidden to allow dropdown to escape */
+  position: relative;
+  z-index: 100; /* Ensure action bar is above other content */
 }
 
 .action-controls {
@@ -557,7 +561,12 @@ export default {
   gap: 1rem;
 }
 
-/* Dropdown - Fixed Z-Index */
+/* Dropdown Container - Ensures dropdown can overflow */
+.dropdown-container {
+  position: relative;
+  z-index: 1050; /* Bootstrap's dropdown z-index */
+}
+
 .dropdown {
   position: relative;
 }
@@ -566,18 +575,32 @@ export default {
   position: absolute;
   top: 100%;
   left: 0;
-  z-index: 9999 !important;
+  z-index: 1055; /* Higher than Bootstrap's default dropdown z-index */
   min-width: 280px;
   margin-top: 0.25rem;
   background-color: var(--surface-elevated);
   border: 1px solid var(--border-primary);
   border-radius: 0.75rem;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-xl); /* Enhanced shadow for better visibility */
   animation: dropdownSlide 0.2s ease;
+  /* Ensure dropdown is not clipped */
+  transform: translateZ(0); /* Create new stacking context */
 }
 
 .add-dropdown-menu.show {
   display: block;
+}
+
+/* Table Wrapper - Controls overflow separately from action bar */
+.table-wrapper {
+  position: relative;
+  z-index: 1; /* Lower than dropdown */
+}
+
+/* Override table container if needed */
+.table-wrapper :deep(.table-container) {
+  position: relative;
+  z-index: 1;
 }
 
 @keyframes dropdownSlide {
@@ -599,6 +622,9 @@ export default {
   border-right: none;
   border-top: none;
   transition: background-color 0.2s ease;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
 }
 
 .dropdown-item:last-child {
@@ -667,6 +693,12 @@ export default {
   border: 1px solid var(--border-secondary);
   color: var(--text-primary);
   box-shadow: var(--shadow-md);
+}
+
+/* Ensure proper stacking context for modals */
+.modal,
+.modal-backdrop {
+  z-index: 1060; /* Higher than dropdown */
 }
 
 /* Responsive */
