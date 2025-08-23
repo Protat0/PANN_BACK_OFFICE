@@ -1,16 +1,16 @@
 <template>
-  <div class="bulk-entry-page">
+  <div class="bulk-entry-page surface-secondary">
     <!-- Header with Navigation -->
     <div class="page-header">
       <div class="breadcrumb">
-        <router-link to="/products" class="breadcrumb-link">Products</router-link>
-        <span class="breadcrumb-separator">></span>
-        <span class="breadcrumb-current">Add Products (Bulk)</span>
+        <router-link to="/products" class="breadcrumb-link text-tertiary">Products</router-link>
+        <span class="breadcrumb-separator text-tertiary">></span>
+        <span class="breadcrumb-current text-accent">Add Products (Bulk)</span>
       </div>
       
       <div class="header-actions">
         <button 
-          class="btn btn-secondary" 
+          class="btn btn-filter" 
           @click="openBarcodeScanner"
           :disabled="loading"
         >
@@ -25,7 +25,7 @@
         </button>
         
         <button 
-          class="btn btn-primary" 
+          class="btn btn-save" 
           @click="saveProducts" 
           :disabled="loading || !hasValidProducts"
         >
@@ -43,12 +43,12 @@
     </div>
 
     <!-- Progress Indicator -->
-    <div v-if="products.length > 0" class="progress-section">
+    <div v-if="products.length > 0" class="progress-section surface-card">
       <div class="progress-info">
-        <span class="product-count">{{ products.length }} Products Added</span>
-        <span class="valid-count">{{ validProducts }} Valid • {{ invalidProducts }} Invalid</span>
+        <span class="product-count text-primary">{{ products.length }} Products Added</span>
+        <span class="valid-count text-tertiary">{{ validProducts }} Valid • {{ invalidProducts }} Invalid</span>
       </div>
-      <div class="progress-bar">
+      <div class="progress-bar surface-tertiary">
         <div 
           class="progress-fill" 
           :style="{ width: `${progressPercentage}%` }"
@@ -57,14 +57,14 @@
     </div>
 
     <!-- Success/Error Messages -->
-    <div v-if="successMessage" class="message success-message">
+    <div v-if="successMessage" class="message status-success">
       <svg class="message-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="20,6 9,17 4,12"/>
       </svg>
       {{ successMessage }}
     </div>
     
-    <div v-if="errorMessage" class="message error-message">
+    <div v-if="errorMessage" class="message status-error">
       <svg class="message-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/>
         <line x1="15" y1="9" x2="9" y2="15"/>
@@ -74,12 +74,12 @@
     </div>
 
     <!-- Bulk Entry Table -->
-    <div class="table-container">
-      <div class="table-header">
-        <h2 class="table-title">Add Products in Bulk</h2>
+    <div class="table-container surface-card">
+      <div class="table-header surface-primary border-bottom-theme">
+        <h2 class="table-title text-primary">Add Products in Bulk</h2>
         <div class="table-actions">
           <button 
-            class="btn btn-success btn-sm" 
+            class="btn btn-add btn-sm" 
             @click="addNewRow"
             :disabled="loading"
           >
@@ -92,7 +92,7 @@
           
           <button 
             v-if="products.length > 0"
-            class="btn btn-error btn-sm" 
+            class="btn btn-delete btn-sm" 
             @click="clearAll"
             :disabled="loading"
           >
@@ -109,29 +109,29 @@
         <table class="bulk-entry-table">
           <thead>
             <tr>
-              <th class="row-number-col">#</th>
-              <th class="image-col">Image</th>
-              <th class="name-col">Name <span class="required">*</span></th>
-              <th class="sku-col">SKU <span class="required">*</span></th>
-              <th class="category-col">Category <span class="required">*</span></th>
-              <th class="cost-col">Cost Price <span class="required">*</span></th>
-              <th class="markup-col">Mark up % <span class="required">*</span></th>
-              <th class="selling-col">Selling Price <span class="required">*</span></th>
-              <th class="stock-col">Stock</th>
-              <th class="actions-col">Actions</th>
+              <th class="row-number-col surface-secondary text-primary">#</th>
+              <th class="image-col surface-secondary text-primary">Image</th>
+              <th class="name-col surface-secondary text-primary">Name <span class="required text-error">*</span></th>
+              <th class="sku-col surface-secondary text-primary">SKU <span class="required text-error">*</span></th>
+              <th class="category-col surface-secondary text-primary">Category <span class="required text-error">*</span></th>
+              <th class="cost-col surface-secondary text-primary">Cost Price <span class="required text-error">*</span></th>
+              <th class="markup-col surface-secondary text-primary">Mark up % <span class="required text-error">*</span></th>
+              <th class="selling-col surface-secondary text-primary">Selling Price <span class="required text-error">*</span></th>
+              <th class="stock-col surface-secondary text-primary">Stock</th>
+              <th class="actions-col surface-secondary text-primary">Actions</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="products.length === 0" class="empty-row">
               <td colspan="10" class="empty-state">
                 <div class="empty-content">
-                  <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <svg class="empty-icon text-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                     <line x1="9" y1="12" x2="15" y2="12"/>
                     <line x1="12" y1="9" x2="12" y2="15"/>
                   </svg>
-                  <p>No products added yet</p>
-                  <button class="btn btn-primary btn-sm" @click="addNewRow">
+                  <p class="text-tertiary">No products added yet</p>
+                  <button class="btn btn-add btn-sm" @click="addNewRow">
                     Add First Product
                   </button>
                 </div>
@@ -143,7 +143,7 @@
               :key="product.id"
               :class="{ 'invalid-row': !isProductValid(product) }"
             >
-              <td class="row-number">{{ index + 1 }}</td>
+              <td class="row-number text-tertiary">{{ index + 1 }}</td>
               
               <!-- Image Upload -->
               <td class="image-cell">
@@ -155,14 +155,14 @@
                     accept="image/*"
                     class="image-input"
                   />
-                  <label :for="`image-${product.id}`" class="image-label">
+                  <label :for="`image-${product.id}`" class="image-label border-theme-subtle">
                     <img 
                       v-if="product.image_preview" 
                       :src="product.image_preview" 
                       alt="Product"
                       class="product-image"
                     />
-                    <div v-else class="image-placeholder">
+                    <div v-else class="image-placeholder surface-tertiary">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                         <circle cx="8.5" cy="8.5" r="1.5"/>
@@ -179,7 +179,7 @@
                   v-model="product.product_name"
                   type="text"
                   placeholder="Product name"
-                  class="table-input"
+                  class="table-input input-theme"
                   @input="calculateSellingPrice(index); handleProductDataChange()"
                 />
               </td>
@@ -190,18 +190,18 @@
                   v-model="product.SKU"
                   type="text"
                   placeholder="Auto-generated"
-                  class="table-input sku-input"
+                  class="table-input sku-input input-theme"
                   @blur="validateSKU(index)"
                   @input="handleProductDataChange"
                 />
-                <div v-if="product.sku_error" class="field-error">{{ product.sku_error }}</div>
+                <div v-if="product.sku_error" class="field-error text-error">{{ product.sku_error }}</div>
               </td>
               
               <!-- Category -->
               <td class="category-cell">
                 <select 
                   v-model="product.category_id"
-                  class="table-select"
+                  class="table-select input-theme"
                   @change="handleProductDataChange"
                 >
                   <option value="">Select category</option>
@@ -219,7 +219,7 @@
                   step="0.01"
                   min="0"
                   placeholder="0.00"
-                  class="table-input price-input"
+                  class="table-input price-input input-theme"
                   @input="calculateSellingPrice(index); handleProductDataChange()"
                 />
               </td>
@@ -232,10 +232,10 @@
                   min="0"
                   max="1000"
                   placeholder="25"
-                  class="table-input markup-input"
+                  class="table-input markup-input input-theme"
                   @input="calculateSellingPrice(index); handleProductDataChange()"
                 />
-                <span class="markup-suffix">%</span>
+                <span class="markup-suffix text-tertiary">%</span>
               </td>
               
               <!-- Selling Price -->
@@ -246,7 +246,7 @@
                   step="0.01"
                   min="0"
                   placeholder="0.00"
-                  class="table-input price-input"
+                  class="table-input price-input input-theme"
                   @input="calculateMarkup(index); handleProductDataChange()"
                 />
               </td>
@@ -258,7 +258,7 @@
                   type="number"
                   min="0"
                   placeholder="0"
-                  class="table-input stock-input"
+                  class="table-input stock-input input-theme"
                   @input="handleProductDataChange"
                 />
               </td>
@@ -958,11 +958,12 @@ export default {
 </script>
 
 <style scoped>
+
+
 .bulk-entry-page {
   padding: 1.5rem;
   max-width: 100%;
   margin: 0 auto;
-  background-color: var(--neutral-light);
   min-height: 100vh;
 }
 
@@ -979,26 +980,23 @@ export default {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--tertiary-medium);
   font-size: 0.875rem;
 }
 
 .breadcrumb-link {
-  color: var(--tertiary-medium);
   text-decoration: none;
   transition: color 0.2s ease;
 }
 
 .breadcrumb-link:hover {
-  color: var(--primary);
+  color: var(--text-accent);
 }
 
 .breadcrumb-separator {
-  color: var(--tertiary-medium);
+  font-weight: 300;
 }
 
 .breadcrumb-current {
-  color: var(--primary);
   font-weight: 600;
 }
 
@@ -1013,7 +1011,7 @@ export default {
   align-items: center;
   gap: 0.5rem;
   padding: 0.625rem 1.25rem;
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   border: none;
   font-weight: 500;
   cursor: pointer;
@@ -1025,51 +1023,6 @@ export default {
 .btn-icon {
   width: 16px;
   height: 16px;
-}
-
-.btn-primary {
-  background-color: var(--primary);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background-color: var(--primary-dark);
-}
-
-.btn-secondary {
-  background-color: var(--neutral-medium);
-  color: var(--tertiary-dark);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background-color: var(--neutral-dark);
-}
-
-.btn-info {
-  background-color: var(--info);
-  color: white;
-}
-
-.btn-info:hover:not(:disabled) {
-  background-color: var(--info-dark);
-}
-
-.btn-success {
-  background-color: var(--success);
-  color: white;
-}
-
-.btn-success:hover:not(:disabled) {
-  background-color: var(--success-dark);
-}
-
-.btn-error {
-  background-color: var(--error);
-  color: white;
-}
-
-.btn-error:hover:not(:disabled) {
-  background-color: var(--error-dark);
 }
 
 .btn-sm {
@@ -1092,10 +1045,8 @@ export default {
 }
 
 .progress-section {
-  background: white;
   padding: 1rem 1.5rem;
   border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   margin-bottom: 1.5rem;
 }
 
@@ -1108,19 +1059,16 @@ export default {
 
 .product-count {
   font-weight: 600;
-  color: var(--tertiary-dark);
   font-size: 1rem;
 }
 
 .valid-count {
   font-size: 0.875rem;
-  color: var(--tertiary-medium);
 }
 
 .progress-bar {
   width: 100%;
   height: 8px;
-  background-color: var(--neutral-light);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -1147,24 +1095,9 @@ export default {
   flex-shrink: 0;
 }
 
-.success-message {
-  background-color: var(--success-light);
-  border: 1px solid var(--success);
-  color: var(--success-dark);
-}
-
-.error-message {
-  background-color: var(--error-light);
-  border: 1px solid var(--error);
-  color: var(--error-dark);
-}
-
 .table-container {
-  background: white;
   border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   overflow: hidden;
-  border: 1px solid var(--neutral-medium);
 }
 
 .table-header {
@@ -1172,14 +1105,11 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem;
-  border-bottom: 1px solid var(--neutral-medium);
-  background-color: white;
 }
 
 .table-title {
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--tertiary-dark);
   margin: 0;
 }
 
@@ -1200,12 +1130,10 @@ export default {
 }
 
 .bulk-entry-table th {
-  background-color: var(--neutral-light);
   padding: 1rem 0.75rem;
   text-align: left;
   font-weight: 600;
-  color: var(--tertiary-dark);
-  border-bottom: 2px solid var(--neutral-medium);
+  border-bottom: 2px solid var(--border-primary);
   font-size: 0.875rem;
   white-space: nowrap;
   position: sticky;
@@ -1215,25 +1143,24 @@ export default {
 
 .bulk-entry-table td {
   padding: 0.75rem;
-  border-bottom: 1px solid var(--neutral);
+  border-bottom: 1px solid var(--border-secondary);
   vertical-align: middle;
 }
 
 .bulk-entry-table tr:hover {
-  background-color: var(--neutral-light);
+  background-color: var(--state-hover);
 }
 
 .invalid-row {
-  background-color: rgba(235, 105, 102, 0.1) !important;
-  border-left: 3px solid var(--error);
+  background-color: rgba(var(--error), 0.1) !important;
+  border-left: 3px solid var(--status-error);
 }
 
 .invalid-row:hover {
-  background-color: rgba(235, 105, 102, 0.15) !important;
+  background-color: rgba(var(--error), 0.15) !important;
 }
 
 .required {
-  color: var(--error);
   font-weight: 500;
 }
 
@@ -1251,7 +1178,6 @@ export default {
 
 .row-number {
   font-weight: 500;
-  color: var(--tertiary-medium);
   text-align: center;
 }
 
@@ -1273,12 +1199,13 @@ export default {
   cursor: pointer;
   border-radius: 0.375rem;
   overflow: hidden;
-  border: 2px dashed var(--neutral);
+  border-width: 2px;
+  border-style: dashed;
   transition: border-color 0.2s ease;
 }
 
 .image-label:hover {
-  border-color: var(--primary);
+  border-color: var(--border-accent);
 }
 
 .product-image {
@@ -1293,8 +1220,7 @@ export default {
   justify-content: center;
   width: 100%;
   height: 100%;
-  background-color: var(--neutral-light);
-  color: var(--tertiary-medium);
+  color: var(--text-tertiary);
 }
 
 .image-placeholder svg {
@@ -1302,33 +1228,23 @@ export default {
   height: 20px;
 }
 
-/* Form Inputs */
+/* Form Inputs - Using semantic input classes */
 .table-input,
 .table-select {
   width: 100%;
   padding: 0.5rem;
-  border: 1px solid var(--neutral-medium);
   border-radius: 0.375rem;
   font-size: 0.875rem;
-  background: white;
-  color: var(--tertiary-dark);
-  transition: border-color 0.2s ease;
-}
-
-.table-input:focus,
-.table-select:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(115, 146, 226, 0.1);
+  transition: all 0.2s ease;
 }
 
 .table-input.invalid {
-  border-color: var(--error);
-  background-color: var(--error-light);
+  border-color: var(--border-error);
+  background-color: var(--status-error-bg);
 }
 
 .table-input.invalid:focus {
-  box-shadow: 0 0 0 3px rgba(229, 57, 53, 0.1);
+  box-shadow: 0 0 0 3px rgba(var(--error), 0.1);
 }
 
 .sku-input {
@@ -1350,7 +1266,6 @@ export default {
   right: 0.75rem;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--tertiary-medium);
   font-size: 0.875rem;
   pointer-events: none;
 }
@@ -1361,7 +1276,6 @@ export default {
 
 .field-error {
   font-size: 0.75rem;
-  color: var(--error);
   margin-top: 0.25rem;
   font-weight: 500;
 }
@@ -1392,22 +1306,22 @@ export default {
 }
 
 .duplicate-btn {
-  color: var(--info);
-  border-color: var(--info);
+  color: var(--status-info);
+  border-color: var(--status-info);
 }
 
 .duplicate-btn:hover {
-  background-color: var(--info-light);
+  background-color: var(--status-info-bg);
   color: var(--info-dark);
 }
 
 .delete-btn {
-  color: var(--error);
-  border-color: var(--error);
+  color: var(--status-error);
+  border-color: var(--status-error);
 }
 
 .delete-btn:hover {
-  background-color: var(--error-light);
+  background-color: var(--status-error-bg);
   color: var(--error-dark);
 }
 
@@ -1422,13 +1336,11 @@ export default {
   flex-direction: column;
   align-items: center;
   gap: 1rem;
-  color: var(--tertiary-medium);
 }
 
 .empty-icon {
   width: 48px;
   height: 48px;
-  color: var(--tertiary-medium);
 }
 
 .empty-content p {
@@ -1516,7 +1428,7 @@ export default {
   
   .bulk-entry-page {
     padding: 0;
-    background: white;
+    background: var(--surface-primary);
   }
   
   .table-container {
@@ -1529,30 +1441,6 @@ export default {
     border: 1px solid #000;
     padding: 0.5rem;
   }
-}
-
-/* Light Theme (Default) */
-.bulk-entry-page {
-  background-color: var(--neutral-light);
-  color: var(--tertiary-dark);
-}
-
-.table-container,
-.progress-section {
-  background-color: white;
-  border-color: var(--neutral-medium);
-}
-
-.bulk-entry-table th {
-  background-color: var(--neutral-light);
-  color: var(--tertiary-dark);
-}
-
-.table-input,
-.table-select {
-  background-color: white;
-  border-color: var(--neutral-medium);
-  color: var(--tertiary-dark);
 }
 
 /* Animation for new rows */
@@ -1575,7 +1463,7 @@ export default {
 .table-input:focus,
 .table-select:focus,
 .action-btn:focus {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--border-accent);
   outline-offset: 2px;
 }
 
@@ -1587,10 +1475,10 @@ export default {
 
 /* Validation success state */
 .table-input.valid {
-  border-color: var(--success);
+  border-color: var(--border-success);
 }
 
 .table-input.valid:focus {
-  box-shadow: 0 0 0 3px rgba(94, 180, 136, 0.1);
+  box-shadow: 0 0 0 3px rgba(var(--success), 0.1);
 }
 </style>
