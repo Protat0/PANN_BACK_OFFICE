@@ -1,0 +1,400 @@
+/* ==========================================================================
+   BRAND COLOR PALETTE - UNCHANGED
+   Your existing brand colors remain intact
+   ========================================================================== */
+
+:root {
+  /* Primary Colors */
+  --primary: #7392E2;
+  --primary-light: #ABBDED;
+  --primary-medium: #567CDC;
+  --primary-dark: #2854C5;
+  
+  /* Secondary Colors */
+  --secondary: #A07BE3;
+  --secondary-light: #C9B4EF;
+  --secondary-medium: #8B5EDC;
+  --secondary-dark: #632ACA;
+  
+  /* Tertiary Colors */
+  --tertiary: #99899A;
+  --tertiary-light: #B4A8B4;
+  --tertiary-medium: #8B798C;
+  --tertiary-dark: #6C5D6D;
+  
+  /* Error Colors */
+  --error: #E53935;
+  --error-light: #EB6966;
+  --error-medium: #E0211C;
+  --error-dark: #AE1916;
+  
+  /* Success Colors */
+  --success: #5EB488;
+  --success-light: #83C5A3;
+  --success-medium: #4EA87A;
+  --success-dark: #3C825F;
+  
+  /* Info Colors */
+  --info: #7F598B;
+  --info-light: #966EA2;
+  --info-medium: #72507D;
+  --info-dark: #583E61;
+  
+  /* Neutral Colors */
+  --neutral: #D1D1D1;
+  --neutral-light: #FAFAFA;
+  --neutral-medium: #BCBCBC;
+  --neutral-dark: #929292;
+  
+  /* Neutral Variant */
+  --neutral-variant: #B8A9A0;
+  --neutral-variant-light: #D5CCC7;
+  --neutral-variant-medium: #A9978C;
+  --neutral-variant-dark: #897466;
+
+  /* ==========================================================================
+     DARK MODE FOUNDATIONS
+     Base colors for dark theme
+     ========================================================================== */
+  
+  /* Dark Mode Backgrounds */
+  --bg-dark-primary: #121212;
+  --bg-dark-secondary: #1e1e1e;
+  --bg-dark-tertiary: #2a2a2a;
+  --bg-dark-elevated: #333333;
+  
+  /* Dark Mode Surfaces */
+  --surface-dark: #1e1e1e;
+  --surface-dark-container: #2a2a2a;
+  --surface-dark-elevated: #333333;
+  --surface-dark-variant: #404040;
+  
+  /* Dark Mode Text Colors */
+  --text-dark-primary: #ffffff;
+  --text-dark-secondary: #e0e0e0;
+  --text-dark-tertiary: #b0b0b0;
+  --text-dark-disabled: #666666;
+  
+  /* Dark Mode Borders */
+  --border-dark: #404040;
+  --border-dark-light: #505050;
+  --border-dark-heavy: #606060;
+  --border-dark-subtle: #2a2a2a;
+  
+  /* Dark Mode Interactive States */
+  --hover-dark: rgba(255, 255, 255, 0.08);
+  --active-dark: rgba(255, 255, 255, 0.12);
+  --focus-dark: rgba(255, 255, 255, 0.16);
+  --selected-dark: rgba(115, 146, 226, 0.16);
+  
+  /* Dark Mode Color Adjustments - Muted Versions with 3 Shades */
+  --primary-dark-mode-light: #A5B6ED;
+  --primary-dark-mode: #8FA4E8;
+  --primary-dark-mode-dark: #7992E3;
+  
+  --secondary-dark-mode-light: #C099EC;
+  --secondary-dark-mode: #B088E8;
+  --secondary-dark-mode-dark: #A077E4;
+  
+  --success-dark-mode-light: #7DD1A5;
+  --success-dark-mode: #6BC497;
+  --success-dark-mode-dark: #59B789;
+  
+  --error-dark-mode-light: #F26B67;
+  --error-dark-mode: #EF5350;
+  --error-dark-mode-dark: #EC3B39;
+  
+  --info-dark-mode-light: #9D7BA9;
+  --info-dark-mode: #8B6B97;
+  --info-dark-mode-dark: #795B85;
+}
+
+/* ==========================================================================
+   SEMANTIC THEME SYSTEM - LIGHT THEME (DEFAULT)
+   These variables automatically adapt to theme changes
+   ========================================================================== */
+
+:root,
+.light-theme {
+  /* ==========================================================================
+     SURFACE SYSTEM
+     Different surface levels with appropriate elevation
+     ========================================================================== */
+  
+  --surface-primary: #ffffff;              /* Main content areas, cards, modals */
+  --surface-secondary: #F8F8F8;            /* Page backgrounds - dirty white */
+  --surface-tertiary: var(--neutral-medium); /* Subtle backgrounds, disabled states */
+  --surface-elevated: #ffffff;             /* Floating elements, dropdowns, tooltips */
+  --surface-overlay: rgba(255, 255, 255, 0.95); /* Overlays, glass effects */
+  
+  /* ==========================================================================
+     TEXT SYSTEM
+     Hierarchical text colors for different content types
+     ========================================================================== */
+  
+  --text-primary: var(--primary-dark);     /* Headlines, important text - use primary */
+  --text-secondary: var(--info-dark);      /* Body text, descriptions - use info */
+  --text-tertiary: var(--tertiary);        /* Captions, metadata, placeholders */
+  --text-disabled: var(--neutral-dark);    /* Disabled text */
+  --text-inverse: #ffffff;                 /* Text on dark backgrounds */
+  --text-accent: var(--secondary-dark);    /* Links, accented text - use secondary */
+  
+  /* ==========================================================================
+     BORDER SYSTEM
+     Consistent border colors for different contexts
+     ========================================================================== */
+  
+  --border-primary: var(--neutral-medium); /* Default borders */
+  --border-secondary: var(--neutral);      /* Subtle borders, dividers */
+  --border-accent: var(--secondary);       /* Focus states, active borders - use secondary */
+  --border-error: var(--error);            /* Error states */
+  --border-success: var(--success);        /* Success states */
+  
+  /* ==========================================================================
+     SHADOW SYSTEM
+     Elevation and depth through shadows
+     ========================================================================== */
+  
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  
+  /* ==========================================================================
+     INTERACTIVE STATES
+     Hover, active, focus, and selection states
+     ========================================================================== */
+  
+  --state-hover: rgba(160, 123, 227, 0.08);   /* Hover overlays - use secondary */
+  --state-active: rgba(160, 123, 227, 0.12);  /* Active/pressed states - use secondary */
+  --state-focus: rgba(160, 123, 227, 0.16);   /* Focus rings - use secondary */
+  --state-selected: rgba(160, 123, 227, 0.12); /* Selected items - use secondary */
+  --state-disabled: rgba(108, 93, 109, 0.04);  /* Disabled overlays */
+  
+  /* ==========================================================================
+     STATUS COLORS
+     Semantic colors for different states
+     ========================================================================== */
+  
+  --status-error: var(--error);
+  --status-error-bg: var(--error-light);
+  --status-warning: #FF9800;
+  --status-warning-bg: #FFE0B2;
+  --status-success: var(--success);
+  --status-success-bg: var(--success-light);
+  --status-info: var(--info);
+  --status-info-bg: var(--info-light);
+  
+  /* ==========================================================================
+     COMPONENT SPECIFIC
+     Common component color patterns
+     ========================================================================== */
+  
+  --input-bg: #ffffff;
+  --input-border: var(--border-primary);
+  --input-text: var(--text-primary);
+  --input-placeholder: var(--text-tertiary);
+  
+  --button-bg: var(--surface-primary);
+  --button-border: var(--border-primary);
+  --button-text: var(--text-primary);
+  
+  --nav-bg: var(--surface-primary);
+  --nav-text: var(--text-secondary);
+  --nav-text-active: var(--text-accent);
+  
+  --card-bg: var(--surface-primary);
+  --card-border: var(--border-secondary);
+  --card-shadow: var(--shadow-md);
+}
+
+/* ==========================================================================
+   SEMANTIC THEME SYSTEM - DARK THEME
+   Override semantic variables for dark mode
+   ========================================================================== */
+
+.dark-theme {
+  /* ==========================================================================
+     SURFACE SYSTEM - DARK
+     ========================================================================== */
+  
+  --surface-primary: var(--surface-dark);
+  --surface-secondary: var(--bg-dark-primary);
+  --surface-tertiary: var(--surface-dark-container);
+  --surface-elevated: var(--surface-dark-elevated);
+  --surface-overlay: rgba(30, 30, 30, 0.95);
+  
+  /* ==========================================================================
+     TEXT SYSTEM - DARK
+     ========================================================================== */
+  
+  --text-primary: var(--primary-dark-mode); /* Headlines, important text - muted primary */
+  --text-secondary: var(--text-dark-primary); /* Body text, descriptions - white/close to white */
+  --text-tertiary: var(--text-dark-tertiary); /* Captions, metadata, placeholders */
+  --text-disabled: var(--text-dark-disabled); /* Disabled text */
+  --text-inverse: var(--bg-dark-primary);   /* Text on light backgrounds */
+  --text-accent: var(--secondary-dark-mode); /* Links, accented text - muted secondary */
+  
+  /* ==========================================================================
+     BORDER SYSTEM - DARK
+     ========================================================================== */
+  
+  --border-primary: var(--border-dark);
+  --border-secondary: var(--border-dark-subtle);
+  --border-accent: var(--secondary-dark-mode); /* Focus states, active borders - muted secondary */
+  --border-error: var(--error-dark-mode);  /* Error states */
+  --border-success: var(--success-dark-mode); /* Success states */
+  
+  /* ==========================================================================
+     SHADOW SYSTEM - DARK
+     Enhanced shadows for better visibility in dark mode
+     ========================================================================== */
+  
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  
+  /* ==========================================================================
+     INTERACTIVE STATES - DARK
+     ========================================================================== */
+  
+  --state-hover: var(--hover-dark);
+  --state-active: var(--active-dark);
+  --state-focus: var(--focus-dark);
+  --state-selected: var(--selected-dark);
+  --state-disabled: rgba(102, 102, 102, 0.08);
+  
+  /* ==========================================================================
+     STATUS COLORS - DARK
+     Adjusted for better visibility in dark mode
+     ========================================================================== */
+  
+  --status-error: var(--error-dark-mode);
+  --status-error-bg: rgba(239, 83, 80, 0.12);
+  --status-warning: #FFB74D;
+  --status-warning-bg: rgba(255, 183, 77, 0.12);
+  --status-success: var(--success-dark-mode);
+  --status-success-bg: rgba(107, 196, 151, 0.12);
+  --status-info: var(--info-dark-mode);
+  --status-info-bg: rgba(139, 107, 151, 0.12);
+  
+  /* ==========================================================================
+     COMPONENT SPECIFIC - DARK
+     ========================================================================== */
+  
+  --input-bg: var(--surface-dark-container);
+  --input-border: var(--border-dark);
+  --input-text: var(--text-dark-primary);
+  --input-placeholder: var(--text-dark-tertiary);
+  
+  --button-bg: var(--surface-dark);
+  --button-border: var(--border-dark);
+  --button-text: var(--text-dark-primary);
+  
+  --nav-bg: var(--surface-dark);
+  --nav-text: var(--text-dark-secondary);
+  --nav-text-active: var(--secondary-dark-mode); /* Use muted secondary for active nav */
+  
+  --card-bg: var(--surface-dark);
+  --card-border: var(--border-dark-subtle);
+  --card-shadow: var(--shadow-lg);
+  
+  /* ==========================================================================
+     BOOTSTRAP INTEGRATION - DARK
+     Override Bootstrap variables for dark mode
+     ========================================================================== */
+  
+  --bs-body-bg: var(--bg-dark-primary);
+  --bs-body-color: var(--text-dark-primary);
+  --bs-border-color: var(--border-dark);
+  --bs-secondary-bg: var(--surface-dark-container);
+  --bs-tertiary-bg: var(--surface-dark);
+  
+  /* Form controls */
+  --bs-form-control-bg: var(--surface-dark-container);
+  --bs-form-control-color: var(--text-dark-primary);
+  --bs-form-control-border-color: var(--border-dark);
+  
+  /* Cards and containers */
+  --bs-card-bg: var(--surface-dark);
+  --bs-card-border-color: var(--border-dark);
+  
+  /* Modals */
+  --bs-modal-bg: var(--surface-dark-elevated);
+  --bs-modal-border-color: var(--border-dark);
+  
+  /* Tables */
+  --bs-table-bg: var(--surface-dark);
+  --bs-table-border-color: var(--border-dark);
+  --bs-table-striped-bg: var(--surface-dark-container);
+  --bs-table-hover-bg: var(--state-hover);
+}
+
+/* ==========================================================================
+   LEGACY COMPATIBILITY
+   Maintain compatibility with existing variable names
+   ========================================================================== */
+
+:root,
+.light-theme {
+  /* Backward compatibility aliases */
+  --bg-primary: var(--surface-secondary);
+  --bg-secondary: var(--surface-primary);
+  --bg-muted: var(--surface-tertiary);
+  --current-text-primary: var(--text-primary);
+  --current-text-secondary: var(--text-secondary);
+  --current-border: var(--border-primary);
+  --current-shadow: var(--shadow-md);
+}
+
+.dark-theme {
+  /* Backward compatibility aliases */
+  --bg-primary: var(--surface-secondary);
+  --bg-secondary: var(--surface-primary);
+  --bg-muted: var(--surface-tertiary);
+  --current-text-primary: var(--text-primary);
+  --current-text-secondary: var(--text-secondary);
+  --current-border: var(--border-primary);
+  --current-shadow: var(--shadow-md);
+}
+
+/* ==========================================================================
+   SYSTEM PREFERENCE DETECTION
+   Automatically apply dark mode based on user's system preference
+   ========================================================================== */
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light-theme) {
+    /* Apply dark theme variables when system prefers dark and no explicit theme is set */
+    --surface-primary: var(--surface-dark);
+    --surface-secondary: var(--bg-dark-primary);
+    --surface-tertiary: var(--surface-dark-container);
+    --surface-elevated: var(--surface-dark-elevated);
+    --surface-overlay: rgba(30, 30, 30, 0.95);
+    
+    --text-primary: var(--primary-dark-mode); /* Headlines - muted primary */
+    --text-secondary: var(--text-dark-primary); /* Body text - white/close to white */
+    --text-tertiary: var(--text-dark-tertiary);
+    --text-disabled: var(--text-dark-disabled);
+    --text-inverse: var(--bg-dark-primary);
+    --text-accent: var(--secondary-dark-mode); /* Links - muted secondary */
+    
+    --border-primary: var(--border-dark);
+    --border-secondary: var(--border-dark-subtle);
+    --border-accent: var(--secondary-dark-mode); /* Focus states - muted secondary */
+    
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
+    --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    
+    --state-hover: var(--hover-dark);
+    --state-active: var(--active-dark);
+    --state-focus: var(--focus-dark);
+    --state-selected: var(--selected-dark);
+  }
+}
