@@ -1,46 +1,4 @@
-async exportData() {
-      try {
-        const blob = await productsApiService.exportProducts({
-          format: 'csv',
-          filters: {
-            category: this.categoryFilter !== 'all' ? this.categoryFilter : undefined,
-            stock: this.stockFilter !== 'all' ? this.stockFilter : undefined,
-            search: this.searchFilter || undefined
-          }
-        })
-        
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `products_${new Date().toISOString().split('T')[0]}.csv`
-        a.click()
-        window.URL.revokeObjectURL(url)
-      } catch (error) {
-        console.error('API export failed, falling back to client-side export:', error)
-        
-        const headers = ['ID', 'Name', 'Category', 'Price', 'Cost', 'Margin', 'Stock']
-        const csvContent = [
-          headers.join(','),
-          ...this.filteredProducts.map(product => [
-            product._id.slice(-6),
-            `"${product.product_name}"`,
-            this.getCategoryName(product.category_id),
-            product.selling_price,
-            product.cost_price,
-            this.calculateMargin(product.cost_price, product.selling_price),
-            product.stock
-          ].join(','))
-        ].join('\n')
-
-        const blob = new Blob([csvContent], { type: 'text/csv' })
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `products_${new Date().toISOString().split('T')[0]}.csv`
-        a.click()
-        window.URL.revokeObjectURL(url)
-      }
-    },<template>
+<template>
   <div class="container-fluid pt-2 pb-4 products-page">
     <!-- Page Title -->
     <div class="mb-3">
@@ -107,11 +65,6 @@ async exportData() {
     <div v-if="error" class="alert alert-danger text-center" role="alert">
       <p class="mb-3">{{ error }}</p>
       <button class="btn btn-primary" @click="refreshData">Try Again</button>
-    </div>
-
-    <!-- Success Message -->
-    <div v-if="successMessage" class="alert alert-success text-center" role="alert">
-      {{ successMessage }}
     </div>
 
     <!-- Action Bar and Filters - Separate Section -->
@@ -354,16 +307,6 @@ async exportData() {
                 >
                   <Package :size="12" />
                 </button>
-                <!-- <button 
-                  class="btn btn-outline-success btn-icon-only btn-lg"
-                  @click="toggleProductStatus(product)"
-                  data-bs-toggle="tooltip"
-                  :title="product.status === 'active' ? 'Deactivate Product' : 'Activate Product'"
-                  :class="{ 'btn-outline-warning': product.status !== 'active' }"
-                >
-                  <Lock v-if="product.status === 'active'" :size="12" />
-                  <Unlock v-else :size="12" />
-                </button> -->
                 <button 
                   class="btn btn-outline-danger btn-icon-only btn-lg" 
                   @click="deleteProduct(product)"
@@ -441,6 +384,7 @@ async exportData() {
 </template>
 
 <script>
+import { useToast } from '@/composables/useToast.js'
 import productsApiService from '../../services/apiProducts.js'
 import AddProductModal from '../../components/products/AddProductModal.vue'
 import StockUpdateModal from '../../components/products/StockUpdateModal.vue'
@@ -487,6 +431,13 @@ export default {
     Lock,
     Unlock
   },
+  setup() {
+    const { success, error, warning, info } = useToast()
+    
+    return {
+      toast: { success, error, warning, info }
+    }
+  },
   data() {
     return {
       currentPage: 1,
@@ -496,7 +447,6 @@ export default {
       selectedProducts: [],
       loading: false,
       error: null,
-      successMessage: null,
       
       // UI State
       showAddDropdown: false,
@@ -599,9 +549,11 @@ export default {
           modal.show()
         } catch (error) {
           console.error('❌ Error creating/showing modal:', error)
+          this.toast.error('Failed to open import modal')
         }
       } else {
         console.error('❌ Modal element #importModal not found in DOM')
+        this.toast.error('Import modal not available')
       }
       
       this.closeAddDropdown()
@@ -624,9 +576,18 @@ export default {
         
         this.applyFilters()
         await this.fetchReportCounts()
+        
+        // Success toast for data loading (optional - only for manual refresh)
+        if (!this.loading) {
+          this.toast.info(`Loaded ${this.products.length} products`, { duration: 2000 })
+        }
       } catch (error) {
         console.error('Error fetching products:', error)
         this.error = `Failed to load products: ${error.message}`
+        this.toast.error(`Failed to load products: ${error.message}`, {
+          duration: 6000,
+          persistent: false
+        })
       } finally {
         this.loading = false
       }
@@ -639,20 +600,36 @@ export default {
         
         const expiringData = await productsApiService.getExpiringProducts({ days_ahead: 30 })
         this.expiringCount = Array.isArray(expiringData) ? expiringData.length : (expiringData.count || 0)
+        
+        // Show warnings for critical inventory levels
+        if (this.lowStockCount > 0) {
+          this.toast.warning(`${this.lowStockCount} items are running low on stock`, {
+            duration: 5000
+          })
+        }
+        
+        if (this.expiringCount > 0) {
+          this.toast.info(`${this.expiringCount} items will expire within 30 days`, {
+            duration: 4000
+          })
+        }
       } catch (error) {
         console.error('Error fetching report counts:', error)
+        this.toast.error('Failed to load inventory alerts')
       }
     },
 
     async showLowStockReport() {
       if (this.$refs.reportsModal && this.$refs.reportsModal.showLowStockModal) {
         await this.$refs.reportsModal.showLowStockModal()
+        this.toast.info('Showing low stock report')
       }
     },
 
     async showExpiringReport() {
       if (this.$refs.reportsModal && this.$refs.reportsModal.showExpiringModal) {
         await this.$refs.reportsModal.showExpiringModal()
+        this.toast.info('Showing expiring products report')
       }
     },
 
@@ -695,44 +672,48 @@ export default {
       this.searchFilter = ''
       this.searchMode = false
       this.applyFilters()
+      this.toast.info('Filters cleared')
     },
 
     async refreshData() {
-      this.successMessage = null
       await this.fetchProducts()
+      this.toast.success('Product data refreshed')
     },
 
     selectAll(event) {
       if (event.target.checked) {
         this.selectedProducts = this.paginatedProducts.map(product => product._id)
+        this.toast.info(`Selected ${this.selectedProducts.length} products`)
       } else {
         this.selectedProducts = []
+        this.toast.info('Selection cleared')
       }
     },
 
     async deleteSelected() {
-      if (this.selectedProducts.length === 0) return
+      if (this.selectedProducts.length === 0) {
+        this.toast.warning('No products selected')
+        return
+      }
       
       const confirmed = confirm(`Are you sure you want to delete ${this.selectedProducts.length} product(s)?`)
       if (!confirmed) return
 
-      this.loading = true
+      const loadingToastId = this.toast.loading(`Deleting ${this.selectedProducts.length} product(s)...`)
       
       try {
         await productsApiService.bulkDeleteProducts(this.selectedProducts)
-        this.successMessage = `Successfully deleted ${this.selectedProducts.length} product(s)`
+        this.toast.dismiss(loadingToastId)
+        this.toast.success(`Successfully deleted ${this.selectedProducts.length} product(s)`)
         this.selectedProducts = []
         await this.fetchProducts()
       } catch (error) {
         console.error('Error deleting products:', error)
-        this.error = `Failed to delete products: ${error.message}`
-      } finally {
-        this.loading = false
+        this.toast.dismiss(loadingToastId)
+        this.toast.error(`Failed to delete products: ${error.message}`, {
+          duration: 6000
+        })
       }
-      
-      setTimeout(() => {
-        this.successMessage = null
-      }, 3000)
     },
 
     showAddProductModal() {
@@ -762,71 +743,129 @@ export default {
       }
     },
 
+    async exportData() {
+      const loadingToastId = this.toast.loading('Preparing export...')
+      
+      try {
+        const blob = await productsApiService.exportProducts({
+          format: 'csv',
+          filters: {
+            category: this.categoryFilter !== 'all' ? this.categoryFilter : undefined,
+            stock: this.stockFilter !== 'all' ? this.stockFilter : undefined,
+            search: this.searchFilter || undefined
+          }
+        })
+        
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `products_${new Date().toISOString().split('T')[0]}.csv`
+        a.click()
+        window.URL.revokeObjectURL(url)
+        
+        this.toast.dismiss(loadingToastId)
+        this.toast.success(`Export completed! Downloaded ${this.filteredProducts.length} products`)
+      } catch (error) {
+        console.error('API export failed, falling back to client-side export:', error)
+        
+        const headers = ['ID', 'Name', 'Category', 'Price', 'Cost', 'Margin', 'Stock']
+        const csvContent = [
+          headers.join(','),
+          ...this.filteredProducts.map(product => [
+            product._id.slice(-6),
+            `"${product.product_name}"`,
+            this.getCategoryName(product.category_id),
+            product.selling_price,
+            product.cost_price,
+            this.calculateMargin(product.cost_price, product.selling_price),
+            product.stock
+          ].join(','))
+        ].join('\n')
+
+        const blob = new Blob([csvContent], { type: 'text/csv' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `products_${new Date().toISOString().split('T')[0]}.csv`
+        a.click()
+        window.URL.revokeObjectURL(url)
+        
+        this.toast.dismiss(loadingToastId)
+        this.toast.warning('Used backup export method - data exported successfully')
+      }
+    },
+
     async generateProductBarcode(product) {
+      const loadingToastId = this.toast.loading(`Generating barcode for "${product.product_name}"...`)
+      
       try {
         await productsApiService.generateBarcode(product._id)
-        this.successMessage = `Barcode generated for "${product.product_name}"`
+        this.toast.dismiss(loadingToastId)
+        this.toast.success(`Barcode generated for "${product.product_name}"`)
         await this.fetchProducts()
-        
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
       } catch (error) {
         console.error('Error generating barcode:', error)
-        this.error = `Failed to generate barcode: ${error.message}`
+        this.toast.dismiss(loadingToastId)
+        this.toast.error(`Failed to generate barcode: ${error.message}`)
       }
     },
 
     handleProductSuccess(result) {
-      this.successMessage = result.message
+      // Show success toast based on the action performed
+      if (result.message) {
+        this.toast.success(result.message)
+      } else {
+        this.toast.success('Product saved successfully')
+      }
       this.fetchProducts()
-      
-      setTimeout(() => {
-        this.successMessage = null
-      }, 3000)
     },
 
     handleStockUpdateSuccess(result) {
-      this.successMessage = result.message
+      this.toast.success(result.message || 'Stock updated successfully')
       this.fetchProducts()
-      
-      setTimeout(() => {
-        this.successMessage = null
-      }, 3000)
     },
 
     handleImportSuccess(result) {
-      this.successMessage = `Import completed! ${result.totalSuccessful || 0} products imported successfully.`
-      this.fetchProducts()
+      const successCount = result.totalSuccessful || 0
+      const failedCount = result.totalFailed || 0
       
-      setTimeout(() => {
-        this.successMessage = null
-      }, 5000)
+      if (failedCount > 0) {
+        this.toast.warning(
+          `Import completed with warnings: ${successCount} products imported, ${failedCount} failed`,
+          { duration: 8000 }
+        )
+      } else {
+        this.toast.success(
+          `Import completed successfully! ${successCount} products imported`,
+          { duration: 6000 }
+        )
+      }
+      
+      this.fetchProducts()
     },
 
     handleImportError(error) {
-      this.error = `Import failed: ${error.message || 'An unexpected error occurred'}`
-      
-      setTimeout(() => {
-        this.error = null
-      }, 5000)
+      this.toast.error(
+        `Import failed: ${error.message || 'An unexpected error occurred'}`,
+        { duration: 8000, persistent: false }
+      )
     },
 
     async deleteProduct(product) {
       const confirmed = confirm(`Are you sure you want to delete "${product.product_name}"?`)
       if (!confirmed) return
 
+      const loadingToastId = this.toast.loading(`Deleting "${product.product_name}"...`)
+
       try {
         await productsApiService.deleteProduct(product._id)
-        this.successMessage = `Product "${product.product_name}" deleted successfully`
+        this.toast.dismiss(loadingToastId)
+        this.toast.success(`Product "${product.product_name}" deleted successfully`)
         await this.fetchProducts()
-        
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
       } catch (error) {
         console.error('Error deleting product:', error)
-        this.error = `Failed to delete product: ${error.message}`
+        this.toast.dismiss(loadingToastId)
+        this.toast.error(`Failed to delete product: ${error.message}`)
       }
     },
 
@@ -837,17 +876,17 @@ export default {
       const confirmed = confirm(`Are you sure you want to ${action} "${product.product_name}"?`)
       if (!confirmed) return
 
+      const loadingToastId = this.toast.loading(`${action.charAt(0).toUpperCase() + action.slice(1)}ing product...`)
+
       try {
         await productsApiService.updateProduct(product._id, { status: newStatus })
-        this.successMessage = `Product "${product.product_name}" ${action}d successfully`
+        this.toast.dismiss(loadingToastId)
+        this.toast.success(`Product "${product.product_name}" ${action}d successfully`)
         await this.fetchProducts()
-        
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
       } catch (error) {
         console.error('Error updating product status:', error)
-        this.error = `Failed to ${action} product: ${error.message}`
+        this.toast.dismiss(loadingToastId)
+        this.toast.error(`Failed to ${action} product: ${error.message}`)
       }
     },
 
@@ -908,6 +947,13 @@ export default {
     handlePageChange(page) {
       this.currentPage = page
       this.selectedProducts = []
+      
+      // Optional: Show page change toast for better UX
+      if (this.filteredProducts.length > this.itemsPerPage) {
+        this.toast.info(`Page ${page} of ${Math.ceil(this.filteredProducts.length / this.itemsPerPage)}`, {
+          duration: 1500
+        })
+      }
     }
   }
 }

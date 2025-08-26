@@ -18,6 +18,9 @@ import Suppliers from '@/pages/suppliers/Suppliers.vue'
 import SupplierDetails from '@/pages/suppliers/SupplierDetails.vue'
 import OrdersHistory from '@/pages/suppliers/OrdersHistory.vue'
 
+// Debug components (only for development)
+import ToastDebug from '@/pages/ToastDebug.vue'
+
 // Auth guard function
 function requireAuth(to, from, next) {
   const token = localStorage.getItem('authToken')
@@ -122,6 +125,16 @@ const router = createRouter({
               { name: 'Suppliers', path: '/suppliers' },
               { name: 'Details', path: null }
             ]
+          }
+        },
+        // Debug routes (development only)
+        {
+          path: 'debug/toast',
+          name: 'ToastDebug',
+          component: ToastDebug,
+          meta: {
+            title: 'Toast Debug',
+            isDevelopmentOnly: true
           }
         },
         // Other routes

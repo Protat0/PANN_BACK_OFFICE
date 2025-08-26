@@ -42,17 +42,32 @@
         <button @click="closeProfileModal">Close</button>
       </div>
     </div>
+
+    <!-- Toast Container - Add this for global toast notifications -->
+    <ToastContainer />
   </div>
 </template>
 
 <script>
+import { useToast } from '../composables/useToast.js'
 import Sidebar from '../components/Sidebar.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
+import ToastContainer from '@/components/common/ToastContainer.vue'
+
 export default {
   name: 'MainLayout',
   components: {
     Sidebar,
-    NotificationBell
+    NotificationBell,
+    ToastContainer
+  },
+  setup() {
+    // Make toast available globally in this layout if needed
+    const { success, error, warning, info } = useToast()
+    
+    return {
+      toast: { success, error, warning, info }
+    }
   },
   data() {
     return {
@@ -104,6 +119,9 @@ export default {
     async handleLogout() {
       console.log('User logging out')
       
+      // Show logout toast
+      const logoutToastId = this.toast.loading('Logging out...')
+      
       try {
         // Call logout API
         const token = localStorage.getItem('authToken')
@@ -116,16 +134,26 @@ export default {
             }
           })
         }
+        
+        // Success toast
+        this.toast.dismiss(logoutToastId)
+        this.toast.success('Successfully logged out', { duration: 2000 })
+        
       } catch (error) {
         console.error('Logout API error:', error)
+        this.toast.dismiss(logoutToastId)
+        this.toast.warning('Logged out with connection issues', { duration: 3000 })
       } finally {
         // Clear stored data
         localStorage.removeItem('authToken')
         localStorage.removeItem('refreshToken')
         localStorage.removeItem('userData')
         
-        // Redirect to login
-        this.$router.push('/login')
+        // Small delay to show the toast before redirecting
+        setTimeout(() => {
+          // Redirect to login
+          this.$router.push('/login')
+        }, 1500)
       }
     }
   },
@@ -136,6 +164,15 @@ export default {
       next()
     } else {
       next('/login')
+    }
+  },
+  mounted() {
+    // Show welcome toast when user first loads the app (optional)
+    const userData = this.userInfo
+    if (userData.full_name) {
+      this.toast.success(`Welcome back, ${userData.full_name}!`, {
+        duration: 3000
+      })
     }
   }
 }
@@ -148,6 +185,7 @@ export default {
   width: 100vw;
   margin: 0;
   padding: 0;
+  position: relative; /* Added for toast positioning */
 }
 
 .main-content {
@@ -326,4 +364,25 @@ export default {
   .content-header h1 {
     font-size: 1.25rem;
   }
-}</style>
+}
+
+/* Toast Container positioning adjustments for layout */
+/* The toast container will automatically position itself in the top-right */
+/* but we need to ensure it doesn't interfere with our sidebar layout */
+:deep(.toast-container) {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10000; /* Higher than modals and sidebar */
+}
+
+/* Adjust toast positioning on mobile to account for potential sidebars */
+@media (max-width: 768px) {
+  :deep(.toast-container) {
+    top: 0.5rem;
+    right: 0.5rem;
+    left: 0.5rem;
+    right: 0.5rem;
+  }
+}
+</style>
