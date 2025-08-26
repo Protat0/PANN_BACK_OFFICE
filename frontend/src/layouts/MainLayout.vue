@@ -5,6 +5,7 @@
       @menu-changed="handleMenuChange"
       @show-profile="handleShowProfile"
       @logout="handleLogout"
+      @sidebar-toggled="handleSidebarToggle"
     />
     
    <!-- Main Content Area -->
@@ -18,8 +19,6 @@
           <div class="header-right">
             <!-- Notification Bell -->
             <NotificationBell />
-            
-         
           </div>
         </div>
       </header>
@@ -30,16 +29,40 @@
       </div>
     </main>
 
+    <!-- Dark Mode Toggle Button -->
+    <DarkModeToggle />
+
     <!-- Profile Modal (if needed) -->
     <div v-if="showProfileModal" class="modal-overlay" @click="closeProfileModal">
       <div class="modal-content" @click.stop>
-        <h2>My Profile</h2>
-        <div class="profile-info">
-          <p><strong>User:</strong> {{ userInfo.full_name || 'N/A' }}</p>
-          <p><strong>Email:</strong> {{ userInfo.email || 'N/A' }}</p>
-          <p><strong>Role:</strong> {{ userInfo.role || 'N/A' }}</p>
+        <div class="modal-header">
+          <h2>My Profile</h2>
+          <button class="modal-close-btn" @click="closeProfileModal">
+            <X :size="20" />
+          </button>
         </div>
-        <button @click="closeProfileModal">Close</button>
+        <div class="profile-info">
+          <div class="profile-field">
+            <label>User:</label>
+            <span>{{ userInfo.full_name || 'N/A' }}</span>
+          </div>
+          <div class="profile-field">
+            <label>Email:</label>
+            <span>{{ userInfo.email || 'N/A' }}</span>
+          </div>
+          <div class="profile-field">
+            <label>Role:</label>
+            <span>{{ userInfo.role || 'N/A' }}</span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-cancel btn-sm" @click="closeProfileModal">
+            Close
+          </button>
+          <button class="btn btn-edit btn-sm">
+            Edit Profile
+          </button>
+        </div>
       </div>
     </div>
 
@@ -50,8 +73,11 @@
 
 <script>
 import { useToast } from '../composables/useToast.js'
-import Sidebar from '../components/Sidebar.vue'
+import Sidebar from './Sidebar.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
+import DarkModeToggle from '@/components/common/DarkModeToggle.vue'
+import { X } from 'lucide-vue-next'
+
 import ToastContainer from '@/components/common/ToastContainer.vue'
 
 export default {
@@ -59,6 +85,8 @@ export default {
   components: {
     Sidebar,
     NotificationBell,
+    DarkModeToggle,
+    X,
     ToastContainer
   },
   setup() {
@@ -84,11 +112,14 @@ export default {
         '/products': 'Products',
         '/products/bulk': 'Add Products (Bulk)',
         '/categories': 'Categories',
-        '/logs': 'Inventory Logs',
+        '/categorydetails': 'Category Details',
+        '/logs': 'System Logs',
         '/suppliers': 'Suppliers',
         '/promotions': 'Promotions',
-        '/sales-by-item': 'Sales by Item',
-        '/sales-by-category': 'Sales by Category'
+        '/salesbyitem': 'Sales By Item',
+        '/salesbycategory': 'Sales By Category',
+        '/uncategorized': 'Uncategorized Products',
+        '/allNotifications': 'All Notifications'
       }
       
       // Handle dynamic product detail routes
@@ -115,6 +146,9 @@ export default {
     },
     closeProfileModal() {
       this.showProfileModal = false
+    },
+    handleSidebarToggle(collapsed) {
+      this.sidebarCollapsed = collapsed
     },
     async handleLogout() {
       console.log('User logging out')
@@ -157,6 +191,20 @@ export default {
       }
     }
   },
+  mounted() {
+    // Load sidebar state from localStorage
+    const savedState = localStorage.getItem('sidebar-collapsed')
+    if (savedState !== null) {
+      this.sidebarCollapsed = JSON.parse(savedState)
+    }
+  },
+  mounted() {
+    // Load sidebar state from localStorage
+    const savedState = localStorage.getItem('sidebar-collapsed')
+    if (savedState !== null) {
+      this.sidebarCollapsed = JSON.parse(savedState)
+    }
+  },
   beforeRouteEnter(to, from, next) {
     // Check if user is authenticated before entering any protected route
     const token = localStorage.getItem('authToken')
@@ -179,8 +227,11 @@ export default {
 </script>
 
 <style scoped>
+/* ==========================================================================
+   APP LAYOUT - SEMANTIC THEME SYSTEM
+   ========================================================================== */
+
 .app-layout {
-  display: flex;
   min-height: 100vh;
   width: 100vw;
   margin: 0;
@@ -188,24 +239,35 @@ export default {
   position: relative; /* Added for toast positioning */
 }
 
+/* ==========================================================================
+   MAIN CONTENT AREA - SEMANTIC STYLING
+   ========================================================================== */
+
 .main-content {
-  flex: 1;
+  margin-left: 280px; /* Default sidebar width */
+  transition: margin-left 0.3s ease;
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
   min-width: 0;
-  transition: all 0.3s ease;
 }
 
+.main-content.sidebar-collapsed {
+  margin-left: 80px; /* Collapsed sidebar width */
+}
+
+/* ==========================================================================
+   CONTENT HEADER - SEMANTIC STYLING
+   ========================================================================== */
+
 .content-header {
-  background: white;
-  /* Match sidebar header height: logo + toggle section + padding */
-  height: 100px; /* This matches the sidebar header total height */
+  height: 100px; /* Match sidebar header height */
   padding: 0 2.5rem;
-  border-bottom: 1px solid var(--neutral-medium);
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   flex-shrink: 0;
   display: flex;
-  align-items: center; /* Center the title vertically */
+  align-items: center;
+  border-bottom: 1px solid var(--border-primary);
+  @apply header-theme transition-theme;
 }
 
 .header-content {
@@ -216,11 +278,11 @@ export default {
 }
 
 .content-header h1 {
-  color: var(--tertiary-dark);
   font-size: 1.875rem;
   font-weight: 600;
   margin: 0;
   flex: 1;
+  @apply text-primary transition-theme;
 }
 
 .header-right {
@@ -229,18 +291,9 @@ export default {
   gap: 1rem;
 }
 
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.user-name {
-  color: #6b7280;
-  font-size: 0.875rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
+/* ==========================================================================
+   PAGE CONTENT - SEMANTIC STYLING
+   ========================================================================== */
 
 .page-content {
   flex: 1;
@@ -249,63 +302,154 @@ export default {
   overflow-x: hidden;
   width: 100%;
   min-width: 0;
-  background-color: #f9fafb;
+  @apply page-container transition-theme;
 }
 
-/* Modal styles */
+/* ==========================================================================
+   MODAL STYLES - SEMANTIC STYLING
+   ========================================================================== */
+
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 2000;
+  backdrop-filter: blur(4px);
+  @apply modal-overlay-theme transition-theme;
 }
 
 .modal-content {
-  background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  max-width: 400px;
+  border-radius: 16px;
+  max-width: 480px;
   width: 90%;
+  transform: scale(1);
+  opacity: 1;
+  animation: modalSlideIn 0.3s ease-out;
+  @apply modal-theme shadow-2xl transition-theme;
 }
 
-.modal-content h2 {
-  margin-bottom: 1rem;
-  color: var(--tertiary-dark);
+@keyframes modalSlideIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
-.profile-info {
-  margin: 1rem 0;
+/* Modal Header */
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 1.5rem 0;
+  margin-bottom: 1.5rem;
+  @apply border-bottom-theme;
 }
 
-.profile-info p {
-  margin-bottom: 0.5rem;
-  color: var(--tertiary-medium);
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  @apply text-primary transition-theme;
 }
 
-.modal-content button {
-  background-color: var(--primary);
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
+.modal-close-btn {
+  background: none;
   border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  margin-top: 1rem;
-  font-weight: 500;
-  transition: background-color 0.2s;
+  @apply border-theme text-tertiary transition-theme;
 }
 
-.modal-content button:hover {
-  background-color: var(--primary-dark);
+.modal-close-btn:hover {
+  @apply surface-tertiary border-accent text-secondary;
 }
 
-/* Responsive design */
+/* Profile Info */
+.profile-info {
+  padding: 0 1.5rem 1.5rem;
+}
+
+.profile-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  @apply border-bottom-theme transition-theme;
+}
+
+.profile-field:last-child {
+  border-bottom: none;
+}
+
+.profile-field label {
+  font-weight: 600;
+  font-size: 0.875rem;
+  @apply text-primary transition-theme;
+}
+
+.profile-field span {
+  font-size: 0.875rem;
+  @apply text-secondary transition-theme;
+}
+
+/* Modal Footer */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border-radius: 0 0 16px 16px;
+  @apply border-top-theme surface-secondary transition-theme;
+}
+
+/* ==========================================================================
+   ENHANCED INTERACTIONS
+   ========================================================================== */
+
+/* Profile field hover effect */
+.profile-field:hover {
+  margin: 0 -0.5rem;
+  padding: 0.75rem 0.5rem;
+  border-radius: 8px;
+  @apply surface-tertiary;
+}
+
+/* Modal content elevation on hover */
+.modal-content:hover {
+  @apply shadow-2xl;
+  box-shadow: 
+    0 32px 64px -12px var(--shadow-2xl),
+    0 0 0 1px var(--border-primary);
+}
+
+/* Header border line effect */
+.content-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: var(--border-primary);
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN
+   ========================================================================== */
+
 @media (max-width: 1024px) {
   .page-content {
     padding: 2rem;
@@ -318,16 +462,28 @@ export default {
   .header-right {
     gap: 0.75rem;
   }
+  
+  .modal-content {
+    max-width: 420px;
+  }
 }
 
 @media (max-width: 768px) {
+  .main-content {
+    margin-left: 0;
+  }
+  
+  .main-content.sidebar-collapsed {
+    margin-left: 0;
+  }
+  
   .page-content {
     padding: 1.5rem;
   }
   
   .content-header {
     padding: 0 1.5rem;
-    height: 80px; /* Slightly smaller on mobile */
+    height: 80px;
   }
   
   .content-header h1 {
@@ -338,8 +494,16 @@ export default {
     gap: 0.5rem;
   }
   
-  .user-name {
-    display: none; /* Hide user name on smaller screens */
+  .modal-content {
+    max-width: 90%;
+    margin: 1rem;
+  }
+  
+  .modal-header,
+  .profile-info,
+  .modal-footer {
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 }
 
@@ -350,39 +514,102 @@ export default {
   
   .content-header {
     padding: 0 1rem;
-    height: 70px; /* Even smaller on very small screens */
+    height: 70px;
   }
   
   .content-header h1 {
     font-size: 1.25rem;
   }
   
-  .header-content {
-    flex-direction: row; /* Keep horizontal layout */
+  .modal-footer {
+    flex-direction: column;
   }
   
-  .content-header h1 {
-    font-size: 1.25rem;
+  .modal-footer .btn {
+    width: 100%;
+    justify-content: center;
   }
 }
 
-/* Toast Container positioning adjustments for layout */
-/* The toast container will automatically position itself in the top-right */
-/* but we need to ensure it doesn't interfere with our sidebar layout */
-:deep(.toast-container) {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  z-index: 10000; /* Higher than modals and sidebar */
+/* ==========================================================================
+   ACCESSIBILITY & REDUCED MOTION
+   ========================================================================== */
+
+/* Enhanced focus styles */
+.modal-close-btn:focus-visible {
+  @apply focus-ring-theme;
 }
 
-/* Adjust toast positioning on mobile to account for potential sidebars */
-@media (max-width: 768px) {
-  :deep(.toast-container) {
-    top: 0.5rem;
-    right: 0.5rem;
-    left: 0.5rem;
-    right: 0.5rem;
+/* Smooth transitions for reduced motion users */
+@media (prefers-reduced-motion: reduce) {
+  .app-layout,
+  .content-header,
+  .content-header h1,
+  .page-content,
+  .modal-content,
+  .modal-header h2,
+  .profile-field,
+  .modal-footer,
+  .modal-close-btn {
+    transition: none !important;
+    animation: none !important;
   }
+  
+  .modal-content {
+    transform: none !important;
+  }
+}
+
+/* ==========================================================================
+   ENHANCED VISUAL EFFECTS
+   ========================================================================== */
+
+/* Page content subtle gradient background */
+.page-content {
+  background: 
+    linear-gradient(
+      180deg, 
+      var(--surface-secondary) 0%, 
+      var(--surface-secondary) 100%
+    );
+}
+
+/* Modal backdrop blur enhancement */
+@supports (backdrop-filter: blur(8px)) {
+  .modal-overlay {
+    backdrop-filter: blur(8px);
+  }
+}
+
+/* Button elevation effects */
+.modal-footer .btn {
+  @apply shadow-sm transition-all-theme;
+}
+
+.modal-footer .btn:hover {
+  transform: translateY(-1px);
+  @apply shadow-md;
+}
+
+/* Header content enhancement */
+.header-content {
+  position: relative;
+}
+
+.header-content::before {
+  content: '';
+  position: absolute;
+  left: -2.5rem;
+  right: -2.5rem;
+  top: -1rem;
+  bottom: -1rem;
+  background: linear-gradient(
+    135deg,
+    var(--surface-primary) 0%,
+    var(--surface-secondary) 100%
+  );
+  border-radius: 0 0 16px 16px;
+  z-index: -1;
+  opacity: 0.5;
 }
 </style>

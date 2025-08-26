@@ -1,16 +1,16 @@
 <template>
-  <div class="bulk-entry-page">
+  <div class="bulk-entry-page surface-secondary">
     <!-- Header with Navigation -->
     <div class="page-header">
       <div class="breadcrumb">
-        <router-link to="/products" class="breadcrumb-link">Products</router-link>
-        <span class="breadcrumb-separator">></span>
-        <span class="breadcrumb-current">Add Products (Bulk)</span>
+        <router-link to="/products" class="breadcrumb-link text-tertiary">Products</router-link>
+        <span class="breadcrumb-separator text-tertiary">></span>
+        <span class="breadcrumb-current text-accent">Add Products (Bulk)</span>
       </div>
       
       <div class="header-actions">
         <button 
-          class="btn btn-secondary" 
+          class="btn btn-filter" 
           @click="openBarcodeScanner"
           :disabled="loading"
         >
@@ -25,11 +25,11 @@
         </button>
         
         <button 
-          class="btn btn-primary" 
+          class="btn btn-save" 
           @click="saveProducts" 
-          :disabled="loading || !hasValidProducts"
+          :disabled="bulkLoading || !hasValidProducts"
         >
-          <svg v-if="loading" class="btn-icon spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg v-if="bulkLoading" class="btn-icon spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 12a9 9 0 11-6.219-8.56"/>
           </svg>
           <svg v-else class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -37,18 +37,18 @@
             <polyline points="17,21 17,13 7,13 7,21"/>
             <polyline points="7,3 7,8 15,8"/>
           </svg>
-          {{ loading ? 'Saving...' : 'Save Products' }}
+          {{ bulkLoading ? 'Saving...' : 'Save Products' }}
         </button>
       </div>
     </div>
 
     <!-- Progress Indicator -->
-    <div v-if="products.length > 0" class="progress-section">
+    <div v-if="bulkProducts.length > 0" class="progress-section surface-card">
       <div class="progress-info">
-        <span class="product-count">{{ products.length }} Products Added</span>
-        <span class="valid-count">{{ validProducts }} Valid • {{ invalidProducts }} Invalid</span>
+        <span class="product-count text-primary">{{ bulkProducts.length }} Products Added</span>
+        <span class="valid-count text-tertiary">{{ validProducts }} Valid • {{ invalidProducts }} Invalid</span>
       </div>
-      <div class="progress-bar">
+      <div class="progress-bar surface-tertiary">
         <div 
           class="progress-fill" 
           :style="{ width: `${progressPercentage}%` }"
@@ -57,31 +57,31 @@
     </div>
 
     <!-- Success/Error Messages -->
-    <div v-if="successMessage" class="message success-message">
+    <div v-if="successMessage" class="message status-success">
       <svg class="message-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="20,6 9,17 4,12"/>
       </svg>
       {{ successMessage }}
     </div>
     
-    <div v-if="errorMessage" class="message error-message">
+    <div v-if="error" class="message status-error">
       <svg class="message-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/>
         <line x1="15" y1="9" x2="9" y2="15"/>
         <line x1="9" y1="9" x2="15" y2="15"/>
       </svg>
-      {{ errorMessage }}
+      {{ error }}
     </div>
 
     <!-- Bulk Entry Table -->
-    <div class="table-container">
-      <div class="table-header">
-        <h2 class="table-title">Add Products in Bulk</h2>
+    <div class="table-container surface-card">
+      <div class="table-header surface-primary border-bottom-theme">
+        <h2 class="table-title text-primary">Add Products in Bulk</h2>
         <div class="table-actions">
           <button 
-            class="btn btn-success btn-sm" 
+            class="btn btn-add btn-sm" 
             @click="addNewRow"
-            :disabled="loading"
+            :disabled="bulkLoading"
           >
             <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="5" x2="12" y2="19"/>
@@ -91,10 +91,10 @@
           </button>
           
           <button 
-            v-if="products.length > 0"
-            class="btn btn-error btn-sm" 
+            v-if="bulkProducts.length > 0"
+            class="btn btn-delete btn-sm" 
             @click="clearAll"
-            :disabled="loading"
+            :disabled="bulkLoading"
           >
             <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="3,6 5,6 21,6"/>
@@ -109,29 +109,29 @@
         <table class="bulk-entry-table">
           <thead>
             <tr>
-              <th class="row-number-col">#</th>
-              <th class="image-col">Image</th>
-              <th class="name-col">Name <span class="required">*</span></th>
-              <th class="sku-col">SKU <span class="required">*</span></th>
-              <th class="category-col">Category <span class="required">*</span></th>
-              <th class="cost-col">Cost Price <span class="required">*</span></th>
-              <th class="markup-col">Mark up % <span class="required">*</span></th>
-              <th class="selling-col">Selling Price <span class="required">*</span></th>
-              <th class="stock-col">Stock</th>
-              <th class="actions-col">Actions</th>
+              <th class="row-number-col surface-secondary text-primary">#</th>
+              <th class="image-col surface-secondary text-primary">Image</th>
+              <th class="name-col surface-secondary text-primary">Name <span class="required text-error">*</span></th>
+              <th class="sku-col surface-secondary text-primary">SKU <span class="required text-error">*</span></th>
+              <th class="category-col surface-secondary text-primary">Category <span class="required text-error">*</span></th>
+              <th class="cost-col surface-secondary text-primary">Cost Price <span class="required text-error">*</span></th>
+              <th class="markup-col surface-secondary text-primary">Mark up % <span class="required text-error">*</span></th>
+              <th class="selling-col surface-secondary text-primary">Selling Price <span class="required text-error">*</span></th>
+              <th class="stock-col surface-secondary text-primary">Stock</th>
+              <th class="actions-col surface-secondary text-primary">Actions</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-if="products.length === 0" class="empty-row">
+            <tr v-if="bulkProducts.length === 0" class="empty-row">
               <td colspan="10" class="empty-state">
                 <div class="empty-content">
-                  <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <svg class="empty-icon text-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                     <line x1="9" y1="12" x2="15" y2="12"/>
                     <line x1="12" y1="9" x2="12" y2="15"/>
                   </svg>
-                  <p>No products added yet</p>
-                  <button class="btn btn-primary btn-sm" @click="addNewRow">
+                  <p class="text-tertiary">No products added yet</p>
+                  <button class="btn btn-add btn-sm" @click="addNewRow">
                     Add First Product
                   </button>
                 </div>
@@ -139,11 +139,11 @@
             </tr>
             
             <tr 
-              v-for="(product, index) in products" 
+              v-for="(product, index) in bulkProducts" 
               :key="product.id"
               :class="{ 'invalid-row': !isProductValid(product) }"
             >
-              <td class="row-number">{{ index + 1 }}</td>
+              <td class="row-number text-tertiary">{{ index + 1 }}</td>
               
               <!-- Image Upload -->
               <td class="image-cell">
@@ -155,14 +155,14 @@
                     accept="image/*"
                     class="image-input"
                   />
-                  <label :for="`image-${product.id}`" class="image-label">
+                  <label :for="`image-${product.id}`" class="image-label border-theme-subtle">
                     <img 
                       v-if="product.image_preview" 
                       :src="product.image_preview" 
                       alt="Product"
                       class="product-image"
                     />
-                    <div v-else class="image-placeholder">
+                    <div v-else class="image-placeholder surface-tertiary">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                         <circle cx="8.5" cy="8.5" r="1.5"/>
@@ -179,7 +179,7 @@
                   v-model="product.product_name"
                   type="text"
                   placeholder="Product name"
-                  class="table-input"
+                  class="table-input input-theme"
                   @input="calculateSellingPrice(index); handleProductDataChange()"
                 />
               </td>
@@ -190,24 +190,28 @@
                   v-model="product.SKU"
                   type="text"
                   placeholder="Auto-generated"
-                  class="table-input sku-input"
+                  class="table-input sku-input input-theme"
                   @blur="validateSKU(index)"
                   @input="handleProductDataChange"
                 />
-                <div v-if="product.sku_error" class="field-error">{{ product.sku_error }}</div>
+                <div v-if="product.sku_error" class="field-error text-error">{{ product.sku_error }}</div>
               </td>
               
               <!-- Category -->
               <td class="category-cell">
                 <select 
                   v-model="product.category_id"
-                  class="table-select"
+                  class="table-select input-theme"
                   @change="handleProductDataChange"
                 >
                   <option value="">Select category</option>
-                  <option value="noodles">Noodles</option>
-                  <option value="drinks">Drinks</option>
-                  <option value="toppings">Toppings</option>
+                  <option 
+                    v-for="category in categories" 
+                    :key="category._id"
+                    :value="category._id"
+                  >
+                    {{ category.category_name }}
+                  </option>
                 </select>
               </td>
               
@@ -219,7 +223,7 @@
                   step="0.01"
                   min="0"
                   placeholder="0.00"
-                  class="table-input price-input"
+                  class="table-input price-input input-theme"
                   @input="calculateSellingPrice(index); handleProductDataChange()"
                 />
               </td>
@@ -232,10 +236,10 @@
                   min="0"
                   max="1000"
                   placeholder="25"
-                  class="table-input markup-input"
+                  class="table-input markup-input input-theme"
                   @input="calculateSellingPrice(index); handleProductDataChange()"
                 />
-                <span class="markup-suffix">%</span>
+                <span class="markup-suffix text-tertiary">%</span>
               </td>
               
               <!-- Selling Price -->
@@ -246,7 +250,7 @@
                   step="0.01"
                   min="0"
                   placeholder="0.00"
-                  class="table-input price-input"
+                  class="table-input price-input input-theme"
                   @input="calculateMarkup(index); handleProductDataChange()"
                 />
               </td>
@@ -258,7 +262,7 @@
                   type="number"
                   min="0"
                   placeholder="0"
-                  class="table-input stock-input"
+                  class="table-input stock-input input-theme"
                   @input="handleProductDataChange"
                 />
               </td>
@@ -338,6 +342,7 @@ import BarcodeScanner from '../../components/products/BarcodeScanner.vue'
 import NotificationModal from '../../components/common/NotificationModal.vue'
 import SaveAsDraftModal from '../../components/common/SaveAsDraftModal.vue'
 import { useSaveAsDraftModal } from '../../composables/ui/useSaveAsDraftModal.js'
+import { useProducts } from '../../composables/ui/products/useProducts.js'
 
 export default {
   name: 'ProductBulkEntry',
@@ -348,6 +353,15 @@ export default {
   },
 
   setup() {
+    const {
+      categories,
+      loading: productsLoading,
+      error: productsError,
+      successMessage: productsSuccessMessage,
+      fetchCategories,
+      handleProductSuccess
+    } = useProducts()
+
     const {
       modalRef,
       isLoading: draftLoading,
@@ -365,6 +379,15 @@ export default {
     } = useSaveAsDraftModal()
     
     return {
+      // useProducts exports
+      categories,
+      productsLoading,
+      productsError,
+      productsSuccessMessage,
+      fetchCategories,
+      handleProductSuccess,
+      
+      // useSaveAsDraftModal exports  
       draftModalRef: modalRef,
       draftLoading,
       draftModalConfig: modalConfig,
@@ -383,10 +406,9 @@ export default {
 
   data() {
     return {
-      products: [],
-      loading: false,
-      successMessage: null,
-      errorMessage: null,
+      // RENAMED: Avoid conflicts with useProducts
+      bulkProducts: [], // Renamed from 'products'
+      bulkLoading: false, // Renamed from 'loading'
       showBarcodeModal: false,
       nextId: 1,
       showNotificationModal: false,
@@ -399,31 +421,31 @@ export default {
       hasConfirmedLeave: false,
       pendingNavigation: null,
       cleanupBeforeUnload: null,
-      // ADD THIS - Control modal visibility directly
       showDraftModal: false
     }
   },
+  
   computed: {
+    // OPTIMIZATION: Use shared validation logic with consistency fixes
     hasValidProducts() {
-      return this.products.some(product => this.isProductValid(product))
+      return this.bulkProducts.some(product => this.isProductValid(product))
     },
     
     validProducts() {
-      return this.products.filter(product => this.isProductValid(product)).length
+      return this.bulkProducts.filter(product => this.isProductValid(product)).length
     },
     
     invalidProducts() {
-      return this.products.length - this.validProducts
+      return this.bulkProducts.length - this.validProducts
     },
     
     progressPercentage() {
-      if (this.products.length === 0) return 0
-      return Math.round((this.validProducts / this.products.length) * 100)
+      if (this.bulkProducts.length === 0) return 0
+      return Math.round((this.validProducts / this.bulkProducts.length) * 100)
     },
 
     hasUnsavedWork() {
-      return this.products.some(product => {
-        // Only consider it "unsaved work" if user has actually entered meaningful data
+      return this.bulkProducts.some(product => {
         const hasProductName = product.product_name && product.product_name.trim().length > 0
         const hasSKU = product.SKU && product.SKU.trim().length > 0  
         const hasCostPrice = product.cost_price && product.cost_price > 0
@@ -431,69 +453,76 @@ export default {
         const hasCategory = product.category_id && product.category_id !== ''
         const hasImage = product.image_file || product.image_preview
         
-        // Only count as "unsaved work" if user has filled in actual data
         return hasProductName || hasSKU || hasCostPrice || hasSellingPrice || hasCategory || hasImage
       })
     },
 
     draftDataSummary() {
       return this.createDataSummary({
-        products: this.products.filter(p => p.product_name?.trim() || p.cost_price),
-        totalProducts: this.products.length,
+        products: this.bulkProducts.filter(p => p.product_name?.trim() || p.cost_price),
+        totalProducts: this.bulkProducts.length,
         validProducts: this.validProducts,
         invalidProducts: this.invalidProducts
       })
+    },
+
+    // OPTIMIZATION: Use shared computed properties
+    successMessage() {
+      return this.productsSuccessMessage
+    },
+
+    error() {
+      return this.productsError
+    },
+
+    loading() {
+      return this.productsLoading || this.bulkLoading
     }
   },
 
-    watch: {
-      // Watch the composable's isVisible state
-      isVisible(newValue) {
-        if (newValue && this.$refs.saveDraftModal) {
-          this.$refs.saveDraftModal.show()
-        } else if (!newValue && this.$refs.saveDraftModal) {
-          this.$refs.saveDraftModal.hide()
-        }
-      },
-      
-      // Add this watcher to control the draft content display
-      shouldShowDraftContent(newValue) {
-        console.log('Draft content should show:', newValue)
+  watch: {
+    shouldShowDraftContent(newValue) {
+      console.log('Draft content should show:', newValue)
+    }
+  },
+
+  async mounted() {
+    // OPTIMIZATION: Use existing fetchCategories from useProducts
+    await this.fetchCategories()
+    
+    // Start with one empty row
+    this.addNewRow()
+    
+    // Setup before unload handler for unsaved changes
+    this.cleanupBeforeUnload = this.setupBeforeUnloadHandler(() => {
+      if (this.hasUnsavedWork) {
+        return 'You have unsaved product data. Are you sure you want to leave?'
       }
-    },
+    })
+  },
 
-    mounted() {
-      // Start with one empty row
-      this.addNewRow()
-      
-      // Setup before unload handler for unsaved changes
-      this.cleanupBeforeUnload = this.setupBeforeUnloadHandler(() => {
-        if (this.hasUnsavedWork) {
-          return 'You have unsaved product data. Are you sure you want to leave?'
-        }
-      })
-    },
+  beforeUnmount() {
+    if (this.cleanupBeforeUnload) {
+      this.cleanupBeforeUnload()
+    }
+  },
 
-    beforeUnmount() {
-      if (this.cleanupBeforeUnload) {
-        this.cleanupBeforeUnload()
-      }
-    },
-
-    beforeRouteLeave(to, from, next) {
-      if (this.hasUnsavedWork && !this.hasConfirmedLeave) {
-        try {
-          this.showDraftModalBeforeLeave(next)
-        } catch (error) {
-          console.error('Error showing draft modal:', error)
-          // If there's an error, just allow navigation
-          next()
-        }
-      } else {
+  beforeRouteLeave(to, from, next) {
+    if (this.hasUnsavedWork && !this.hasConfirmedLeave) {
+      try {
+        this.showDraftModalBeforeLeave(next)
+      } catch (error) {
+        console.error('Error showing draft modal:', error)
         next()
       }
-    },
+    } else {
+      next()
+    }
+  },
+  
   methods: {
+    // OPTIMIZATION: Remove redundant fetchCategories method since we use useProducts
+    
     addNewRow() {
       const newProduct = {
         id: this.nextId++,
@@ -510,19 +539,19 @@ export default {
         image_file: null,
         sku_error: null
       }
-      this.products.push(newProduct)
+      this.bulkProducts.push(newProduct)
       this.handleProductDataChange()
     },
     
     removeRow(index) {
-      if (this.products.length > 1) {
-        this.products.splice(index, 1)
+      if (this.bulkProducts.length > 1) {
+        this.bulkProducts.splice(index, 1)
         this.handleProductDataChange()
       }
     },
     
     duplicateRow(index) {
-      const original = this.products[index]
+      const original = this.bulkProducts[index]
       const duplicate = {
         ...original,
         id: this.nextId++,
@@ -531,19 +560,20 @@ export default {
         sku_error: null
       }
       
-      this.products.splice(index + 1, 0, duplicate)
+      this.bulkProducts.splice(index + 1, 0, duplicate)
       this.handleProductDataChange()
     },
     
     clearAll() {
       const confirmed = confirm('Are you sure you want to clear all products? This action cannot be undone.')
       if (confirmed) {
-        this.products = []
+        this.bulkProducts = []
         this.addNewRow()
         this.clearMessages()
       }
     },
 
+    // OPTIMIZATION: Enhanced validation using consistent logic
     isProductValid(product) {
       const nameValid = product.product_name && 
                       product.product_name.trim().length > 0
@@ -552,11 +582,15 @@ export default {
                         product.cost_price > 0 && 
                         !isNaN(product.cost_price)
       
-      return !!(nameValid && priceValid && !product.sku_error)
+      // Enhanced category validation using useProducts categories
+      const categoryValid = !product.category_id || 
+                          this.categories.some(c => c._id === product.category_id)
+      
+      return !!(nameValid && priceValid && categoryValid && !product.sku_error)
     },
     
     calculateSellingPrice(index) {
-      const product = this.products[index]
+      const product = this.bulkProducts[index]
       if (product.cost_price && product.markup_percentage) {
         const markup = product.cost_price * (product.markup_percentage / 100)
         product.selling_price = parseFloat((product.cost_price + markup).toFixed(2))
@@ -564,10 +598,227 @@ export default {
     },
     
     calculateMarkup(index) {
-      const product = this.products[index]
+      const product = this.bulkProducts[index]
       if (product.cost_price && product.selling_price && product.cost_price > 0) {
         const markup = ((product.selling_price - product.cost_price) / product.cost_price) * 100
         product.markup_percentage = parseFloat(markup.toFixed(2))
+      }
+    },
+
+    // CRITICAL FIX: Enhanced saveProducts with product_history initialization
+    async saveProducts() {
+      console.log('=== SAVE PRODUCTS CALLED ===')
+      console.log('Valid products:', this.hasValidProducts)
+      console.log('Products to save:', this.bulkProducts.filter(product => this.isProductValid(product)))
+      
+      if (!this.hasValidProducts) {
+        this.showError('Please add at least one valid product')
+        return
+      }
+      
+      this.bulkLoading = true
+      this.clearMessages()
+      
+      try {
+        // Filter only valid products
+        const validProducts = this.bulkProducts.filter(product => this.isProductValid(product))
+        
+        // CRITICAL FIX: Enhanced data preparation with product_history initialization
+        const productsData = validProducts.map(product => {
+          const currentTimestamp = new Date().toISOString()
+          
+          const data = {
+            product_name: product.product_name?.trim(),
+            cost_price: parseFloat(product.cost_price),
+            selling_price: parseFloat(product.selling_price),
+            stock: parseInt(product.stock) || 0,
+            unit: product.unit || 'piece',
+            status: product.status || 'active',
+            low_stock_threshold: Math.max(1, Math.floor((product.stock || 0) * 0.1)),
+            is_taxable: true,
+            
+            // CRITICAL FIX: Initialize product_history array
+            product_history: [
+              {
+                action: 'created',
+                timestamp: currentTimestamp,
+                details: {
+                  created_via: 'bulk_creation',
+                  initial_stock: parseInt(product.stock) || 0,
+                  cost_price: parseFloat(product.cost_price),
+                  selling_price: parseFloat(product.selling_price)
+                },
+                user_id: null, // Will be set by backend based on auth
+                notes: `Product created via bulk entry with initial stock of ${parseInt(product.stock) || 0}`
+              }
+            ],
+            
+            // Additional timestamps for consistency
+            created_at: currentTimestamp,
+            updated_at: currentTimestamp
+          }
+          
+          // Only add these fields if they have actual values
+          if (product.SKU && product.SKU.trim()) {
+            data.SKU = product.SKU.trim()
+          }
+          
+          // Use category_id instead of category
+          if (product.category_id && product.category_id !== '') {
+            data.category_id = product.category_id
+            
+            // Add category info to history
+            data.product_history[0].details.category_id = product.category_id
+          }
+          
+          // Add image data if present
+          if (product.image_file) {
+            data.image = product.image_file
+          }
+          
+          return data
+        })
+        
+        // Enhanced validation with history check
+        console.log('=== FINAL VALIDATION BEFORE API ===')
+        const hasInvalidData = productsData.some((product, index) => {
+          const nameInvalid = !product.product_name || 
+                            typeof product.product_name !== 'string' || 
+                            product.product_name.trim() === ''
+          
+          const priceInvalid = !product.cost_price || 
+                              isNaN(product.cost_price) || 
+                              product.cost_price <= 0
+          
+          const historyInvalid = !product.product_history || 
+                               !Array.isArray(product.product_history) ||
+                               product.product_history.length === 0
+          
+          if (nameInvalid) {
+            console.error(`Product ${index + 1} has invalid name:`, product.product_name)
+          }
+          if (priceInvalid) {
+            console.error(`Product ${index + 1} has invalid price:`, product.cost_price)
+          }
+          if (historyInvalid) {
+            console.error(`Product ${index + 1} has invalid history:`, product.product_history)
+          }
+          
+          return nameInvalid || priceInvalid || historyInvalid
+        })
+        
+        if (hasInvalidData) {
+          this.showError('Some products have invalid data. Check console for details.')
+          this.bulkLoading = false
+          return
+        }
+        
+        console.log('Sending products data with history:', productsData)
+        
+        // Use the fixed bulkCreateProducts method
+        const result = await productsApiService.bulkCreateProducts(productsData)
+        
+        console.log('Full API Response:', result)
+        
+        // Parse response based on new API structure
+        let successfulCount = 0
+        let failedCount = 0
+        
+        if (result) {
+          if (result.results) {
+            if (result.results.total_successful !== undefined) {
+              successfulCount = result.results.total_successful
+              failedCount = result.results.total_failed || 0
+            } else if (Array.isArray(result.results)) {
+              result.results.forEach(item => {
+                if (item.success !== false) {
+                  successfulCount++
+                } else {
+                  failedCount++
+                }
+              })
+            }
+          } else if (result.total_successful !== undefined) {
+            successfulCount = result.total_successful
+            failedCount = result.total_failed || 0
+          } else if (result.message && result.message.includes('success')) {
+            successfulCount = validProducts.length
+          } else {
+            successfulCount = validProducts.length
+          }
+        }
+        
+        console.log('Final counts - Success:', successfulCount, 'Failed:', failedCount)
+        
+        // OPTIMIZATION: Use handleProductSuccess from useProducts for consistency
+        if (successfulCount > 0) {
+          console.log('✅ Triggering success notification...')
+          
+          this.currentDraftData = null
+          
+          // Reset table
+          console.log('🔄 Resetting table after successful product creation...')
+          this.bulkProducts = []
+          this.nextId = 1
+          this.addNewRow()
+          console.log('✅ Table reset complete')
+          
+          // Use useProducts success handler for consistency
+          this.handleProductSuccess({
+            message: `${successfulCount} product${successfulCount > 1 ? 's have' : ' has'} been created successfully.`
+          })
+          
+          // Set notification data
+          this.notificationData = {
+            type: 'success',
+            title: 'Products Created Successfully!',
+            message: `${successfulCount} product${successfulCount > 1 ? 's have' : ' has'} been created successfully.`,
+            details: {
+              successful: successfulCount,
+              failed: failedCount
+            }
+          }
+          
+          // Show the modal
+          this.showNotificationModal = true
+          
+        } else {
+          console.error('❌ No products were created successfully')
+          this.showError('Failed to create products. Please check your data and try again.')
+        }
+        
+        // Handle failures
+        if (failedCount > 0) {
+          console.warn('⚠️ Some products failed to create')
+          setTimeout(() => {
+            this.showError(`${failedCount} products failed to create. Check console for details.`)
+          }, 100)
+        }
+        
+      } catch (error) {
+        console.error('💥 Error saving products:', error)
+        console.error('💥 Error details:', error.response?.data)
+        
+        let errorMessage = 'Failed to save products'
+        
+        if (error.response?.data?.error) {
+          errorMessage = error.response.data.error
+        } else if (error.response?.data?.message) {
+          errorMessage = error.response.data.message
+        } else if (error.message) {
+          errorMessage = error.message
+        }
+        
+        this.notificationData = {
+          type: 'error',
+          title: 'Failed to Create Products',
+          message: errorMessage,
+          details: null
+        }
+        this.showNotificationModal = true
+        
+      } finally {
+        this.bulkLoading = false
       }
     },
 
@@ -576,7 +827,6 @@ export default {
         await this.composableSaveDraft(draftInfo)
         this.showSuccess(`Draft "${draftInfo.name}" saved successfully!`)
         
-        // Hide modal
         this.showDraftModal = false
         
         if (this.pendingNavigation) {
@@ -611,16 +861,14 @@ export default {
     },
 
     handleProductDataChange() {
-      // Only set draft data if there's meaningful unsaved work
       if (this.hasUnsavedWork) {
         this.currentDraftData = {
-          products: [...this.products],
-          totalProducts: this.products.length,
+          products: [...this.bulkProducts],
+          totalProducts: this.bulkProducts.length,
           validProducts: this.validProducts,
           timestamp: new Date().toISOString()
         }
       } else {
-        // Clear draft data if there's no meaningful work
         this.currentDraftData = null
       }
     },
@@ -630,16 +878,17 @@ export default {
       this.showDraftModal = true
     },
     
+    // OPTIMIZATION: Enhanced SKU validation using existing products
     async validateSKU(index) {
-      const product = this.products[index]
+      const product = this.bulkProducts[index]
       if (!product.SKU) {
         product.sku_error = null
         return
       }
       
       try {
-        // Check for duplicates in current list
-        const duplicates = this.products.filter((p, i) => 
+        // Check for duplicates in current bulk list
+        const duplicates = this.bulkProducts.filter((p, i) => 
           i !== index && p.SKU === product.SKU
         )
         
@@ -648,7 +897,7 @@ export default {
           return
         }
         
-        // Check if SKU exists in database
+        // OPTIMIZATION: Use existing productExistsBySku method
         const exists = await productsApiService.productExistsBySku(product.SKU)
         if (exists) {
           product.sku_error = 'SKU already exists'
@@ -664,22 +913,19 @@ export default {
     handleImageUpload(index, event) {
       const file = event.target.files[0]
       if (file) {
-        // Validate file type
         if (!file.type.startsWith('image/')) {
           this.showError('Please select a valid image file')
           return
         }
         
-        // Validate file size (max 5MB)
         if (file.size > 5 * 1024 * 1024) {
           this.showError('Image size must be less than 5MB')
           return
         }
         
-        const product = this.products[index]
+        const product = this.bulkProducts[index]
         product.image_file = file
         
-        // Create preview
         const reader = new FileReader()
         reader.onload = (e) => {
           product.image_preview = e.target.result
@@ -698,240 +944,42 @@ export default {
     },
     
     handleBarcodeScanned(barcodeData) {
-      // Find an empty row or add a new one
-      let targetIndex = this.products.findIndex(p => !p.product_name)
+      let targetIndex = this.bulkProducts.findIndex(p => !p.product_name)
       if (targetIndex === -1) {
         this.addNewRow()
-        targetIndex = this.products.length - 1
+        targetIndex = this.bulkProducts.length - 1
       }
       
-      // Populate the row with scanned data
-      const product = this.products[targetIndex]
+      const product = this.bulkProducts[targetIndex]
       product.SKU = barcodeData.code
       product.product_name = barcodeData.product_name || ''
       
-      // If we have additional product data from the barcode
       if (barcodeData.cost_price) product.cost_price = barcodeData.cost_price
       if (barcodeData.category_id) product.category_id = barcodeData.category_id
       
       this.closeBarcodeScanner()
       this.showSuccess('Product added from barcode scan')
     },
-    
-
-    async saveProducts() {
-      console.log('=== SAVE PRODUCTS CALLED ===')
-      console.log('Valid products:', this.hasValidProducts)
-      console.log('Products to save:', this.products.filter(product => this.isProductValid(product)))
-      
-      if (!this.hasValidProducts) {
-        this.showError('Please add at least one valid product')
-        return
-      }
-      
-      this.loading = true
-      this.clearMessages()
-      
-      try {
-        // Filter only valid products
-        const validProducts = this.products.filter(product => this.isProductValid(product))
-        
-        // Clean data preparation
-        const productsData = validProducts.map(product => {
-          const data = {
-            product_name: product.product_name?.trim(),
-            cost_price: parseFloat(product.cost_price),
-            selling_price: parseFloat(product.selling_price),
-            stock: parseInt(product.stock) || 0,
-            unit: product.unit || 'piece',
-            status: product.status || 'active',
-            low_stock_threshold: Math.max(1, Math.floor((product.stock || 0) * 0.1)),
-            is_taxable: true
-          }
-          
-          // Only add these fields if they have actual values
-          if (product.SKU && product.SKU.trim()) {
-            data.SKU = product.SKU.trim()
-          }
-          
-          if (product.category_id && product.category_id !== '') {
-            data.category_id = product.category_id
-          }
-          
-          return data
-        })
-        
-        // Final validation before sending
-        console.log('=== FINAL VALIDATION BEFORE API ===')
-        const hasInvalidData = productsData.some((product, index) => {
-          const nameInvalid = !product.product_name || 
-                            typeof product.product_name !== 'string' || 
-                            product.product_name.trim() === ''
-          
-          const priceInvalid = !product.cost_price || 
-                              isNaN(product.cost_price) || 
-                              product.cost_price <= 0
-          
-          if (nameInvalid) {
-            console.error(`Product ${index + 1} has invalid name:`, product.product_name)
-          }
-          if (priceInvalid) {
-            console.error(`Product ${index + 1} has invalid price:`, product.cost_price)
-          }
-          
-          return nameInvalid || priceInvalid
-        })
-        
-        if (hasInvalidData) {
-          this.showError('Some products have invalid data. Check console for details.')
-          return
-        }
-        
-        console.log('Sending products data:', productsData)
-        
-        // Call the API
-        const result = await productsApiService.bulkCreateProducts(productsData)
-        
-        console.log('Full API Response:', result)
-        console.log('Response data:', result.data)
-        
-        // Fixed response parsing - handle both wrapped and direct response
-        let successfulCount = 0
-        let failedCount = 0
-        let responseData = null
-        
-        // Check if response is wrapped in .data or direct
-        responseData = result.data || result
-        
-        console.log('Parsed response data:', responseData)
-        console.log('Response message:', responseData?.message)
-        console.log('Response results:', responseData?.results)
-        
-        // Parse response based on actual structure
-        if (responseData) {
-          // Check if we have results array
-          if (responseData.results && Array.isArray(responseData.results)) {
-            console.log('Found results array, parsing individual results...')
-            responseData.results.forEach((item, index) => {
-              console.log(`Result ${index}:`, item)
-              // Since API says "completed", assume success unless there's explicit error
-              if (!item.error && !item.failed) {
-                successfulCount++
-              } else {
-                failedCount++
-              }
-            })
-          } 
-          // If message indicates completion, assume all successful
-          else if (responseData.message && responseData.message.includes('completed')) {
-            console.log('No results array, but message indicates completion. Assuming all successful.')
-            successfulCount = validProducts.length
-          }
-          // Handle other possible success indicators
-          else if (responseData.success || responseData.status === 'success') {
-            console.log('Response indicates success, assuming all products successful.')
-            successfulCount = validProducts.length
-          }
-        }
-        
-        // Fallback: if we got a 200 response but no clear success indicators
-        if (successfulCount === 0 && failedCount === 0) {
-          console.log('No clear success/failure indicators, but got 200 response. Assuming success.')
-          successfulCount = validProducts.length
-        }
-        
-        console.log('Final calculated counts - Success:', successfulCount, 'Failed:', failedCount)
-        
-        // Show success notification if we have any successful creates
-        if (successfulCount > 0) {
-          console.log('✅ Triggering success notification...')
-          
-          this.currentDraftData = null
-          // RESET TABLE IMMEDIATELY UPON SUCCESS - BEFORE SHOWING MODAL
-          console.log('🔄 Resetting table after successful product creation...')
-          this.products = []
-          this.nextId = 1
-          this.addNewRow()
-          this.clearMessages()
-          console.log('✅ Table reset complete, new products array:', this.products)
-          
-          // Set notification data
-          this.notificationData = {
-            type: 'success',
-            title: 'Products Created Successfully!',
-            message: `${successfulCount} product${successfulCount > 1 ? 's have' : ' has'} been created successfully.`,
-            details: {
-              successful: successfulCount,
-              failed: failedCount
-            }
-          }
-          
-          // Show the modal
-          this.showNotificationModal = true
-          
-          console.log('✅ Notification modal visible:', this.showNotificationModal)
-          console.log('✅ Notification data:', this.notificationData)
-          
-        } else {
-          console.error('❌ No success detected despite 200 response')
-          this.showError('Products may have been created but response was unclear. Please check your inventory.')
-        }
-        
-        // Handle failures
-        if (failedCount > 0) {
-          console.warn('⚠️ Some products failed to create')
-          setTimeout(() => {
-            this.showError(`${failedCount} products failed to create. Check console for details.`)
-          }, 100)
-        }
-        
-      } catch (error) {
-        console.error('💥 Error saving products:', error)
-        console.error('💥 Error details:', error.response?.data)
-        
-        // Better error handling
-        let errorMessage = 'Failed to save products'
-        
-        if (error.response?.data?.error) {
-          errorMessage = error.response.data.error
-        } else if (error.response?.data?.message) {
-          errorMessage = error.response.data.message
-        } else if (error.message) {
-          errorMessage = error.message
-        }
-        
-        this.notificationData = {
-          type: 'error',
-          title: 'Failed to Create Products',
-          message: errorMessage,
-          details: null
-        }
-        this.showNotificationModal = true
-        
-      } finally {
-        this.loading = false
-      }
-    },
         
     showSuccess(message) {
-      this.successMessage = message
-      this.errorMessage = null
-      setTimeout(() => {
-        this.successMessage = null
-      }, 5000)
+      // OPTIMIZATION: Could use handleProductSuccess from useProducts instead
+      this.handleProductSuccess({ message })
     },
     
     showError(message) {
-      this.errorMessage = message
-      this.successMessage = null
+      // Set error directly since useProducts handles it
+      this.$emit('error', message) // If parent handles errors
+      // Or set local error
+      this.productsError = message
       setTimeout(() => {
-        this.errorMessage = null
+        this.productsError = null
       }, 5000)
     },
     
     clearMessages() {
-      this.successMessage = null
-      this.errorMessage = null
+      // Clear messages handled by useProducts
+      this.productsSuccessMessage = null
+      this.productsError = null
     },
 
     closeNotificationModal() {
@@ -939,18 +987,16 @@ export default {
     },
 
     handleNotificationConfirm() {
-      // Reset table for adding more products
-      this.products = []
-      this.nextId = 1  // Reset the ID counter too
+      this.bulkProducts = []
+      this.nextId = 1
       this.addNewRow()
-      this.clearMessages()  // Clear any residual messages
+      this.clearMessages()
       this.showNotificationModal = false
       
-      console.log('Table reset, new products array:', this.products)
+      console.log('Table reset, new products array:', this.bulkProducts)
     },
 
     handleNotificationRetry() {
-      // Just close modal, keep current data
       this.showNotificationModal = false
     }
   }
@@ -958,11 +1004,12 @@ export default {
 </script>
 
 <style scoped>
+/* Same styles as before - keeping existing styles intact */
+
 .bulk-entry-page {
   padding: 1.5rem;
   max-width: 100%;
   margin: 0 auto;
-  background-color: var(--neutral-light);
   min-height: 100vh;
 }
 
@@ -979,26 +1026,23 @@ export default {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--tertiary-medium);
   font-size: 0.875rem;
 }
 
 .breadcrumb-link {
-  color: var(--tertiary-medium);
   text-decoration: none;
   transition: color 0.2s ease;
 }
 
 .breadcrumb-link:hover {
-  color: var(--primary);
+  color: var(--text-accent);
 }
 
 .breadcrumb-separator {
-  color: var(--tertiary-medium);
+  font-weight: 300;
 }
 
 .breadcrumb-current {
-  color: var(--primary);
   font-weight: 600;
 }
 
@@ -1013,7 +1057,7 @@ export default {
   align-items: center;
   gap: 0.5rem;
   padding: 0.625rem 1.25rem;
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   border: none;
   font-weight: 500;
   cursor: pointer;
@@ -1025,51 +1069,6 @@ export default {
 .btn-icon {
   width: 16px;
   height: 16px;
-}
-
-.btn-primary {
-  background-color: var(--primary);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background-color: var(--primary-dark);
-}
-
-.btn-secondary {
-  background-color: var(--neutral-medium);
-  color: var(--tertiary-dark);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background-color: var(--neutral-dark);
-}
-
-.btn-info {
-  background-color: var(--info);
-  color: white;
-}
-
-.btn-info:hover:not(:disabled) {
-  background-color: var(--info-dark);
-}
-
-.btn-success {
-  background-color: var(--success);
-  color: white;
-}
-
-.btn-success:hover:not(:disabled) {
-  background-color: var(--success-dark);
-}
-
-.btn-error {
-  background-color: var(--error);
-  color: white;
-}
-
-.btn-error:hover:not(:disabled) {
-  background-color: var(--error-dark);
 }
 
 .btn-sm {
@@ -1092,10 +1091,8 @@ export default {
 }
 
 .progress-section {
-  background: white;
   padding: 1rem 1.5rem;
   border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   margin-bottom: 1.5rem;
 }
 
@@ -1108,19 +1105,16 @@ export default {
 
 .product-count {
   font-weight: 600;
-  color: var(--tertiary-dark);
   font-size: 1rem;
 }
 
 .valid-count {
   font-size: 0.875rem;
-  color: var(--tertiary-medium);
 }
 
 .progress-bar {
   width: 100%;
   height: 8px;
-  background-color: var(--neutral-light);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -1147,24 +1141,9 @@ export default {
   flex-shrink: 0;
 }
 
-.success-message {
-  background-color: var(--success-light);
-  border: 1px solid var(--success);
-  color: var(--success-dark);
-}
-
-.error-message {
-  background-color: var(--error-light);
-  border: 1px solid var(--error);
-  color: var(--error-dark);
-}
-
 .table-container {
-  background: white;
   border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   overflow: hidden;
-  border: 1px solid var(--neutral-medium);
 }
 
 .table-header {
@@ -1172,14 +1151,11 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem;
-  border-bottom: 1px solid var(--neutral-medium);
-  background-color: white;
 }
 
 .table-title {
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--tertiary-dark);
   margin: 0;
 }
 
@@ -1200,12 +1176,10 @@ export default {
 }
 
 .bulk-entry-table th {
-  background-color: var(--neutral-light);
   padding: 1rem 0.75rem;
   text-align: left;
   font-weight: 600;
-  color: var(--tertiary-dark);
-  border-bottom: 2px solid var(--neutral-medium);
+  border-bottom: 2px solid var(--border-primary);
   font-size: 0.875rem;
   white-space: nowrap;
   position: sticky;
@@ -1215,25 +1189,24 @@ export default {
 
 .bulk-entry-table td {
   padding: 0.75rem;
-  border-bottom: 1px solid var(--neutral);
+  border-bottom: 1px solid var(--border-secondary);
   vertical-align: middle;
 }
 
 .bulk-entry-table tr:hover {
-  background-color: var(--neutral-light);
+  background-color: var(--state-hover);
 }
 
 .invalid-row {
-  background-color: rgba(235, 105, 102, 0.1) !important;
-  border-left: 3px solid var(--error);
+  background-color: rgba(var(--error), 0.1) !important;
+  border-left: 3px solid var(--status-error);
 }
 
 .invalid-row:hover {
-  background-color: rgba(235, 105, 102, 0.15) !important;
+  background-color: rgba(var(--error), 0.15) !important;
 }
 
 .required {
-  color: var(--error);
   font-weight: 500;
 }
 
@@ -1251,7 +1224,6 @@ export default {
 
 .row-number {
   font-weight: 500;
-  color: var(--tertiary-medium);
   text-align: center;
 }
 
@@ -1273,12 +1245,13 @@ export default {
   cursor: pointer;
   border-radius: 0.375rem;
   overflow: hidden;
-  border: 2px dashed var(--neutral);
+  border-width: 2px;
+  border-style: dashed;
   transition: border-color 0.2s ease;
 }
 
 .image-label:hover {
-  border-color: var(--primary);
+  border-color: var(--border-accent);
 }
 
 .product-image {
@@ -1293,8 +1266,7 @@ export default {
   justify-content: center;
   width: 100%;
   height: 100%;
-  background-color: var(--neutral-light);
-  color: var(--tertiary-medium);
+  color: var(--text-tertiary);
 }
 
 .image-placeholder svg {
@@ -1302,33 +1274,23 @@ export default {
   height: 20px;
 }
 
-/* Form Inputs */
+/* Form Inputs - Using semantic input classes */
 .table-input,
 .table-select {
   width: 100%;
   padding: 0.5rem;
-  border: 1px solid var(--neutral-medium);
   border-radius: 0.375rem;
   font-size: 0.875rem;
-  background: white;
-  color: var(--tertiary-dark);
-  transition: border-color 0.2s ease;
-}
-
-.table-input:focus,
-.table-select:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(115, 146, 226, 0.1);
+  transition: all 0.2s ease;
 }
 
 .table-input.invalid {
-  border-color: var(--error);
-  background-color: var(--error-light);
+  border-color: var(--border-error);
+  background-color: var(--status-error-bg);
 }
 
 .table-input.invalid:focus {
-  box-shadow: 0 0 0 3px rgba(229, 57, 53, 0.1);
+  box-shadow: 0 0 0 3px rgba(var(--error), 0.1);
 }
 
 .sku-input {
@@ -1350,7 +1312,6 @@ export default {
   right: 0.75rem;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--tertiary-medium);
   font-size: 0.875rem;
   pointer-events: none;
 }
@@ -1361,7 +1322,6 @@ export default {
 
 .field-error {
   font-size: 0.75rem;
-  color: var(--error);
   margin-top: 0.25rem;
   font-weight: 500;
 }
@@ -1392,22 +1352,22 @@ export default {
 }
 
 .duplicate-btn {
-  color: var(--info);
-  border-color: var(--info);
+  color: var(--status-info);
+  border-color: var(--status-info);
 }
 
 .duplicate-btn:hover {
-  background-color: var(--info-light);
+  background-color: var(--status-info-bg);
   color: var(--info-dark);
 }
 
 .delete-btn {
-  color: var(--error);
-  border-color: var(--error);
+  color: var(--status-error);
+  border-color: var(--status-error);
 }
 
 .delete-btn:hover {
-  background-color: var(--error-light);
+  background-color: var(--status-error-bg);
   color: var(--error-dark);
 }
 
@@ -1422,13 +1382,11 @@ export default {
   flex-direction: column;
   align-items: center;
   gap: 1rem;
-  color: var(--tertiary-medium);
 }
 
 .empty-icon {
   width: 48px;
   height: 48px;
-  color: var(--tertiary-medium);
 }
 
 .empty-content p {
@@ -1516,7 +1474,7 @@ export default {
   
   .bulk-entry-page {
     padding: 0;
-    background: white;
+    background: var(--surface-primary);
   }
   
   .table-container {
@@ -1529,30 +1487,6 @@ export default {
     border: 1px solid #000;
     padding: 0.5rem;
   }
-}
-
-/* Light Theme (Default) */
-.bulk-entry-page {
-  background-color: var(--neutral-light);
-  color: var(--tertiary-dark);
-}
-
-.table-container,
-.progress-section {
-  background-color: white;
-  border-color: var(--neutral-medium);
-}
-
-.bulk-entry-table th {
-  background-color: var(--neutral-light);
-  color: var(--tertiary-dark);
-}
-
-.table-input,
-.table-select {
-  background-color: white;
-  border-color: var(--neutral-medium);
-  color: var(--tertiary-dark);
 }
 
 /* Animation for new rows */
@@ -1575,7 +1509,7 @@ export default {
 .table-input:focus,
 .table-select:focus,
 .action-btn:focus {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--border-accent);
   outline-offset: 2px;
 }
 
@@ -1587,10 +1521,10 @@ export default {
 
 /* Validation success state */
 .table-input.valid {
-  border-color: var(--success);
+  border-color: var(--border-success);
 }
 
 .table-input.valid:focus {
-  box-shadow: 0 0 0 3px rgba(94, 180, 136, 0.1);
+  box-shadow: 0 0 0 3px rgba(var(--success), 0.1);
 }
 </style>

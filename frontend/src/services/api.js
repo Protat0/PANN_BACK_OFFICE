@@ -3,7 +3,7 @@ import axios from 'axios';
 
 // Create axios instance with default config
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -53,7 +53,7 @@ api.interceptors.response.use(
         // Attempt to refresh token
         const refreshToken = localStorage.getItem('refreshToken');
         if (refreshToken) {
-          const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/auth/refresh/`, {
+          const response = await axios.post(`${import.meta.env.VITE_API_URL}/auth/refresh/`, {
             refresh_token: refreshToken
           });
           

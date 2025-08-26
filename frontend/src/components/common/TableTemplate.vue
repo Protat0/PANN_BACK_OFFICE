@@ -11,7 +11,7 @@
       </table>
     </div>
     
-    <!-- Add this pagination section -->
+    <!-- Pagination section -->
     <div v-if="showPagination && totalPages > 1" class="pagination-container">
       <div class="d-flex justify-content-between align-items-center">
         <div class="pagination-info">
@@ -90,20 +90,23 @@ export default {
       default: 1
     }
   },
+  
   emits: ['page-changed'],
+  
   computed: {
     totalPages() {
       return Math.ceil(this.totalItems / this.itemsPerPage)
     },
     startItem() {
+      if (this.totalItems === 0) return 0
       return (this.currentPage - 1) * this.itemsPerPage + 1
     },
     endItem() {
       return Math.min(this.currentPage * this.itemsPerPage, this.totalItems)
     }
   },
+  
   methods: {
-
     handleScroll(event) {
       const scrollTop = event.target.scrollTop
       const tableContainer = event.target
@@ -116,53 +119,57 @@ export default {
     },
 
     goToPage(page) {
-
-      console.log('goToPage called with:', page) // Add debug
-      console.log('Current page:', this.currentPage) // Add debug
-      console.log('Total pages:', this.totalPages) // Add debug
-
       if (page >= 1 && page <= this.totalPages && page !== this.currentPage) {
-        console.log('Emitting page-changed event') 
         this.$emit('page-changed', page)
       }
     },
+    
     previousPage() {
       this.goToPage(this.currentPage - 1)
     },
+    
     nextPage() {
       this.goToPage(this.currentPage + 1)
     }
   }
 }
+
+
 </script>
 
 <style scoped>
 .table-container {
-  background: white;
+  background-color: var(--surface-primary);
   border-radius: 0.75rem;
-  /* Much harder drop shadow on all sides */
-  box-shadow: 
-    0 20px 25px -5px rgba(0, 0, 0, 0.25),
-    0 10px 10px -5px rgba(0, 0, 0, 0.15),
-    0 0 0 1px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-lg);
+  /* Changed from overflow: hidden to overflow: visible for dropdown */
+  overflow: visible;
+  border: 1px solid var(--border-secondary);
+  position: relative;
+  z-index: 1;
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .table-responsive {
-  border-radius: 0.75rem;
+  border-radius: 0.75rem 0.75rem 0 0;
+  /* Only clip horizontal overflow, allow vertical overflow for dropdown */
+  overflow-x: auto;
+  overflow-y: visible;
+  position: relative;
+  max-width: 100%;
 }
 
 .data-table {
   margin-bottom: 0;
   border-collapse: separate;
   border-spacing: 0;
+  width: 100%;
 }
 
 /* Header Styling */
 .table-header {
   background-color: var(--primary-medium) !important;
-  color: white !important;
+  color: var(--text-inverse) !important;
 }
 
 .data-table :deep(.table-header th) {
@@ -171,7 +178,7 @@ export default {
   font-size: 0.875rem;
   letter-spacing: 0.025em;
   border: none !important;
-  color: white !important;
+  color: var(--text-inverse) !important;
   text-transform: uppercase;
   position: relative;
   background-color: var(--primary-medium) !important;
@@ -188,10 +195,11 @@ export default {
 /* Body Styling */
 .data-table :deep(tbody td) {
   padding: 0.875rem 1rem;
-  border-bottom: 1px solid var(--neutral-light);
+  border-bottom: 1px solid var(--border-secondary);
   font-size: 0.875rem;
-  color: var(--tertiary-dark);
+  color: var(--text-secondary);
   vertical-align: middle;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
 .data-table :deep(tbody tr:last-child td) {
@@ -199,11 +207,11 @@ export default {
 }
 
 .data-table :deep(tbody tr:hover) {
-  background-color: var(--neutral-light);
+  background-color: var(--state-hover);
 }
 
 .data-table :deep(tbody tr.table-primary) {
-  background-color: var(--primary-light);
+  background-color: var(--state-selected);
 }
 
 .data-table :deep(tbody tr.text-muted) {
@@ -224,13 +232,11 @@ export default {
   overflow: hidden;
   padding: 0;
   margin: 0 1px;
-  /* Harder drop shadow for action buttons */
   box-shadow: 0 3px 6px 0 rgba(0, 0, 0, 0.12);
 }
 
 .data-table :deep(.action-btn:hover) {
   transform: translateY(-2px);
-  /* Much harder shadow on hover */
   box-shadow: 0 8px 15px rgba(0, 0, 0, 0.25);
 }
 
@@ -246,7 +252,7 @@ export default {
   transform: scale(1.1);
 }
 
-/* Action Button Color Overrides using colors.css */
+/* Action Button Color Overrides */
 .data-table :deep(.action-btn-edit) {
   --bs-btn-color: var(--secondary);
   --bs-btn-border-color: var(--secondary);
@@ -313,6 +319,7 @@ export default {
   --bs-btn-active-border-color: var(--error-dark);
 }
 
+/* Additional action button variants */
 .data-table :deep(.action-btn-duplicate) {
   --bs-btn-color: var(--secondary-medium);
   --bs-btn-border-color: var(--secondary-medium);
@@ -345,126 +352,6 @@ export default {
   --bs-btn-hover-border-color: var(--info-dark);
 }
 
-.data-table :deep(.action-btn-share) {
-  --bs-btn-color: var(--primary-medium);
-  --bs-btn-border-color: var(--primary-medium);
-  --bs-btn-hover-color: var(--primary-dark);
-  --bs-btn-hover-bg: var(--primary-light);
-  --bs-btn-hover-border-color: var(--primary-dark);
-}
-
-.data-table :deep(.action-btn-settings) {
-  --bs-btn-color: var(--tertiary-dark);
-  --bs-btn-border-color: var(--tertiary-dark);
-  --bs-btn-hover-color: var(--tertiary-dark);
-  --bs-btn-hover-bg: var(--neutral-light);
-  --bs-btn-hover-border-color: var(--tertiary-dark);
-}
-
-.data-table :deep(.action-btn-history) {
-  --bs-btn-color: var(--info-dark);
-  --bs-btn-border-color: var(--info-dark);
-  --bs-btn-hover-color: var(--info-dark);
-  --bs-btn-hover-bg: var(--info-light);
-  --bs-btn-hover-border-color: var(--info-dark);
-}
-
-.data-table :deep(.action-btn-favorite) {
-  --bs-btn-color: #ffc107;
-  --bs-btn-border-color: #ffc107;
-  --bs-btn-hover-color: #f57c00;
-  --bs-btn-hover-bg: #fff3cd;
-  --bs-btn-hover-border-color: #f57c00;
-}
-
-.data-table :deep(.action-btn-print) {
-  --bs-btn-color: var(--neutral-dark);
-  --bs-btn-border-color: var(--neutral-dark);
-  --bs-btn-hover-color: var(--tertiary-dark);
-  --bs-btn-hover-bg: var(--neutral-light);
-  --bs-btn-hover-border-color: var(--tertiary-dark);
-}
-
-.data-table :deep(.action-btn-email) {
-  --bs-btn-color: #17a2b8;
-  --bs-btn-border-color: #17a2b8;
-  --bs-btn-hover-color: #138496;
-  --bs-btn-hover-bg: #d1ecf1;
-  --bs-btn-hover-border-color: #138496;
-}
-
-.data-table :deep(.action-btn-copy) {
-  --bs-btn-color: var(--secondary-dark);
-  --bs-btn-border-color: var(--secondary-dark);
-  --bs-btn-hover-color: var(--secondary-dark);
-  --bs-btn-hover-bg: var(--secondary-light);
-  --bs-btn-hover-border-color: var(--secondary-dark);
-}
-
-.data-table :deep(.action-btn-move) {
-  --bs-btn-color: var(--primary-dark);
-  --bs-btn-border-color: var(--primary-dark);
-  --bs-btn-hover-color: var(--primary-dark);
-  --bs-btn-hover-bg: var(--primary-light);
-  --bs-btn-hover-border-color: var(--primary-dark);
-}
-
-.data-table :deep(.action-btn-export) {
-  --bs-btn-color: var(--success-dark);
-  --bs-btn-border-color: var(--success-dark);
-  --bs-btn-hover-color: var(--success-dark);
-  --bs-btn-hover-bg: var(--success-light);
-  --bs-btn-hover-border-color: var(--success-dark);
-}
-
-.data-table :deep(.action-btn-import) {
-  --bs-btn-color: var(--info-dark);
-  --bs-btn-border-color: var(--info-dark);
-  --bs-btn-hover-color: var(--info-dark);
-  --bs-btn-hover-bg: var(--info-light);
-  --bs-btn-hover-border-color: var(--info-dark);
-}
-
-.data-table :deep(.action-btn-approve) {
-  --bs-btn-color: var(--success);
-  --bs-btn-border-color: var(--success);
-  --bs-btn-hover-color: var(--success-dark);
-  --bs-btn-hover-bg: var(--success-light);
-  --bs-btn-hover-border-color: var(--success-dark);
-}
-
-.data-table :deep(.action-btn-reject) {
-  --bs-btn-color: var(--error);
-  --bs-btn-border-color: var(--error);
-  --bs-btn-hover-color: var(--error-dark);
-  --bs-btn-hover-bg: var(--error-light);
-  --bs-btn-hover-border-color: var(--error-dark);
-}
-
-.data-table :deep(.action-btn-pause) {
-  --bs-btn-color: #ffc107;
-  --bs-btn-border-color: #ffc107;
-  --bs-btn-hover-color: #f57c00;
-  --bs-btn-hover-bg: #fff3cd;
-  --bs-btn-hover-border-color: #f57c00;
-}
-
-.data-table :deep(.action-btn-play) {
-  --bs-btn-color: var(--success);
-  --bs-btn-border-color: var(--success);
-  --bs-btn-hover-color: var(--success-dark);
-  --bs-btn-hover-bg: var(--success-light);
-  --bs-btn-hover-border-color: var(--success-dark);
-}
-
-.data-table :deep(.action-btn-stop) {
-  --bs-btn-color: var(--error);
-  --bs-btn-border-color: var(--error);
-  --bs-btn-hover-color: var(--error-dark);
-  --bs-btn-hover-bg: var(--error-light);
-  --bs-btn-hover-border-color: var(--error-dark);
-}
-
 /* Badge and Status Styling */
 .data-table :deep(.badge) {
   font-size: 0.75rem;
@@ -487,10 +374,11 @@ export default {
 /* Pagination Container with Shadow */
 .pagination-container {
   padding: 1rem;
-  border-top: 1px solid var(--neutral-light);
-  background-color: #FAFAFA; /* Lighter than global background */
-  /* Harder inner shadow for depth */
-  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.12);
+  border-top: 1px solid var(--border-secondary);
+  background-color: var(--surface-secondary);
+  box-shadow: inset 0 2px 4px 0 var(--shadow-sm);
+  border-radius: 0 0 0.75rem 0.75rem;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .pagination-info {
@@ -498,35 +386,33 @@ export default {
 }
 
 .pagination .page-link {
-  color: var(--primary);
-  border-color: var(--neutral);
+  color: var(--text-accent);
+  border-color: var(--border-primary);
   padding: 0.375rem 0.75rem;
-  /* Harder shadow for pagination buttons */
-  box-shadow: 0 3px 6px 0 rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-sm);
   transition: all 0.2s ease;
+  background-color: var(--surface-primary);
 }
 
 .pagination .page-link:hover {
-  color: var(--primary-dark);
-  background-color: var(--primary-light);
-  border-color: var(--primary);
-  /* Much harder shadow on hover */
-  box-shadow: 0 6px 12px 0 rgba(0, 0, 0, 0.18);
+  color: var(--text-accent);
+  background-color: var(--state-hover);
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-md);
   transform: translateY(-2px);
 }
 
 .pagination .page-item.active .page-link {
   background-color: var(--primary);
   border-color: var(--primary);
-  color: white;
-  /* Hardest shadow for active state */
-  box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.25);
+  color: var(--text-inverse);
+  box-shadow: var(--shadow-lg);
 }
 
 .pagination .page-item.disabled .page-link {
-  color: var(--tertiary-medium);
-  background-color: var(--neutral-light);
-  border-color: var(--neutral);
+  color: var(--text-disabled);
+  background-color: var(--surface-tertiary);
+  border-color: var(--border-secondary);
   box-shadow: none;
 }
 
@@ -551,10 +437,77 @@ export default {
   transition: transform 0.2s ease;
 }
 
+/* Sticky Header */
+.table-header-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 10; /* Lower than dropdown but above table content */
+  background-color: var(--primary-medium) !important;
+  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.15);
+}
+
+.table-header-sticky th {
+  position: relative;
+  background-color: var(--primary-medium) !important;
+}
+
+/* Add shadow when scrolling for better visual separation */
+.table-header-sticky::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.15), transparent);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* Enhanced scroll shadow effect */
+.table-responsive.scrolled .table-header-sticky::after {
+  opacity: 1;
+}
+
+/* Checkbox Styling */
+.data-table :deep(.form-check-input) {
+  border-width: 2px !important;
+  border-color: var(--border-primary) !important;
+  background-color: var(--surface-primary);
+  width: 1.1em;
+  height: 1.1em;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.data-table :deep(.form-check-input:hover) {
+  border-color: var(--border-accent) !important;
+  box-shadow: var(--shadow-md);
+}
+
+.data-table :deep(.form-check-input:focus) {
+  border-color: var(--border-accent) !important;
+  box-shadow: 0 0 0 3px rgba(160, 123, 227, 0.25) !important;
+}
+
+.data-table :deep(.form-check-input:checked) {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  border-width: 2px !important;
+  box-shadow: var(--shadow-md);
+}
+
+.data-table :deep(.form-check-input:indeterminate) {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  border-width: 2px !important;
+  box-shadow: var(--shadow-md);
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
   .table-responsive {
-    border-radius: 0.75rem;
+    border-radius: 0.75rem 0.75rem 0 0;
   }
   
   .data-table {
@@ -593,69 +546,21 @@ export default {
   }
 }
 
-.table-header-sticky {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background-color: var(--primary-medium) !important;
-  /* Harder shadow for sticky header */
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.15);
+/* Reduced Motion Preferences */
+@media (prefers-reduced-motion: reduce) {
+  .data-table :deep(.action-btn),
+  .pagination .page-link,
+  .page-link-icon,
+  .data-table :deep(.action-btn svg),
+  .page-link-icon svg {
+    transition: none !important;
+  }
+  
+  .data-table :deep(.action-btn:hover),
+  .pagination .page-link:hover,
+  .page-link-icon:hover {
+    transform: none !important;
+  }
 }
 
-.table-header-sticky th {
-  position: relative;
-  background-color: var(--primary-medium) !important;
-}
-
-/* Add shadow when scrolling for better visual separation */
-.table-header-sticky::after {
-  content: '';
-  position: absolute;
-  bottom: -3px;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.15), transparent);
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-/* Enhanced scroll shadow effect */
-.table-responsive.scrolled .table-header-sticky::after {
-  opacity: 1;
-}
-
-/* Checkbox Styling - Thicker Outlines for Better Clarity */
-.data-table :deep(.form-check-input) {
-  border-width: 2px !important;
-  border-color: var(--neutral-dark) !important;
-  width: 1.1em;
-  height: 1.1em;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.08);
-}
-
-.data-table :deep(.form-check-input:hover) {
-  border-color: var(--primary) !important;
-  box-shadow: 0 3px 6px 0 rgba(0, 0, 0, 0.12);
-}
-
-.data-table :deep(.form-check-input:focus) {
-  border-color: var(--primary) !important;
-  box-shadow: 0 0 0 3px rgba(115, 146, 226, 0.25) !important;
-}
-
-.data-table :deep(.form-check-input:checked) {
-  background-color: var(--primary) !important;
-  border-color: var(--primary) !important;
-  border-width: 2px !important;
-  box-shadow: 0 3px 6px 0 rgba(0, 0, 0, 0.15);
-}
-
-.data-table :deep(.form-check-input:indeterminate) {
-  background-color: var(--primary) !important;
-  border-color: var(--primary) !important;
-  border-width: 2px !important;
-  box-shadow: 0 3px 6px 0 rgba(0, 0, 0, 0.15);
-}
 </style>

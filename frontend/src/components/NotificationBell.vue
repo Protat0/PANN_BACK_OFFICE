@@ -92,9 +92,9 @@
 
       <!-- Footer -->
       <div class="dropdown-footer">
-        <button @click="viewAllNotifications" class="view-all-btn">
+        <router-link to="/allNotifications" class="view-all-btn" @click="closeDropdown">
           View All Notifications
-        </button>
+        </router-link>
       </div>
     </div>
 
@@ -104,185 +104,42 @@
       class="notification-overlay"
       @click="showDropdown = false"
     ></div>
-
-    <!-- Full Notifications Modal -->
-    <div v-if="showFullModal" class="full-modal-overlay" @click="closeFullModal">
-      <div class="full-modal-content" @click.stop>
-        <!-- Modal Header -->
-        <div class="modal-header">
-          <h2>All Notifications</h2>
-          <button @click="closeFullModal" class="modal-close-btn">
-            ✕
-          </button>
-        </div>
-
-        <!-- Modal Filters -->
-        <div class="modal-filters">
-          <div class="filter-group">
-            <label>Filter:</label>
-            <select v-model="modalFilter" @change="applyModalFilters">
-              <option value="all">All Notifications</option>
-              <option value="unread">Unread Only</option>
-              <option value="today">Today</option>
-              <option value="week">This Week</option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <label>Priority:</label>
-            <select v-model="priorityFilter" @change="applyModalFilters">
-              <option value="">All Priorities</option>
-              <option value="urgent">Urgent</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <label>Type:</label>
-            <select v-model="typeFilter" @change="applyModalFilters">
-              <option value="">All Types</option>
-              <option value="system">System</option>
-              <option value="inventory">Inventory</option>
-              <option value="order">Order</option>
-              <option value="payment">Payment</option>
-              <option value="promotion">Promotion</option>
-              <option value="alert">Alert</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Modal Content -->
-        <div class="modal-body">
-          <div v-if="modalLoading" class="loading-state">
-            <div class="spinner"></div>
-            <p>Loading all notifications...</p>
-          </div>
-
-          <div v-else-if="filteredModalNotifications.length === 0" class="empty-state">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" class="empty-icon">
-              <path d="M12 2C13.1 2 14 2.9 14 4C14 4.74 13.6 5.39 13 5.73V7C13 10.97 16.03 14 20 14V16C20 16.55 19.55 17 19 17H5C4.45 17 4 16.55 4 16V14C7.97 14 11 10.97 11 7V5.73C10.4 5.39 10 4.74 10 4C10 2.9 10.9 2 12 2Z" fill="#d1d5db"/>
-            </svg>
-            <h3>No notifications found</h3>
-            <p>{{ getEmptyStateMessage() }}</p>
-          </div>
-
-          <div v-else class="modal-notifications-list">
-            <!-- Pagination Info -->
-            <div v-if="pagination.total_count > 0" class="pagination-info">
-              Showing {{ filteredModalNotifications.length }} of {{ pagination.total_count }} notifications
-              <span v-if="pagination.total_pages > 1">
-                (Page {{ pagination.current_page }} of {{ pagination.total_pages }})
-              </span>
-            </div>
-
-            <div 
-              v-for="notification in filteredModalNotifications" 
-              :key="notification.id"
-              class="modal-notification-item"
-              :class="{ 
-                'unread': !notification.is_read,
-                [`priority-${notification.priority}`]: true 
-              }"
-            >
-              <!-- Priority Indicator -->
-              <div class="priority-indicator" :class="`priority-${notification.priority}`"></div>
-              
-              <!-- Notification Content -->
-              <div class="notification-content">
-                <div class="notification-header">
-                  <h4>{{ notification.title }}</h4>
-                  <div class="notification-actions">
-                    <span class="time-ago">{{ formatTimeAgo(notification.created_at) }}</span>
-                    <button 
-                      v-if="!notification.is_read"
-                      @click="markAsRead(notification)"
-                      class="mark-read-btn"
-                      title="Mark as read"
-                    >
-                      ✓
-                    </button>
-                  </div>
-                </div>
-                <p class="notification-message">{{ notification.message }}</p>
-                <div class="notification-meta">
-                  <span class="notification-type">{{ notification.notification_type || 'System' }}</span>
-                  <span class="priority-badge" :class="`priority-${notification.priority}`">
-                    {{ formatPriority(notification.priority) }}
-                  </span>
-                  <span v-if="notification.metadata && notification.metadata.source" class="notification-source">
-                    {{ notification.metadata.source }}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Load More Button (if paginated) -->
-            <div v-if="pagination.has_next" class="load-more-container">
-              <button @click="loadMoreNotifications" class="load-more-btn" :disabled="loadingMore">
-                {{ loadingMore ? 'Loading...' : 'Load More' }}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Modal Footer -->
-        <div class="modal-footer">
-          <button 
-            v-if="unreadCount > 0"
-            @click="markAllAsReadInModal"
-            class="btn-secondary"
-            :disabled="markingAllAsRead"
-          >
-            {{ markingAllAsRead ? 'Marking...' : `Mark all ${unreadCount} as read` }}
-          </button>
-          
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script>
+import apijs from '../services/api'
 export default {
   name: 'NotificationBell',
   data() {
     return {
       notifications: [],
-      allNotifications: [],
-      filteredModalNotifications: [],
       unreadCount: 0,
       showDropdown: false,
-      showFullModal: false,
       loading: false,
-      modalLoading: false,
-      loadingMore: false,
       markingAllAsRead: false,
-      pollInterval: null,
-      modalFilter: 'all',
-      priorityFilter: '',
-      typeFilter: '',
-      pagination: {
-        current_page: 1,
-        total_pages: 1,
-        total_count: 0,
-        per_page: 50,
-        has_next: false,
-        has_previous: false
-      }
+      pollInterval: null
     }
   },
-  mounted() { //This was used for debugging and ensuring that the notifications does get recent entries. 
-   // this.fetchNotifications()
-    //this.startPolling()
+  
+  mounted() {
+    this.fetchNotifications()
+    this.startPolling()
   },
+  
   beforeUnmount() {
     this.stopPolling()
   },
+  
   methods: {
+    // ================================================================
+    // DATA FETCHING METHODS
+    // ================================================================
+    
     async fetchNotifications() {
       this.loading = true
       try {
-        const response = await fetch('http://localhost:8000/api/notifications/recent', {
+        const response = await fetch('http://localhost:8000/api/v1/notifications/recent', {
           headers: {
             'Content-Type': 'application/json'
           }
@@ -313,6 +170,10 @@ export default {
       }
     },
 
+    // ================================================================
+    // UI STATE MANAGEMENT
+    // ================================================================
+    
     updateUnreadCount() {
       this.unreadCount = this.notifications.filter(n => !n.is_read).length
     },
@@ -324,35 +185,44 @@ export default {
       }
     },
 
+    closeDropdown() {
+      this.showDropdown = false
+    },
+
+    // ================================================================
+    // NOTIFICATION ACTIONS
+    // ================================================================
+    
     async markAsRead(notification) {
       if (notification.is_read) return
 
+      const notificationId = notification.id || notification._id;
+      
+      // Vue 3 way - direct assignment
+      notification.isMarkingRead = true;
+
       try {
         const response = await fetch(
-          `http://localhost:8000/api/notifications/${notification.id}/mark-read/`,
+          `http://localhost:8000/api/notifications/${notificationId}/mark-read/`,
           {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json'
             }
           }
-        )
+        );
 
         if (response.ok) {
           notification.is_read = true
           this.updateUnreadCount()
-          
-          // Also update in modal notifications if exists
-          const modalNotification = this.allNotifications.find(n => n.id === notification.id)
-          if (modalNotification) {
-            modalNotification.is_read = true
-          }
-          this.applyModalFilters()
         } else {
           console.error('Failed to mark notification as read:', await response.text())
         }
       } catch (error) {
         console.error('Error marking notification as read:', error)
+      } finally {
+        // Vue 3 way - direct assignment
+        notification.isMarkingRead = false;
       }
     },
 
@@ -361,162 +231,52 @@ export default {
       
       this.markingAllAsRead = true
       try {
-        // Mark all notifications as read individually since we don't have a bulk endpoint
-        const unreadNotifications = this.notifications.filter(n => !n.is_read)
-        
-        for (const notification of unreadNotifications) {
-          await this.markAsRead(notification)
-        }
-        
-        // Update counts
-        this.unreadCount = 0
-        this.applyModalFilters()
-      } catch (error) {
-        console.error('Error marking all notifications as read:', error)
-      } finally {
-        this.markingAllAsRead = false
-      }
-    },
-
-    viewAllNotifications() {
-      console.log('Opening modal...')
-      this.showDropdown = false
-      this.showFullModal = true
-      this.fetchAllNotifications()
-    },
-
-    closeFullModal() {
-      console.log('Closing modal...')
-      this.showFullModal = false
-      this.modalFilter = 'all'
-      this.priorityFilter = ''
-      this.typeFilter = ''
-      this.pagination.current_page = 1
-    },
-
-    async fetchAllNotifications() {
-      this.modalLoading = true
-      try {
-        const response = await fetch('http://localhost:8000/api/notifications/all/?page=1&limit=50', {
+        const response = await fetch('http://localhost:8000/api/notifications/mark-all-read/', {
+          method: 'PATCH',
           headers: {
             'Content-Type': 'application/json'
           }
         })
 
-       // console.log('All notifications API Response status:', response.status) !THis is to check if the Notifications API will be able to connect and fetch
-
         if (response.ok) {
           const result = await response.json()
-          console.log('All notifications response:', result)
+          console.log('Mark all as read response:', result)
           
-          if (result.success) {
-            this.allNotifications = result.data || []
-            this.pagination = result.pagination || this.pagination
-            this.applyModalFilters()
-          } else {
-            console.error('API returned error:', result.message)
-            this.allNotifications = []
-          }
+          // Update all notifications to read status
+          this.notifications.forEach(notification => {
+            notification.is_read = true
+          })
+          
+          // Update counts
+          this.unreadCount = 0
+          
         } else {
-          console.error('Failed to fetch all notifications:', response.status, await response.text())
-          this.allNotifications = []
+          console.error('Failed to mark all as read:', await response.text())
+          await this.fallbackMarkAllAsRead()
         }
-      } catch (error) {
-        console.error('Error fetching all notifications:', error)
-        this.allNotifications = []
-      } finally {
-        this.modalLoading = false
-      }
-    },
-
-    async loadMoreNotifications() {
-      if (!this.pagination.has_next || this.loadingMore) return
-      
-      this.loadingMore = true
-      try {
-        const nextPage = this.pagination.current_page + 1
-        const response = await fetch(`http://localhost:8000/api/notifications/all/?page=${nextPage}&limit=50`, {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        })
-
-        if (response.ok) {
-          const result = await response.json()
-          
-          if (result.success) {
-            this.allNotifications = [...this.allNotifications, ...(result.data || [])]
-            this.pagination = result.pagination || this.pagination
-            this.applyModalFilters()
-          }
-        }
-      } catch (error) {
-        console.error('Error loading more notifications:', error)
-      } finally {
-        this.loadingMore = false
-      }
-    },
-
-    applyModalFilters() {
-      console.log('Applying filters:', this.modalFilter, this.priorityFilter, this.typeFilter)
-      let filtered = [...this.allNotifications]
-
-      // Apply read/unread filter
-      if (this.modalFilter === 'unread') {
-        filtered = filtered.filter(n => !n.is_read)
-      } else if (this.modalFilter === 'today') {
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        filtered = filtered.filter(n => {
-          const notificationDate = new Date(n.created_at)
-          return notificationDate >= today
-        })
-      } else if (this.modalFilter === 'week') {
-        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-        filtered = filtered.filter(n => {
-          const notificationDate = new Date(n.created_at)
-          return notificationDate >= weekAgo
-        })
-      }
-
-      // Apply priority filter
-      if (this.priorityFilter) {
-        filtered = filtered.filter(n => n.priority === this.priorityFilter)
-      }
-
-      // Apply type filter
-      if (this.typeFilter) {
-        filtered = filtered.filter(n => n.notification_type === this.typeFilter)
-      }
-
-      this.filteredModalNotifications = filtered
-      console.log('Filtered notifications:', this.filteredModalNotifications.length)
-    },
-
-    async markAllAsReadInModal() {
-      if (this.unreadCount === 0) return
-      
-      this.markingAllAsRead = true
-      try {
-        const unreadNotifications = this.allNotifications.filter(n => !n.is_read)
-        
-        for (const notification of unreadNotifications) {
-          await this.markAsRead(notification)
-        }
-        
-        this.unreadCount = 0
-        this.applyModalFilters()
       } catch (error) {
         console.error('Error marking all notifications as read:', error)
+        await this.fallbackMarkAllAsRead()
       } finally {
         this.markingAllAsRead = false
       }
     },
 
+    async fallbackMarkAllAsRead() {
+      const unreadNotifications = this.notifications.filter(n => !n.is_read)
+      for (const notification of unreadNotifications) {
+        await this.markAsRead(notification)
+      }
+    },
+
+    // ================================================================
+    // POLLING AND BACKGROUND UPDATES
+    // ================================================================
+    
     startPolling() {
       // Poll for new notifications every 30 seconds
       this.pollInterval = setInterval(() => {
-        if (!this.showDropdown && !this.showFullModal) {
+        if (!this.showDropdown) {
           this.fetchNotifications()
         }
       }, 30000)
@@ -525,9 +285,14 @@ export default {
     stopPolling() {
       if (this.pollInterval) {
         clearInterval(this.pollInterval)
+        this.pollInterval = null
       }
     },
 
+    // ================================================================
+    // UTILITY METHODS
+    // ================================================================
+    
     formatTimeAgo(dateString) {
       const now = new Date()
       const notificationDate = new Date(dateString)
@@ -555,28 +320,12 @@ export default {
         urgent: 'Urgent'
       }
       return priorities[priority] || priority
-    },
-
-    getEmptyStateMessage() {
-      if (this.modalFilter === 'unread') {
-        return "You're all caught up! No unread notifications."
-      } else if (this.modalFilter === 'today') {
-        return "No notifications from today."
-      } else if (this.modalFilter === 'week') {
-        return "No notifications from this week."
-      } else if (this.priorityFilter) {
-        return `No ${this.priorityFilter} priority notifications found.`
-      } else if (this.typeFilter) {
-        return `No ${this.typeFilter} notifications found.`
-      }
-      return "You're all caught up!"
     }
   }
 }
 </script>
 
 <style scoped>
-/* ... (keeping all the existing styles) ... */
 .notification-container {
   position: relative;
 }
@@ -871,6 +620,7 @@ export default {
 }
 
 .view-all-btn {
+  display: block;
   width: 100%;
   background-color: #6366f1;
   color: white;
@@ -880,250 +630,20 @@ export default {
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.2s;
+  text-decoration: none;
+  text-align: center;
 }
 
 .view-all-btn:hover {
   background-color: #4f46e5;
-}
-
-/* Full Modal Styles */
-.full-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 2000;
-  padding: 1rem;
-}
-
-.full-modal-content {
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  width: 100%;
-  max-width: 800px;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem 2rem;
-  border-bottom: 1px solid #e5e7eb;
-  background-color: #f9fafb;
-}
-
-.modal-header h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.modal-close-btn {
-  background: none;
-  border: none;
-  color: #6b7280;
-  font-size: 1.5rem;
-  cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 8px;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-}
-
-.modal-close-btn:hover {
-  background-color: #f3f4f6;
-  color: #374151;
-}
-
-.modal-filters {
-  display: flex;
-  gap: 1rem;
-  padding: 1rem 2rem;
-  border-bottom: 1px solid #f3f4f6;
-  background-color: white;
-}
-
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.filter-group label {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #374151;
-}
-
-.filter-group select {
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
-  background: white;
-  cursor: pointer;
-}
-
-.modal-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 1rem 0;
-}
-
-.modal-notifications-list {
-  padding: 0 2rem;
-}
-
-.modal-notification-item {
-  display: flex;
-  padding: 1.5rem 0;
-  border-bottom: 1px solid #f3f4f6;
-  transition: background-color 0.2s;
-}
-
-.modal-notification-item:hover {
-  background-color: #f9fafb;
-  margin: 0 -2rem;
-  padding-left: 2rem;
-  padding-right: 2rem;
-}
-
-.modal-notification-item.unread {
-  background-color: #eff6ff;
-}
-
-.modal-notification-item.unread:hover {
-  background-color: #dbeafe;
-  margin: 0 -2rem;
-  padding-left: 2rem;
-  padding-right: 2rem;
-}
-
-.modal-notification-item .notification-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  margin-bottom: 0.75rem;
-}
-
-.modal-notification-item .notification-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.mark-read-btn {
-  background: #6366f1;
   color: white;
-  border: none;
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 0.75rem;
-  transition: background-color 0.2s;
-}
-
-.mark-read-btn:hover {
-  background: #4f46e5;
-}
-
-.notification-source {
-  font-size: 0.75rem;
-  color: #9ca3af;
-  background: #f3f4f6;
-  padding: 0.125rem 0.5rem;
-  border-radius: 9999px;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem 2rem;
-  border-top: 1px solid #e5e7eb;
-  background-color: #f9fafb;
-}
-
-.btn-primary, .btn-secondary {
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-}
-
-.btn-primary {
-  background-color: #6366f1;
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: #4f46e5;
-}
-
-.btn-secondary {
-  background-color: #f3f4f6;
-  color: #374151;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background-color: #e5e7eb;
-}
-
-.btn-secondary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  text-decoration: none;
 }
 
 @media (max-width: 768px) {
-  .full-modal-content {
-    max-width: 95vw;
-    max-height: 95vh;
-  }
-  
-  .modal-header {
-    padding: 1rem 1.5rem;
-  }
-  
-  .modal-filters {
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 1rem 1.5rem;
-  }
-  
-  .modal-notifications-list {
-    padding: 0 1.5rem;
-  }
-  
-  .modal-footer {
-    padding: 1rem 1.5rem;
-    flex-direction: column;
-    gap: 1rem;
-  }
-  
-  .modal-footer .btn-primary,
-  .modal-footer .btn-secondary {
-    width: 100%;
+  .notification-dropdown {
+    width: 350px;
+    max-width: 90vw;
   }
 }
 </style>

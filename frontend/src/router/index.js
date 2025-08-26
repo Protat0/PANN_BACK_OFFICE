@@ -12,8 +12,15 @@ import Customers from '@/pages/Customers.vue'
 import Products from '@/pages/inventory/Products.vue'
 import ProductBulkEntry from '@/pages/inventory/ProductBulkEntry.vue'
 import ProductDetails from '@/pages/inventory/ProductDetails.vue'
+import Categories from '@/pages/inventory/Categories.vue'
+import CategoryDetails from '@/pages/inventory/CategoryDetails.vue'
+import Promotions from '@/pages/Promotions.vue'
 import SalesByItem from '@/pages/reports/SalesByItem.vue'
 import SalesByCategory from '@/pages/reports/SalesByCategory.vue'
+import UncategorizedProducts from '@/components/categories/UncategorizedProducts.vue'
+import Logs from '@/pages/Logs.vue'
+import AllNotifications from '@/pages/notifications/AllNotifications.vue'
+import TesterPage from '@/pages/TesterPage.vue'
 import Suppliers from '@/pages/suppliers/Suppliers.vue'
 import SupplierDetails from '@/pages/suppliers/SupplierDetails.vue'
 import OrdersHistory from '@/pages/suppliers/OrdersHistory.vue'
@@ -94,6 +101,17 @@ const router = createRouter({
           component: ProductDetails,
           props: true // This passes the route params as props to the component
         },
+        {
+          path: 'categories',
+          name: 'Categories',
+          component: Categories
+        },
+        {
+          path: 'category/:id', // Change this line
+          name: 'Category Details',
+          component: CategoryDetails,
+          props: true
+        },
         // Suppliers routes
         {
           path: 'suppliers',
@@ -144,12 +162,17 @@ const router = createRouter({
           component: HomeView
         },
         {
+          path: 'promotions',
+          name: 'Promotions',
+          component: Promotions
+        },
+        {
           path: 'sales-by-item',
           name: 'SalesByItem',
           component: SalesByItem
         },
         {
-          path: 'sales-by-category',
+          path: 'salesbycategory',
           name: 'SalesByCategory',
           component: SalesByCategory
         },
@@ -157,6 +180,26 @@ const router = createRouter({
           path: 'about',
           name: 'about',
           component: () => import('../views/AboutView.vue')
+        },
+        {
+          path: 'logs',
+          name: 'Logs',
+          component: Logs
+        },
+        {
+          path: 'uncategorized',
+          name: 'UncategorizedProducts',
+          component: UncategorizedProducts
+        },
+        {
+          path: 'allNotifications',
+          name: 'AllNotifications',
+          component: AllNotifications
+        },
+        {
+          path: 'tester',
+          name: 'TesterPage',
+          component: TesterPage
         }
       ]
     },

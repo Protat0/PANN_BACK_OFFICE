@@ -61,7 +61,7 @@
         <div class="notification-actions">
           <button 
             v-if="type === 'error'" 
-            class="action-btn primary-btn" 
+            class="btn btn-submit btn-with-icon btn-sm" 
             @click="$emit('retry')"
           >
             <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -73,7 +73,7 @@
             Try Again
           </button>
           
-          <button class="action-btn secondary-btn" @click="$emit('close')">
+          <button class="btn btn-cancel btn-sm" @click="$emit('close')">
             Close
           </button>
         </div>
@@ -204,47 +204,56 @@ export default {
 </script>
 
 <style scoped>
+/* ==========================================================================
+   NOTIFICATION MODAL - SEMANTIC THEME SYSTEM
+   ========================================================================== */
+
 .notification-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   padding: 1rem;
+  @apply modal-overlay-theme transition-theme;
 }
 
 .notification-container {
-  background: white;
   border-radius: 1rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   max-width: 500px;
   width: 100%;
   overflow: hidden;
   position: relative;
-  color: var(--tertiary-dark);
+  @apply modal-theme shadow-2xl text-primary transition-theme;
 }
 
-/* Notification Types */
+/* ==========================================================================
+   NOTIFICATION TYPES - SEMANTIC STYLING
+   ========================================================================== */
+
 .notification-success {
-  border-top: 4px solid var(--success);
+  border-top: 4px solid var(--status-success);
 }
 
 .notification-error {
-  border-top: 4px solid var(--error);
+  border-top: 4px solid var(--status-error);
 }
 
 .notification-info {
-  border-top: 4px solid var(--info);
+  border-top: 4px solid var(--status-info);
 }
 
 .notification-warning {
-  border-top: 4px solid #f59e0b;
+  border-top: 4px solid var(--status-warning);
 }
+
+/* ==========================================================================
+   HEADER SECTION - SEMANTIC STYLING
+   ========================================================================== */
 
 .notification-header {
   display: flex;
@@ -261,26 +270,27 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  @apply transition-theme;
 }
 
 .notification-success .notification-icon {
-  background-color: var(--success-light);
-  color: var(--success-dark);
+  background-color: var(--status-success-bg);
+  color: var(--status-success);
 }
 
 .notification-error .notification-icon {
-  background-color: var(--error-light);
-  color: var(--error-dark);
+  background-color: var(--status-error-bg);
+  color: var(--status-error);
 }
 
 .notification-info .notification-icon {
-  background-color: var(--info-light);
-  color: var(--info-dark);
+  background-color: var(--status-info-bg);
+  color: var(--status-info);
 }
 
 .notification-warning .notification-icon {
-  background-color: #fef3c7;
-  color: #92400e;
+  background-color: var(--status-warning-bg);
+  color: var(--status-warning);
 }
 
 .notification-icon svg {
@@ -295,16 +305,16 @@ export default {
 .notification-title {
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--tertiary-dark);
   margin: 0 0 0.5rem 0;
   line-height: 1.3;
+  @apply text-primary transition-theme;
 }
 
 .notification-message {
   font-size: 0.9375rem;
-  color: var(--tertiary-medium);
   margin: 0;
   line-height: 1.5;
+  @apply text-secondary transition-theme;
 }
 
 .close-button {
@@ -313,18 +323,16 @@ export default {
   height: 32px;
   border: none;
   background: transparent;
-  color: var(--tertiary-medium);
   border-radius: 50%;
   cursor: pointer;
-  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
+  @apply text-tertiary transition-all-theme;
 }
 
 .close-button:hover {
-  background-color: var(--neutral-light);
-  color: var(--tertiary-dark);
+  @apply surface-tertiary text-secondary;
 }
 
 .close-button svg {
@@ -332,10 +340,13 @@ export default {
   height: 18px;
 }
 
+/* ==========================================================================
+   DETAILS SECTION - SEMANTIC STYLING
+   ========================================================================== */
+
 .notification-details {
   padding: 0 1.5rem;
-  border-top: 1px solid var(--neutral);
-  border-bottom: 1px solid var(--neutral);
+  @apply border-top-theme border-bottom-theme transition-theme;
 }
 
 .detail-item {
@@ -348,7 +359,7 @@ export default {
 }
 
 .detail-item:not(:last-child) {
-  border-bottom: 1px solid var(--neutral-light);
+  @apply border-bottom-theme;
 }
 
 .detail-icon {
@@ -358,20 +369,24 @@ export default {
 }
 
 .success-detail {
-  color: var(--success-dark);
+  color: var(--status-success);
 }
 
 .success-detail .detail-icon {
-  color: var(--success);
+  color: var(--status-success);
 }
 
 .error-detail {
-  color: var(--error-dark);
+  color: var(--status-error);
 }
 
 .error-detail .detail-icon {
-  color: var(--error);
+  color: var(--status-error);
 }
+
+/* ==========================================================================
+   ACTION BUTTONS - SEMANTIC STYLING
+   ========================================================================== */
 
 .notification-actions {
   display: flex;
@@ -380,43 +395,14 @@ export default {
   justify-content: flex-end;
 }
 
-.action-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1.25rem;
-  border-radius: 0.5rem;
-  border: none;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.875rem;
-}
-
 .btn-icon {
   width: 16px;
   height: 16px;
 }
 
-.primary-btn {
-  background-color: var(--primary);
-  color: white;
-}
-
-.primary-btn:hover {
-  background-color: var(--primary-dark);
-}
-
-.secondary-btn {
-  background-color: var(--neutral-medium);
-  color: var(--tertiary-dark);
-  border: 1px solid var(--neutral-medium);
-}
-
-.secondary-btn:hover {
-  background-color: var(--neutral-dark);
-  border-color: var(--neutral-dark);
-}
+/* ==========================================================================
+   PROGRESS BAR - SEMANTIC STYLING
+   ========================================================================== */
 
 .progress-container {
   position: absolute;
@@ -424,37 +410,43 @@ export default {
   left: 0;
   right: 0;
   height: 3px;
-  background-color: var(--neutral-light);
+  @apply surface-tertiary;
 }
 
 .progress-bar {
   height: 100%;
+  @apply transition-all-theme;
   transition: width 0.1s linear;
 }
 
 .notification-success .progress-bar {
-  background-color: var(--success);
+  background-color: var(--status-success);
 }
 
 .notification-error .progress-bar {
-  background-color: var(--error);
+  background-color: var(--status-error);
 }
 
 .notification-info .progress-bar {
-  background-color: var(--info);
+  background-color: var(--status-info);
 }
 
 .notification-warning .progress-bar {
-  background-color: #f59e0b;
+  background-color: var(--status-warning);
 }
 
-/* Animations */
+/* ==========================================================================
+   ANIMATIONS
+   ========================================================================== */
+
 .notification-enter-active {
-  transition: all 0.3s ease;
+  @apply transition-all-theme;
+  transition-duration: 0.3s;
 }
 
 .notification-leave-active {
-  transition: all 0.3s ease;
+  @apply transition-all-theme;
+  transition-duration: 0.3s;
 }
 
 .notification-enter-from {
@@ -507,7 +499,45 @@ export default {
   }
 }
 
-/* Responsive Design */
+/* Info Animation */
+.notification-info.notification-enter-active {
+  animation: infoSlide 0.4s ease;
+}
+
+@keyframes infoSlide {
+  0% {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Warning Animation */
+.notification-warning.notification-enter-active {
+  animation: warningPulse 0.5s ease;
+}
+
+@keyframes warningPulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN
+   ========================================================================== */
+
 @media (max-width: 640px) {
   .notification-overlay {
     padding: 0.5rem;
@@ -530,7 +560,7 @@ export default {
     flex-direction: column;
   }
   
-  .action-btn {
+  .notification-actions .btn {
     width: 100%;
     justify-content: center;
   }
@@ -542,12 +572,107 @@ export default {
   .notification-message {
     font-size: 0.875rem;
   }
+  
+  .notification-icon {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .notification-icon svg {
+    width: 20px;
+    height: 20px;
+  }
 }
 
-/* Focus styles for accessibility */
-.action-btn:focus,
+/* ==========================================================================
+   ACCESSIBILITY & FOCUS STATES
+   ========================================================================== */
+
 .close-button:focus {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
+  @apply focus-ring-theme;
+}
+
+/* Enhanced focus for action buttons handled by button utilities */
+
+/* ==========================================================================
+   ENHANCED VISUAL EFFECTS
+   ========================================================================== */
+
+/* Backdrop blur effect */
+@supports (backdrop-filter: blur(8px)) {
+  .notification-overlay {
+    backdrop-filter: blur(8px);
+  }
+}
+
+/* Enhanced shadow for elevated notification */
+.notification-container:hover {
+  @apply shadow-2xl;
+  transform: translateY(-2px);
+}
+
+/* Status indicator glow effect */
+.notification-success {
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.25),
+    0 0 0 1px var(--status-success),
+    0 0 20px rgba(94, 180, 136, 0.1);
+}
+
+.notification-error {
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.25),
+    0 0 0 1px var(--status-error),
+    0 0 20px rgba(229, 57, 53, 0.1);
+}
+
+.notification-info {
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.25),
+    0 0 0 1px var(--status-info),
+    0 0 20px rgba(127, 89, 139, 0.1);
+}
+
+.notification-warning {
+  box-shadow: 
+    0 25px 50px -12px rgba(0, 0, 0, 0.25),
+    0 0 0 1px var(--status-warning),
+    0 0 20px rgba(255, 152, 0, 0.1);
+}
+
+/* Icon animation on appear */
+.notification-icon {
+  animation: iconScale 0.6s ease;
+}
+
+@keyframes iconScale {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ==========================================================================
+   REDUCED MOTION SUPPORT
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .notification-enter-active,
+  .notification-leave-active,
+  .notification-container,
+  .notification-icon,
+  .progress-bar {
+    transition: none !important;
+    animation: none !important;
+  }
+  
+  .notification-container:hover {
+    transform: none !important;
+  }
 }
 </style>

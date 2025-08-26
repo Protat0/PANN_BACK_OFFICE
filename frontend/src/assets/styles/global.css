@@ -1,94 +1,623 @@
-/* Global background styles */
+/* ==========================================================================
+   GLOBAL STYLES - SEMANTIC THEME SYSTEM
+   Uses semantic variables and utility classes for automatic theme switching
+   ========================================================================== */
+
+/* ==========================================================================
+   GLOBAL TRANSITIONS
+   ========================================================================== */
+
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Disable transitions for reduced motion users */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+/* ==========================================================================
+   BASE HTML AND BODY STYLES
+   ========================================================================== */
+
 html,
 body {
-  background-color: var(--bg-primary);
-  transition: background-color 0.3s ease;
+  background-color: var(--surface-secondary);
+  color: var(--text-secondary);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* App container */
 #app {
   min-height: 100vh;
-  background-color: var(--bg-primary);
+  background-color: var(--surface-secondary);
+  color: var(--text-secondary);
 }
 
-/* Common background utility classes */
-.bg-app-primary {
-  background-color: var(--bg-primary) !important;
-}
+/* ==========================================================================
+   PAGE AND CONTENT WRAPPERS
+   ========================================================================== */
 
-.bg-app-secondary {
-  background-color: var(--bg-secondary) !important;
-}
-
-.bg-app-muted {
-  background-color: var(--bg-muted) !important;
-}
-
-.bg-app-dark {
-  background-color: var(--bg-dark) !important;
-}
-
-.bg-app-light {
-  background-color: var(--bg-light) !important;
-}
-
-/* Page wrapper */
 .page-wrapper {
-  background-color: var(--bg-primary);
+  background-color: var(--surface-secondary);
+  color: var(--text-secondary);
   min-height: 100vh;
 }
 
-/* Content area */
 .content-area {
-  background-color: var(--bg-secondary);
+  background-color: var(--surface-primary);
+  color: var(--text-primary);
 }
 
-/* Card overrides to use app colors */
+/* ==========================================================================
+   TYPOGRAPHY - SEMANTIC HIERARCHY
+   ========================================================================== */
+
+/* Headlines use primary color */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary);
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 0.5rem;
+}
+
+/* Body text uses secondary color */
+p {
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+}
+
+/* Links use accent color (secondary) */
+a {
+  color: var(--text-accent);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--text-accent);
+  opacity: 0.8;
+}
+
+/* ==========================================================================
+   BOOTSTRAP COMPONENT OVERRIDES - SEMANTIC
+   ========================================================================== */
+
+/* Cards - Use semantic card variables */
 .card {
-  background-color: var(--bg-secondary);
-  border-color: var(--neutral-medium);
+  background-color: var(--surface-primary);
+  border: 1px solid var(--border-secondary);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
 }
 
-/* Modal overrides */
+.card-header,
+.card-footer {
+  background-color: var(--surface-secondary);
+  border-color: var(--border-primary);
+  color: var(--text-primary);
+}
+
+/* Modals - Use elevated surface */
 .modal-content {
-  background-color: var(--bg-secondary);
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-2xl);
 }
 
-/* Dropdown overrides */
-.dropdown-menu {
-  background-color: var(--bg-secondary);
-  border-color: var(--neutral-medium);
+.modal-header,
+.modal-footer {
+  border-color: var(--border-primary);
 }
 
-/* Offcanvas overrides */
-.offcanvas {
-  background-color: var(--bg-secondary);
+.modal-overlay {
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
 }
 
-/* Navbar overrides */
-.navbar {
-  background-color: var(--bg-secondary) !important;
-}
-
-/* Sidebar overrides */
-.sidebar {
-  background-color: var(--bg-secondary);
-}
-
-/* Table overrides */
-.table {
-  --bs-table-bg: var(--bg-secondary);
-}
-
-/* Form control overrides */
+/* Form Controls - Use semantic input variables */
 .form-control,
 .form-select {
-  background-color: var(--bg-secondary);
-  border-color: var(--neutral-medium);
+  background-color: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--input-text);
 }
 
 .form-control:focus,
 .form-select:focus {
-  background-color: var(--bg-secondary);
-  border-color: var(--primary);
+  background-color: var(--input-bg);
+  border-color: var(--border-accent);
+  color: var(--input-text);
+  box-shadow: 0 0 0 0.25rem rgba(160, 123, 227, 0.25);
+}
+
+.form-control::placeholder {
+  color: var(--input-placeholder);
+}
+
+.form-label,
+.form-text {
+  color: var(--text-primary);
+}
+
+/* Form validation states */
+.form-control.is-invalid {
+  border-color: var(--border-error);
+}
+
+.form-control.is-valid {
+  border-color: var(--border-success);
+}
+
+.invalid-feedback {
+  color: var(--status-error);
+}
+
+.valid-feedback {
+  color: var(--status-success);
+}
+
+/* Tables - Use semantic surface variables */
+.table {
+  --bs-table-bg: var(--surface-primary);
+  --bs-table-border-color: var(--border-primary);
+  color: var(--text-primary);
+}
+
+.table thead th {
+  border-color: var(--border-primary);
+  color: var(--text-primary);
+  background-color: var(--surface-secondary);
+}
+
+.table tbody td {
+  border-color: var(--border-secondary);
+  color: var(--text-secondary);
+}
+
+.table-hover tbody tr:hover {
+  background-color: var(--state-hover);
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: var(--surface-secondary);
+}
+
+/* Dropdowns - Use elevated surface */
+.dropdown-menu {
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-primary);
+  box-shadow: var(--shadow-lg);
+}
+
+.dropdown-item {
+  color: var(--text-primary);
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  background-color: var(--state-hover);
+  color: var(--text-primary);
+}
+
+.dropdown-item.active {
+  background-color: var(--state-selected);
+  color: var(--text-accent);
+}
+
+/* Navigation - Use semantic nav variables */
+.navbar {
+  background-color: var(--nav-bg);
+  border-bottom: 1px solid var(--border-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.navbar-brand,
+.navbar-nav .nav-link {
+  color: var(--nav-text);
+}
+
+.navbar-nav .nav-link:hover,
+.navbar-nav .nav-link.active {
+  color: var(--nav-text-active);
+}
+
+/* Breadcrumbs */
+.breadcrumb {
+  background-color: var(--surface-secondary);
+}
+
+.breadcrumb-item a {
+  color: var(--text-accent);
+}
+
+.breadcrumb-item.active {
+  color: var(--text-tertiary);
+}
+
+/* Alerts - Use status variables */
+.alert {
+  border-width: 1px;
+}
+
+.alert-primary {
+  background-color: var(--surface-primary);
+  border-color: var(--border-accent);
+  color: var(--text-accent);
+}
+
+.alert-success {
+  background-color: var(--status-success-bg);
+  border-color: var(--status-success);
+  color: var(--status-success);
+}
+
+.alert-danger {
+  background-color: var(--status-error-bg);
+  border-color: var(--status-error);
+  color: var(--status-error);
+}
+
+.alert-warning {
+  background-color: var(--status-warning-bg);
+  border-color: var(--status-warning);
+  color: var(--status-warning);
+}
+
+.alert-info {
+  background-color: var(--status-info-bg);
+  border-color: var(--status-info);
+  color: var(--status-info);
+}
+
+/* Badges - Use semantic colors */
+.badge {
+  background-color: var(--surface-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+}
+
+.badge.bg-primary {
+  background-color: var(--text-accent) !important;
+  color: var(--text-inverse) !important;
+}
+
+.badge.bg-success {
+  background-color: var(--status-success) !important;
+  color: var(--text-inverse) !important;
+}
+
+.badge.bg-danger {
+  background-color: var(--status-error) !important;
+  color: var(--text-inverse) !important;
+}
+
+/* Progress bars */
+.progress {
+  background-color: var(--surface-tertiary);
+  border: 1px solid var(--border-secondary);
+}
+
+.progress-bar {
+  background-color: var(--text-accent);
+}
+
+/* List groups */
+.list-group-item {
+  background-color: var(--surface-primary);
+  border-color: var(--border-secondary);
+  color: var(--text-primary);
+}
+
+.list-group-item:hover {
+  background-color: var(--state-hover);
+}
+
+.list-group-item.active {
+  background-color: var(--state-selected);
+  border-color: var(--border-accent);
+  color: var(--text-accent);
+}
+
+/* Offcanvas */
+.offcanvas {
+  background-color: var(--surface-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+}
+
+.offcanvas-header {
+  border-bottom: 1px solid var(--border-primary);
+}
+
+/* Pagination */
+.pagination .page-link {
+  background-color: var(--surface-primary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
+}
+
+.pagination .page-link:hover {
+  background-color: var(--state-hover);
+  border-color: var(--border-accent);
+  color: var(--text-accent);
+}
+
+.pagination .page-item.active .page-link {
+  background-color: var(--text-accent);
+  border-color: var(--border-accent);
+  color: var(--text-inverse);
+}
+
+.pagination .page-item.disabled .page-link {
+  background-color: var(--surface-tertiary);
+  border-color: var(--border-secondary);
+  color: var(--text-disabled);
+}
+
+/* ==========================================================================
+   VUE DATEPICKER THEME INTEGRATION
+   ========================================================================== */
+
+.dp__theme_light {
+  --dp-background-color: var(--surface-elevated);
+  --dp-text-color: var(--text-primary);
+  --dp-border-color: var(--border-primary);
+  --dp-border-color-hover: var(--border-accent);
+  --dp-primary-color: var(--text-accent);
+  --dp-primary-text-color: var(--text-inverse);
+  --dp-secondary-color: var(--surface-secondary);
+  --dp-hover-color: var(--state-hover);
+  --dp-hover-text-color: var(--text-primary);
+  --dp-input-icon-color: var(--text-tertiary);
+}
+
+.dp__input {
+  background-color: var(--input-bg) !important;
+  border: 1px solid var(--input-border) !important;
+  color: var(--input-text) !important;
+  border-radius: 0.5rem !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.dp__input:focus {
+  border-color: var(--border-accent) !important;
+  box-shadow: 0 0 0 0.2rem rgba(160, 123, 227, 0.25) !important;
+  outline: none !important;
+}
+
+.dp__menu {
+  background-color: var(--surface-elevated) !important;
+  border: 1px solid var(--border-primary) !important;
+  border-radius: 0.75rem !important;
+  box-shadow: var(--shadow-xl) !important;
+}
+
+.dp__calendar_item {
+  background-color: transparent !important;
+  color: var(--text-primary) !important;
+}
+
+.dp__date_hover {
+  background-color: var(--state-hover) !important;
+  color: var(--text-primary) !important;
+}
+
+.dp__today {
+  border: 1px solid var(--text-accent) !important;
+  background-color: transparent !important;
+  color: var(--text-primary) !important;
+}
+
+.dp__active_date {
+  background-color: var(--text-accent) !important;
+  color: var(--text-inverse) !important;
+}
+
+/* ==========================================================================
+   SCROLLBAR STYLING - THEME AWARE
+   ========================================================================== */
+
+/* Light theme scrollbar (default) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* ==========================================================================
+   COMMON BACKGROUND UTILITY CLASSES - UPDATED
+   ========================================================================== */
+
+.bg-app-primary {
+  background-color: var(--surface-secondary) !important;
+}
+
+.bg-app-secondary {
+  background-color: var(--surface-primary) !important;
+}
+
+.bg-app-muted {
+  background-color: var(--surface-tertiary) !important;
+}
+
+.bg-app-elevated {
+  background-color: var(--surface-elevated) !important;
+}
+
+/* ==========================================================================
+   FOCUS MANAGEMENT
+   ========================================================================== */
+
+/* Global focus styles */
+*:focus-visible {
+  outline: 2px solid var(--border-accent);
+  outline-offset: 2px;
+}
+
+/* Remove default focus for mouse users */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Enhanced focus for interactive elements */
+button:focus-visible,
+.btn:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--border-accent);
+  outline-offset: 2px;
+}
+
+/* ==========================================================================
+   PRINT STYLES
+   ========================================================================== */
+
+@media print {
+  * {
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+  }
+  
+  .card,
+  .modal-content {
+    border: 1px solid #ccc !important;
+  }
+}
+
+/* ==========================================================================
+   HIGH CONTRAST MODE SUPPORT
+   ========================================================================== */
+
+@media (prefers-contrast: high) {
+  .card,
+  .modal-content,
+  .form-control,
+  .form-select,
+  .dropdown-menu {
+    border-width: 2px !important;
+  }
+  
+  .table thead th,
+  .table tbody td {
+    border-width: 2px !important;
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE ADJUSTMENTS
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .card {
+    box-shadow: var(--shadow-sm);
+  }
+  
+  .modal-content {
+    box-shadow: var(--shadow-lg);
+  }
+  
+  .dropdown-menu {
+    box-shadow: var(--shadow-md);
+  }
+}
+
+@media (max-width: 576px) {
+  body {
+    font-size: 14px;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    line-height: 1.2;
+  }
+}
+
+/* ==========================================================================
+   COMPONENT ENHANCEMENT
+   ========================================================================== */
+
+/* Enhanced card hover effects */
+.card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+  transition: all 0.2s ease;
+}
+
+/* Enhanced button interactions */
+.btn:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn:not(:disabled):active {
+  transform: translateY(0);
+}
+
+/* Enhanced form interactions */
+.form-control:focus,
+.form-select:focus {
+  transform: scale(1.01);
+}
+
+/* Smooth transitions for all interactive elements */
+.card,
+.btn,
+.form-control,
+.form-select,
+.dropdown-menu,
+.modal-content,
+.alert {
+  transition: all 0.2s ease;
+}
+
+/* ==========================================================================
+   ACCESSIBILITY ENHANCEMENTS
+   ========================================================================== */
+
+/* Skip link for screen readers */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: var(--text-accent);
+  color: var(--text-inverse);
+  padding: 8px;
+  text-decoration: none;
+  border-radius: 4px;
+  z-index: 10000;
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
+/* Screen reader only content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

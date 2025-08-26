@@ -21,6 +21,6 @@ from django.http import HttpResponse
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/v1/', include('app.urls')),
-    path('api/notifications/', include('notifications.urls')),
+    path('api/v1/notifications/', include('notifications.urls')),
     path('', lambda request: HttpResponse("POS System API is running!")),
 ]

@@ -1,16 +1,11 @@
 <template>
   <div class="container-fluid pt-2 pb-4 products-page">
-    <!-- Page Title -->
-    <div class="mb-3">
-      <h1 class="h3 fw-semibold text-primary-dark mb-0">Product Management</h1>
-    </div>
-
     <!-- Reports Section -->
     <div class="row mb-3" v-if="!loading">
       <div class="col-6 col-md-3 mb-2">
         <CardTemplate
           size="xs"
-          border-color="danger"
+          border-color="error"
           border-position="start"
           title="Low Stock"
           :value="lowStockCount"
@@ -44,7 +39,7 @@
       <div class="col-6 col-md-3 mb-2">
         <CardTemplate
           size="xs"
-          border-color="primary"
+          border-color="accent"
           border-position="start"
           title="Categories"
           value="3"
@@ -55,30 +50,28 @@
 
     <!-- Loading State -->
     <div v-if="loading && products.length === 0" class="text-center py-5">
-      <div class="spinner-border text-primary" role="status">
+      <div class="spinner-border text-accent" role="status">
         <span class="visually-hidden">Loading...</span>
       </div>
-      <p class="mt-3 text-tertiary-medium">Loading products...</p>
+      <p class="mt-3 text-tertiary">Loading products...</p>
     </div>
 
     <!-- Error State -->
     <div v-if="error" class="alert alert-danger text-center" role="alert">
       <p class="mb-3">{{ error }}</p>
-      <button class="btn btn-primary" @click="refreshData">Try Again</button>
+      <button class="btn btn-submit" @click="refreshData">Try Again</button>
     </div>
 
-    <!-- Action Bar and Filters - Separate Section -->
-    <div v-if="!loading || products.length > 0" class="action-bar-container mb-3">
-      <!-- Integrated Header with Actions and Filters -->
-      <div class="action-bar-controls">
-        <!-- Action Row: Action Buttons and Filters -->
+    <!-- Action Bar and Filters -->
+    <div v-if="!loading || products.length > 0" class="action-bar mb-3">
+      <div class="action-controls">
         <div class="action-row">
-          <!-- Left Side: Main Actions (Always visible when no selection) -->
+          <!-- Left Side: Main Actions -->
           <div v-if="selectedProducts.length === 0" class="d-flex gap-2">
-            <!-- Add Products Dropdown -->
-            <div class="dropdown" ref="addDropdown">
+            <!-- Add Products Dropdown - FIXED -->
+            <div class="dropdown dropdown-container" ref="addDropdown">
               <button 
-                class="btn btn-success btn-sm btn-with-icon-sm dropdown-toggle"
+                class="btn btn-add btn-sm btn-with-icon-sm dropdown-toggle"
                 type="button"
                 @click="toggleAddDropdown"
                 :class="{ 'active': showAddDropdown }"
@@ -88,58 +81,58 @@
               </button>
               
               <div 
-                class="dropdown-menu custom-dropdown-menu" 
+                class="dropdown-menu add-dropdown-menu" 
                 :class="{ 'show': showAddDropdown }"
               >
-                <button class="dropdown-item custom-dropdown-item" @click="handleSingleProduct">
+                <button class="dropdown-item" @click="handleSingleProduct">
                   <div class="d-flex align-items-center gap-3">
-                    <Plus :size="16" class="text-primary" />
+                    <Plus :size="16" class="text-accent" />
                     <div>
                       <div class="fw-semibold">Single Product</div>
-                      <small class="text-muted">Add one product manually</small>
+                      <small class="text-tertiary">Add one product manually</small>
                     </div>
                   </div>
                 </button>
                 
-                <button class="dropdown-item custom-dropdown-item" @click="handleBulkAdd">
+                <button class="dropdown-item" @click="handleBulkAdd">
                   <div class="d-flex align-items-center gap-3">
-                    <Package :size="16" class="text-primary" />
+                    <Package :size="16" class="text-accent" />
                     <div>
                       <div class="fw-semibold">Bulk Entry</div>
-                      <small class="text-muted">Add multiple products (5-20 items)</small>
+                      <small class="text-tertiary">Add multiple products (5-20 items)</small>
                     </div>
                   </div>
                 </button>
                 
-                <button class="dropdown-item custom-dropdown-item" @click="handleImport">
+                <button class="dropdown-item" @click="handleImport">
                   <div class="d-flex align-items-center gap-3">
-                    <FileText :size="16" class="text-primary" />
+                    <FileText :size="16" class="text-accent" />
                     <div>
                       <div class="fw-semibold">Import File</div>
-                      <small class="text-muted">Upload CSV/Excel (20+ items)</small>
+                      <small class="text-tertiary">Upload CSV/Excel (20+ items)</small>
                     </div>
                   </div>
                 </button>
               </div>
             </div>
 
-            <button class="btn btn-outline-secondary btn-sm" @click="handleImport">IMPORT</button>
-            <button 
-              class="btn btn-outline-secondary btn-sm"
-              @click="exportData"
-            >
+            <button class="btn btn-filter btn-sm" @click="toggleColumnFilter">
+              <Settings :size="14" class="me-1" />
+              COLUMNS
+            </button>
+            <button class="btn btn-export btn-sm" @click="exportData">
               EXPORT
             </button>
           </div>
 
-          <!-- Selection Actions (Visible when items are selected) -->
+          <!-- Selection Actions -->
           <div v-if="selectedProducts.length > 0" class="d-flex gap-2">
             <button 
               class="btn btn-delete btn-sm btn-with-icon-sm"
               @click="deleteSelected"
             >
               <Trash2 :size="14" />
-              DELETE
+              DELETE ({{ selectedProducts.length }})
             </button>
           </div>
 
@@ -147,15 +140,14 @@
           <div class="d-flex align-items-center gap-2">
             <!-- Search Toggle -->
             <button 
-              class="btn btn-secondary btn-sm"
+              class="btn btn-filter btn-sm search-toggle"
               @click="toggleSearchMode"
               :class="{ 'active': searchMode }"
-              style="height: calc(1.5em + 0.75rem + 2px); display: flex; align-items: center; justify-content: center; padding: 0 0.75rem;"
             >
               <Search :size="16" />
             </button>
 
-            <!-- Filter Dropdowns (Hidden when search is active) -->
+            <!-- Filter Dropdowns -->
             <template v-if="!searchMode">
               <div class="filter-dropdown">
                 <label class="filter-label">Category</label>
@@ -186,7 +178,7 @@
               </div>
             </template>
 
-            <!-- Search Bar (Visible when search mode is active) -->
+            <!-- Search Bar -->
             <div v-if="searchMode" class="search-container">
               <div class="position-relative">
                 <input 
@@ -195,10 +187,10 @@
                   @input="applyFilters"
                   type="text" 
                   class="form-control form-control-sm search-input"
-                  placeholder="Search"
+                  placeholder="Search products..."
                 />
                 <button 
-                  class="btn btn-sm btn-link position-absolute end-0 top-50 translate-middle-y"
+                  class="btn btn-sm btn-link position-absolute end-0 top-50 translate-middle-y text-tertiary"
                   @click="clearSearch"
                   style="border: none; padding: 0.25rem;"
                 >
@@ -211,14 +203,15 @@
       </div>
     </div>
 
-    <!-- Data Table - Separate Section -->
-    <DataTable
-      v-if="!loading || products.length > 0"
-      :total-items="filteredProducts.length"
-      :current-page="currentPage"
-      :items-per-page="itemsPerPage"
-      @page-changed="handlePageChange"
-    >
+    <!-- Data Table with fixed overflow -->
+    <div class="table-wrapper">
+      <DataTable
+        v-if="!loading || products.length > 0"
+        :total-items="filteredProducts.length"
+        :current-page="currentPage"
+        :items-per-page="itemsPerPage"
+        @page-changed="handlePageChange"
+      >
         <template #header>
           <tr>
             <th style="width: 40px;">
@@ -230,15 +223,15 @@
                 :indeterminate="someSelected"
               />
             </th>
-            <th>
-              Item name
-              <ChevronUp :size="14" class="ms-1" />
-            </th>
-            <th style="width: 120px;">Category</th>
-            <th style="width: 100px;">Price</th>
-            <th style="width: 100px;">Cost</th>
+            <th>Item name <ChevronUp :size="14" class="ms-1" /></th>
+            <th v-if="isColumnVisible('sku')" style="width: 100px;">SKU</th>
+            <th v-if="isColumnVisible('category')" style="width: 120px;">Category</th>
+            <th v-if="isColumnVisible('sellingPrice')" style="width: 100px;">Price</th>
+            <th v-if="isColumnVisible('costPrice')" style="width: 100px;">Cost</th>
             <th style="width: 80px;">Margin</th>
-            <th style="width: 100px;">In stock</th>
+            <th v-if="isColumnVisible('stock')" style="width: 100px;">In stock</th>
+            <th v-if="isColumnVisible('status')" style="width: 80px;">Status</th>
+            <th v-if="isColumnVisible('expiryDate')" style="width: 110px;">Expiry Date</th>
             <th style="width: 160px;">Actions</th>
           </tr>
         </template>
@@ -262,56 +255,77 @@
                 {{ product.product_name }}
               </div>
             </td>
-            <td>
+            <td v-if="isColumnVisible('sku')" class="text-center">
+              <code class="text-primary px-2 py-1 rounded bg-light">
+                {{ product.SKU || '—' }}
+              </code>
+            </td>
+            <td v-if="isColumnVisible('category')">
               <span :class="['badge', 'rounded-pill', getCategoryBadgeClass(product.category_id)]">
                 {{ getCategoryName(product.category_id) }}
               </span>
             </td>
-            <td class="text-end fw-medium">
+            <td v-if="isColumnVisible('sellingPrice')" class="text-end fw-medium">
               ₱{{ formatPrice(product.selling_price) }}
             </td>
-            <td class="text-end fw-medium">
+            <td v-if="isColumnVisible('costPrice')" class="text-end fw-medium">
               ₱{{ formatPrice(product.cost_price) }}
             </td>
             <td class="text-center fw-medium">
-              {{ calculateMargin(product.cost_price, product.selling_price) }}%
+              <span :class="getMarginClass(product.cost_price, product.selling_price)">
+                {{ calculateMargin(product.cost_price, product.selling_price) }}%
+              </span>
             </td>
-            <td class="text-end">
+            <td v-if="isColumnVisible('stock')" class="text-end">
               <span :class="getStockDisplayClass(product)">
                 {{ product.stock || '—' }}
               </span>
             </td>
+            <td v-if="isColumnVisible('status')" class="text-center">
+              <span :class="getStatusBadgeClass(product.status)">
+                {{ getStatusText(product.status) }}
+              </span>
+            </td>
+            <td v-if="isColumnVisible('expiryDate')" class="text-center">
+              <small :class="getExpiryDateClass(product.expiry_date)">
+                {{ formatExpiryDate(product.expiry_date) }}
+              </small>
+            </td>
             <td>
               <div class="d-flex gap-1 justify-content-center">
                 <button 
-                  class="btn btn-outline-secondary btn-icon-only btn-lg" 
+                  class="btn btn-outline-secondary btn-icon-only btn-xs action-btn action-btn-edit" 
                   @click="editProduct(product)"
-                  data-bs-toggle="tooltip"
-                  title="Edit Product"
+                  title="Edit"
                 >
                   <Edit :size="12" />
                 </button>
                 <button 
-                  class="btn btn-outline-primary btn-icon-only btn-lg" 
+                  class="btn btn-outline-primary btn-icon-only btn-xs action-btn action-btn-view" 
                   @click="viewProduct(product)"
-                  data-bs-toggle="tooltip"
-                  title="View Details"
+                  title="View"
                 >
                   <Eye :size="12" />
                 </button>
                 <button 
-                  class="btn btn-outline-info btn-icon-only btn-lg" 
+                  class="btn btn-outline-info btn-icon-only btn-xs action-btn action-btn-stock" 
                   @click="restockProduct(product)"
-                  data-bs-toggle="tooltip"
-                  title="Update Stock"
+                  title="Stock"
                 >
                   <Package :size="12" />
                 </button>
                 <button 
-                  class="btn btn-outline-danger btn-icon-only btn-lg" 
+                  class="btn btn-outline-success btn-icon-only btn-xs action-btn"
+                  @click="toggleProductStatus(product)"
+                  :title="product.status === 'active' ? 'Deactivate' : 'Activate'"
+                  :class="{ 'action-btn-status-inactive': product.status !== 'active' }"
+                >
+                  <component :is="product.status === 'active' ? 'Lock' : 'Unlock'" :size="12" />
+                </button>
+                <button 
+                  class="btn btn-outline-danger btn-icon-only btn-xs action-btn action-btn-delete" 
                   @click="deleteProduct(product)"
-                  data-bs-toggle="tooltip"
-                  title="Delete Product"
+                  title="Delete"
                 >
                   <Trash2 :size="12" />
                 </button>
@@ -319,19 +333,20 @@
             </td>
           </tr>
         </template>
-    </DataTable>
+      </DataTable>
+    </div>
 
     <!-- Empty State -->
     <div v-if="!loading && filteredProducts.length === 0 && !error" class="text-center py-5">
       <div class="card">
         <div class="card-body py-5">
-          <Package :size="48" class="text-tertiary-medium mb-3" />
-          <p class="text-tertiary-medium mb-3">
+          <Package :size="48" class="text-tertiary mb-3" />
+          <p class="text-tertiary mb-3">
             {{ products.length === 0 ? 'No products found' : 'No products match the current filters' }}
           </p>
           <button 
             v-if="products.length === 0" 
-            class="btn btn-primary btn-with-icon" 
+            class="btn btn-add btn-with-icon" 
             @click="handleSingleProduct"
           >
             <Plus :size="16" />
@@ -339,7 +354,7 @@
           </button>
           <button 
             v-else 
-            class="btn btn-secondary btn-with-icon"
+            class="btn btn-refresh btn-with-icon"
             @click="clearFilters"
           >
             <RefreshCw :size="16" />
@@ -352,6 +367,7 @@
     <!-- Modular Components -->
     <AddProductModal
       ref="addProductModal"
+      :categories="categories"
       @success="handleProductSuccess"
     />
 
@@ -380,12 +396,20 @@
       @import-completed="handleImportSuccess"
       @import-failed="handleImportError"
     />
+
+    <ColumnFilterModal
+      :show="showColumnFilter"
+      :current-visible-columns="visibleColumns"
+      @close="showColumnFilter = false"
+      @apply="handleColumnChanges"
+    />
   </div>
 </template>
 
 <script>
 import { useToast } from '@/composables/useToast.js'
-import productsApiService from '../../services/apiProducts.js'
+import { onMounted, onBeforeUnmount } from 'vue'
+import { useProducts } from '../../composables/ui/products/useProducts'
 import AddProductModal from '../../components/products/AddProductModal.vue'
 import StockUpdateModal from '../../components/products/StockUpdateModal.vue'
 import ViewProductModal from '../../components/products/ViewProductModal.vue'
@@ -393,354 +417,57 @@ import ReportsModal from '../../components/products/ReportsModal.vue'
 import DataTable from '@/components/common/TableTemplate.vue'
 import CardTemplate from '@/components/common/CardTemplate.vue'
 import ImportModal from '../../components/products/ImportModal.vue'
+import ColumnFilterModal from '@/components/products/ColumnFilterModal.vue'
 import { 
-  Plus, 
-  Search,
-  X,
-  ChevronUp,
-  Package, 
-  Trash2,
-  RefreshCw,
-  FileText,
-  Edit,
-  Eye,
-  Lock,
-  Unlock
+  Plus, Search, X, ChevronUp, Package, Trash2,
+  RefreshCw, FileText, Edit, Eye, Lock, Unlock, Settings
 } from 'lucide-vue-next'
 
 export default {
   name: 'Products',
   components: {
-    AddProductModal,
-    StockUpdateModal,
-    ViewProductModal,
-    ImportModal,
-    ReportsModal,
-    DataTable,
-    CardTemplate,
-    Plus,
-    Search,
-    X,
-    ChevronUp,
-    Package,
-    Trash2,
-    RefreshCw,
-    FileText,
-    Edit,
-    Eye,
-    Lock,
-    Unlock
-  },
-  setup() {
-    const { success, error, warning, info } = useToast()
-    
-    return {
-      toast: { success, error, warning, info }
-    }
-  },
-  data() {
-    return {
-      currentPage: 1,
-      itemsPerPage: 10,
-      products: [],
-      filteredProducts: [],
-      selectedProducts: [],
-      loading: false,
-      error: null,
-      
-      // UI State
-      showAddDropdown: false,
-      searchMode: false,
-      
-      // Report data
-      lowStockCount: 0,
-      expiringCount: 0,
-      
-      // Filters
-      categoryFilter: 'all',
-      stockFilter: 'all',
-      searchFilter: ''
-    }
-  },
-  computed: {
-    paginatedProducts() {
-      const start = (this.currentPage - 1) * this.itemsPerPage
-      const end = start + this.itemsPerPage
-      return this.filteredProducts.slice(start, end)
-    },
-
-    allSelected() {
-      return this.paginatedProducts.length > 0 && 
-            this.selectedProducts.length === this.paginatedProducts.length
-    },
-
-    someSelected() {
-      return this.selectedProducts.length > 0 && 
-            this.selectedProducts.length < this.paginatedProducts.length
-    }
-  },
-
-  async mounted() {
-    await this.fetchProducts()
-    document.addEventListener('click', this.handleClickOutside)
+    AddProductModal, StockUpdateModal, ViewProductModal,
+    ColumnFilterModal, ImportModal, ReportsModal,
+    DataTable, CardTemplate,
+    Plus, Search, X, ChevronUp, Package, Trash2,
+    RefreshCw, FileText, Edit, Eye, Lock, Unlock, Settings
   },
   
-  beforeUnmount() {
-    document.removeEventListener('click', this.handleClickOutside)
+  setup() {
+    const productsComposable = useProducts()
+    
+    onMounted(() => {
+      productsComposable.initializeProducts()
+    })
+    
+    onBeforeUnmount(() => {
+      productsComposable.cleanupProducts()
+    })
+    
+    return { ...productsComposable }
   },
-
+  
   methods: {
-    handleClickOutside(event) {
-      if (this.$refs.addDropdown && !this.$refs.addDropdown.contains(event.target)) {
-        this.showAddDropdown = false
-      }
-    },
-
-    toggleAddDropdown(event) {
-      event.stopPropagation()
-      this.showAddDropdown = !this.showAddDropdown
-    },
-    
-    closeAddDropdown() {
-      this.showAddDropdown = false
-    },
-
-    toggleSearchMode() {
-      this.searchMode = !this.searchMode
-      
-      if (this.searchMode) {
-        this.$nextTick(() => {
-          if (this.$refs.searchInput) {
-            this.$refs.searchInput.focus()
-          }
-        })
-      } else {
-        this.searchFilter = ''
-        this.applyFilters()
-      }
-    },
-
-    clearSearch() {
-      this.searchFilter = ''
-      this.searchMode = false
-      this.applyFilters()
-    },
-    
-    handleSingleProduct(event) {
-      if (event) event.stopPropagation()
-      this.showAddProductModal()
-      this.closeAddDropdown()
-    },
-    
-    handleBulkAdd(event) {
-      event.stopPropagation()
-      this.$router.push('/products/bulk')
-      this.closeAddDropdown()
-    },
-    
-    handleImport(event) {
-      event.stopPropagation()
-      
-      const importModalElement = document.getElementById('importModal')
-      
-      if (importModalElement) {
-        try {
-          const modal = new bootstrap.Modal(importModalElement)
-          modal.show()
-        } catch (error) {
-          console.error('❌ Error creating/showing modal:', error)
-          this.toast.error('Failed to open import modal')
-        }
-      } else {
-        console.error('❌ Modal element #importModal not found in DOM')
-        this.toast.error('Import modal not available')
-      }
-      
-      this.closeAddDropdown()
-    },
-
-    async fetchProducts() {
-      this.loading = true
-      this.error = null
-      
-      try {
-        const data = await productsApiService.getProducts()
-        
-        if (data.results) {
-          this.products = data.results
-        } else if (Array.isArray(data)) {
-          this.products = data
-        } else {
-          this.products = data.products || []
-        }
-        
-        this.applyFilters()
-        await this.fetchReportCounts()
-        
-        // Success toast for data loading (optional - only for manual refresh)
-        if (!this.loading) {
-          this.toast.info(`Loaded ${this.products.length} products`, { duration: 2000 })
-        }
-      } catch (error) {
-        console.error('Error fetching products:', error)
-        this.error = `Failed to load products: ${error.message}`
-        this.toast.error(`Failed to load products: ${error.message}`, {
-          duration: 6000,
-          persistent: false
-        })
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async fetchReportCounts() {
-      try {
-        const lowStockData = await productsApiService.getLowStockProducts()
-        this.lowStockCount = Array.isArray(lowStockData) ? lowStockData.length : (lowStockData.count || 0)
-        
-        const expiringData = await productsApiService.getExpiringProducts({ days_ahead: 30 })
-        this.expiringCount = Array.isArray(expiringData) ? expiringData.length : (expiringData.count || 0)
-        
-        // Show warnings for critical inventory levels
-        if (this.lowStockCount > 0) {
-          this.toast.warning(`${this.lowStockCount} items are running low on stock`, {
-            duration: 5000
-          })
-        }
-        
-        if (this.expiringCount > 0) {
-          this.toast.info(`${this.expiringCount} items will expire within 30 days`, {
-            duration: 4000
-          })
-        }
-      } catch (error) {
-        console.error('Error fetching report counts:', error)
-        this.toast.error('Failed to load inventory alerts')
-      }
-    },
-
-    async showLowStockReport() {
-      if (this.$refs.reportsModal && this.$refs.reportsModal.showLowStockModal) {
-        await this.$refs.reportsModal.showLowStockModal()
-        this.toast.info('Showing low stock report')
-      }
-    },
-
-    async showExpiringReport() {
-      if (this.$refs.reportsModal && this.$refs.reportsModal.showExpiringModal) {
-        await this.$refs.reportsModal.showExpiringModal()
-        this.toast.info('Showing expiring products report')
-      }
-    },
-
-    applyFilters() {
-      let filtered = [...this.products]
-
-      if (this.categoryFilter !== 'all') {
-        filtered = filtered.filter(product => product.category_id === this.categoryFilter)
-      }
-
-      if (this.stockFilter !== 'all') {
-        if (this.stockFilter === 'out-of-stock') {
-          filtered = filtered.filter(product => product.stock === 0)
-        } else if (this.stockFilter === 'low-stock') {
-          filtered = filtered.filter(product => 
-            product.stock > 0 && product.stock <= product.low_stock_threshold
-          )
-        } else if (this.stockFilter === 'in-stock') {
-          filtered = filtered.filter(product => product.stock > product.low_stock_threshold)
-        }
-      }
-
-      if (this.searchFilter.trim()) {
-        const search = this.searchFilter.toLowerCase()
-        filtered = filtered.filter(product => 
-          product.product_name?.toLowerCase().includes(search) ||
-          product.SKU?.toLowerCase().includes(search) ||
-          product._id?.toLowerCase().includes(search)
-        )
-      }
-
-      this.currentPage = 1
-      this.selectedProducts = []
-      this.filteredProducts = filtered
-    },
-
-    clearFilters() {
-      this.categoryFilter = 'all'
-      this.stockFilter = 'all'
-      this.searchFilter = ''
-      this.searchMode = false
-      this.applyFilters()
-      this.toast.info('Filters cleared')
-    },
-
-    async refreshData() {
-      await this.fetchProducts()
-      this.toast.success('Product data refreshed')
-    },
-
-    selectAll(event) {
-      if (event.target.checked) {
-        this.selectedProducts = this.paginatedProducts.map(product => product._id)
-        this.toast.info(`Selected ${this.selectedProducts.length} products`)
-      } else {
-        this.selectedProducts = []
-        this.toast.info('Selection cleared')
-      }
-    },
-
-    async deleteSelected() {
-      if (this.selectedProducts.length === 0) {
-        this.toast.warning('No products selected')
-        return
-      }
-      
-      const confirmed = confirm(`Are you sure you want to delete ${this.selectedProducts.length} product(s)?`)
-      if (!confirmed) return
-
-      const loadingToastId = this.toast.loading(`Deleting ${this.selectedProducts.length} product(s)...`)
-      
-      try {
-        await productsApiService.bulkDeleteProducts(this.selectedProducts)
-        this.toast.dismiss(loadingToastId)
-        this.toast.success(`Successfully deleted ${this.selectedProducts.length} product(s)`)
-        this.selectedProducts = []
-        await this.fetchProducts()
-      } catch (error) {
-        console.error('Error deleting products:', error)
-        this.toast.dismiss(loadingToastId)
-        this.toast.error(`Failed to delete products: ${error.message}`, {
-          duration: 6000
-        })
-      }
-    },
-
     showAddProductModal() {
-      if (this.$refs.addProductModal && this.$refs.addProductModal.openAdd) {
-        this.$refs.addProductModal.openAdd()
-      }
+      this.$refs.addProductModal?.openAdd?.()
     },
-
+    
     editProduct(product) {
-      if (this.$refs.viewProductModal && this.$refs.viewProductModal.close) {
-        this.$refs.viewProductModal.close()
+      const enrichedProduct = {
+        ...product,
+        category_id: product.category_id || ''
       }
-      if (this.$refs.addProductModal && this.$refs.addProductModal.openEdit) {
-        this.$refs.addProductModal.openEdit(product)
-      }
+      
+      this.$refs.viewProductModal?.close?.()
+      this.$refs.addProductModal?.openEdit?.(enrichedProduct)
     },
-
+    
     viewProduct(product) {
-      if (this.$refs.viewProductModal && this.$refs.viewProductModal.open) {
-        this.$refs.viewProductModal.open(product)
-      }
+      this.$refs.viewProductModal?.open?.(product)
     },
-
+    
     restockProduct(product) {
-      if (this.$refs.stockUpdateModal && this.$refs.stockUpdateModal.openStock) {
-        this.$refs.stockUpdateModal.openStock(product)
-      }
+      this.$refs.stockUpdateModal?.openStock?.(product)
     },
 
     async exportData() {
@@ -809,186 +536,68 @@ export default {
         this.toast.error(`Failed to generate barcode: ${error.message}`)
       }
     },
-
-    handleProductSuccess(result) {
-      // Show success toast based on the action performed
-      if (result.message) {
-        this.toast.success(result.message)
-      } else {
-        this.toast.success('Product saved successfully')
-      }
-      this.fetchProducts()
+    
+    async showLowStockReport() {
+      await this.$refs.reportsModal?.showLowStockModal?.()
     },
-
-    handleStockUpdateSuccess(result) {
-      this.toast.success(result.message || 'Stock updated successfully')
-      this.fetchProducts()
+    
+    async showExpiringReport() {
+      await this.$refs.reportsModal?.showExpiringModal?.()
     },
-
-    handleImportSuccess(result) {
-      const successCount = result.totalSuccessful || 0
-      const failedCount = result.totalFailed || 0
+    
+    handleSingleProduct(event) {
+      event?.stopPropagation()
+      this.showAddProductModal()
+      this.closeAddDropdown()
+    },
+    
+    handleImport(event) {
+      event?.stopPropagation()
       
-      if (failedCount > 0) {
-        this.toast.warning(
-          `Import completed with warnings: ${successCount} products imported, ${failedCount} failed`,
-          { duration: 8000 }
-        )
-      } else {
-        this.toast.success(
-          `Import completed successfully! ${successCount} products imported`,
-          { duration: 6000 }
-        )
+      const importModalElement = document.getElementById('importModal')
+      if (importModalElement) {
+        try {
+          const modal = new bootstrap.Modal(importModalElement)
+          modal.show()
+        } catch (error) {
+          console.error('Error showing modal:', error)
+        }
       }
       
-      this.fetchProducts()
+      this.closeAddDropdown()
     },
-
-    handleImportError(error) {
-      this.toast.error(
-        `Import failed: ${error.message || 'An unexpected error occurred'}`,
-        { duration: 8000, persistent: false }
-      )
-    },
-
-    async deleteProduct(product) {
-      const confirmed = confirm(`Are you sure you want to delete "${product.product_name}"?`)
-      if (!confirmed) return
-
-      const loadingToastId = this.toast.loading(`Deleting "${product.product_name}"...`)
-
-      try {
-        await productsApiService.deleteProduct(product._id)
-        this.toast.dismiss(loadingToastId)
-        this.toast.success(`Product "${product.product_name}" deleted successfully`)
-        await this.fetchProducts()
-      } catch (error) {
-        console.error('Error deleting product:', error)
-        this.toast.dismiss(loadingToastId)
-        this.toast.error(`Failed to delete product: ${error.message}`)
-      }
-    },
-
-    async toggleProductStatus(product) {
-      const newStatus = product.status === 'active' ? 'inactive' : 'active'
-      const action = newStatus === 'active' ? 'activate' : 'deactivate'
-      
-      const confirmed = confirm(`Are you sure you want to ${action} "${product.product_name}"?`)
-      if (!confirmed) return
-
-      const loadingToastId = this.toast.loading(`${action.charAt(0).toUpperCase() + action.slice(1)}ing product...`)
-
-      try {
-        await productsApiService.updateProduct(product._id, { status: newStatus })
-        this.toast.dismiss(loadingToastId)
-        this.toast.success(`Product "${product.product_name}" ${action}d successfully`)
-        await this.fetchProducts()
-      } catch (error) {
-        console.error('Error updating product status:', error)
-        this.toast.dismiss(loadingToastId)
-        this.toast.error(`Failed to ${action} product: ${error.message}`)
-      }
-    },
-
-    getCategoryName(categoryId) {
-      const categories = {
-        'noodles': 'Noodles',
-        'drinks': 'Drinks', 
-        'toppings': 'Toppings'
-      }
-      return categories[categoryId] || categoryId
-    },
-
-    getCategoryBadgeClass(categoryId) {
-      const classes = {
-        'noodles': 'text-bg-secondary',
-        'drinks': 'text-bg-primary', 
-        'toppings': 'text-bg-info'
-      }
-      return classes[categoryId] || 'text-bg-light'
-    },
-
-    getProductNameClass(product) {
-      if (product.stock === 0) return 'text-danger fw-bold'
-      if (product.stock <= product.low_stock_threshold) return 'text-warning fw-semibold'
-      return 'text-tertiary-dark'
-    },
-
-    getRowClass(product) {
-      const classes = []
-      
-      if (this.selectedProducts.includes(product._id)) {
-        classes.push('table-primary')
-      }
-      
-      if (product.status === 'inactive') {
-        classes.push('text-muted')
-      }
-      
-      return classes.join(' ')
-    },
-
-    getStockDisplayClass(product) {
-      if (product.stock === 0) return 'text-danger fw-bold'
-      if (product.stock <= product.low_stock_threshold) return 'text-warning fw-semibold'
-      return 'text-tertiary-medium'
-    },
-
-    calculateMargin(costPrice, sellingPrice) {
-      if (!costPrice || !sellingPrice) return 0
-      const margin = ((sellingPrice - costPrice) / sellingPrice) * 100
-      return Math.round(margin)
-    },
-
-    formatPrice(price) {
-      return parseFloat(price || 0).toFixed(2)
-    },
-
-    handlePageChange(page) {
-      this.currentPage = page
-      this.selectedProducts = []
-      
-      // Optional: Show page change toast for better UX
-      if (this.filteredProducts.length > this.itemsPerPage) {
-        this.toast.info(`Page ${page} of ${Math.ceil(this.filteredProducts.length / this.itemsPerPage)}`, {
-          duration: 1500
-        })
-      }
+    
+    selectAll(event) {
+      this.$options.setup().selectAll(event.target.checked)
     }
   }
 }
 </script>
 
 <style scoped>
+/* Page Container */
 .products-page {
-  background-color: var(--neutral-light);
   min-height: 100vh;
+  background-color: var(--surface-secondary);
+  color: var(--text-secondary);
+  position: relative; /* Establish positioning context */
 }
 
-.text-primary-dark {
-  color: var(--primary-dark) !important;
-}
-
-.text-tertiary-dark {
-  color: var(--tertiary-dark) !important;
-}
-
-.text-tertiary-medium {
-  color: var(--tertiary-medium) !important;
-}
-
-/* Table Container */
-.table-container {
-  background: white;
+/* Action Bar */
+.action-bar {
+  background-color: var(--surface-primary);
+  border: 1px solid var(--border-secondary);
+  box-shadow: var(--shadow-sm);
   border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  overflow: hidden;
+  /* Remove overflow: hidden to allow dropdown to escape */
+  position: relative;
+  z-index: 100; /* Ensure action bar is above other content */
 }
 
-/* Header Controls */
-.table-header-controls {
-  border-bottom: 1px solid var(--neutral);
-  background-color: white;
+.action-controls {
+  background-color: var(--surface-primary);
+  border-bottom: 1px solid var(--border-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .action-row {
@@ -1000,43 +609,46 @@ export default {
   gap: 1rem;
 }
 
-/* Filter Dropdown */
-.filter-dropdown {
-  min-width: 120px;
+/* Dropdown Container - Ensures dropdown can overflow */
+.dropdown-container {
+  position: relative;
+  z-index: 1050; /* Bootstrap's dropdown z-index */
 }
 
-.filter-label {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--tertiary-medium);
-  margin-bottom: 0.25rem;
+.dropdown {
+  position: relative;
+}
+
+.add-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1055; /* Higher than Bootstrap's default dropdown z-index */
+  min-width: 280px;
+  margin-top: 0.25rem;
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-primary);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-xl); /* Enhanced shadow for better visibility */
+  animation: dropdownSlide 0.2s ease;
+  /* Ensure dropdown is not clipped */
+  transform: translateZ(0); /* Create new stacking context */
+}
+
+.add-dropdown-menu.show {
   display: block;
 }
 
-/* Search Container */
-.search-container {
-  min-width: 300px;
+/* Table Wrapper - Controls overflow separately from action bar */
+.table-wrapper {
+  position: relative;
+  z-index: 1; /* Lower than dropdown */
 }
 
-.search-input {
-  padding-right: 2.5rem;
-  height: calc(1.5em + 0.75rem + 2px); /* Match form-select height */
-}
-
-.search-container .position-relative .btn {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Custom dropdown styling */
-.custom-dropdown-menu {
-  min-width: 280px;
-  border: 1px solid var(--neutral);
-  border-radius: 0.75rem;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-  animation: dropdownSlide 0.2s ease;
+/* Override table container if needed */
+.table-wrapper :deep(.table-container) {
+  position: relative;
+  z-index: 1;
 }
 
 @keyframes dropdownSlide {
@@ -1050,47 +662,94 @@ export default {
   }
 }
 
-.custom-dropdown-item {
+.dropdown-item {
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--neutral-light);
-  transition: all 0.2s ease;
+  border-bottom: 1px solid var(--border-primary);
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
 }
 
-.custom-dropdown-item:last-child {
+.dropdown-item:last-child {
   border-bottom: none;
 }
 
-.custom-dropdown-item:hover {
-  background-color: var(--primary-light);
+.dropdown-item:hover {
+  background-color: var(--state-hover);
+}
+
+/* Filters */
+.filter-dropdown {
+  min-width: 120px;
+}
+
+.filter-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+  display: block;
+  color: var(--text-tertiary);
+}
+
+.form-select {
+  background-color: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--input-text);
+}
+
+.form-select:focus {
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 0.2rem rgba(160, 123, 227, 0.25);
+}
+
+/* Search */
+.search-container {
+  min-width: 300px;
+}
+
+.search-input {
+  padding-right: 2.5rem;
+  height: calc(1.5em + 0.75rem + 2px);
+  background-color: var(--input-bg);
+  border-color: var(--input-border);
+  color: var(--input-text);
+}
+
+.search-toggle {
+  height: calc(1.5em + 0.75rem + 2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.75rem;
 }
 
 /* Button States */
 .btn.active {
-  background-color: var(--primary);
-  border-color: var(--primary);
-  color: white;
+  color: var(--text-inverse);
+  background-color: var(--secondary);
+  border-color: var(--secondary);
 }
 
-/* Custom hover states for import/export buttons */
-.btn.btn-outline-secondary:hover {
-  background-color: var(--info-light);
-  border-color: var(--info);
-  color: var(--info-dark);
+/* Card Styling */
+.card {
+  background-color: var(--surface-primary);
+  border: 1px solid var(--border-secondary);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
 }
 
-/* Form controls focus states */
-.form-select:focus,
-.form-control:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
+/* Ensure proper stacking context for modals */
+.modal,
+.modal-backdrop {
+  z-index: 1060; /* Higher than dropdown */
 }
 
-/* Table row selection */
-.table tbody tr.table-primary {
-  background-color: var(--primary-light) !important;
-}
-
-/* Responsive adjustments */
+/* Responsive */
 @media (max-width: 768px) {
   .action-row {
     flex-direction: column;
@@ -1101,13 +760,13 @@ export default {
     min-width: 100%;
   }
   
-  .custom-dropdown-menu {
+  .add-dropdown-menu {
     min-width: 250px;
     right: 0;
     left: auto;
   }
   
-  .custom-dropdown-item {
+  .dropdown-item {
     padding: 0.875rem 1rem;
   }
 }
