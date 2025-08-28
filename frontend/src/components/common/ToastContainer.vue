@@ -92,7 +92,7 @@ export default {
 <style scoped>
 .toast-container {
   position: fixed;
-  top: 1rem;
+  bottom: 1rem;
   right: 1rem;
   z-index: 9999;
   pointer-events: none;
@@ -100,7 +100,7 @@ export default {
 
 .toast-list {
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse; /* Reverse order so newest appears at bottom */
   align-items: flex-end;
   gap: 0.5rem;
 }
@@ -116,50 +116,94 @@ export default {
   min-width: 300px;
   max-width: 500px;
   padding: 1rem 1.25rem;
-  background-color: var(--surface-elevated);
   border-radius: 0.5rem;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   border-left: 4px solid;
   overflow: hidden;
-  transition: all 0.3s ease;
+  background-color: #ffffff; /* Solid white background */
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  @apply transition-theme;
 }
 
-/* Toast Types */
+/* Dark mode toast background */
+.dark-theme .toast-notification {
+  background-color: #1f2937; /* Solid dark background */
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+}
+
+/* System preference dark mode */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light-theme) .toast-notification {
+    background-color: #1f2937;
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* Toast Types - Solid Background Colors */
 .toast-success {
-  border-left-color: var(--status-success);
-  background-color: #f0f9f4;
+  border-left-color: #22c55e;
+  background-color: #f0fdf4 !important; /* Light green background */
 }
 
 .toast-error {
-  border-left-color: var(--status-error);
-  background-color: #fef2f2;
+  border-left-color: #ef4444;
+  background-color: #fef2f2 !important; /* Light red background */
 }
 
 .toast-warning {
-  border-left-color: var(--status-warning);
-  background-color: #fffbeb;
+  border-left-color: #f59e0b;
+  background-color: #fffbeb !important; /* Light yellow background */
 }
 
 .toast-info {
-  border-left-color: var(--status-info);
-  background-color: #f0f4ff;
+  border-left-color: #3b82f6;
+  background-color: #eff6ff !important; /* Light blue background */
 }
 
-/* Dark theme adjustments */
+/* Dark Mode Toast Type Backgrounds */
 .dark-theme .toast-success {
-  background-color: rgba(34, 197, 94, 0.1);
+  background-color: #064e3b !important; /* Dark green */
+  border-left-color: #10b981;
 }
 
 .dark-theme .toast-error {
-  background-color: rgba(239, 68, 68, 0.1);
+  background-color: #7f1d1d !important; /* Dark red */
+  border-left-color: #f87171;
 }
 
 .dark-theme .toast-warning {
-  background-color: rgba(245, 158, 11, 0.1);
+  background-color: #78350f !important; /* Dark yellow */
+  border-left-color: #fbbf24;
 }
 
 .dark-theme .toast-info {
-  background-color: rgba(59, 130, 246, 0.1);
+  background-color: #1e3a8a !important; /* Dark blue */
+  border-left-color: #60a5fa;
+}
+
+/* System Dark Mode Preference */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light-theme) .toast-success {
+    background-color: #064e3b !important;
+    border-left-color: #10b981;
+  }
+  
+  :root:not(.light-theme) .toast-error {
+    background-color: #7f1d1d !important;
+    border-left-color: #f87171;
+  }
+  
+  :root:not(.light-theme) .toast-warning {
+    background-color: #78350f !important;
+    border-left-color: #fbbf24;
+  }
+  
+  :root:not(.light-theme) .toast-info {
+    background-color: #1e3a8a !important;
+    border-left-color: #60a5fa;
+  }
 }
 
 /* Icon Section */
@@ -196,9 +240,9 @@ export default {
 .toast-message {
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--tertiary-dark);
   line-height: 1.4;
   word-wrap: break-word;
+  @apply text-primary transition-theme;
 }
 
 /* Close Button */
@@ -213,19 +257,12 @@ export default {
   background: none;
   border: none;
   border-radius: 0.25rem;
-  color: var(--tertiary-medium);
   cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.toast-close:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-  color: var(--tertiary-dark);
+  @apply text-tertiary transition-theme hover-surface;
 }
 
 .toast-close:focus {
-  outline: 2px solid var(--border-accent);
-  outline-offset: 1px;
+  @apply focus-ring-theme;
 }
 
 /* Progress Bar Container */
@@ -235,10 +272,12 @@ export default {
   left: 0;
   right: 0;
   height: 3px;
-  background-color: rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  background-color: rgba(0, 0, 0, 0.1);
+  @apply transition-theme;
 }
 
+/* Dark mode progress container */
 .dark-theme .toast-progress-container {
   background-color: rgba(255, 255, 255, 0.1);
 }
@@ -288,7 +327,7 @@ export default {
   background-color: var(--status-info, #3b82f6);
 }
 
-/* Toast Transitions */
+/* Toast Transitions - Bottom Entry Animation */
 .toast-list-move,
 .toast-list-enter-active,
 .toast-list-leave-active {
@@ -297,12 +336,12 @@ export default {
 
 .toast-list-enter-from {
   opacity: 0;
-  transform: translateX(100%) scale(0.9);
+  transform: translateY(100%) scale(0.9); /* Enter from bottom */
 }
 
 .toast-list-leave-to {
   opacity: 0;
-  transform: translateX(100%) scale(0.9);
+  transform: translateX(100%) scale(0.9); /* Exit to right */
 }
 
 .toast-list-leave-active {
@@ -318,7 +357,7 @@ export default {
 /* Responsive Design */
 @media (max-width: 576px) {
   .toast-container {
-    top: 0.5rem;
+    bottom: 0.5rem;
     right: 0.5rem;
     left: 0.5rem;
   }
@@ -329,7 +368,7 @@ export default {
   }
 }
 
-/* Accessibility */
+/* Accessibility & Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
   .toast-notification,
   .toast-progress-bar,
@@ -337,7 +376,14 @@ export default {
   .toast-list-enter-active,
   .toast-list-leave-active {
     animation: none !important;
-    transition: none !important;
+    @apply transition-none;
+  }
+}
+
+/* Enhanced Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light-theme) .toast-progress-container {
+    background-color: rgba(255, 255, 255, 0.1);
   }
 }
 </style>

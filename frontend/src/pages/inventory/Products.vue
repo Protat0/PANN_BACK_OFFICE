@@ -435,6 +435,7 @@ export default {
   
   setup() {
     const productsComposable = useProducts()
+    const { success, error, warning, info, loading, dismiss } = useToast()
     
     onMounted(() => {
       productsComposable.initializeProducts()
@@ -444,7 +445,10 @@ export default {
       productsComposable.cleanupProducts()
     })
     
-    return { ...productsComposable }
+    return { 
+    ...productsComposable,
+    toast: { success, error, warning, info, loading, dismiss }
+  }
   },
   
   methods: {
@@ -569,6 +573,48 @@ export default {
     
     selectAll(event) {
       this.$options.setup().selectAll(event.target.checked)
+      const count = event.target.checked ? this.paginatedProducts.length : 0
+      if (count > 0) {
+        this.toast.info(`Selected ${count} products`)
+      } else {
+        this.toast.info('Selection cleared')
+      }
+    },
+
+    handleProductSuccess(result) {
+      if (result.message) {
+        this.toast.success(result.message)
+      } else {
+        this.toast.success('Item added') // The exact toast you wanted
+      }
+    },
+
+    handleStockUpdateSuccess(result) {
+      this.toast.success(result.message || 'Stock updated successfully')
+    },
+
+    handleImportSuccess(result) {
+      const successCount = result.totalSuccessful || 0
+      const failedCount = result.totalFailed || 0
+      
+      if (failedCount > 0) {
+        this.toast.warning(
+          `Import completed with warnings: ${successCount} products imported, ${failedCount} failed`,
+          { duration: 8000 }
+        )
+      } else {
+        this.toast.success(
+          `Import completed successfully! ${successCount} products imported`,
+          { duration: 6000 }
+        )
+      }
+    },
+
+    handleImportError(error) {
+      this.toast.error(
+        `Import failed: ${error.message || 'An unexpected error occurred'}`,
+        { duration: 8000 }
+      )
     }
   }
 }
