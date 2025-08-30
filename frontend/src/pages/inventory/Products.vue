@@ -224,14 +224,14 @@
               />
             </th>
             <th>Item name <ChevronUp :size="14" class="ms-1" /></th>
-            <th v-if="isColumnVisible('sku')" style="width: 100px;">SKU</th>
+            <th v-if="isColumnVisible('sku')" style="width: 200px;">SKU</th>
             <th v-if="isColumnVisible('category')" style="width: 120px;">Category</th>
-            <th v-if="isColumnVisible('sellingPrice')" style="width: 100px;">Price</th>
-            <th v-if="isColumnVisible('costPrice')" style="width: 100px;">Cost</th>
+            <th v-if="isColumnVisible('sellingPrice')" style="width: 100px; text-align: right;">Price</th>
+            <th v-if="isColumnVisible('costPrice')" style="width: 100px; text-align: right;">Cost</th>
             <th style="width: 80px;">Margin</th>
             <th v-if="isColumnVisible('stock')" style="width: 100px;">In stock</th>
             <th v-if="isColumnVisible('status')" style="width: 80px;">Status</th>
-            <th v-if="isColumnVisible('expiryDate')" style="width: 110px;">Expiry Date</th>
+            <th v-if="isColumnVisible('expiryDate')" style="width: 130px;">Expiry Date</th>
             <th style="width: 160px;">Actions</th>
           </tr>
         </template>
@@ -255,8 +255,8 @@
                 {{ product.product_name }}
               </div>
             </td>
-            <td v-if="isColumnVisible('sku')" class="text-center">
-              <code class="text-primary px-2 py-1 rounded bg-light">
+            <td v-if="isColumnVisible('sku')" class="text-left">
+              <code class="text-primary">
                 {{ product.SKU || '—' }}
               </code>
             </td>
