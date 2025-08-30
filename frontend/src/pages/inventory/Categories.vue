@@ -21,39 +21,23 @@
       <div class="action-bar-controls surface-card border-theme">
         <div class="action-row">
           <!-- Left Side: Main Actions -->
-          <div v-if="selectedCategories.length === 0" class="d-flex gap-2">
+          <div class="d-flex gap-2">
             <button 
               class="btn btn-add btn-sm btn-with-icon-sm"
               @click="handleAddCategory"
               :disabled="loading"
             >
-              <div v-if="loading" class="spinner-border spinner-border-sm me-2" role="status">
-                <span class="visually-hidden">Loading...</span>
-              </div>
-              <Plus v-else :size="14" />
-              {{ loading ? 'CREATING...' : 'ADD CATEGORY' }}
+              <Plus :size="14" />
+              ADD CATEGORY
             </button>
-
+            
             <button 
               class="btn btn-export btn-sm btn-with-icon-sm"
               @click="handleExport" 
-              :disabled="loading || categories.length === 0"
+              :disabled="loading || filteredCategories.length === 0"
             >
               <FileDown :size="14" />
               EXPORT
-            </button>
-          </div>
-
-          <!-- Bulk Actions for Selected Items -->
-          <div v-else class="d-flex gap-2">
-            <span class="text-tertiary-medium">{{ selectedCategories.length }} selected</span>
-            <button 
-              class="btn btn-delete btn-sm btn-with-icon-sm"
-              @click="deleteSelected"
-              :disabled="loading"
-            >
-              <Trash2 :size="14" />
-              Delete Selected
             </button>
           </div>
 
@@ -133,59 +117,45 @@
 
     <!-- Category Cards Section -->
     <div v-if="!loading && !error" class="row g-3 mb-4">
-      <!-- Sample Categories Data -->
-      <div class="col-6 col-md-3">
+      <div 
+        v-for="category in filteredCategories" 
+        :key="category._id"
+        class="col-6 col-md-3"
+      >
         <CardTemplate
           size="md"
           border-color="primary"
           border-position="start"
-          title="Drinks"
-          subtitle="Hot and cold drinks that are available for all the customers"
+          :title="category.category_name"
+          :subtitle="getCategorySubtitle(category)"
           shadow="sm"
           clickable
-
         >
           <template #content>
-            <!-- Selection Checkbox -->
-            <div class="position-absolute top-0 start-0 p-2">
-              <input 
-                type="checkbox" 
-                class="form-check-input"
-                @click.stop
-              />
-            </div>
-
             <div class="d-flex justify-content-between align-items-center mb-2">
               <div>
-                <div class="text-primary fw-bold h5 mb-1">55</div>
+                <div class="text-primary fw-bold h5 mb-1">
+                  {{ getProductCount(category) }}
+                </div>
                 <small class="text-tertiary-medium">Products</small>
               </div>
               <div class="category-icon surface-primary-light rounded-circle p-2">
-                <Coffee :size="20" class="text-status-primary" />
+                <Package :size="20" class="text-status-primary" />
               </div>
-            </div>
-
-            <!-- Sales Data -->
-            <div class="mb-2">
-              <small class="text-tertiary-medium">Sales: </small>
-              <span class="text-success fw-semibold">₱313,882.67</span>
             </div>
 
             <!-- Action buttons -->
             <div class="d-flex gap-1 mt-2">
               <button 
-                class="btn btn-view btn-sm btn-with-icon-sm"
-                data-bs-toggle="tooltip"
-                title="View Category Details"
+                class="btn btn-view btn-sm"
+                @click.stop="viewCategory(category._id)"
               >
                 <Eye :size="14" />
-                <span class="btn-text">View</span>
+                View
               </button>
-
               <button 
-                class="btn btn-delete btn-sm btn-with-icon-sm"
-                data-bs-toggle="tooltip"
-                title="Delete Category"
+                class="btn btn-delete btn-sm"
+                @click.stop="handleDeleteCategory(category)"
               >
                 <Trash2 :size="14" />
                 Delete
@@ -194,227 +164,6 @@
           </template>
         </CardTemplate>
       </div>
-
-      <div class="col-6 col-md-3">
-        <CardTemplate
-          size="md"
-          border-color="secondary"
-          border-position="start"
-          title="Noodles"
-          subtitle="Different Types of Noodles for customers to eat"
-          shadow="sm"
-          clickable
-
-        >
-          <template #content>
-            <!-- Selection Checkbox -->
-            <div class="position-absolute top-0 start-0 p-2">
-              <input 
-                type="checkbox" 
-                class="form-check-input"
-                @click.stop
-              />
-            </div>
-
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <div>
-                <div class="text-primary fw-bold h5 mb-1">102</div>
-                <small class="text-tertiary-medium">Products</small>
-              </div>
-              <div class="category-icon surface-secondary-light rounded-circle p-2">
-                <Utensils :size="20" class="text-status-info" />
-              </div>
-            </div>
-
-            <!-- Sales Data -->
-            <div class="mb-2">
-              <small class="text-tertiary-medium">Sales: </small>
-              <span class="text-success fw-semibold">₱793,417.04</span>
-            </div>
-
-            <!-- Action buttons -->
-            <div class="d-flex gap-1 mt-2">
-              <button 
-                class="btn btn-view btn-sm btn-with-icon-sm"
-                data-bs-toggle="tooltip"
-                title="View Category Details"
-              >
-                <Eye :size="14" />
-                <span class="btn-text">View</span>
-              </button>
-
-              <button 
-                class="btn btn-delete btn-sm btn-with-icon-sm"
-                data-bs-toggle="tooltip"
-                title="Delete Category"
-              >
-                <Trash2 :size="14" />
-                Delete
-              </button>
-            </div>
-          </template>
-        </CardTemplate>
-      </div>
-
-      <div class="col-6 col-md-3">
-        <CardTemplate
-          size="md"
-          border-color="info"
-          border-position="start"
-          title="Toppings"
-          subtitle="Different Types of Toppings to add to the meals"
-          shadow="sm"
-          clickable
-
-        >
-          <template #content>
-            <!-- Selection Checkbox -->
-            <div class="position-absolute top-0 start-0 p-2">
-              <input 
-                type="checkbox" 
-                class="form-check-input"
-                @click.stop
-              />
-            </div>
-
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <div>
-                <div class="text-primary fw-bold h5 mb-1">40</div>
-                <small class="text-tertiary-medium">Products</small>
-              </div>
-              <div class="category-icon surface-info-light rounded-circle p-2">
-                <Star :size="20" class="text-status-info" />
-              </div>
-            </div>
-
-            <!-- Sales Data -->
-            <div class="mb-2">
-              <small class="text-tertiary-medium">Sales: </small>
-              <span class="text-success fw-semibold">₱533,301.06</span>
-            </div>
-
-            <!-- Action buttons -->
-            <div class="d-flex gap-1 mt-2">
-              <button 
-                class="btn btn-view btn-sm btn-with-icon-sm"
-                data-bs-toggle="tooltip"
-                title="View Category Details"
-              >
-                <Eye :size="14" />
-                <span class="btn-text">View</span>
-              </button>
-
-              <button 
-                class="btn btn-delete btn-sm btn-with-icon-sm"
-                data-bs-toggle="tooltip"
-                title="Delete Category"
-              >
-                <Trash2 :size="14" />
-                Delete
-              </button>
-            </div>
-          </template>
-        </CardTemplate>
-      </div>
-
-      <div class="col-6 col-md-3">
-        <CardTemplate
-          size="md"
-          border-color="success"
-          border-position="start"
-          title="Others"
-          subtitle="These items are the different items available in the menu"
-          shadow="sm"
-          clickable
-
-        >
-          <template #content>
-            <!-- Selection Checkbox -->
-            <div class="position-absolute top-0 start-0 p-2">
-              <input 
-                type="checkbox" 
-                class="form-check-input"
-                @click.stop
-              />
-            </div>
-
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <div>
-                <div class="text-primary fw-bold h5 mb-1">42</div>
-                <small class="text-tertiary-medium">Products</small>
-              </div>
-              <div class="category-icon surface-success-light rounded-circle p-2">
-                <ShoppingBag :size="20" class="text-status-success" />
-              </div>
-            </div>
-
-            <!-- Sales Data -->
-            <div class="mb-2">
-              <small class="text-tertiary-medium">Sales: </small>
-              <span class="text-success fw-semibold">₱182,981.72</span>
-            </div>
-
-            <!-- Action buttons -->
-            <div class="d-flex gap-1 mt-2">
-              <button 
-                class="btn btn-view btn-sm btn-with-icon-sm"
-                data-bs-toggle="tooltip"
-                title="View Category Details"
-              >
-                <Eye :size="14" />
-                <span class="btn-text">View</span>
-              </button>
-
-              <button 
-                class="btn btn-delete btn-sm btn-with-icon-sm"
-                data-bs-toggle="tooltip"
-                title="Delete Category"
-              >
-                <Trash2 :size="14" />
-                Delete
-              </button>
-            </div>
-          </template>
-        </CardTemplate>
-      </div>
-    </div>
-
-    <!-- Pagination -->
-    <div v-if="filteredCategories.length > itemsPerPage" class="d-flex justify-content-center">
-      <nav aria-label="Categories pagination">
-        <ul class="pagination pagination-sm">
-          <li class="page-item" :class="{ disabled: currentPage === 1 }">
-            <button 
-              class="page-link" 
-              @click="handlePageChange(currentPage - 1)" 
-              :disabled="currentPage === 1"
-            >
-              Previous
-            </button>
-          </li>
-          
-          <li 
-            v-for="page in Math.ceil(filteredCategories.length / itemsPerPage)" 
-            :key="page"
-            class="page-item" 
-            :class="{ active: page === currentPage }"
-          >
-            <button class="page-link" @click="handlePageChange(page)">
-              {{ page }}
-            </button>
-          </li>
-          
-          <li class="page-item" :class="{ disabled: currentPage === Math.ceil(filteredCategories.length / itemsPerPage) }">
-            <button 
-              class="page-link" 
-              @click="handlePageChange(currentPage + 1)" 
-              :disabled="currentPage === Math.ceil(filteredCategories.length / itemsPerPage)"
-            >
-              Next
-            </button>
-          </li>
-        </ul>
-      </nav>
     </div>
 
     <!-- Empty State -->
@@ -422,10 +171,10 @@
       <Package :size="64" class="text-tertiary-medium mb-3" />
       <h5 class="text-tertiary-dark">No categories found</h5>
       <p class="text-tertiary-medium mb-3">
-        {{ getEmptyStateMessage() }}
+        {{ categories.length === 0 ? 'Get started by creating your first category.' : 'No categories match your current filters.' }}
       </p>
       <button 
-        v-if="categories.length === 0 && statusFilter !== 'deleted'"
+        v-if="categories.length === 0"
         class="btn btn-add"
         @click="handleAddCategory"
       >
@@ -433,9 +182,9 @@
         Add First Category
       </button>
       <button 
-        v-else-if="searchFilter || statusFilter !== 'all'"
+        v-else
         class="btn btn-filter"
-        @click="clearFilters"
+        @click="handleClearFilters"
       >
         Clear Filters
       </button>
@@ -447,107 +196,51 @@
 </template>
 
 <script>
+import { ref, nextTick } from 'vue'
 import CardTemplate from '@/components/common/CardTemplate.vue'
 import AddCategoryModal from '@/components/categories/AddCategoryModal.vue'
 import { useCategories } from '@/composables/ui/categories/useCategories'
-import { 
-  Plus, 
-  Search,
-  X,
-  Package, 
-  Trash2,
-  Eye,
-  Coffee,
-  Star,
-  Zap,
-  Utensils,
-  ShoppingBag,
-  Grid3x3,
-  RotateCcw,
-  FileDown
-} from 'lucide-vue-next'
 
 export default {
   name: 'Categories',
   components: {
     CardTemplate,
     AddCategoryModal,
-    Plus,
-    Search,
-    X,
-    Package,
-    Trash2,
-    Eye,
-    Coffee,
-    Star,
-    Zap,
-    Utensils,
-    ShoppingBag,
-    Grid3x3,
-    RotateCcw,
-    FileDown
   },
 
   setup() {
+    const searchInput = ref(null)
+    
     // Use the categories composable
     const {
       // State
       categories,
       filteredCategories,
-      selectedCategories,
       loading,
       error,
       successMessage,
+      uncategorizedCount,
       
       // UI State
       searchMode,
       
-      // Pagination
-      currentPage,
-      itemsPerPage,
-      paginatedCategories,
-      
       // Filters
       statusFilter,
       searchFilter,
-      includeDeleted,
-      
-      // Computed
-      allSelected,
-      someSelected,
-      activeCategories,
       
       // Core Methods
-      fetchCategoriesWithSalesData,
-      createCategory,
-      updateCategory,
-      softDeleteCategory,
-      hardDeleteCategory,
-      restoreCategory,
-      getCategoryDeleteInfo,
       refreshData,
+      getProductCount,
+      getCategorySubtitle,
+      fetchUncategorizedCount,
+      softDeleteCategory,
+      exportCategories,
       
       // Filter and Search
       applyFilters,
       clearFilters,
-      
-      // Selection Methods
-      selectAll,
-      deleteSelected,
-      
-      // UI Methods
       toggleSearchMode,
       clearSearch,
-      
-      // Pagination
-      handlePageChange,
-      
-      // Formatting Methods
-      formatDate,
-      formatSalesData,
-      getCategoryStatusClass,
-      getCategoryStatusText,
-      getRowClass,
       
       // Success/Error handlers
       handleCategorySuccess,
@@ -558,74 +251,61 @@ export default {
       cleanupCategories
     } = useCategories()
 
+    // Watch search mode to focus input
+    const handleToggleSearchMode = async () => {
+      toggleSearchMode()
+      if (searchMode.value) {
+        await nextTick()
+        if (searchInput.value) {
+          searchInput.value.focus()
+        }
+      }
+    }
+
     return {
-      // Export all useCategories functionality
+      // Refs
+      searchInput,
+      
+      // State from composable
       categories,
       filteredCategories,
-      selectedCategories,
       loading,
       error,
       successMessage,
+      uncategorizedCount,
       searchMode,
-      currentPage,
-      itemsPerPage,
-      paginatedCategories,
       statusFilter,
       searchFilter,
-      includeDeleted,
-      allSelected,
-      someSelected,
-      activeCategories,
-      fetchCategoriesWithSalesData,
-      createCategory,
-      updateCategory,
-      softDeleteCategory,
-      hardDeleteCategory,
-      restoreCategory,
-      getCategoryDeleteInfo,
+      
+      // Methods from composable
       refreshData,
+      getProductCount,
+      getCategorySubtitle,
+      fetchUncategorizedCount,
+      softDeleteCategory,
+      exportCategories,
       applyFilters,
       clearFilters,
-      selectAll,
-      deleteSelected,
-      toggleSearchMode,
       clearSearch,
-      handlePageChange,
-      formatDate,
-      formatSalesData,
-      getCategoryStatusClass,
-      getCategoryStatusText,
-      getRowClass,
       handleCategorySuccess,
       handleCategoryError,
       initializeCategories,
-      cleanupCategories
-    }
-  },
-
-  data() {
-    return {
-      isAdmin: true, // TODO: Get from auth composable
+      cleanupCategories,
       
-      // Uncategorized tracking
-      uncategorizedCount: 0,
-      UNCATEGORIZED_CATEGORY_ID: '686a4de143821e2b21f725c6'
-    }
-  },
-
-  computed: {
-    // Override paginatedCategories to exclude Uncategorized category
-    displayedCategories() {
-      return this.paginatedCategories.filter(category => 
-        category._id !== this.UNCATEGORIZED_CATEGORY_ID
-      )
+      // Local methods
+      toggleSearchMode: handleToggleSearchMode
     }
   },
 
   async mounted() {
-    // Initialize categories using composable
-    await this.initializeCategories()
-    await this.fetchUncategorizedCount()
+    try {
+      // Initialize categories using composable
+      await this.initializeCategories()
+      await this.fetchUncategorizedCount()
+    } catch (error) {
+      console.error('Error initializing categories page:', error)
+      this.handleCategoryError(error)
+    }
   },
 
   beforeUnmount() {
@@ -634,24 +314,7 @@ export default {
   },
 
   methods: {
-    // Fetch uncategorized products count (category-specific logic)
-    async fetchUncategorizedCount() {
-      try {
-        console.log('Fetching uncategorized products count...')
-        
-        // Use composable's fetchCategoryProducts method
-        const products = await this.$options.setup().fetchCategoryProducts(this.UNCATEGORIZED_CATEGORY_ID)
-        
-        this.uncategorizedCount = Array.isArray(products) ? products.length : 0
-        console.log(`Found ${this.uncategorizedCount} uncategorized products`)
-        
-      } catch (error) {
-        console.error('Error fetching uncategorized count:', error)
-        this.uncategorizedCount = 0
-      }
-    },
-
-    // Modal handlers (keeping existing modal integration)
+    // Modal handlers
     async handleAddCategory() {
       console.log('Add Category button clicked')
       
@@ -659,6 +322,7 @@ export default {
         this.$refs.addCategoryModal.openAddMode()
       } else {
         console.error('AddCategoryModal ref not found')
+        this.handleCategoryError({ message: 'Modal component not available' })
       }
     },
 
@@ -680,14 +344,13 @@ export default {
       }
     },
 
-    // Navigation (keeping existing logic)
-    viewCategory(category) {
-      console.log('View category:', category)
-      
-      const categoryId = category._id || category.id || category.category_id
+    // Navigation
+    viewCategory(categoryId) {
+      console.log('View category:', categoryId)
       
       if (!categoryId) {
-        console.error('No valid ID found in category object')
+        console.error('No valid category ID provided')
+        this.handleCategoryError({ message: 'Invalid category ID' })
         return
       }
       
@@ -698,178 +361,54 @@ export default {
       })
     },
 
-    // Enhanced delete methods using composable
-    async handleSoftDelete(category) {
+    // Delete handler
+    async handleDeleteCategory(category) {
       try {
-        const deleteInfo = await this.getCategoryDeleteInfo(category._id)
-        
-        const categoryName = category.category_name || 'this category'
-        const productCount = deleteInfo.delete_info?.products_count || 0
-        const subcategoryCount = deleteInfo.delete_info?.subcategories_count || 0
-        
-        let confirmMessage = `Are you sure you want to delete "${categoryName}"?`
-        
-        if (productCount > 0 || subcategoryCount > 0) {
-          confirmMessage += `\n\nThis category contains:`
-          if (subcategoryCount > 0) confirmMessage += `\n• ${subcategoryCount} subcategory`
-          if (productCount > 0) confirmMessage += `\n• ${productCount} product(s)`
-          confirmMessage += `\n\nProducts will be moved to Uncategorized.`
-        }
-        
-        const confirmed = confirm(confirmMessage)
-        if (!confirmed) return
-
-        await this.softDeleteCategory(category._id)
-        await this.fetchUncategorizedCount() // Refresh uncategorized count
-        
-      } catch (error) {
-        console.error('Error soft deleting category:', error)
-        this.handleCategoryError(error)
-      }
-    },
-
-    async handleRestore(category) {
-      try {
-        const confirmed = confirm(`Are you sure you want to restore "${category.category_name}"?`)
-        if (!confirmed) return
-
-        await this.restoreCategory(category._id)
-        await this.fetchUncategorizedCount() // Refresh uncategorized count
-        
-      } catch (error) {
-        console.error('Error restoring category:', error)
-        this.handleCategoryError(error)
-      }
-    },
-
-    async handleHardDelete(category) {
-      try {
-        const categoryName = category.category_name || 'this category'
-        
         const confirmed = confirm(
-          `⚠️ PERMANENT DELETE WARNING ⚠️\n\n` +
-          `Are you sure you want to PERMANENTLY delete "${categoryName}"?\n\n` +
-          `This action:\n` +
-          `• CANNOT be undone\n` +
-          `• Will permanently remove all data\n` +
-          `• Requires admin permissions\n\n` +
-          `Type "DELETE" to confirm this permanent action.`
+          `Are you sure you want to delete "${category.category_name}"?\n\n` +
+          `This will move the category to trash. Products will be moved to Uncategorized.`
         )
         
         if (!confirmed) return
-
-        const confirmText = prompt('Please type "DELETE" to confirm permanent deletion:')
-        if (confirmText !== 'DELETE') {
-          this.handleCategoryError({ message: 'Confirmation text did not match. Operation cancelled.' })
-          return
-        }
-
-        await this.hardDeleteCategory(category._id)
-        await this.fetchUncategorizedCount() // Refresh uncategorized count
+        
+        console.log('Deleting category:', category._id)
+        await this.softDeleteCategory(category._id)
+        
+        // Refresh uncategorized count since products might be moved there
+        await this.fetchUncategorizedCount()
         
       } catch (error) {
-        console.error('Error hard deleting category:', error)
+        console.error('Error deleting category:', error)
         this.handleCategoryError(error)
       }
     },
 
-    // Export using composable
+    // Export handler
     async handleExport() {
       try {
-        const exportParams = {
+        console.log('Exporting categories...')
+        
+        await this.exportCategories({
           format: 'csv',
           include_sales_data: true,
-          include_deleted: this.includeDeleted
-        }
+          include_deleted: this.statusFilter === 'deleted'
+        })
         
-        await this.exportCategories(exportParams)
+        console.log('Export completed successfully')
         
       } catch (error) {
-        console.error('Export error:', error)
-        this.handleCategoryError(error)
+        console.error('Export failed:', error)
+        this.handleCategoryError({ message: `Export failed: ${error.message}` })
       }
     },
 
-    // Utility methods (enhanced with composable integration)
-    getCategorySubtitle(category) {
-      if (category.isDeleted) {
-        return `Deleted ${this.formatDate(category.deleted_at)}`
-      }
-      return category.description || category.subtitle || `${category.category_name} products`
-    },
-
-    getProductCount(category) {
-      // Handle different data structures
-      if (category.subcategories) {
-        return category.subcategories.reduce((total, sub) => total + (sub.product_count || 0), 0)
-      }
-      return category.product_count || 0
-    },
-
-    getEmptyStateMessage() {
-      if (this.statusFilter === 'deleted') {
-        return 'No deleted categories found.'
-      } else if (this.categories.length === 0) {
-        return 'Get started by creating your first category.'
-      } else if (this.searchFilter) {
-        return `No categories match "${this.searchFilter}". Try a different search term.`
-      } else {
-        return 'Try adjusting your search or filters.'
-      }
-    },
-
-    // ICON AND STYLING METHODS (keeping existing visual logic)
-    getCategoryIcon(category, index) {
-      const categoryName = (category.category_name || '').toLowerCase()
-      
-      if (categoryName.includes('noodles') || categoryName.includes('pasta')) {
-        return 'Utensils'
-      } else if (categoryName.includes('drink') || categoryName.includes('beverage')) {
-        return 'Coffee'
-      } else if (categoryName.includes('topping') || categoryName.includes('extra')) {
-        return 'Star'
-      } else if (categoryName.includes('snack') || categoryName.includes('side')) {
-        return 'Zap'
-      } else if (categoryName.includes('food') || categoryName.includes('meal')) {
-        return 'Package'
-      } else if (categoryName.includes('bag') || categoryName.includes('shop')) {
-        return 'ShoppingBag'
-      }
-      
-      const icons = ['Package', 'Coffee', 'Star', 'Zap', 'Utensils', 'ShoppingBag', 'Grid3x3']
-      return icons[index % icons.length]
-    },
-
-    getCategoryBorderColor(category, index) {
-      const categoryName = (category.category_name || '').toLowerCase()
-      
-      if (categoryName.includes('noodle') || categoryName.includes('pasta')) {
-        return 'secondary'
-      } else if (categoryName.includes('drink') || categoryName.includes('beverage')) {
-        return 'primary'
-      } else if (categoryName.includes('topping') || categoryName.includes('extra')) {
-        return 'info'
-      } else if (categoryName.includes('snack') || categoryName.includes('side')) {
-        return 'success'
-      }
-      
-      const colors = ['secondary', 'primary', 'info', 'success']
-      return colors[index % colors.length]
-    },
-
-    getCategoryIconClass(category, index) {
-      const borderColor = this.getCategoryBorderColor(category, index)
-      return `category-icon surface-${borderColor}-light rounded-circle p-2`
-    },
-
-    getCategoryIconColor(category, index) {
-      const borderColor = this.getCategoryBorderColor(category, index)
-      return `text-status-${borderColor === 'secondary' ? 'info' : borderColor}`
+    // Filter helper
+    handleClearFilters() {
+      this.clearFilters()
     }
   }
 }
 </script>
-
 
 <style scoped>
 .categories-page {
@@ -922,6 +461,11 @@ export default {
   justify-content: center;
   width: 44px;
   height: 44px;
+}
+
+.state-active {
+  background-color: var(--state-selected) !important;
+  color: var(--text-accent) !important;
 }
 
 @media (max-width: 768px) {

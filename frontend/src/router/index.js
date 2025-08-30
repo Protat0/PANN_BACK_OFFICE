@@ -1,11 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 
-// Import authentication and layout components
 import Login from '../pages/Login.vue'
 import MainLayout from '../layouts/MainLayout.vue'
 
-// Import your page components
 import Dashboard from '../pages/Dashboard.vue'
 import Accounts from '../pages/Accounts.vue'
 import Customers from '../pages/Customers.vue'
@@ -100,7 +98,7 @@ const router = createRouter({
           component: Categories
         },
         {
-          path: 'category/:id', // Change this line
+          path: 'category/:id',
           name: 'Category Details',
           component: CategoryDetails,
           props: true

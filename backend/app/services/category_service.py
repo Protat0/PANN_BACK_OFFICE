@@ -11,10 +11,10 @@ class CategoryService:
     def __init__(self):
         self.db = db_manager.get_database()  
         self.category_collection = self.db.category
-        self.audit_service = AuditLogService()
-        # ✅ ADD: Initialize audit service
+        
+        # ✅ FIXED: Single, clean audit service initialization
         try:
-            from .audit_service import AuditLogService
+            # Import should be at the top of the file, not inside try block
             self.audit_service = AuditLogService()
             print("✅ Audit service initialized for CategoryService")
         except Exception as e:
@@ -1572,6 +1572,7 @@ class ProductSubcategoryService:
     # Constants inside the class
     UNCATEGORIZED_CATEGORY_NAME = "Uncategorized"
     UNCATEGORIZED_SUBCATEGORY_NAME = "General"
+    UNCATEGORIZED_CATEGORY_ID = '686a4de143821e2b21f725c6'
     
     def __init__(self):
         self.db = db_manager.get_database()  
@@ -1585,7 +1586,7 @@ class ProductSubcategoryService:
             print(f"⚠️ Could not initialize audit service: {e}")
             self.audit_service = None
     
-    def update_product_subcategory(self, product_id, new_subcategory, category_id):
+    def update_product_subcategory(self, product_id, new_subcategory, category_id, current_user=None):
         """
         Updated method: Handle "None" as a real subcategory name
         """
@@ -1648,7 +1649,8 @@ class ProductSubcategoryService:
                     product_id, 
                     product_name, 
                     current_category, 
-                    current_subcategory
+                    current_subcategory,
+                    current_user
                 )
             else:
                 # Treat "None" as a real subcategory name, not a special case
@@ -1658,14 +1660,15 @@ class ProductSubcategoryService:
                     target_category, 
                     new_subcategory,  # "None" is treated as a real subcategory
                     current_category,
-                    current_subcategory
+                    current_subcategory,
+                    current_user
                 )
                 
         except Exception as e:
             print(f"❌ Error in product-centric update: {str(e)}")
             raise Exception(f"Error updating product subcategory: {str(e)}")
     
-    def _move_to_uncategorized_category(self, product_id, product_name, current_category=None, current_subcategory=None):
+    def _move_to_uncategorized_category(self, product_id, product_name, current_category=None, current_subcategory=None, current_user=None):
         """
         Move a product to the special 'Uncategorized' category
         """
@@ -1737,7 +1740,7 @@ class ProductSubcategoryService:
         except Exception as e:
             raise Exception(f"Error moving to uncategorized category: {str(e)}")
     
-    def _move_product_to_subcategory(self, product_id, product_name, target_category, new_subcategory, current_category, current_subcategory):
+    def _move_product_to_subcategory(self, product_id, product_name, target_category, new_subcategory, current_category, current_subcategory, current_user=None):
         """Move product to a specific subcategory"""
         try:
             # Check if target subcategory exists
