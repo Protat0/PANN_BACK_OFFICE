@@ -62,14 +62,9 @@
 </template>
 
 <script>
-import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
 export default {
   name: 'DataTable',
-  components: {
-    ChevronLeft,
-    ChevronRight
-  },
 
   props: {
     // Pagination props
@@ -220,8 +215,8 @@ export default {
 
 /* Action Button Base Styles */
 .data-table :deep(.action-btn) {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
