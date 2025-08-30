@@ -420,16 +420,19 @@ export function useProducts() {
   }
   
   const formatExpiryDate = (expiryDate) => {
-    if (!expiryDate) return '—'
+    if (!expiryDate) return 'N/A'
     try {
       const date = new Date(expiryDate)
+      if (isNaN(date.getTime())) {
+        return 'N/A'
+      }
       return date.toLocaleDateString('en-US', { 
         month: 'short', 
         day: 'numeric', 
         year: 'numeric' 
       })
     } catch (err) {
-      return '—'
+      return 'N/A'
     }
   }
   
