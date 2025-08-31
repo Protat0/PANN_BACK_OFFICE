@@ -230,10 +230,9 @@ export default {
   },
   methods: {
     handleTargetSalesClick() {
-      console.log('Target sales button clicked')
+      // Target sales button clicked
     },
     updateChart() {
-      console.log('Updating chart for frequency:', this.selectedFrequency)
       // Update chart data based on frequency
       if (this.chart) {
         // Sample data changes based on frequency
@@ -346,7 +345,6 @@ export default {
           }
         })
       } catch (error) {
-        console.error('Failed to load Chart.js:', error)
         // Fallback: show a simple text message
         this.$refs.chartCanvas.style.display = 'none'
         const fallback = document.createElement('div')

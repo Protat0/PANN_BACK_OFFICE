@@ -65,14 +65,20 @@
         </div>
       </div>
     </div>
+
+    <!-- Toast Container - Add this for global toast notifications -->
+    <ToastContainer />
   </div>
 </template>
 
 <script>
+import { useToast } from '../composables/useToast.js'
 import Sidebar from './Sidebar.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 import DarkModeToggle from '@/components/common/DarkModeToggle.vue'
 import { X } from 'lucide-vue-next'
+
+import ToastContainer from '@/components/common/ToastContainer.vue'
 
 export default {
   name: 'MainLayout',
@@ -80,7 +86,16 @@ export default {
     Sidebar,
     NotificationBell,
     DarkModeToggle,
-    X
+    X,
+    ToastContainer
+  },
+  setup() {
+    // Make toast available globally in this layout if needed
+    const { success, error, warning, info } = useToast()
+    
+    return {
+      toast: { success, error, warning, info }
+    }
   },
   data() {
     return {
@@ -138,6 +153,9 @@ export default {
     async handleLogout() {
       console.log('User logging out')
       
+      // Show logout toast
+      const logoutToastId = this.toast.loading('Logging out...')
+      
       try {
         // Call logout API
         const token = localStorage.getItem('authToken')
@@ -150,17 +168,34 @@ export default {
             }
           })
         }
+        
+        // Success toast
+        this.toast.dismiss(logoutToastId)
+        this.toast.success('Successfully logged out', { duration: 2000 })
+        
       } catch (error) {
         console.error('Logout API error:', error)
+        this.toast.dismiss(logoutToastId)
+        this.toast.warning('Logged out with connection issues', { duration: 3000 })
       } finally {
         // Clear stored data
         localStorage.removeItem('authToken')
         localStorage.removeItem('refreshToken')
         localStorage.removeItem('userData')
         
-        // Redirect to login
-        this.$router.push('/login')
+        // Small delay to show the toast before redirecting
+        setTimeout(() => {
+          // Redirect to login
+          this.$router.push('/login')
+        }, 1500)
       }
+    }
+  },
+  mounted() {
+    // Load sidebar state from localStorage
+    const savedState = localStorage.getItem('sidebar-collapsed')
+    if (savedState !== null) {
+      this.sidebarCollapsed = JSON.parse(savedState)
     }
   },
   mounted() {
@@ -178,6 +213,15 @@ export default {
     } else {
       next('/login')
     }
+  },
+  mounted() {
+    // Show welcome toast when user first loads the app (optional)
+    const userData = this.userInfo
+    if (userData.full_name) {
+      this.toast.success(`Welcome back, ${userData.full_name}!`, {
+        duration: 3000
+      })
+    }
   }
 }
 </script>
@@ -192,7 +236,7 @@ export default {
   width: 100vw;
   margin: 0;
   padding: 0;
-  @apply page-container transition-theme;
+  position: relative; /* Added for toast positioning */
 }
 
 /* ==========================================================================

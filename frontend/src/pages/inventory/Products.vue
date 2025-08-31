@@ -62,11 +62,6 @@
       <button class="btn btn-submit" @click="refreshData">Try Again</button>
     </div>
 
-    <!-- Success Message -->
-    <div v-if="successMessage" class="alert alert-success text-center" role="alert">
-      {{ successMessage }}
-    </div>
-
     <!-- Action Bar and Filters -->
     <div v-if="!loading || products.length > 0" class="action-bar mb-3">
       <div class="action-controls">
@@ -229,14 +224,14 @@
               />
             </th>
             <th>Item name <ChevronUp :size="14" class="ms-1" /></th>
-            <th v-if="isColumnVisible('sku')" style="width: 100px;">SKU</th>
+            <th v-if="isColumnVisible('sku')" style="width: 200px;">SKU</th>
             <th v-if="isColumnVisible('category')" style="width: 120px;">Category</th>
-            <th v-if="isColumnVisible('sellingPrice')" style="width: 100px;">Price</th>
-            <th v-if="isColumnVisible('costPrice')" style="width: 100px;">Cost</th>
+            <th v-if="isColumnVisible('sellingPrice')" style="width: 100px; text-align: right;">Price</th>
+            <th v-if="isColumnVisible('costPrice')" style="width: 100px; text-align: right;">Cost</th>
             <th style="width: 80px;">Margin</th>
             <th v-if="isColumnVisible('stock')" style="width: 100px;">In stock</th>
             <th v-if="isColumnVisible('status')" style="width: 80px;">Status</th>
-            <th v-if="isColumnVisible('expiryDate')" style="width: 110px;">Expiry Date</th>
+            <th v-if="isColumnVisible('expiryDate')" style="width: 130px;">Expiry Date</th>
             <th style="width: 160px;">Actions</th>
           </tr>
         </template>
@@ -260,8 +255,8 @@
                 {{ product.product_name }}
               </div>
             </td>
-            <td v-if="isColumnVisible('sku')" class="text-center">
-              <code class="text-primary px-2 py-1 rounded bg-light">
+            <td v-if="isColumnVisible('sku')" class="text-left">
+              <code class="text-primary">
                 {{ product.SKU || '—' }}
               </code>
             </td>
@@ -412,6 +407,7 @@
 </template>
 
 <script>
+import { useToast } from '@/composables/useToast.js'
 import { onMounted, onBeforeUnmount } from 'vue'
 import { useProducts } from '../../composables/ui/products/useProducts'
 import AddProductModal from '../../components/products/AddProductModal.vue'
@@ -439,6 +435,7 @@ export default {
   
   setup() {
     const productsComposable = useProducts()
+    const { success, error, warning, info, loading, dismiss } = useToast()
     
     onMounted(() => {
       productsComposable.initializeProducts()
@@ -448,7 +445,10 @@ export default {
       productsComposable.cleanupProducts()
     })
     
-    return { ...productsComposable }
+    return { 
+    ...productsComposable,
+    toast: { success, error, warning, info, loading, dismiss }
+  }
   },
   
   methods: {
@@ -473,19 +473,71 @@ export default {
     restockProduct(product) {
       this.$refs.stockUpdateModal?.openStock?.(product)
     },
-    
+
+    async exportData() {
+      const loadingToastId = this.toast.loading('Preparing export...')
+      
+      try {
+        const blob = await productsApiService.exportProducts({
+          format: 'csv',
+          filters: {
+            category: this.categoryFilter !== 'all' ? this.categoryFilter : undefined,
+            stock: this.stockFilter !== 'all' ? this.stockFilter : undefined,
+            search: this.searchFilter || undefined
+          }
+        })
+        
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `products_${new Date().toISOString().split('T')[0]}.csv`
+        a.click()
+        window.URL.revokeObjectURL(url)
+        
+        this.toast.dismiss(loadingToastId)
+        this.toast.success(`Export completed! Downloaded ${this.filteredProducts.length} products`)
+      } catch (error) {
+        console.error('API export failed, falling back to client-side export:', error)
+        
+        const headers = ['ID', 'Name', 'Category', 'Price', 'Cost', 'Margin', 'Stock']
+        const csvContent = [
+          headers.join(','),
+          ...this.filteredProducts.map(product => [
+            product._id.slice(-6),
+            `"${product.product_name}"`,
+            this.getCategoryName(product.category_id),
+            product.selling_price,
+            product.cost_price,
+            this.calculateMargin(product.cost_price, product.selling_price),
+            product.stock
+          ].join(','))
+        ].join('\n')
+
+        const blob = new Blob([csvContent], { type: 'text/csv' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `products_${new Date().toISOString().split('T')[0]}.csv`
+        a.click()
+        window.URL.revokeObjectURL(url)
+        
+        this.toast.dismiss(loadingToastId)
+        this.toast.warning('Used backup export method - data exported successfully')
+      }
+    },
+
     async generateProductBarcode(product) {
+      const loadingToastId = this.toast.loading(`Generating barcode for "${product.product_name}"...`)
+      
       try {
         await productsApiService.generateBarcode(product._id)
-        this.successMessage = `Barcode generated for "${product.product_name}"`
+        this.toast.dismiss(loadingToastId)
+        this.toast.success(`Barcode generated for "${product.product_name}"`)
         await this.fetchProducts()
-        
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
       } catch (error) {
         console.error('Error generating barcode:', error)
-        this.error = `Failed to generate barcode: ${error.message}`
+        this.toast.dismiss(loadingToastId)
+        this.toast.error(`Failed to generate barcode: ${error.message}`)
       }
     },
     
@@ -521,6 +573,48 @@ export default {
     
     selectAll(event) {
       this.$options.setup().selectAll(event.target.checked)
+      const count = event.target.checked ? this.paginatedProducts.length : 0
+      if (count > 0) {
+        this.toast.info(`Selected ${count} products`)
+      } else {
+        this.toast.info('Selection cleared')
+      }
+    },
+
+    handleProductSuccess(result) {
+      if (result.message) {
+        this.toast.success(result.message)
+      } else {
+        this.toast.success('Item added') // The exact toast you wanted
+      }
+    },
+
+    handleStockUpdateSuccess(result) {
+      this.toast.success(result.message || 'Stock updated successfully')
+    },
+
+    handleImportSuccess(result) {
+      const successCount = result.totalSuccessful || 0
+      const failedCount = result.totalFailed || 0
+      
+      if (failedCount > 0) {
+        this.toast.warning(
+          `Import completed with warnings: ${successCount} products imported, ${failedCount} failed`,
+          { duration: 8000 }
+        )
+      } else {
+        this.toast.success(
+          `Import completed successfully! ${successCount} products imported`,
+          { duration: 6000 }
+        )
+      }
+    },
+
+    handleImportError(error) {
+      this.toast.error(
+        `Import failed: ${error.message || 'An unexpected error occurred'}`,
+        { duration: 8000 }
+      )
     }
   }
 }
