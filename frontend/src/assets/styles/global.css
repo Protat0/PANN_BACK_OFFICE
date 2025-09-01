@@ -7,14 +7,68 @@
    GLOBAL TRANSITIONS
    ========================================================================== */
 
-* {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+/* ==========================================================================
+   CONTROLLED TRANSITIONS - PERFORMANCE OPTIMIZED
+   ========================================================================== */
+
+/* Disable all transitions during theme switching */
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+}
+
+/* More noticeable fade animation during theme switch */
+.theme-switching {
+  animation: theme-fade 0.4s ease-in-out;
+}
+
+@keyframes theme-fade {
+  0% { 
+    opacity: 1; 
+    transform: scale(1);
+  }
+  50% { 
+    opacity: 0.7; 
+    transform: scale(0.998);
+  }
+  100% { 
+    opacity: 1; 
+    transform: scale(1);
+  }
+}
+
+/* Only animate elements that actually change and matter for UX */
+html,
+body,
+#app,
+.page-wrapper,
+.content-area,
+.card,
+.modal-content,
+.form-control,
+.form-select,
+.btn,
+.alert,
+.dropdown-menu,
+.navbar,
+.table,
+.badge,
+.pagination .page-link {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+/* Keep existing link transitions */
+a {
+  transition: color 0.2s ease;
 }
 
 /* Disable transitions for reduced motion users */
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
+    animation: none !important;
   }
 }
 
@@ -26,7 +80,7 @@ html,
 body {
   background-color: var(--surface-secondary);
   color: var(--text-secondary);
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* App container */

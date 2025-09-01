@@ -2,7 +2,7 @@
   <div class="container-fluid pt-2 pb-4 suppliers-page">
     <!-- Page Title -->
     <div class="mb-3">
-      <h1 class="h3 fw-semibold text-primary-dark mb-0">Supplier Management</h1>
+      <h1 class="h3 fw-semibold mb-0" style="color: var(--text-primary);">Supplier Management</h1>
     </div>
 
     <!-- Reports Section -->
@@ -655,38 +655,43 @@ export default {
 @import '@/assets/styles/colors.css';
 @import '@/assets/styles/buttons.css';
 
+/* Page Container - Theme Aware */
 .suppliers-page {
-  background-color: var(--neutral-light);
+  background-color: var(--surface-secondary); /* Changed from --neutral-light */
+  color: var(--text-secondary);
   min-height: 100vh;
+  position: relative;
 }
 
 .text-primary-dark {
-  color: var(--primary-dark) !important;
+  color: var(--text-primary) !important; /* Use semantic instead of fixed color */
 }
 
 .text-tertiary-dark {
-  color: var(--tertiary-dark) !important;
+  color: var(--text-secondary) !important; /* More appropriate semantic color */
 }
 
 .text-tertiary-medium {
-  color: var(--tertiary-medium) !important;
+  color: var(--text-tertiary) !important;
 }
 
-/* Action Bar Container */
+/* Action Bar Container - Theme Aware */
 .action-bar-container {
-  background: white;
+  background-color: var(--surface-primary); /* Changed from white */
+  border: 1px solid var(--border-secondary);
   border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm); /* Use semantic shadow */
   overflow: visible;
   position: relative;
   z-index: 1000;
 }
 
 .action-bar-controls {
-  border-bottom: 1px solid var(--neutral);
-  background-color: white;
+  border-bottom: 1px solid var(--border-primary); /* Use semantic border */
+  background-color: var(--surface-primary); /* Theme aware */
   position: relative;
   z-index: 1001;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .action-row {
@@ -698,7 +703,7 @@ export default {
   gap: 1rem;
 }
 
-/* Filter Dropdown */
+/* Filter Dropdown - Theme Aware */
 .filter-dropdown {
   min-width: 120px;
 }
@@ -706,9 +711,30 @@ export default {
 .filter-label {
   font-size: 0.75rem;
   font-weight: 500;
-  color: var(--tertiary-medium);
+  color: var(--text-tertiary); /* Use semantic color */
   margin-bottom: 0.25rem;
   display: block;
+}
+
+/* Form Controls - Theme Aware */
+.form-select,
+.form-control {
+  background-color: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--input-text);
+  transition: all 0.2s ease;
+}
+
+.form-select:focus,
+.form-control:focus {
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 0.2rem rgba(160, 123, 227, 0.25);
+  background-color: var(--input-bg);
+  color: var(--input-text);
+}
+
+.form-control::placeholder {
+  color: var(--input-placeholder);
 }
 
 /* Search Container */
@@ -719,6 +745,14 @@ export default {
 .search-input {
   padding-right: 2.5rem;
   height: calc(1.5em + 0.75rem + 2px);
+  background-color: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--input-text);
+}
+
+.search-input:focus {
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 0.2rem rgba(160, 123, 227, 0.25);
 }
 
 .search-container .position-relative .btn {
@@ -726,9 +760,15 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--text-tertiary);
+  transition: color 0.2s ease;
 }
 
-/* Custom dropdown styling */
+.search-container .position-relative .btn:hover {
+  color: var(--text-secondary);
+}
+
+/* Custom dropdown styling - Theme Aware */
 .dropdown {
   position: relative;
   z-index: 1100;
@@ -736,9 +776,10 @@ export default {
 
 .custom-dropdown-menu {
   min-width: 280px;
-  border: 1px solid var(--neutral);
+  border: 1px solid var(--border-primary); /* Use semantic border */
   border-radius: 0.75rem;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-xl); /* Use semantic shadow */
+  background-color: var(--surface-elevated); /* Theme aware background */
   animation: dropdownSlide 0.2s ease;
   z-index: 1200 !important;
   position: absolute !important;
@@ -765,8 +806,14 @@ export default {
 
 .custom-dropdown-item {
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--neutral-light);
+  border-bottom: 1px solid var(--border-secondary); /* Use semantic border */
   transition: all 0.2s ease;
+  background-color: transparent;
+  color: var(--text-primary); /* Use semantic text color */
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  cursor: pointer;
 }
 
 .custom-dropdown-item:last-child {
@@ -774,28 +821,75 @@ export default {
 }
 
 .custom-dropdown-item:hover {
-  background-color: var(--primary-light);
+  background-color: var(--state-hover); /* Use semantic hover state */
+  color: var(--text-primary);
+}
+
+/* Small text in dropdown */
+.custom-dropdown-item small {
+  color: var(--text-tertiary) !important;
+}
+
+/* Icons in dropdown */
+.custom-dropdown-item .text-primary {
+  color: var(--text-accent) !important; /* Use accent color for icons */
 }
 
 /* Button States */
 .btn.active {
-  background-color: var(--primary);
-  border-color: var(--primary);
-  color: white;
+  background-color: var(--text-accent);
+  border-color: var(--border-accent);
+  color: var(--text-inverse);
 }
 
-/* Custom hover states for import/export buttons */
+/* Alert States - Theme Aware */
+.alert {
+  background-color: var(--surface-primary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
+}
+
+.alert-danger {
+  background-color: var(--status-error-bg);
+  border-color: var(--border-error);
+  color: var(--status-error);
+}
+
+.alert-success {
+  background-color: var(--status-success-bg);
+  border-color: var(--border-success);
+  color: var(--status-success);
+}
+
+.alert-info {
+  background-color: var(--status-info-bg);
+  border-color: var(--status-info);
+  color: var(--status-info);
+}
+
+/* Loading spinner */
+.spinner-border {
+  color: var(--text-accent);
+}
+
+/* Card styling */
+.card {
+  background-color: var(--surface-primary);
+  border: 1px solid var(--border-secondary);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-md);
+  transition: all 0.3s ease;
+}
+
+.card-body {
+  color: var(--text-primary);
+}
+
+/* Custom hover states for buttons */
 .btn.btn-outline-secondary:hover {
-  background-color: var(--info-light);
-  border-color: var(--info);
-  color: var(--info-dark);
-}
-
-/* Form controls focus states */
-.form-select:focus,
-.form-control:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
+  background-color: var(--state-hover);
+  border-color: var(--border-accent);
+  color: var(--text-primary);
 }
 
 /* Responsive adjustments */
@@ -808,12 +902,34 @@ export default {
   .search-container {
     min-width: 100%;
   }
+  
+  .custom-dropdown-menu {
+    min-width: 250px;
+    right: 0;
+    left: auto;
+  }
 }
 
 @media (max-width: 576px) {
   .btn-sm {
     font-size: 0.8rem;
     padding: 0.375rem 0.5rem;
+  }
+  
+  .custom-dropdown-item {
+    padding: 0.875rem 1rem;
+  }
+}
+
+/* Add smooth transitions for theme switching */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Disable transitions for reduced motion users */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
   }
 }
 </style>

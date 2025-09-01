@@ -38,26 +38,32 @@ export default {
     },
     applyTheme() {
       const html = document.documentElement
-      const body = document.body
       
       console.log('🎨 Applying theme:', this.isDarkMode ? 'dark' : 'light')
       
-      if (this.isDarkMode) {
-        html.classList.add('dark-theme')
-        html.classList.remove('light-theme')
-        body.classList.add('dark-theme')
-        body.classList.remove('light-theme')
-        console.log('🌙 Dark theme applied')
-      } else {
-        html.classList.add('light-theme')
-        html.classList.remove('dark-theme')
-        body.classList.add('light-theme')
-        body.classList.remove('dark-theme')
-        console.log('☀️ Light theme applied')
-      }
+      // Step 1: Start the fade animation
+      document.body.classList.add('theme-switching')
+      
+      // Step 2: Apply theme change at the midpoint of animation (200ms)
+      setTimeout(() => {
+        if (this.isDarkMode) {
+          html.classList.remove('light-theme')
+          html.classList.add('dark-theme')
+        } else {
+          html.classList.remove('dark-theme')
+          html.classList.add('light-theme')
+        }
+        
+        // Force reflow
+        html.offsetHeight
+      }, 200)
+      
+      // Step 3: Remove animation class after animation completes
+      setTimeout(() => {
+        document.body.classList.remove('theme-switching')
+      }, 400)
       
       console.log('📋 HTML classes:', html.classList.toString())
-      console.log('📋 Body classes:', body.classList.toString())
     }
   }
 }
