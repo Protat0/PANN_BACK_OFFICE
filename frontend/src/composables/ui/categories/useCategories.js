@@ -1,11 +1,8 @@
 // composables/useCategories.js
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed } from 'vue'
 import categoryApiService from '@/services/apiCategory.js'
-import { useRouter } from 'vue-router'
 
 export function useCategories() {
-  const router = useRouter()
-  
   // State
   const categories = ref([])
   const filteredCategories = ref([])
@@ -13,6 +10,8 @@ export function useCategories() {
   const loading = ref(false)
   const error = ref(null)
   const successMessage = ref(null)
+  const uncategorizedCount = ref(0)
+  const UNCATEGORIZED_CATEGORY_ID = '686a4de143821e2b21f725c6'
   
   // UI State
   const showAddDropdown = ref(false)
@@ -67,19 +66,19 @@ export function useCategories() {
     error.value = null
     
     try {
-      console.log('🔄 useCategories: Fetching categories...')
+      console.log('Fetching categories...')
       const data = await categoryApiService.getAllCategories({
         include_deleted: includeDeleted.value,
         ...params
       })
       
       categories.value = Array.isArray(data) ? data : []
-      console.log(`✅ useCategories: Fetched ${categories.value.length} categories`)
+      console.log(`Fetched ${categories.value.length} categories`)
       
       applyFilters()
       
     } catch (err) {
-      console.error('❌ useCategories: Error fetching categories:', err)
+      console.error('Error fetching categories:', err)
       error.value = `Failed to load categories: ${err.message}`
       categories.value = []
     } finally {
@@ -92,16 +91,16 @@ export function useCategories() {
     error.value = null
     
     try {
-      console.log('🔄 useCategories: Fetching categories with sales data...')
+      console.log('Fetching categories with sales data...')
       const data = await categoryApiService.CategoryData(params)
       
       categories.value = Array.isArray(data) ? data : (data.categories || [])
-      console.log(`✅ useCategories: Fetched ${categories.value.length} categories with sales data`)
+      console.log(`Fetched ${categories.value.length} categories with sales data`)
       
       applyFilters()
       
     } catch (err) {
-      console.error('❌ useCategories: Error fetching categories with sales data:', err)
+      console.error('Error fetching categories with sales data:', err)
       error.value = `Failed to load category data: ${err.message}`
       categories.value = []
     } finally {
@@ -109,10 +108,57 @@ export function useCategories() {
     }
   }
 
+  const getCategorySubtitle = (category) => {
+    if (category.isDeleted) {
+      return `Deleted ${formatDate(category.deleted_at)}`
+    }
+    return category.description || category.subtitle || `${category.category_name} products`
+  }
+
+  const getProductCount = (category) => {
+    if (category.subcategories) {
+      return category.subcategories.reduce((total, sub) => total + (sub.product_count || 0), 0)
+    }
+    if (category.sub_categories) {
+      return category.sub_categories.reduce((total, sub) => total + (sub.products?.length || 0), 0)
+    }
+    return category.product_count || 0
+  }
+
+  // Fixed: Use the actual API method that exists
+  const fetchUncategorizedCount = async () => {
+    try {
+      console.log('Fetching uncategorized products count...')
+      const products = await categoryApiService.FindProdcategory({ 
+        id: UNCATEGORIZED_CATEGORY_ID 
+      })
+      
+      uncategorizedCount.value = Array.isArray(products) ? products.length : 0
+      console.log(`Found ${uncategorizedCount.value} uncategorized products`)
+    } catch (error) {
+      console.error('Error fetching uncategorized count:', error)
+      uncategorizedCount.value = 0
+    }
+  }
+
+  // Fixed: Use the actual API method
   const getCategoryById = async (categoryId, includeDeleted = false) => {
     try {
-      console.log(`🔍 useCategories: Fetching category ${categoryId}`)
-      const category = await categoryApiService.getCategoryById(categoryId, includeDeleted)
+      console.log(`Fetching category ${categoryId}`)
+      
+      // Use FindCategoryData which matches your API service
+      const response = await categoryApiService.FindCategoryData({ 
+        id: categoryId,
+        include_deleted: includeDeleted 
+      })
+      
+      // Handle different response formats
+      let category = null
+      if (response && response.category) {
+        category = response.category
+      } else if (response && typeof response === 'object' && !Array.isArray(response)) {
+        category = response
+      }
       
       if (category) {
         // Update category in local state if it exists
@@ -125,7 +171,7 @@ export function useCategories() {
       
       return category
     } catch (err) {
-      console.error(`❌ useCategories: Error fetching category ${categoryId}:`, err)
+      console.error(`Error fetching category ${categoryId}:`, err)
       error.value = `Failed to load category: ${err.message}`
       return null
     }
@@ -136,7 +182,7 @@ export function useCategories() {
     error.value = null
     
     try {
-      console.log('➕ useCategories: Creating category...', categoryData)
+      console.log('Creating category...', categoryData)
       const newCategory = await categoryApiService.AddCategoryData(categoryData)
       
       // Add to local state
@@ -151,7 +197,7 @@ export function useCategories() {
       
       return newCategory
     } catch (err) {
-      console.error('❌ useCategories: Error creating category:', err)
+      console.error('Error creating category:', err)
       error.value = `Failed to create category: ${err.message}`
       throw err
     } finally {
@@ -164,7 +210,7 @@ export function useCategories() {
     error.value = null
     
     try {
-      console.log(`🔄 useCategories: Updating category ${categoryId}...`, updateData)
+      console.log(`Updating category ${categoryId}...`, updateData)
       const updatedCategory = await categoryApiService.UpdateCategoryData({
         id: categoryId,
         ...updateData
@@ -185,7 +231,7 @@ export function useCategories() {
       
       return updatedCategory
     } catch (err) {
-      console.error(`❌ useCategories: Error updating category ${categoryId}:`, err)
+      console.error(`Error updating category ${categoryId}:`, err)
       error.value = `Failed to update category: ${err.message}`
       throw err
     } finally {
@@ -195,7 +241,7 @@ export function useCategories() {
 
   const softDeleteCategory = async (categoryId) => {
     try {
-      console.log(`🗑️ useCategories: Soft deleting category ${categoryId}`)
+      console.log(`Soft deleting category ${categoryId}`)
       const result = await categoryApiService.SoftDeleteCategory(categoryId)
       
       // Update in local state
@@ -214,7 +260,7 @@ export function useCategories() {
       
       return result
     } catch (err) {
-      console.error(`❌ useCategories: Error soft deleting category ${categoryId}:`, err)
+      console.error(`Error soft deleting category ${categoryId}:`, err)
       error.value = `Failed to delete category: ${err.message}`
       throw err
     }
@@ -222,7 +268,7 @@ export function useCategories() {
 
   const hardDeleteCategory = async (categoryId) => {
     try {
-      console.log(`💀 useCategories: Hard deleting category ${categoryId}`)
+      console.log(`Hard deleting category ${categoryId}`)
       const result = await categoryApiService.HardDeleteCategory(categoryId)
       
       // Remove from local state
@@ -238,7 +284,7 @@ export function useCategories() {
       
       return result
     } catch (err) {
-      console.error(`❌ useCategories: Error hard deleting category ${categoryId}:`, err)
+      console.error(`Error hard deleting category ${categoryId}:`, err)
       error.value = `Failed to permanently delete category: ${err.message}`
       throw err
     }
@@ -246,7 +292,7 @@ export function useCategories() {
 
   const restoreCategory = async (categoryId) => {
     try {
-      console.log(`🔄 useCategories: Restoring category ${categoryId}`)
+      console.log(`Restoring category ${categoryId}`)
       const result = await categoryApiService.RestoreCategory(categoryId)
       
       // Update in local state
@@ -265,7 +311,7 @@ export function useCategories() {
       
       return result
     } catch (err) {
-      console.error(`❌ useCategories: Error restoring category ${categoryId}:`, err)
+      console.error(`Error restoring category ${categoryId}:`, err)
       error.value = `Failed to restore category: ${err.message}`
       throw err
     }
@@ -273,30 +319,30 @@ export function useCategories() {
 
   const getCategoryDeleteInfo = async (categoryId) => {
     try {
-      console.log(`ℹ️ useCategories: Getting delete info for category ${categoryId}`)
+      console.log(`Getting delete info for category ${categoryId}`)
       return await categoryApiService.GetCategoryDeleteInfo(categoryId)
     } catch (err) {
-      console.error(`❌ useCategories: Error getting delete info for category ${categoryId}:`, err)
+      console.error(`Error getting delete info for category ${categoryId}:`, err)
       throw err
     }
   }
 
-  // Product Management Methods
+  // Product Management Methods - Fixed to match API
   const fetchCategoryProducts = async (categoryId, forceRefresh = false) => {
     if (loadingProducts.value[categoryId] && !forceRefresh) return
     
     loadingProducts.value[categoryId] = true
     
     try {
-      console.log(`📦 useCategories: Fetching products for category ${categoryId}`)
+      console.log(`Fetching products for category ${categoryId}`)
       const products = await categoryApiService.FindProdcategory({ id: categoryId })
       
       categoryProducts.value[categoryId] = products
-      console.log(`✅ useCategories: Fetched ${products.length} products for category ${categoryId}`)
+      console.log(`Fetched ${products.length} products for category ${categoryId}`)
       
       return products
     } catch (err) {
-      console.error(`❌ useCategories: Error fetching products for category ${categoryId}:`, err)
+      console.error(`Error fetching products for category ${categoryId}:`, err)
       categoryProducts.value[categoryId] = []
       return []
     } finally {
@@ -306,7 +352,7 @@ export function useCategories() {
 
   const moveProductToUncategorized = async (productId, currentCategoryId) => {
     try {
-      console.log(`🔄 useCategories: Moving product ${productId} to uncategorized`)
+      console.log(`Moving product ${productId} to uncategorized`)
       const result = await categoryApiService.MoveProductToUncategorized({
         product_id: productId,
         current_category_id: currentCategoryId
@@ -325,7 +371,7 @@ export function useCategories() {
       
       return result
     } catch (err) {
-      console.error(`❌ useCategories: Error moving product to uncategorized:`, err)
+      console.error(`Error moving product to uncategorized:`, err)
       error.value = `Failed to move product: ${err.message}`
       throw err
     }
@@ -333,7 +379,7 @@ export function useCategories() {
 
   const bulkMoveProductsToUncategorized = async (productIds, currentCategoryId) => {
     try {
-      console.log(`🔄 useCategories: Bulk moving ${productIds.length} products to uncategorized`)
+      console.log(`Bulk moving ${productIds.length} products to uncategorized`)
       const result = await categoryApiService.BulkMoveProductsToUncategorized({
         product_ids: productIds,
         current_category_id: currentCategoryId
@@ -352,7 +398,7 @@ export function useCategories() {
       
       return result
     } catch (err) {
-      console.error(`❌ useCategories: Error in bulk move to uncategorized:`, err)
+      console.error(`Error in bulk move to uncategorized:`, err)
       error.value = `Failed to move products: ${err.message}`
       throw err
     }
@@ -360,7 +406,7 @@ export function useCategories() {
 
   const updateProductSubcategory = async (productId, categoryId, newSubcategory) => {
     try {
-      console.log(`🔄 useCategories: Updating product ${productId} subcategory to ${newSubcategory}`)
+      console.log(`Updating product ${productId} subcategory to ${newSubcategory}`)
       const result = await categoryApiService.SubCatChangeTab({
         product_id: productId,
         category_id: categoryId,
@@ -380,7 +426,7 @@ export function useCategories() {
       
       return result
     } catch (err) {
-      console.error(`❌ useCategories: Error updating product subcategory:`, err)
+      console.error(`Error updating product subcategory:`, err)
       error.value = `Failed to update subcategory: ${err.message}`
       throw err
     }
@@ -389,7 +435,7 @@ export function useCategories() {
   // Subcategory Methods
   const addSubcategory = async (categoryId, subcategoryData) => {
     try {
-      console.log(`➕ useCategories: Adding subcategory to category ${categoryId}`)
+      console.log(`Adding subcategory to category ${categoryId}`)
       const result = await categoryApiService.AddSubCategoryData(categoryId, subcategoryData)
       
       // Refresh category data
@@ -403,7 +449,7 @@ export function useCategories() {
       
       return result
     } catch (err) {
-      console.error(`❌ useCategories: Error adding subcategory:`, err)
+      console.error(`Error adding subcategory:`, err)
       error.value = `Failed to add subcategory: ${err.message}`
       throw err
     }
@@ -411,10 +457,10 @@ export function useCategories() {
 
   const getSubcategories = async (categoryId) => {
     try {
-      console.log(`📂 useCategories: Fetching subcategories for category ${categoryId}`)
+      console.log(`Fetching subcategories for category ${categoryId}`)
       return await categoryApiService.getSubcategories(categoryId)
     } catch (err) {
-      console.error(`❌ useCategories: Error fetching subcategories:`, err)
+      console.error(`Error fetching subcategories:`, err)
       return []
     }
   }
@@ -422,7 +468,7 @@ export function useCategories() {
   // Export Methods
   const exportCategories = async (params = {}) => {
     try {
-      console.log('📤 useCategories: Exporting categories...', params)
+      console.log('Exporting categories...', params)
       const blob = await categoryApiService.ExportCategoryData(params)
       
       // Create download link
@@ -440,7 +486,7 @@ export function useCategories() {
       }, 3000)
       
     } catch (err) {
-      console.error('❌ useCategories: Export failed:', err)
+      console.error('Export failed:', err)
       error.value = `Export failed: ${err.message}`
     }
   }
@@ -519,7 +565,7 @@ export function useCategories() {
       selectedCategories.value = []
       await fetchCategories()
     } catch (err) {
-      console.error('❌ useCategories: Error deleting categories:', err)
+      console.error('Error deleting categories:', err)
       error.value = `Failed to delete categories: ${err.message}`
     } finally {
       loading.value = false
@@ -689,6 +735,10 @@ export function useCategories() {
     restoreCategory,
     getCategoryDeleteInfo,
     refreshData,
+    uncategorizedCount,
+    fetchUncategorizedCount,
+    getProductCount,
+    getCategorySubtitle,
     
     // Product Management
     fetchCategoryProducts,

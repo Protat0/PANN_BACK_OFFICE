@@ -1,14 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
 
-// Import authentication and layout components
-import Login from '@/pages/Login.vue'
-import MainLayout from '@/layouts/MainLayout.vue'
+import Login from '../pages/Login.vue'
+import MainLayout from '../layouts/MainLayout.vue'
 
-// Import your page components
-import Dashboard from '@/pages/Dashboard.vue'
-import Accounts from '@/pages/Accounts.vue'
-import Customers from '@/pages/Customers.vue'
+import Dashboard from '../pages/Dashboard.vue'
+import Accounts from '../pages/Accounts.vue'
+import Customers from '../pages/Customers.vue'
 import Products from '@/pages/inventory/Products.vue'
 import ProductBulkEntry from '@/pages/inventory/ProductBulkEntry.vue'
 import ProductDetails from '@/pages/inventory/ProductDetails.vue'
@@ -107,7 +105,7 @@ const router = createRouter({
           component: Categories
         },
         {
-          path: 'category/:id', // Change this line
+          path: 'category/:id',
           name: 'Category Details',
           component: CategoryDetails,
           props: true
