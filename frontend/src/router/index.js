@@ -97,7 +97,7 @@ const router = createRouter({
           path: 'products/:id',
           name: 'ProductDetails',
           component: ProductDetails,
-          props: true // This passes the route params as props to the component
+          props: true
         },
         {
           path: 'categories',

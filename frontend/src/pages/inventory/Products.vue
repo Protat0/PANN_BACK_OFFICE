@@ -315,14 +315,6 @@
                   <Package :size="12" />
                 </button>
                 <button 
-                  class="btn btn-outline-success btn-icon-only btn-xs action-btn"
-                  @click="toggleProductStatus(product)"
-                  :title="product.status === 'active' ? 'Deactivate' : 'Activate'"
-                  :class="{ 'action-btn-status-inactive': product.status !== 'active' }"
-                >
-                  <component :is="product.status === 'active' ? 'Lock' : 'Unlock'" :size="12" />
-                </button>
-                <button 
                   class="btn btn-outline-danger btn-icon-only btn-xs action-btn action-btn-delete" 
                   @click="deleteProduct(product)"
                   title="Delete"
@@ -467,9 +459,9 @@ export default {
     },
     
     viewProduct(product) {
-      this.$refs.viewProductModal?.open?.(product)
+      this.$router.push(`/products/${product._id}`)
     },
-    
+        
     restockProduct(product) {
       this.$refs.stockUpdateModal?.openStock?.(product)
     },
