@@ -22,6 +22,9 @@ window.bootstrap = bootstrap
 
 const app = createApp(App)
 
+console.log('All env vars:', import.meta.env);
+console.log('VITE_API_URL:', import.meta.env.VITE_API_URL);
+
 app.component('VueDatePicker', VueDatePicker)
 
 // Optional: Add a global method to change themes
