@@ -69,7 +69,6 @@
               <div class="description-and-buttons">
                 <p class="product-description text-tertiary">{{ currentProduct.description || 'Product description not available.' }}</p>
                 <div class="button-group">
-                  <button @click="handleUpdateStock" class="btn btn-edit btn-sm">Update Stock</button>
                   <button @click="handleDelete" class="btn btn-delete btn-sm">Delete</button>
                   <button @click="handleEdit" class="btn btn-edit btn-sm">Edit</button>
                   <button @click="handleExport" class="btn btn-outline-secondary btn-sm">Export</button>
@@ -101,14 +100,132 @@
         <!-- Content Area -->
         <div class="flex-1 overflow-auto p-6 surface-secondary">
           <!-- Overview Tab -->
-          <ProductOverview 
-            v-if="activeTab === 'Overview' && !loading && currentProduct._id && transformedProductData.id"
-            :product-data="transformedProductData"
-            @stock-adjustment="handleStockAdjustment"
-            @reorder="handleReorder"
-            @view-history="handleViewHistory"
-            @image-upload="handleImageUpload"
-          />
+        <!-- Overview Tab -->
+        <div v-if="activeTab === 'Overview'" class="row g-4">
+          <!-- Left Column - Product Details -->
+          <div class="col-lg-8">
+            <!-- Primary Details Card -->
+            <div class="card-theme p-4 mb-4">
+              <h3 class="text-primary mb-3">Primary Details</h3>
+              
+              <div class="row mb-3">
+                <div class="col-6">
+                  <small class="text-tertiary d-block">Product Name</small>
+                  <span class="text-secondary">{{ currentProduct.product_name || 'N/A' }}</span>
+                </div>
+                <div class="col-6">
+                  <small class="text-tertiary d-block">Product ID</small>
+                  <span class="text-secondary">{{ currentProduct._id || 'N/A' }}</span>
+                </div>
+              </div>
+              
+              <div class="row mb-3">
+                <div class="col-6">
+                  <small class="text-tertiary d-block">Product Category</small>
+                  <span class="text-secondary">{{ currentProduct.category_name || 'Uncategorized' }}</span>
+                </div>
+                <div class="col-6">
+                  <small class="text-tertiary d-block">Batch Date</small>
+                  <span class="text-secondary">{{ currentProduct.batch_date || currentProduct.created_at }}</span>
+                </div>
+              </div>
+              
+              <div class="row">
+                <div class="col-6">
+                  <small class="text-tertiary d-block">Threshold Value</small>
+                  <span class="text-secondary">{{ currentProduct.low_stock_threshold || 0 }}</span>
+                </div>
+                <div class="col-6">
+                  <small class="text-tertiary d-block">Expiry Date</small>
+                  <span class="text-secondary">{{ currentProduct.expiry_date }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Supplier Details Card -->
+            <div class="card-theme p-4">
+              <h3 class="text-primary mb-3">Supplier Details</h3>
+              
+              <div class="row">
+                <div class="col-6">
+                  <small class="text-tertiary d-block">Supplier Name</small>
+                  <span class="text-secondary">{{ currentProduct.supplier_name || 'Unknown Supplier' }}</span>
+                </div>
+                <div class="col-6">
+                  <small class="text-tertiary d-block">Contact Number</small>
+                  <span class="text-secondary">{{ currentProduct.supplier_contact || 'N/A' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column - Image and Stock -->
+          <div class="col-lg-4">
+            <!-- Product Image Card -->
+            <div class="card-theme p-3 mb-4">
+              <img 
+                :src="currentProduct.image_url || currentProduct.image || 'https://via.placeholder.com/300x200?text=No+Image'" 
+                :alt="currentProduct.product_name" 
+                class="img-fluid rounded"
+                style="width: 100%; height: 200px; object-fit: cover;"
+              />
+              <div class="text-center mt-2">
+                <button @click="handleImageUpload" class="btn btn-outline-secondary btn-sm">
+                  Change Image
+                </button>
+              </div>
+            </div>
+
+            <!-- Stock Information Card -->
+            <div class="card-theme p-4">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="text-primary mb-0">Stock Information</h5>
+                <button @click="handleStockAdjustment" class="btn btn-edit btn-sm">
+                  Adjust Stock
+                </button>
+              </div>
+              
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <small class="text-tertiary">Opening Stock</small>
+                <span class="text-secondary fw-semibold">{{ currentProduct.opening_stock || currentProduct.stock || 0 }}</span>
+              </div>
+              
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <small class="text-tertiary">Current Stock</small>
+                <span :class="currentProduct.stock === 0 ? 'text-error' : currentProduct.stock <= currentProduct.low_stock_threshold ? 'text-warning' : 'text-success'" class="fw-semibold">
+                  {{ currentProduct.stock || 0 }}
+                </span>
+              </div>
+              
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <small class="text-tertiary">On the Way</small>
+                <span class="text-secondary fw-semibold">{{ currentProduct.on_the_way || 0 }}</span>
+              </div>
+              
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <small class="text-tertiary">Reserved Stock</small>
+                <span class="text-secondary fw-semibold">{{ currentProduct.reserved_stock || 0 }}</span>
+              </div>
+              
+              <hr class="border-theme-subtle">
+              
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <small class="text-tertiary">Cost Price</small>
+                <span class="text-secondary fw-semibold">{{ currentProduct.cost_price }}</span>
+              </div>
+              
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <small class="text-tertiary">Selling Price</small>
+                <span class="text-secondary fw-semibold">{{ currentProduct.selling_price }}</span>
+              </div>
+              
+              <div class="d-flex justify-content-between align-items-center">
+                <small class="text-tertiary">Unit Type</small>
+                <span class="text-accent fw-semibold">{{ currentProduct.unit || 'pcs' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
           <!-- Other Tabs -->
           <div v-else-if="activeTab === 'Purchases'" class="card-theme p-6">
@@ -150,14 +267,12 @@
 import { ref, onMounted, watch, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProducts } from '@/composables/ui/products/useProducts';
-import ProductOverview from '@/components/products/ProductOverview.vue';
 import AddProductModal from '@/components/products/AddProductModal.vue';
 import StockUpdateModal from '@/components/products/StockUpdateModal.vue';
 
 export default {
   name: 'ProductDetails',
   components: {
-    ProductOverview,
     AddProductModal,
     StockUpdateModal
   },
@@ -183,8 +298,6 @@ export default {
       fetchProducts,
       fetchCategories,
       getCategoryName,
-      formatPrice,
-      formatExpiryDate
     } = useProducts();
 
     // Local state for this component

@@ -11,6 +11,12 @@ const api = axios.create({
   }
 });
 
+console.log('API Config:', {
+  viteApiUrl: import.meta.env.VITE_API_URL,
+  baseURL: api.defaults.baseURL,
+  env: import.meta.env
+});
+
 // Request interceptor for authentication
 api.interceptors.request.use(
   (config) => {
