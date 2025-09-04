@@ -47,13 +47,9 @@
         <label for="categoryFilter">Filter by Category:</label>
         <select id="categoryFilter" v-model="categoryFilter" @change="handleFilterChange" :disabled="loading">
           <option value="all">All Categories</option>
-          
-          <!-- Session Events -->
           <option value="session">Sessions</option>
           <option value="login">Login</option>
           <option value="logout">Logout</option>
-          
-          <!-- Audit Events -->
           <option value="category">Categories</option>
           <option value="product">Products</option>
           <option value="customer">Customers</option>
@@ -92,11 +88,10 @@
       </div>
     </div>
 
-    
     <!-- Loading State -->
     <div v-if="loading && session_logs.length === 0" class="loading-state">
-      <div class="spinner-border text-primary"></div>
-      <p>Loading session logs...</p>
+      <div class="spinner-border text-accent"></div>
+      <p class="text-secondary">Loading session logs...</p>
     </div>
 
     <!-- Error State -->
@@ -104,7 +99,7 @@
       <div class="alert alert-danger text-center" role="alert">
         <i class="bi bi-exclamation-triangle"></i>
         <p class="mb-3">{{ error }}</p>
-        <button class="btn btn-primary" @click="loadLogs" :disabled="loading">
+        <button class="btn btn-submit" @click="loadLogs" :disabled="loading">
           <i class="bi bi-arrow-clockwise"></i>
           {{ loading ? 'Retrying...' : 'Try Again' }}
         </button>
@@ -175,20 +170,20 @@
     <div v-if="!loading && paginatedLogs.length === 0 && !error" class="empty-state">
       <div class="card">
         <div class="card-body text-center py-5">
-          <i class="bi bi-file-text" style="font-size: 3rem; color: #6b7280;"></i>
-          <p class="mt-3 mb-3">
+          <i class="bi bi-file-text empty-state-icon"></i>
+          <p class="mt-3 mb-3 text-tertiary">
             {{ session_logs.length === 0 ? 'No session logs found' : 'No logs match the current filters' }}
           </p>
-          <button v-if="session_logs.length === 0" class="btn btn-primary" @click="loadLogs">
+          <button v-if="session_logs.length === 0" class="btn btn-submit" @click="loadLogs">
             <i class="bi bi-arrow-clockwise"></i>
             Refresh Logs
           </button>
           <div v-else class="d-flex gap-2 justify-content-center">
-            <button class="btn btn-secondary" @click="clearFilters">
+            <button class="btn btn-cancel" @click="clearFilters">
               <i class="bi bi-funnel"></i>
               Clear Filters
             </button>
-            <button class="btn btn-info" @click="loadLogs">
+            <button class="btn btn-refresh" @click="loadLogs">
               <i class="bi bi-arrow-clockwise"></i>
               Refresh Data
             </button>
@@ -247,7 +242,7 @@
       
       <!-- Pagination info -->
       <div class="pagination-info">
-        <small class="text-muted">
+        <small class="text-tertiary">
           Page {{ currentPage }} of {{ totalPages }} 
           ({{ filteredLogs.length }} filtered records out of {{ totalLogsCount }} total)
         </small>
@@ -271,27 +266,26 @@ export default {
       categoryFilter: 'all',
       searchFilter: '',
       
-      
       // Pagination data
       currentPage: 1,
       pageSize: 25,
       
       // Auto-refresh functionality
-      autoRefreshEnabled: true, // Enable by default for "automatic" branding
-      autoRefreshInterval: 30000, // 30 seconds (base interval)
-      baseRefreshInterval: 30000, // Store original interval
+      autoRefreshEnabled: true,
+      autoRefreshInterval: 30000,
+      baseRefreshInterval: 30000,
       autoRefreshTimer: null,
       countdown: 30,
       countdownTimer: null,
       
-      // Connection health tracking (Option 2)
+      // Connection health tracking
       connectionLost: false,
       consecutiveErrors: 0,
       lastSuccessfulLoad: null,
       
-      // Smart refresh rate tracking (Option 3)
-      recentActivity: [], // Track recent entries for smart adjustment
-      activityCheckInterval: 60000, // Check activity every minute
+      // Smart refresh rate tracking
+      recentActivity: [],
+      activityCheckInterval: 60000,
       
       // Performance optimizations
       filterDebounceTimer: null,
@@ -310,7 +304,6 @@ export default {
   computed: {
     // Memoized filtered logs for better performance
     filteredLogs() {
-      // Check if filters have changed
       if (
         this.memoizedFilters.categoryFilter === this.categoryFilter &&
         this.memoizedFilters.searchFilter === this.searchFilter &&
@@ -319,10 +312,8 @@ export default {
         return this.memoizedFilters.result
       }
       
-      // Apply filters
       let filtered = [...this.session_logs]
       
-      // Category filter
       if (this.categoryFilter !== 'all') {
         filtered = filtered.filter(log => {
           const eventType = (log.event_type || '').toLowerCase()
@@ -330,7 +321,6 @@ export default {
         })
       }
 
-      // Search filter (user ID)
       if (this.searchFilter.trim()) {
         const search = this.searchFilter.toLowerCase()
         filtered = filtered.filter(log => 
@@ -338,14 +328,12 @@ export default {
         )
       }
       
-      // Sort by timestamp (latest first) to ensure consistent ordering
       filtered.sort((a, b) => {
         const dateA = new Date(a.timestamp || 0)
         const dateB = new Date(b.timestamp || 0)
-        return dateB - dateA // Latest first
+        return dateB - dateA
       })
       
-      // Cache the result
       this.memoizedFilters = {
         categoryFilter: this.categoryFilter,
         searchFilter: this.searchFilter,
@@ -355,18 +343,15 @@ export default {
       return filtered
     },
     
-    // Calculate total pages based on filtered logs
     totalPages() {
       return Math.ceil(this.filteredLogs.length / this.pageSize)
     },
 
-    // Get logs for current page with formatted log IDs
     paginatedLogs() {
       const start = (this.currentPage - 1) * this.pageSize
       const end = start + this.pageSize
       const logs = this.filteredLogs.slice(start, end)
       
-      // Add formatted log ID and log type to each log
       return logs.map((log, index) => {
         const position = start + index + 1;
         const logType = this.getLogType(log);
@@ -380,7 +365,6 @@ export default {
       })
     },
     
-    // Calculate record numbers for display
     startRecord() {
       return this.filteredLogs.length === 0 ? 0 : (this.currentPage - 1) * this.pageSize + 1
     },
@@ -394,12 +378,10 @@ export default {
       return this.session_logs.length
     },
 
-    // Check if any filters are active
     hasActiveFilters() {
       return this.categoryFilter !== 'all' || this.searchFilter.trim() !== ''
     },
     
-    // Optimized visible pages calculation
     visiblePages() {
       const pages = []
       const delta = 2
@@ -433,14 +415,10 @@ export default {
   },
   
   methods: {
-    // ================================================================
-    // DATA FETCHING - OPTIMIZED WITH CONNECTION HEALTH & SMART REFRESH
-    // ================================================================
     async loadLogs(isAutoRefresh = false, isEmergencyReconnect = false) {
       return await this.loadCombinedLogs(isAutoRefresh, isEmergencyReconnect)
     },
 
-    // ADD this new method after loadLogs
     async loadCombinedLogs(isAutoRefresh = false, isEmergencyReconnect = false) {
       if (this.loading && !isAutoRefresh && !isEmergencyReconnect) return
       
@@ -450,7 +428,6 @@ export default {
       }
       
       try {
-        // Use the new combined logs API
         let logType = 'all'
         if (['session', 'login', 'logout'].includes(this.categoryFilter)) {
           logType = 'session'
@@ -465,7 +442,6 @@ export default {
         
         const previousLogsLength = this.session_logs.length
         
-        // Handle response
         let newLogs = []
         if (response && response.success && response.data) {
           newLogs = response.data
@@ -476,16 +452,13 @@ export default {
           newLogs = response.data
         }
         
-        // Connection health tracking (same as existing)
         this.connectionLost = false
         this.consecutiveErrors = 0
         this.lastSuccessfulLoad = Date.now()
         this.error = null
         
-        // Smart refresh rate adjustment (same as existing)
         this.trackActivityAndAdjustRefreshRate(newLogs, previousLogsLength)
         
-        // Track new entries for highlighting (same as existing)
         if (isAutoRefresh && this.session_logs.length > 0) {
           const existingIds = new Set(this.session_logs.map(log => log.log_id || log._id))
           newLogs.forEach(log => {
@@ -538,59 +511,47 @@ export default {
       }
     },
 
-    // OPTION 2: Emergency reconnect method
     async emergencyReconnect() {
       console.log('Emergency reconnect initiated')
       this.consecutiveErrors = 0
       this.connectionLost = false
       await this.loadLogs(false, true)
       
-      // Restart auto-refresh if it was stopped
       if (!this.autoRefreshEnabled) {
         this.autoRefreshEnabled = true
         this.startAutoRefresh()
       }
     },
 
-    // OPTION 3: Smart refresh rate adjustment based on activity
     trackActivityAndAdjustRefreshRate(newLogs, previousLength) {
       const now = Date.now()
       
-      // Clean old activity data (older than 5 minutes)
       this.recentActivity = this.recentActivity.filter(
         activity => now - activity.timestamp < 300000
       )
       
-      // Count recent activity (last 2 minutes)
       const recentCount = this.recentActivity.filter(
         activity => now - activity.timestamp < 120000
       ).length
       
-      // Adjust refresh rate based on activity
       if (recentCount >= 10) {
-        // High activity: refresh every 10 seconds
         this.autoRefreshInterval = 10000
         console.log('High activity detected: refresh rate increased to 10s')
       } else if (recentCount >= 5) {
-        // Medium activity: refresh every 20 seconds
         this.autoRefreshInterval = 20000
         console.log('Medium activity detected: refresh rate set to 20s')
       } else if (recentCount === 0 && this.recentActivity.length === 0) {
-        // No activity: refresh every 60 seconds
         this.autoRefreshInterval = 60000
         console.log('No activity detected: refresh rate decreased to 60s')
       } else {
-        // Normal activity: use base interval
         this.autoRefreshInterval = this.baseRefreshInterval
       }
       
-      // Restart auto-refresh with new interval if it's running
       if (this.autoRefreshEnabled && this.autoRefreshTimer) {
         this.startAutoRefresh()
       }
     },
 
-    // OPTION 2: Connection status methods
     getConnectionStatus() {
       if (this.connectionLost) return 'connection-lost'
       if (this.consecutiveErrors > 0) return 'connection-unstable'
@@ -616,9 +577,6 @@ export default {
       }
     },
 
-    // ================================================================
-    // AUTO-REFRESH FUNCTIONALITY
-    // ================================================================
     toggleAutoRefresh() {
       if (this.autoRefreshEnabled) {
         this.autoRefreshEnabled = false
@@ -632,9 +590,8 @@ export default {
     },
     
     startAutoRefresh() {
-      this.stopAutoRefresh() // Clear any existing timers
+      this.stopAutoRefresh()
       
-      // Start countdown
       this.countdown = this.autoRefreshInterval / 1000
       this.countdownTimer = setInterval(() => {
         this.countdown--
@@ -643,7 +600,6 @@ export default {
         }
       }, 1000)
       
-      // Start auto-refresh timer
       this.autoRefreshTimer = setInterval(() => {
         this.loadLogs(true)
       }, this.autoRefreshInterval)
@@ -665,26 +621,18 @@ export default {
       console.log('Auto-refresh disabled')
     },
 
-    // ================================================================
-    // FILTER METHODS - OPTIMIZED WITH DEBOUNCING
-    // ================================================================
     handleFilterChange() {
-      // Clear existing timer
       if (this.filterDebounceTimer) {
         clearTimeout(this.filterDebounceTimer)
       }
       
-      // Debounce filter application for 300ms
       this.filterDebounceTimer = setTimeout(() => {
         this.applyFilters()
       }, 300)
     },
     
     applyFilters() {
-      // Reset to first page when filters change
       this.currentPage = 1
-      
-      // Clear memoization cache to force recalculation
       this.memoizedFilters.result = []
       
       console.log('Filters applied:', {
@@ -701,9 +649,6 @@ export default {
       this.memoizedFilters.result = []
     },
 
-    // ================================================================
-    // PAGINATION METHODS - OPTIMIZED
-    // ================================================================
     goToPage(page) {
       if (page >= 1 && page <= this.totalPages && page !== this.currentPage) {
         this.currentPage = page
@@ -715,15 +660,9 @@ export default {
       console.log(`Page size changed to: ${this.pageSize}`)
     },
 
-    // ================================================================
-    // LOG TYPE AND FORMATTING METHODS
-    // ================================================================
-    
-    // Determine log type based on event_type
     getLogType(log) {
       const eventType = (log.event_type || '').toLowerCase();
       
-      // Session-related events
       if (eventType.includes('session') || 
           eventType.includes('login') || 
           eventType.includes('logout') || 
@@ -731,7 +670,6 @@ export default {
         return 'session';
       }
       
-      // Audit-related events (CRUD operations)
       if (eventType.includes('create') || 
           eventType.includes('update') || 
           eventType.includes('delete') || 
@@ -742,26 +680,21 @@ export default {
         return 'audit';
       }
       
-      // Default to session if unsure
       return 'session';
     },
 
-    // Generate formatted log ID (SES-1, AUD-1, etc.)
     getFormattedLogId(log, position) {
       const logType = this.getLogType(log);
       const prefix = logType === 'session' ? 'SES' : 'AUD';
       
-      // Get the counter for this specific log type
       const typeCounter = this.getTypeCounter(position, logType);
       
       return `${prefix}-${typeCounter}`;
     },
 
-    // Calculate counter for each log type separately
     getTypeCounter(currentPosition, logType) {
       let counter = 0;
       
-      // Count logs of the same type up to current position
       for (let i = 0; i < currentPosition; i++) {
         if (i < this.filteredLogs.length) {
           const log = this.filteredLogs[i];
@@ -774,9 +707,6 @@ export default {
       return counter;
     },
 
-    // ================================================================
-    // UTILITY METHODS - OPTIMIZED WITH MEMOIZATION
-    // ================================================================
     getAmountQty(sessionLog) {
       const eventType = (sessionLog.event_type || '').toLowerCase()
       return (eventType === 'session' || eventType === 'session complete') 
@@ -785,7 +715,6 @@ export default {
     },
     
     getStatusClass(status) {
-      // Use Map for O(1) lookup instead of switch
       const statusMap = {
         'completed': 'status-success',
         'success': 'status-success',
@@ -801,7 +730,6 @@ export default {
       if (!timestamp) return 'N/A'
       
       try {
-        // Cache formatted dates to avoid repeated formatting
         if (!this._timestampCache) this._timestampCache = new Map()
         
         if (this._timestampCache.has(timestamp)) {
@@ -829,27 +757,21 @@ export default {
     }
   },
   
-  // ================================================================
-  // LIFECYCLE HOOKS
-  // ================================================================
   async mounted() {
     console.log('=== System Logs component mounted ===')
     await this.loadLogs()
     
-    // Initialize auto-refresh (enabled by default for "automatic" branding)
     this.autoRefreshEnabled = true
     this.startAutoRefresh()
   },
   
   beforeUnmount() {
-    // Clean up timers
     this.stopAutoRefresh()
     
     if (this.filterDebounceTimer) {
       clearTimeout(this.filterDebounceTimer)
     }
     
-    // Clear caches
     if (this._timestampCache) {
       this._timestampCache.clear()
     }
@@ -858,13 +780,23 @@ export default {
 </script>
 
 <style scoped>
+/* ==========================================================================
+   LOGS PAGE - SEMANTIC THEME SYSTEM WITH DARK MODE SUPPORT
+   ========================================================================== */
+
 .logs-page {
   padding: 1.5rem;
   max-width: 1400px;
   margin: 0 auto;
-  background-color: #f8fafc;
+  background-color: var(--surface-secondary);
   min-height: 100vh;
+  color: var(--text-secondary);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
+
+/* ==========================================================================
+   PAGE HEADER
+   ========================================================================== */
 
 .page-header {
   display: flex;
@@ -876,8 +808,9 @@ export default {
 .page-title {
   font-size: 2rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-primary);
   margin: 0;
+  transition: color 0.3s ease;
 }
 
 .header-actions {
@@ -890,18 +823,20 @@ export default {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  background: #f0fdf4;
+  background: var(--surface-primary);
   padding: 0.75rem 1rem;
   border-radius: 0.5rem;
-  border: 1px solid #bbf7d0;
+  border: 1px solid var(--border-secondary);
   min-width: 280px;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .status-text {
   font-size: 0.875rem;
-  color: #16a34a;
+  color: var(--text-secondary);
   font-weight: 500;
   flex: 1;
+  transition: color 0.3s ease;
 }
 
 .connection-indicator {
@@ -912,223 +847,141 @@ export default {
   border-radius: 0.5rem;
   font-size: 0.875rem;
   font-weight: 500;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .connection-good {
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #16a34a;
+  background: var(--surface-primary);
+  border: 1px solid var(--border-success);
+  color: var(--status-success);
 }
 
 .connection-unstable {
-  background: #fefce8;
-  border: 1px solid #fde047;
-  color: #ca8a04;
+  background: var(--surface-primary);
+  border: 1px solid var(--status-warning);
+  color: var(--status-warning);
 }
 
 .connection-lost {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
+  background: var(--surface-primary);
+  border: 1px solid var(--border-error);
+  color: var(--status-error);
 }
 
 .connection-unknown {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  color: #64748b;
+  background: var(--surface-primary);
+  border: 1px solid var(--border-secondary);
+  color: var(--text-tertiary);
 }
 
-.auto-refresh-indicator {
-  margin-bottom: 1rem;
-}
+/* ==========================================================================
+   FILTERS SECTION
+   ========================================================================== */
 
-/* New entry highlight animation */
-.new-entry {
-  background-color: #fef3c7 !important;
-  animation: newEntryFade 5s ease-out forwards;
-}
-
-@keyframes newEntryFade {
-  0% {
-    background-color: #fef3c7;
-  }
-  100% {
-    background-color: transparent;
-  }
-}
-
-/* Enhanced button styles */
-.btn {
-  padding: 0.5rem 1.25rem;
-  border-radius: 0.5rem;
-  border: none;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.875rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  white-space: nowrap;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background-color: #3b82f6;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background-color: #2563eb;
-}
-
-.btn-secondary {
-  background-color: #e2e8f0;
-  color: #475569;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background-color: #cbd5e1;
-}
-
-.btn-warning {
-  background-color: #f59e0b;
-  color: white;
-}
-
-.btn-warning:hover:not(:disabled) {
-  background-color: #d97706;
-}
-
-.btn-info {
-  background-color: #06b6d4;
-  color: white;
-}
-
-.btn-info:hover:not(:disabled) {
-  background-color: #0891b2;
-}
-
-.btn-sm {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-}
-
-.btn-outline-success {
-  background-color: transparent;
-  color: #16a34a;
-  border: 1px solid #16a34a;
-}
-
-.btn-outline-success:hover {
-  background-color: #16a34a;
-  color: white;
-  border-color: #16a34a;
-}
-
-.btn-outline-secondary {
-  background-color: transparent;
-  color: #6b7280;
-  border: 1px solid #6b7280;
-}
-
-.btn-outline-secondary:hover {
-  background-color: #6b7280;
-  color: white;
-  border-color: #6b7280;
-}
-
-/* Spinning icon animation */
-.spinning {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* Enhanced filters section */
 .filters-section {
-  background: white;
+  background: var(--surface-primary);
   padding: 1.5rem;
   border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-secondary);
   margin-bottom: 1.5rem;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 1rem;
   align-items: end;
-}
-
-.filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .filter-group label {
   font-weight: 500;
-  color: #374151;
+  color: var(--text-primary);
   font-size: 0.875rem;
+  display: block;
+  margin-bottom: 0.5rem;
+  transition: color 0.3s ease;
 }
 
 .filter-group select,
 .filter-group input {
+  width: 100%;
   padding: 0.5rem;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-primary);
   border-radius: 0.375rem;
   font-size: 0.875rem;
-  transition: border-color 0.2s ease;
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  transition: all 0.3s ease;
 }
 
 .filter-group select:focus,
 .filter-group input:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 3px rgba(160, 123, 227, 0.25);
 }
 
-.loading-state, .error-state {
+.filter-group select::placeholder,
+.filter-group input::placeholder {
+  color: var(--input-placeholder);
+}
+
+/* ==========================================================================
+   LOADING AND ERROR STATES
+   ========================================================================== */
+
+.loading-state, 
+.error-state {
   text-align: center;
   padding: 3rem;
-  background: white;
+  background: var(--surface-primary);
   border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-secondary);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .error-state {
-  color: #dc2626;
+  color: var(--status-error);
 }
 
 .refresh-indicator {
+  background: var(--surface-primary);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border-primary);
   margin-bottom: 1rem;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .table-info {
-  background: white;
+  background: var(--surface-primary);
   padding: 1rem 1.5rem;
   border-radius: 0.75rem 0.75rem 0 0;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--border-secondary);
   font-size: 0.875rem;
-  color: #64748b;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  color: var(--text-tertiary);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-secondary);
+  border-bottom: none;
+  transition: all 0.3s ease;
 }
 
 .filter-indicator {
-  color: #3b82f6;
+  color: var(--text-accent);
   font-weight: 500;
 }
 
+/* ==========================================================================
+   TABLE CONTAINER
+   ========================================================================== */
+
 .table-container {
-  background: white;
+  background: var(--surface-primary);
   border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-secondary);
   overflow: hidden;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .logs-table {
@@ -1138,8 +991,8 @@ export default {
 }
 
 .logs-table thead {
-  background-color: #567cdc;
-  color: white;
+  background-color: var(--primary-medium);
+  color: var(--text-inverse);
 }
 
 .logs-table th {
@@ -1148,483 +1001,319 @@ export default {
   font-weight: 600;
   font-size: 0.875rem;
   letter-spacing: 0.025em;
+  color: var(--text-inverse);
+  border-bottom: 1px solid var(--primary-dark);
 }
 
 .logs-table td {
   padding: 1rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--border-secondary);
   font-size: 0.875rem;
-  transition: background-color 0.2s ease;
+  transition: all 0.3s ease;
+  color: var(--text-secondary);
 }
 
 .logs-table tbody tr:hover {
-  background-color: #f8fafc;
+  background-color: var(--state-hover);
 }
 
-/* Updated Log ID column to show formatted IDs */
-.log-id-column {
-  width: 100px;
-  text-align: center;
-  font-weight: 600;
-  color: #475569;
-  padding: 0.5rem;
+.logs-table tbody tr.new-entry {
+  background-color: var(--status-warning-bg);
+  animation: highlight-fade 3s ease-out;
 }
+
+@keyframes highlight-fade {
+  0% {
+    background-color: var(--status-warning-bg);
+    transform: scale(1.01);
+  }
+  100% {
+    background-color: var(--surface-primary);
+    transform: scale(1);
+  }
+}
+
+/* ==========================================================================
+   LOG-SPECIFIC STYLES
+   ========================================================================== */
 
 .position-number {
   display: inline-block;
-  min-width: 60px;
-  padding: 0.5rem 0.75rem;
-  color: white;
-  border-radius: 0.5rem;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  font-family: monospace;
-  letter-spacing: 0.5px;
-}
-
-/* Session log styling (blue theme) */
-.position-number.session {
-  background-color: #567cdc;
-  border: 2px solid #4f46e5;
-}
-
-/* Audit log styling (purple theme) */
-.position-number.audit {
-  background-color: #7c3aed;
-  border: 2px solid #6d28d9;
-}
-
-/* Latest entry highlighting - keep original colors but add glow effect */
-.logs-table tbody tr:first-child .position-number.session {
-  animation: latestSessionPulse 2s ease-in-out;
-  box-shadow: 0 0 0 3px rgba(86, 124, 220, 0.4);
-}
-
-.logs-table tbody tr:first-child .position-number.audit {
-  animation: latestAuditPulse 2s ease-in-out;
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.4);
-}
-
-@keyframes latestSessionPulse {
-  0%, 100% { 
-    background-color: #567cdc;
-    border-color: #4f46e5;
-    transform: scale(1);
-  }
-  50% { 
-    background-color: #4f46e5;
-    border-color: #3730a3;
-    transform: scale(1.05);
-  }
-}
-
-@keyframes latestAuditPulse {
-  0%, 100% { 
-    background-color: #7c3aed;
-    border-color: #6d28d9;
-    transform: scale(1);
-  }
-  50% { 
-    background-color: #6d28d9;
-    border-color: #5b21b6;
-    transform: scale(1.05);
-  }
-}
-
-/* New entry highlighting - orange for both types */
-.new-entry .position-number.session,
-.new-entry .position-number.audit {
-  background-color: #f59e0b;
-  border-color: #d97706;
-  animation: newPositionFade 5s ease-out forwards;
-}
-
-@keyframes newPositionFade {
-  0% {
-    background-color: #f59e0b;
-    border-color: #d97706;
-    transform: scale(1.1);
-  }
-  25% {
-    background-color: #f59e0b;
-    border-color: #d97706;
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-/* Other column styles */
-.user-id-column {
-  width: 120px;
-  font-weight: 500;
-  color: #1e293b;
-}
-
-.ref-id-column {
-  width: 120px;
-  color: #64748b;
-  font-family: monospace;
-}
-
-.event-type-column {
-  width: 120px;
-  color: #1e293b;
-}
-
-.amount-column {
-  width: 100px;
-  text-align: center;
-  color: #1e293b;
-}
-
-.status-column {
-  width: 100px;
-  text-align: center;
-}
-
-.timestamp-column {
-  width: 150px;
-  color: #64748b;
-  font-size: 0.8125rem;
-}
-
-.remarks-column {
-  width: 200px;
-  max-width: 200px;
-  color: #64748b;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Status badge styles */
-.status-badge {
   padding: 0.25rem 0.5rem;
   border-radius: 0.375rem;
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--text-inverse);
+  border: 2px solid transparent;
+}
+
+.position-number.session {
+  background-color: var(--primary-medium);
+  border-color: var(--primary-dark);
+}
+
+.position-number.audit {
+  background-color: var(--secondary);
+  border-color: var(--secondary-dark);
+}
+
+/* Status badges */
+.status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
   font-size: 0.75rem;
   font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
+  display: inline-block;
+  min-width: 60px;
+  text-align: center;
 }
 
-.status-badge.status-success {
-  background-color: #dcfce7;
-  color: #166534;
+.status-success {
+  background-color: var(--status-success-bg);
+  color: var(--status-success);
+  border: 1px solid var(--status-success);
 }
 
-.status-badge.status-active {
-  background-color: #dbeafe;
-  color: #1e40af;
+.status-active {
+  background-color: var(--status-info-bg);
+  color: var(--status-info);
+  border: 1px solid var(--status-info);
 }
 
-.status-badge.status-failed {
-  background-color: #fee2e2;
-  color: #991b1b;
+.status-failed {
+  background-color: var(--status-error-bg);
+  color: var(--status-error);
+  border: 1px solid var(--status-error);
 }
 
-.status-badge.status-default {
-  background-color: #f1f5f9;
-  color: #475569;
+.status-default {
+  background-color: var(--surface-tertiary);
+  color: var(--text-tertiary);
+  border: 1px solid var(--border-secondary);
 }
+
+/* ==========================================================================
+   EMPTY STATE
+   ========================================================================== */
 
 .empty-state {
   text-align: center;
   padding: 3rem;
-  color: #64748b;
-  background: white;
+  color: var(--text-tertiary);
+  background: var(--surface-primary);
   border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-secondary);
+  transition: all 0.3s ease;
+}
+
+.empty-state-icon {
+  font-size: 3rem;
+  color: var(--text-tertiary);
+  transition: color 0.3s ease;
 }
 
 .card {
-  background: white;
+  background: var(--surface-primary);
   border-radius: 0.5rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-secondary);
+  transition: all 0.3s ease;
 }
 
 .card-body {
   padding: 1.5rem;
 }
 
-.py-5 {
-  padding-top: 3rem;
-  padding-bottom: 3rem;
-}
+/* ==========================================================================
+   PAGINATION
+   ========================================================================== */
 
-.d-flex {
-  display: flex;
-}
-
-.gap-2 {
-  gap: 0.5rem;
-}
-
-.justify-content-center {
-  justify-content: center;
-}
-
-/* Pagination styles */
 .pagination-container {
-  background: white;
+  background: var(--surface-primary);
   padding: 1.5rem;
   border-radius: 0 0 0.75rem 0.75rem;
-  border-top: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-}
-
-.pagination {
-  margin-bottom: 1rem;
-  display: flex;
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.pagination-sm .page-link {
-  padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
+  border-top: 1px solid var(--border-secondary);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-secondary);
+  border-top: none;
+  transition: all 0.3s ease;
 }
 
 .pagination-info {
   text-align: center;
-}
-
-.page-item {
-  margin: 0;
-}
-
-.page-link {
-  border: 1px solid #e2e8f0;
-  color: #567cdc;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
-  transition: all 0.2s ease;
-  text-decoration: none;
-  background: white;
-  border-radius: 0;
-  margin: 0;
-}
-
-.page-link:hover {
-  background-color: #f8fafc;
-  border-color: #567cdc;
-  color: #567cdc;
-}
-
-.page-item.active .page-link {
-  background-color: #567cdc;
-  border-color: #567cdc;
-  color: white;
-}
-
-.page-item.disabled .page-link {
-  color: #9ca3af;
-  background-color: #fff;
-  border-color: #e2e8f0;
-  cursor: not-allowed;
-}
-
-.page-item:first-child .page-link {
-  border-radius: 0.375rem 0 0 0.375rem;
-}
-
-.page-item:last-child .page-link {
-  border-radius: 0 0.375rem 0.375rem 0;
-}
-
-.justify-content-center {
-  justify-content: center;
-}
-
-/* Alert styles */
-.alert {
-  padding: 1rem;
-  border-radius: 0.5rem;
-  border: 1px solid transparent;
-  margin-bottom: 1rem;
-}
-
-.alert-danger {
-  background-color: #fef2f2;
-  border-color: #fecaca;
-  color: #dc2626;
-}
-
-.alert-info {
-  background-color: #eff6ff;
-  border-color: #bfdbfe;
-  color: #1d4ed8;
-}
-
-.text-center {
-  text-align: center;
-}
-
-.mb-3 {
-  margin-bottom: 1rem;
-}
-
-.me-2 {
-  margin-right: 0.5rem;
-}
-
-.mt-3 {
   margin-top: 1rem;
 }
 
-.spinner-border {
-  width: 2rem;
-  height: 2rem;
-  border: 0.25em solid currentColor;
-  border-right-color: transparent;
-  border-radius: 50%;
-  animation: spin 0.75s linear infinite;
+.page-link {
+  border: 1px solid var(--border-primary);
+  color: var(--text-accent);
+  background: var(--surface-primary);
+  transition: all 0.3s ease;
 }
 
-.spinner-border-sm {
-  width: 1rem;
-  height: 1rem;
-  border-width: 0.2em;
+.page-link:hover {
+  background-color: var(--state-hover);
+  border-color: var(--border-accent);
+  color: var(--text-accent);
+}
+
+.page-item.active .page-link {
+  background-color: var(--text-accent);
+  border-color: var(--border-accent);
+  color: var(--text-inverse);
+}
+
+.page-item.disabled .page-link {
+  color: var(--text-disabled);
+  background-color: var(--surface-tertiary);
+  border-color: var(--border-secondary);
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   ALERT STYLES
+   ========================================================================== */
+
+.alert-danger {
+  background-color: var(--status-error-bg);
+  border-color: var(--border-error);
+  color: var(--status-error);
+}
+
+.alert-info {
+  background-color: var(--status-info-bg);
+  border-color: var(--status-info);
+  color: var(--status-info);
+}
+
+/* ==========================================================================
+   UTILITY CLASSES
+   ========================================================================== */
+
+.text-accent {
+  color: var(--text-accent) !important;
 }
 
 .text-primary {
-  color: #3b82f6;
+  color: var(--text-primary) !important;
+}
+
+.text-secondary {
+  color: var(--text-secondary) !important;
+}
+
+.text-tertiary {
+  color: var(--text-tertiary) !important;
 }
 
 .text-success {
-  color: #10b981;
+  color: var(--status-success) !important;
+}
+
+.text-warning {
+  color: var(--status-warning) !important;
 }
 
 .text-muted {
-  color: #6b7280;
+  color: var(--text-tertiary) !important;
 }
 
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+/* ==========================================================================
+   ANIMATIONS
+   ========================================================================== */
+
+.spinning {
+  animation: spin 1s linear infinite;
 }
 
-/* Responsive Design */
-@media (max-width: 1024px) {
-  .logs-page {
-    padding: 1rem;
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
   }
+  to {
+    transform: rotate(360deg);
+  }
+}
 
+/* ==========================================================================
+   RESPONSIVE DESIGN
+   ========================================================================== */
+
+@media (max-width: 1024px) {
   .filters-section {
     grid-template-columns: 1fr;
+    gap: 1rem;
   }
   
-  .table-container {
-    overflow-x: auto;
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
   }
   
-  .logs-table {
-    min-width: 900px;
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .auto-refresh-status {
+    min-width: auto;
+    flex: 1;
   }
 }
 
 @media (max-width: 768px) {
-  .page-header {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
-  }
-  
-  .header-actions {
-    justify-content: center;
-    flex-wrap: wrap;
+  .logs-page {
+    padding: 1rem;
   }
   
   .page-title {
     font-size: 1.5rem;
-    text-align: center;
   }
   
-  .btn {
-    padding: 0.5rem 1rem;
-    font-size: 0.8125rem;
+  .header-actions {
+    flex-direction: column;
+    gap: 0.5rem;
   }
-
-  .filters-section {
-    padding: 1rem;
+  
+  .auto-refresh-status,
+  .connection-indicator {
+    width: 100%;
   }
-
+  
   .logs-table th,
   .logs-table td {
-    padding: 0.75rem 0.5rem;
+    padding: 0.5rem;
     font-size: 0.8125rem;
-  }
-
-  .pagination {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  .auto-refresh-status {
-    min-width: auto;
-    width: 100%;
-    justify-content: center;
-  }
-
-  /* Responsive adjustments for position numbers */
-  .log-id-column {
-    width: 90px;
   }
   
   .position-number {
-    font-size: 0.75rem;
-    padding: 0.375rem 0.5rem;
-    min-width: 50px;
-  }
-  
-  .user-id-column,
-  .ref-id-column,
-  .event-type-column {
-    width: 100px;
-  }
-  
-  .amount-column,
-  .status-column {
-    width: 80px;
-  }
-  
-  .timestamp-column {
-    width: 130px;
-  }
-  
-  .remarks-column {
-    width: 150px;
-    max-width: 150px;
+    padding: 0.125rem 0.375rem;
+    font-size: 0.6875rem;
   }
 }
 
-@media (max-width: 640px) {
-  .header-actions {
-    grid-template-columns: 1fr;
-    display: grid;
-    gap: 0.5rem;
-  }
-
-  .btn {
-    font-size: 0.75rem;
-    padding: 0.5rem 0.75rem;
-  }
-
-  .auto-refresh-status {
-    min-width: auto;
+@media (max-width: 576px) {
+  .logs-page {
     padding: 0.5rem;
   }
-
-  .connection-indicator {
-    padding: 0.375rem 0.5rem;
+  
+  .page-title {
+    font-size: 1.25rem;
+  }
+  
+  .filters-section {
+    padding: 1rem;
+  }
+  
+  .logs-table {
+    font-size: 0.75rem;
+  }
+  
+  .logs-table th,
+  .logs-table td {
+    padding: 0.25rem;
   }
 }
 </style>

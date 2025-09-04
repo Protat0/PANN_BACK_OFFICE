@@ -28,6 +28,83 @@ class CategoryApiService {
     }
   }
 
+  async getActiveCategories() {
+    try {
+      console.log("🔍 getActiveCategories: Fetching active categories only");
+      const allCategories = await this.getAllCategories();
+      const activeCategories = allCategories.filter(cat => cat.status === 'active' && !cat.isDeleted);
+      console.log(`✅ getActiveCategories: Found ${activeCategories.length} active categories`);
+      return activeCategories;
+    } catch (error) {
+      console.error("❌ getActiveCategories: Error:", error);
+      return [];
+    }
+  }
+
+  async getCategoryById(categoryId, includeDeleted = false) {
+    try {
+      console.log(`🔍 getCategoryById: Fetching category ${categoryId}`);
+      const params = includeDeleted ? { include_deleted: true } : {};
+      const response = await api.get(`/category/${categoryId}`, { params });
+      console.log(`✅ getCategoryById: Got category data:`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ getCategoryById: Error fetching category ${categoryId}:`, error);
+      return null;
+    }
+  }
+
+  async getSubcategories(categoryId) {
+    try {
+      const response = await api.get(`/category/${categoryId}/subcategories/`);
+      return response.data.subcategories || [];
+    } catch (error) {
+      console.error(`Error fetching subcategories for ${categoryId}:`, error);
+      this.handleError(error);
+    }
+  }
+
+
+  async getAllCategories(params = {}) {
+    try {
+      console.log("🔍 getAllCategories: Fetching all categories for products");
+      
+      // Try the dataview endpoint first (since you have CategoryData working)
+      try {
+        const response = await api.get('/category/dataview', { params });
+        console.log("✅ getAllCategories: Got response from /category/dataview:", response.data);
+        
+        // Handle different response formats
+        if (response.data && Array.isArray(response.data)) {
+          return response.data;
+        } else if (response.data && response.data.categories) {
+          return response.data.categories;
+        } else {
+          console.log("⚠️ getAllCategories: Unexpected response format, returning empty array");
+          return [];
+        }
+      } catch (dataviewError) {
+        console.log("⚠️ getAllCategories: /category/dataview failed, trying /category/");
+        
+        // Fallback to basic category endpoint
+        const response = await api.get('/category/', { params });
+        console.log("✅ getAllCategories: Got response from /category/:", response.data);
+        
+        if (response.data && Array.isArray(response.data)) {
+          return response.data;
+        } else if (response.data && response.data.categories) {
+          return response.data.categories;
+        } else {
+          return [];
+        }
+      }
+    } catch (error) {
+      console.error("❌ getAllCategories: Error fetching categories:", error);
+      // Don't throw error, return empty array to prevent breaking
+      return [];
+    }
+  }
+
   /**
    * Add new category
    * @param {Object} params - Category data
@@ -106,7 +183,7 @@ class CategoryApiService {
           });
           
           console.log('Sending update data:', updateData);
-          const response = await api.put(`/category/${params.id}/`, updateData);
+          const response = await api.put(`/category/${params.id}`, updateData);
           
           console.log('Category updated successfully:', response.data);
           return response.data;
@@ -124,19 +201,20 @@ class CategoryApiService {
    */
   async FindCategoryData(params = {}) {
     try {
-        console.log(`This API call is getting ${params.id} Category`);
-        
-        const queryParams = {};
-        if (params.include_deleted !== undefined) {
-            queryParams.include_deleted = params.include_deleted;
-        }
-        
-        const response = await api.get(`/category/${params.id}`, { params: queryParams });
-        return response.data;
-        
+      console.log(`This API call is getting ${params.id} Category`);
+      
+      const queryParams = {};
+      if (params.include_deleted !== undefined) {
+        queryParams.include_deleted = params.include_deleted;
+      }
+      
+      // FIXED: Remove trailing slash
+      const response = await api.get(`/category/${params.id}`, { params: queryParams });
+      return response.data;
+      
     } catch (error) {
-        console.error(`Error fetching specific category ${params.id} data:`, error);
-        throw error;
+      console.error(`Error fetching specific category ${params.id} data:`, error);
+      throw error;
     }
   }
 

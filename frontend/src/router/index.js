@@ -1,11 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
+import HomeView from '@/views/HomeView.vue'
 
-// Import authentication and layout components
 import Login from '../pages/Login.vue'
 import MainLayout from '../layouts/MainLayout.vue'
 
-// Import your page components
 import Dashboard from '../pages/Dashboard.vue'
 import Accounts from '../pages/Accounts.vue'
 import Customers from '../pages/Customers.vue'
@@ -20,6 +18,13 @@ import SalesByCategory from '@/pages/reports/SalesByCategory.vue'
 import UncategorizedProducts from '@/components/categories/UncategorizedProducts.vue'
 import Logs from '@/pages/Logs.vue'
 import AllNotifications from '@/pages/notifications/AllNotifications.vue'
+import TesterPage from '@/pages/TesterPage.vue'
+import Suppliers from '@/pages/suppliers/Suppliers.vue'
+import SupplierDetails from '@/pages/suppliers/SupplierDetails.vue'
+import OrdersHistory from '@/pages/suppliers/OrdersHistory.vue'
+
+// Debug components (only for development)
+import ToastDebug from '@/pages/ToastDebug.vue'
 
 // Auth guard function
 function requireAuth(to, from, next) {
@@ -77,6 +82,7 @@ const router = createRouter({
           name: 'Customers',
           component: Customers
         },
+        // Inventory routes
         {
           path: 'products',
           name: 'Products',
@@ -91,7 +97,7 @@ const router = createRouter({
           path: 'products/:id',
           name: 'ProductDetails',
           component: ProductDetails,
-          props: true // This passes the route params as props to the component
+          props: true
         },
         {
           path: 'categories',
@@ -99,11 +105,55 @@ const router = createRouter({
           component: Categories
         },
         {
-          path: 'category/:id', // Change this line
+          path: 'category/:id',
           name: 'Category Details',
           component: CategoryDetails,
           props: true
         },
+        // Suppliers routes
+        {
+          path: 'suppliers',
+          name: 'Suppliers',
+          component: Suppliers
+        },
+        {
+          path: 'suppliers/orders',
+          name: 'OrdersHistory',
+          component: OrdersHistory,
+          meta: {
+            title: 'Purchase Orders History',
+            breadcrumb: [
+              { name: 'Dashboard', path: '/dashboard' },
+              { name: 'Suppliers', path: '/suppliers' },
+              { name: 'Orders History', path: null }
+            ]
+          }
+        },
+        {
+          path: 'suppliers/:supplierId',
+          name: 'SupplierDetails',
+          component: SupplierDetails,
+          props: true, // This passes the route params as props to the component
+          meta: {
+            title: 'Supplier Details',
+            breadcrumb: [
+              { name: 'Dashboard', path: '/dashboard' },
+              { name: 'Suppliers', path: '/suppliers' },
+              { name: 'Details', path: null }
+            ]
+          }
+        },
+        // Debug routes (development only)
+        {
+          path: 'debug/toast',
+          name: 'ToastDebug',
+          component: ToastDebug,
+          meta: {
+            title: 'Toast Debug',
+            isDevelopmentOnly: true
+          }
+        },
+        // Other routes
         {
           path: 'home',
           name: 'home',
@@ -144,6 +194,11 @@ const router = createRouter({
           name: 'AllNotifications',
           component: AllNotifications
         },
+        {
+          path: 'tester',
+          name: 'TesterPage',
+          component: TesterPage
+        }
       ]
     },
     // Catch all route - redirect to login
@@ -157,6 +212,12 @@ const router = createRouter({
 // Global navigation guard for debugging
 router.beforeEach((to, from, next) => {
   console.log(`Navigating from ${from.path} to ${to.path}`)
+  
+  // Optional: Set page title based on route meta
+  if (to.meta && to.meta.title) {
+    document.title = `${to.meta.title} - Your App Name`
+  }
+  
   next()
 })
 

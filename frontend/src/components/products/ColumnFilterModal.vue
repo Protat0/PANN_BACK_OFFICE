@@ -2,10 +2,10 @@
   <div v-if="show" class="modal fade show d-block" tabindex="-1" @click="handleOverlayClick">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content" @click.stop>
-        <div class="modal-header bg-light">
+        <div class="modal-header surface-secondary">
           <div>
-            <h5 class="modal-title text-primary-dark fw-semibold">Column Visibility</h5>
-            <p class="text-tertiary-medium small mb-0">Customize which columns are visible in your table</p>
+            <h5 class="modal-title text-accent fw-semibold">Column Visibility</h5>
+            <p class="text-tertiary small mb-0">Customize which columns are visible in your table</p>
           </div>
           <button type="button" class="btn-close" @click="$emit('close')"></button>
         </div>
@@ -28,14 +28,14 @@
           <div class="column-groups">
             <!-- Essential Columns (Always Required) -->
             <div class="mb-4">
-              <h6 class="d-flex align-items-center gap-2 mb-3 text-tertiary-dark fw-semibold">
-                <svg class="text-primary" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <h6 class="d-flex align-items-center gap-2 mb-3 text-primary fw-semibold">
+                <svg class="text-accent" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                   <circle cx="12" cy="16" r="1"/>
                   <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>
                 Essential Columns
-                <small class="text-tertiary-medium fw-normal ms-2">(Always visible)</small>
+                <small class="text-tertiary fw-normal ms-2">(Always visible)</small>
               </h6>
               <div class="row g-3">
                 <div 
@@ -43,7 +43,7 @@
                   :key="column.key"
                   class="col-12 col-md-6"
                 >
-                  <div class="card border-tertiary-medium bg-tertiary-light opacity-75">
+                  <div class="card border-tertiary-medium surface-tertiary opacity-75">
                     <div class="card-body p-3">
                       <div class="form-check">
                         <input 
@@ -54,8 +54,8 @@
                           disabled
                         />
                         <label class="form-check-label d-flex flex-column" :for="`col-${column.key}`">
-                          <span class="fw-semibold text-tertiary-dark">{{ column.name }}</span>
-                          <small class="text-tertiary-medium">{{ column.description }}</small>
+                          <span class="fw-semibold text-accent">{{ column.name }}</span>
+                          <small class="text-tertiary">{{ column.description }}</small>
                         </label>
                       </div>
                     </div>
@@ -66,8 +66,8 @@
 
             <!-- Basic Information -->
             <div class="mb-4">
-              <h6 class="d-flex align-items-center gap-2 mb-3 text-tertiary-dark fw-semibold">
-                <svg class="text-primary" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <h6 class="d-flex align-items-center gap-2 mb-3 text-primary fw-semibold">
+                <svg class="text-accent" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                   <polyline points="14,2 14,8 20,8"/>
                   <line x1="16" y1="13" x2="8" y2="13"/>
@@ -82,7 +82,7 @@
                   :key="column.key"
                   class="col-12 col-md-6"
                 >
-                  <div class="card column-card" :class="{ 'border-primary bg-primary-light': visibleColumns[column.key] }">
+                  <div class="card column-card" :class="{ 'border-accent surface-tertiary': visibleColumns[column.key] }">
                     <div class="card-body p-3">
                       <div class="form-check">
                         <input 
@@ -93,8 +93,8 @@
                           @change="updateColumnVisibility"
                         />
                         <label class="form-check-label d-flex flex-column" :for="`col-${column.key}`">
-                          <span class="fw-semibold text-tertiary-dark">{{ column.name }}</span>
-                          <small class="text-tertiary-medium">{{ column.description }}</small>
+                          <span class="fw-semibold text-primary">{{ column.name }}</span>
+                          <small class="text-tertiary">{{ column.description }}</small>
                         </label>
                       </div>
                     </div>
@@ -105,8 +105,8 @@
 
             <!-- Financial Information -->
             <div class="mb-4">
-              <h6 class="d-flex align-items-center gap-2 mb-3 text-tertiary-dark fw-semibold">
-                <svg class="text-primary" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <h6 class="d-flex align-items-center gap-2 mb-3 text-primary fw-semibold">
+                <svg class="text-accent" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="12" y1="1" x2="12" y2="23"/>
                   <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
                 </svg>
@@ -118,7 +118,7 @@
                   :key="column.key"
                   class="col-12 col-md-6"
                 >
-                  <div class="card column-card" :class="{ 'border-primary bg-primary-light': visibleColumns[column.key] }">
+                  <div class="card column-card" :class="{ 'border-accent surface-tertiary': visibleColumns[column.key] }">
                     <div class="card-body p-3">
                       <div class="form-check">
                         <input 
@@ -129,8 +129,8 @@
                           @change="updateColumnVisibility"
                         />
                         <label class="form-check-label d-flex flex-column" :for="`col-${column.key}`">
-                          <span class="fw-semibold text-tertiary-dark">{{ column.name }}</span>
-                          <small class="text-tertiary-medium">{{ column.description }}</small>
+                          <span class="fw-semibold text-primary">{{ column.name }}</span>
+                          <small class="text-tertiary">{{ column.description }}</small>
                         </label>
                       </div>
                     </div>
@@ -141,8 +141,8 @@
 
             <!-- Status & Dates -->
             <div class="mb-4">
-              <h6 class="d-flex align-items-center gap-2 mb-3 text-tertiary-dark fw-semibold">
-                <svg class="text-primary" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <h6 class="d-flex align-items-center gap-2 mb-3 text-primary fw-semibold">
+                <svg class="text-accent" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
                   <line x1="16" y1="2" x2="16" y2="6"/>
                   <line x1="8" y1="2" x2="8" y2="6"/>
@@ -156,7 +156,7 @@
                   :key="column.key"
                   class="col-12 col-md-6"
                 >
-                  <div class="card column-card" :class="{ 'border-primary bg-primary-light': visibleColumns[column.key] }">
+                  <div class="card column-card" :class="{ 'border-accent state-selected': visibleColumns[column.key] }">
                     <div class="card-body p-3">
                       <div class="form-check">
                         <input 
@@ -167,8 +167,8 @@
                           @change="updateColumnVisibility"
                         />
                         <label class="form-check-label d-flex flex-column" :for="`col-${column.key}`">
-                          <span class="fw-semibold text-tertiary-dark">{{ column.name }}</span>
-                          <small class="text-tertiary-medium">{{ column.description }}</small>
+                          <span class="fw-semibold text-primary">{{ column.name }}</span>
+                          <small class="text-tertiary">{{ column.description }}</small>
                         </label>
                       </div>
                     </div>
@@ -180,10 +180,10 @@
 
           <!-- Summary -->
           <div class="mt-4 pt-4 border-top">
-            <div class="card border-primary bg-primary-light">
+            <div class="card border-accent surface-tertiary">
               <div class="card-body">
-                <h6 class="card-title text-primary-dark fw-semibold">Current Selection</h6>
-                <p class="text-primary-dark small mb-3">
+                <h6 class="card-title text-accent fw-semibold">Current Selection</h6>
+                <p class="text-accent small mb-3">
                   <strong>{{ visibleColumnCount }}</strong> of {{ totalColumns }} columns visible
                 </p>
                 <div class="d-flex flex-wrap gap-2">
@@ -200,7 +200,7 @@
           </div>
         </div>
 
-        <div class="modal-footer bg-light">
+        <div class="modal-footer surface-secondary">
           <button @click="cancelChanges" class="btn btn-secondary btn-md">
             Cancel
           </button>
@@ -437,56 +437,24 @@ export default {
   background-color: rgba(0, 0, 0, 0.5);
 }
 
-/* Custom styles for color variables */
-.text-primary-dark {
-  color: var(--primary-dark) !important;
-}
-
-.text-tertiary-medium {
-  color: var(--tertiary-medium) !important;
-}
-
-.text-tertiary-dark {
-  color: var(--tertiary-dark) !important;
-}
-
-.bg-primary-light {
-  background-color: var(--primary-light) !important;
-}
-
-.bg-tertiary-light {
-  background-color: var(--tertiary-light) !important;
-}
-
-.border-primary {
-  border-color: var(--primary) !important;
-}
-
-.border-tertiary-medium {
-  border-color: var(--tertiary-medium) !important;
-}
-
-.text-primary {
-  color: var(--primary) !important;
-}
-
-.bg-primary {
-  background-color: var(--primary) !important;
-}
-
 /* Column card hover effects */
 .column-card {
-  background-color: var(--neutral-light);
-  border: 2px solid var(--neutral);
+  background-color: var(--surface-primary);
+  border: 2px solid var(--border-secondary);
   transition: all 0.2s ease;
   cursor: pointer;
 }
 
 .column-card:hover {
-  border-color: var(--primary-light);
-  background-color: white;
+  border-color: var(--border-accent);
+  background-color: var(--surface-elevated);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(115, 146, 226, 0.1);
+  box-shadow: var(--shadow-md);
+}
+
+.column-card.selected {
+  background-color: var(--state-selected);
+  border-color: var(--border-accent);
 }
 
 /* Custom form check styling to match design */
@@ -498,17 +466,18 @@ export default {
   width: 1.125rem;
   height: 1.125rem;
   margin-top: 0.125rem;
-  border-color: var(--neutral-dark);
+  border-color: var(--border-primary);
+  background-color: var(--input-bg);
 }
 
 .form-check-input:checked {
-  background-color: var(--primary);
-  border-color: var(--primary);
+  background-color: var(--secondary);
+  border-color: var(--secondary);
 }
 
 .form-check-input:focus {
-  border-color: var(--primary-light);
-  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 0.2rem rgba(160, 123, 227, 0.25);
 }
 
 .form-check-label {
@@ -534,15 +503,15 @@ export default {
 
 .modal-header,
 .modal-footer {
-  border-color: var(--neutral);
+  border-color: var(--border-primary);
 }
 
 .modal-header {
-  background-color: var(--neutral-light);
+  background-color: var(--surface-secondary);
 }
 
 .modal-footer {
-  background-color: var(--neutral-light);
+  background-color: var(--surface-secondary);
 }
 
 /* Responsive adjustments */
