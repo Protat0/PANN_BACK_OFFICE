@@ -464,11 +464,347 @@ export default {
 </script>
 
 <style scoped>
+/* Import colors and buttons CSS */
+@import '@/assets/styles/colors.css';
+@import '@/assets/styles/buttons.css';
+
+/* Page Container - Theme Aware */
 .promotions-page {
   min-height: 100vh;
-  background-color: var(--neutral-light);
+  background-color: var(--surface-secondary); /* Changed from --neutral-light */
+  color: var(--text-secondary);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* Action Bar Styles - Theme Aware */
+.action-bar-container {
+  background-color: var(--surface-primary); /* Changed from white */
+  border: 1px solid var(--border-secondary);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-sm); /* Use semantic shadow */
+  overflow: hidden;
+  padding: 1rem;
+  transition: all 0.3s ease;
+}
+
+/* Single Row Layout */
+.action-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Filters Section */
+.filters-section {
+  flex-shrink: 0;
+}
+
+/* Search Toggle Button - Theme Aware */
+.search-toggle-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  background-color: var(--surface-primary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-primary);
+  transition: all 0.2s ease;
+}
+
+.search-toggle-btn:hover {
+  background-color: var(--state-hover);
+  color: var(--text-primary);
+}
+
+.search-toggle-btn.active {
+  background-color: var(--text-accent);
+  border-color: var(--border-accent);
+  color: var(--text-inverse);
+}
+
+/* Filter Groups - Theme Aware */
+.filter-group {
+  min-width: 140px;
+}
+
+.filter-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-tertiary); /* Changed from --tertiary-medium */
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+/* Form Controls - Theme Aware */
+.form-select,
+.form-control {
+  background-color: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--input-text);
+  transition: all 0.2s ease;
+}
+
+.form-select:focus,
+.form-control:focus {
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 0.2rem rgba(160, 123, 227, 0.25);
+  background-color: var(--input-bg);
+  color: var(--input-text);
+}
+
+.form-control::placeholder {
+  color: var(--input-placeholder);
+}
+
+/* Search Container - Theme Aware */
+.search-container {
+  min-width: 300px;
+}
+
+.search-input {
+  padding-right: 2.5rem;
+  height: calc(1.5em + 0.75rem + 2px);
+  background-color: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--input-text);
+}
+
+.search-input:focus {
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 0.2rem rgba(160, 123, 227, 0.25);
+}
+
+.search-container .position-relative .btn {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  transition: color 0.2s ease;
+}
+
+.search-container .position-relative .btn:hover {
+  color: var(--text-secondary);
+}
+
+/* Button States - Theme Aware */
+.btn {
+  background-color: var(--surface-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  background-color: var(--state-hover);
+  color: var(--text-primary);
+}
+
+.btn.active {
+  background-color: var(--text-accent);
+  border-color: var(--border-accent);
+  color: var(--text-inverse);
+}
+
+/* Specific button types */
+.btn-add {
+  background-color: var(--status-success);
+  color: var(--text-inverse);
+  border-color: var(--border-success);
+}
+
+.btn-add:hover {
+  background-color: var(--success-dark);
+  border-color: var(--success-dark);
+}
+
+.btn-delete {
+  background-color: var(--status-error);
+  color: var(--text-inverse);
+  border-color: var(--border-error);
+}
+
+.btn-delete:hover {
+  background-color: var(--error-dark);
+  border-color: var(--error-dark);
+}
+
+.btn-outline-secondary {
+  color: var(--text-tertiary);
+  border-color: var(--border-primary);
+  background-color: transparent;
+}
+
+.btn-outline-secondary:hover {
+  color: var(--text-primary);
+  background-color: var(--state-hover);
+  border-color: var(--border-accent);
+}
+
+.btn-outline-primary {
+  color: var(--text-accent);
+  border-color: var(--border-accent);
+  background-color: transparent;
+}
+
+.btn-outline-primary:hover {
+  color: var(--text-inverse);
+  background-color: var(--text-accent);
+  border-color: var(--text-accent);
+}
+
+.btn-outline-danger {
+  color: var(--status-error);
+  border-color: var(--border-error);
+  background-color: transparent;
+}
+
+.btn-outline-danger:hover {
+  color: var(--text-inverse);
+  background-color: var(--status-error);
+  border-color: var(--status-error);
+}
+
+/* Table and Badge Styling - Theme Aware */
+.table-primary {
+  background-color: var(--state-selected) !important;
+}
+
+.badge {
+  border: 1px solid;
+  transition: all 0.3s ease;
+}
+
+.badge.bg-primary {
+  background-color: var(--text-accent) !important;
+  color: var(--text-inverse) !important;
+  border-color: var(--text-accent) !important;
+}
+
+.badge.bg-success {
+  background-color: var(--status-success) !important;
+  color: var(--text-inverse) !important;
+  border-color: var(--status-success) !important;
+}
+
+.badge.bg-info {
+  background-color: var(--status-info) !important;
+  color: var(--text-inverse) !important;
+  border-color: var(--status-info) !important;
+}
+
+.badge.bg-danger {
+  background-color: var(--status-error) !important;
+  color: var(--text-inverse) !important;
+  border-color: var(--status-error) !important;
+}
+
+.badge.bg-warning {
+  background-color: var(--status-warning) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--status-warning) !important;
+}
+
+.badge.bg-secondary {
+  background-color: var(--surface-tertiary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-primary) !important;
+}
+
+/* Text Colors - Theme Aware */
+.text-tertiary-dark {
+  color: var(--text-primary) !important; /* Use primary for main content */
+}
+
+.text-tertiary-medium {
+  color: var(--text-tertiary) !important;
+}
+
+.fw-medium {
+  color: var(--text-primary);
+}
+
+/* Form Check Controls - Theme Aware */
+.form-check-input {
+  background-color: var(--input-bg);
+  border: 1px solid var(--input-border);
+  transition: all 0.2s ease;
+}
+
+.form-check-input:focus {
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 0.2rem rgba(160, 123, 227, 0.25);
+}
+
+.form-check-input:checked {
+  background-color: var(--text-accent);
+  border-color: var(--text-accent);
+}
+
+/* Action Buttons - Theme Aware */
+.action-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 0.375rem;
+  border-width: 1.5px;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.action-btn-view {
+  color: var(--text-accent);
+  border-color: var(--border-accent);
+}
+
+.action-btn-view:hover {
+  background-color: var(--text-accent);
+  color: var(--text-inverse);
+}
+
+.action-btn-edit {
+  color: var(--text-tertiary);
+  border-color: var(--border-primary);
+}
+
+.action-btn-edit:hover {
+  background-color: var(--state-hover);
+  color: var(--text-primary);
+}
+
+.action-btn-delete {
+  color: var(--status-error);
+  border-color: var(--border-error);
+}
+
+.action-btn-delete:hover {
+  background-color: var(--status-error);
+  color: var(--text-inverse);
+}
+
+/* Empty State - Theme Aware */
+.py-5 {
+  color: var(--text-tertiary);
+}
+
+.opacity-50 {
+  opacity: 0.5;
+  color: var(--text-tertiary);
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
   .action-row {
     flex-direction: column;
@@ -489,81 +825,15 @@ export default {
   }
 }
 
-/* Action Bar Styles */
-.action-bar-container {
-  background: white;
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  padding: 1rem;
+/* Add smooth transitions for theme switching */
+* {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
-/* Single Row Layout */
-.action-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-}
-
-/* Filters Section */
-.filters-section {
-  flex-shrink: 0;
-}
-
-/* Search Toggle Button */
-.search-toggle-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  flex-shrink: 0;
-}
-
-/* Filter Groups */
-.filter-group {
-  min-width: 140px;
-}
-
-.filter-label {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--tertiary-medium);
-  margin-bottom: 0.25rem;
-  display: block;
-}
-
-/* Search Container */
-.search-container {
-  min-width: 300px;
-}
-
-.search-input {
-  padding-right: 2.5rem;
-  height: calc(1.5em + 0.75rem + 2px);
-}
-
-.search-container .position-relative .btn {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Button States */
-.btn.active {
-  background-color: var(--primary);
-  border-color: var(--primary);
-  color: white;
-}
-
-/* Form controls focus states */
-.form-select:focus,
-.form-control:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
+/* Disable transitions for reduced motion users */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
 }
 </style>
