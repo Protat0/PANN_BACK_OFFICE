@@ -13,61 +13,59 @@
     
     <!-- Pagination section -->
     <div v-if="showPagination && totalPages > 1" class="pagination-container">
-      <div class="d-flex justify-content-between align-items-center">
+      <div class="pagination-wrapper">
         <div class="pagination-info">
-          <small style="color: var(--tertiary-medium);">
-            Showing {{ startItem }}-{{ endItem }} of {{ totalItems }} items
-          </small>
+          <small>Showing {{ startItem }}-{{ endItem }} of {{ totalItems }} items</small>
         </div>
         
-        <nav aria-label="Table pagination">
-          <ul class="pagination pagination-sm mb-0">
-            <li class="page-item" :class="{ disabled: currentPage === 1 }">
-              <button 
-                class="page-link page-link-icon" 
-                @click="previousPage" 
-                :disabled="currentPage === 1"
-                aria-label="Previous page"
-              >
-                <ChevronLeft :size="16" />
-              </button>
-            </li>
-            
-            <li 
-              v-for="page in totalPages" 
-              :key="page"
-              class="page-item" 
-              :class="{ active: page === currentPage }"
+        <div class="pagination-controls">
+          <!-- Previous button -->
+          <button 
+            class="page-btn nav-btn" 
+            @click="previousPage" 
+            :disabled="currentPage === 1"
+            aria-label="Previous page"
+          >
+            <ChevronLeft :size="18" />
+          </button>
+          
+          <!-- Page numbers -->
+          <div class="page-numbers">
+            <button 
+              v-for="page in displayedPages" 
+              :key="page.value"
+              class="page-btn"
+              :class="{ 
+                'active': page.value === currentPage,
+                'ellipsis': page.isEllipsis
+              }"
+              @click="!page.isEllipsis && goToPage(page.value)"
+              :disabled="page.isEllipsis"
             >
-              <button class="page-link" @click="goToPage(page)">
-                {{ page }}
-              </button>
-            </li>
-            
-            <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-              <button 
-                class="page-link page-link-icon" 
-                @click="nextPage" 
-                :disabled="currentPage === totalPages"
-                aria-label="Next page"
-              >
-                <ChevronRight :size="16" />
-              </button>
-            </li>
-          </ul>
-        </nav>
+              {{ page.display }}
+            </button>
+          </div>
+          
+          <!-- Next button -->
+          <button 
+            class="page-btn nav-btn" 
+            @click="nextPage" 
+            :disabled="currentPage === totalPages"
+            aria-label="Next page"
+          >
+            <ChevronRight :size="18" />
+          </button>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-
 export default {
   name: 'DataTable',
 
   props: {
-    // Pagination props
     itemsPerPage: {
       type: Number,
       default: 10
@@ -92,27 +90,72 @@ export default {
     totalPages() {
       return Math.ceil(this.totalItems / this.itemsPerPage)
     },
+    
     startItem() {
       if (this.totalItems === 0) return 0
       return (this.currentPage - 1) * this.itemsPerPage + 1
     },
+    
     endItem() {
       return Math.min(this.currentPage * this.itemsPerPage, this.totalItems)
+    },
+    
+    displayedPages() {
+      const maxVisible = 7
+      const pages = []
+      
+      if (this.totalPages <= maxVisible) {
+        // Show all pages if we have 7 or fewer
+        for (let i = 1; i <= this.totalPages; i++) {
+          pages.push({ value: i, display: i, isEllipsis: false })
+        }
+        return pages
+      }
+      
+      // Always show first page
+      pages.push({ value: 1, display: 1, isEllipsis: false })
+      
+      const currentPage = this.currentPage
+      const totalPages = this.totalPages
+      
+      // Calculate the range around current page
+      let start = Math.max(2, currentPage - 2)
+      let end = Math.min(totalPages - 1, currentPage + 2)
+      
+      // Adjust range to always show 5 middle pages when possible
+      if (end - start < 4) {
+        if (start === 2) {
+          end = Math.min(totalPages - 1, start + 4)
+        } else if (end === totalPages - 1) {
+          start = Math.max(2, end - 4)
+        }
+      }
+      
+      // Add left ellipsis if needed
+      if (start > 2) {
+        pages.push({ value: null, display: '...', isEllipsis: true })
+      }
+      
+      // Add middle pages
+      for (let i = start; i <= end; i++) {
+        pages.push({ value: i, display: i, isEllipsis: false })
+      }
+      
+      // Add right ellipsis if needed
+      if (end < totalPages - 1) {
+        pages.push({ value: null, display: '...', isEllipsis: true })
+      }
+      
+      // Always show last page (if not already included)
+      if (totalPages > 1) {
+        pages.push({ value: totalPages, display: totalPages, isEllipsis: false })
+      }
+      
+      return pages
     }
   },
   
   methods: {
-    handleScroll(event) {
-      const scrollTop = event.target.scrollTop
-      const tableContainer = event.target
-      
-      if (scrollTop > 0) {
-        tableContainer.classList.add('scrolled')
-      } else {
-        tableContainer.classList.remove('scrolled')
-      }
-    },
-
     goToPage(page) {
       if (page >= 1 && page <= this.totalPages && page !== this.currentPage) {
         this.$emit('page-changed', page)
@@ -120,16 +163,18 @@ export default {
     },
     
     previousPage() {
-      this.goToPage(this.currentPage - 1)
+      if (this.currentPage > 1) {
+        this.goToPage(this.currentPage - 1)
+      }
     },
     
     nextPage() {
-      this.goToPage(this.currentPage + 1)
+      if (this.currentPage < this.totalPages) {
+        this.goToPage(this.currentPage + 1)
+      }
     }
   }
 }
-
-
 </script>
 
 <style scoped>
@@ -558,4 +603,150 @@ export default {
   }
 }
 
+/* Clean Pagination Styles */
+.pagination-container {
+  padding: 1.5rem;
+  border-top: 1px solid var(--border-secondary);
+  background-color: var(--surface-secondary);
+  border-radius: 0 0 0.75rem 0.75rem;
+}
+
+.pagination-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.pagination-info {
+  font-size: 0.875rem;
+  color: var(--tertiary-medium);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem;
+  background-color: var(--surface-primary);
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-secondary);
+}
+
+.page-numbers {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.page-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid var(--border-primary);
+  background-color: var(--surface-primary);
+  color: var(--text-accent);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.page-btn:hover:not(:disabled):not(.ellipsis) {
+  background-color: var(--state-hover);
+  border-color: var(--border-accent);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.page-btn.active {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: var(--text-inverse);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  font-weight: 600;
+}
+
+.page-btn.ellipsis {
+  border: none;
+  background: transparent;
+  cursor: default;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background-color: var(--surface-tertiary);
+  border-color: var(--border-secondary);
+  color: var(--text-disabled);
+}
+
+.nav-btn {
+  background-color: var(--surface-secondary);
+  border-color: var(--border-primary);
+}
+
+.nav-btn:hover:not(:disabled) {
+  background-color: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .pagination-container {
+    padding: 1rem;
+  }
+  
+  .pagination-controls {
+    gap: 0.25rem;
+    padding: 0.375rem;
+  }
+  
+  .page-btn {
+    min-width: 38px;
+    height: 38px;
+    font-size: 0.8125rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .pagination-wrapper {
+    gap: 0.75rem;
+  }
+  
+  .pagination-controls {
+    gap: 0.125rem;
+    padding: 0.25rem;
+  }
+  
+  .page-btn {
+    min-width: 34px;
+    height: 34px;
+    font-size: 0.75rem;
+  }
+  
+  .pagination-info {
+    font-size: 0.8125rem;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .page-btn {
+    transition: none;
+  }
+  
+  .page-btn:hover:not(:disabled):not(.ellipsis) {
+    transform: none;
+  }
+}
 </style>
