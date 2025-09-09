@@ -4,8 +4,9 @@ from rest_framework import status
 from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from ..services.category_service import CategoryService, CategoryDisplayService, ProductSubcategoryService
+from ..services.category_service import CategoryService, CategoryDisplayService, ProductSubcategoryService, POSCategoryService
 from ..decorators.authenticationDecorator import require_authentication, require_admin, require_permission
+from ..services.category_service import POSCategoryService
 import logging
 import json
 from datetime import datetime
@@ -229,6 +230,44 @@ class CategoryDetailView(APIView):
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+class CategorySoftDeleteView(APIView):
+        
+    @require_authentication
+    def delete(self, request, category_id):
+            """Soft delete a category"""
+            try:
+                logger.info(f"Soft deleting category {category_id} by user: {request.current_user['username']}")
+                
+                category_service = CategoryService()
+                deletion_context = request.data.get('deletion_context', 'user_initiated_deletion')
+                
+                result = category_service.soft_delete_category(
+                    category_id, 
+                    request.current_user, 
+                    deletion_context
+                )
+                
+                if not result:
+                    return Response(
+                        {"error": "Category not found or already deleted"}, 
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+                
+                return Response({
+                    "message": "Category soft deleted successfully",
+                    "category_id": category_id,
+                    "action": "soft_delete",
+                    "can_restore": True,
+                    "deleted_by": request.current_user['username']
+                }, status=status.HTTP_200_OK)
+            
+            except Exception as e:
+                logger.error(f"Error soft deleting category {category_id}: {e}")
+                return Response(
+                    {"error": str(e)}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
 
 
 # ================ DELETE MANAGEMENT VIEWS ================
@@ -914,42 +953,6 @@ class ProductToSubcategoryView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    @require_authentication
-    def delete(self, request, category_id):
-        """Soft delete a category"""
-        try:
-            logger.info(f"Soft deleting category {category_id} by user: {request.current_user['username']}")
-            
-            category_service = CategoryService()
-            deletion_context = request.data.get('deletion_context', 'user_initiated_deletion')
-            
-            result = category_service.soft_delete_category(
-                category_id, 
-                request.current_user, 
-                deletion_context
-            )
-            
-            if not result:
-                return Response(
-                    {"error": "Category not found or already deleted"}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
-            return Response({
-                "message": "Category soft deleted successfully",
-                "category_id": category_id,
-                "action": "soft_delete",
-                "can_restore": True,
-                "deleted_by": request.current_user['username']
-            }, status=status.HTTP_200_OK)
-        
-        except Exception as e:
-            logger.error(f"Error soft deleting category {category_id}: {e}")
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
 
 class SubcategoryProductsView(APIView):
     """Get products in a subcategory with details"""
@@ -973,6 +976,220 @@ class SubcategoryProductsView(APIView):
         
         except Exception as e:
             logger.error(f"Error getting subcategory products: {e}")
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class POSCatalogView(APIView):
+    """Lightweight POS catalog for product selection"""
+    
+    def get(self, request):
+        """Get POS catalog structure - categories with subcategories and product info"""
+        try:
+            pos_service = POSCategoryService()
+            catalog = pos_service.get_pos_catalog_structure()
+            
+            return Response({
+                "message": "POS catalog retrieved successfully",
+                "catalog": catalog,
+                "count": len(catalog)
+            }, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            logger.error(f"Error getting POS catalog: {e}")
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class POSProductBatchView(APIView):
+    """Batch fetch products for POS cart"""
+    
+    def post(self, request):
+        """Batch fetch multiple products by IDs for POS cart"""
+        try:
+            product_ids = request.data.get('product_ids', [])
+            
+            if not product_ids or not isinstance(product_ids, list):
+                return Response(
+                    {"error": "product_ids array is required"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            pos_service = POSCategoryService()
+            products = pos_service.get_products_for_pos_cart(product_ids)
+            
+            return Response({
+                "message": "Products retrieved successfully",
+                "products": products,
+                "count": len(products),
+                "requested_count": len(product_ids)
+            }, status=status.HTTP_200_OK)
+        
+        except ValueError as ve:
+            return Response(
+                {"error": str(ve)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error batch fetching products: {e}")
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class POSSubcategoryProductsView(APIView):
+    """Get all products in a subcategory for POS"""
+    
+    def get(self, request, category_id, subcategory_name):
+        """Get all products in subcategory for bulk POS selection"""
+        try:
+            pos_service = POSCategoryService()
+            products = pos_service.get_products_by_subcategory_for_pos(
+                category_id, 
+                subcategory_name
+            )
+            
+            return Response({
+                "message": "Subcategory products retrieved successfully",
+                "category_id": category_id,
+                "subcategory_name": subcategory_name,
+                "products": products,
+                "count": len(products)
+            }, status=status.HTTP_200_OK)
+        
+        except ValueError as ve:
+            return Response(
+                {"error": str(ve)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error getting subcategory products for POS: {e}")
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class POSBarcodeView(APIView):
+    """POS barcode scanning"""
+    
+    def get(self, request, barcode):
+        """Get product by barcode for POS scanner"""
+        try:
+            pos_service = POSCategoryService()
+            product = pos_service.get_product_by_barcode_for_pos(barcode)
+            
+            if not product:
+                return Response(
+                    {"error": "Product not found for barcode"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            return Response({
+                "message": "Product found",
+                "product": product,
+                "barcode": barcode
+            }, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            logger.error(f"Error barcode lookup: {e}")
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class POSSearchView(APIView):
+    """POS product search"""
+    
+    def get(self, request):
+        """Search products for POS by name or code"""
+        try:
+            search_term = request.query_params.get('q')
+            limit = int(request.query_params.get('limit', 20))
+            
+            if not search_term or not search_term.strip():
+                return Response(
+                    {"error": "Search term 'q' is required"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            pos_service = POSCategoryService()
+            products = pos_service.search_products_for_pos(search_term, limit)
+            
+            return Response({
+                "message": "Search completed",
+                "search_term": search_term,
+                "products": products,
+                "count": len(products)
+            }, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            logger.error(f"Error POS search: {e}")
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class POSStockCheckView(APIView):
+    """POS stock validation"""
+    
+    def post(self, request):
+        """Check product stock before adding to cart"""
+        try:
+            product_id = request.data.get('product_id')
+            requested_quantity = request.data.get('quantity', 1)
+            
+            if not product_id:
+                return Response(
+                    {"error": "product_id is required"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            pos_service = POSCategoryService()
+            stock_status = pos_service.check_product_stock_for_pos(
+                product_id, 
+                requested_quantity
+            )
+            
+            return Response({
+                "message": "Stock check completed",
+                "stock_status": stock_status
+            }, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            logger.error(f"Error POS stock check: {e}")
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class POSLowStockView(APIView):
+    """POS low stock alerts"""
+    
+    def get(self, request):
+        """Get products with low stock for POS alerts"""
+        try:
+            threshold = int(request.query_params.get('threshold', 10))
+            
+            pos_service = POSCategoryService()
+            low_stock_products = pos_service.get_low_stock_products_for_pos(threshold)
+            
+            return Response({
+                "message": "Low stock products retrieved",
+                "threshold": threshold,
+                "products": low_stock_products,
+                "count": len(low_stock_products)
+            }, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            logger.error(f"Error getting low stock products: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR

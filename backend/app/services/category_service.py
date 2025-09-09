@@ -123,33 +123,16 @@ class CategoryService:
             # Check if product already exists in this subcategory
             for subcategory in category.get('sub_categories', []):
                 if subcategory['name'] == subcategory_name:
-                    # Check if product already exists (handle both old and new formats)
-                    existing_product_ids = []
-                    
-                    # Handle combined format
-                    if 'products' in subcategory and isinstance(subcategory['products'], list):
-                        if subcategory['products'] and isinstance(subcategory['products'][0], dict):
-                            existing_product_ids = [p['product_id'] for p in subcategory['products']]
-                        elif subcategory['products'] and isinstance(subcategory['products'][0], str):
-                            # Old string format - check by name
-                            if product_name in subcategory['products']:
-                                return {
-                                    'success': True,
-                                    'action': 'no_change',
-                                    'message': f"Product '{product_name}' already exists in subcategory '{subcategory_name}'"
-                                }
-                    
-                    # Handle old ObjectID format
-                    elif 'product_ids' in subcategory:
-                        existing_product_ids = subcategory['product_ids']
-                    
-                    if product_id in existing_product_ids:
-                        return {
-                            'success': True,
-                            'action': 'no_change',
-                            'message': f"Product '{product_name}' already exists in subcategory '{subcategory_name}'"
-                        }
-            
+                    products = subcategory.get('products', [])
+                    if products and isinstance(products[0], dict):
+                        existing_product_ids = [p['product_id'] for p in products]
+                        if product_id in existing_product_ids:
+                            return {
+                                'success': True,
+                                'action': 'no_change',
+                                'message': f"Product '{product_name}' already exists in subcategory '{subcategory_name}'"
+                            }
+                                    
             # Remove product from any other subcategory first
             self._remove_product_from_all_subcategories(product_id)
             
@@ -203,7 +186,7 @@ class CategoryService:
             raise Exception(f"Error adding product to subcategory: {str(e)}")
 
     def _get_subcategory_product_ids(self, category_id, subcategory_name):
-        """Get all product IDs in a specific subcategory (handles combined format)"""
+        """Get all product IDs in a specific subcategory (combined format only)"""
         try:
             category = self.collection.find_one({'_id': ObjectId(category_id)})
             if not category:
@@ -212,14 +195,9 @@ class CategoryService:
             for subcategory in category.get('sub_categories', []):
                 if subcategory['name'] == subcategory_name:
                     products = subcategory.get('products', [])
-                    # Handle combined format
                     if products and isinstance(products[0], dict):
                         return [p['product_id'] for p in products]
-                    # Handle old formats (for transition period)
-                    elif 'product_ids' in subcategory:
-                        return subcategory['product_ids']
-                    else:
-                        return []
+                    return []
             
             return []
         except Exception as e:
@@ -227,25 +205,19 @@ class CategoryService:
             return []
     
     def _remove_product_from_all_subcategories(self, product_id):
-        """Remove product from all subcategories (handles combined format)"""
+        """Remove product from all subcategories (combined format only)"""
         try:
-            # Find categories containing this product (handle both formats)
             categories_with_product = self.collection.find({
-                '$or': [
-                    {'sub_categories.product_ids': product_id},  # Old format
-                    {'sub_categories.products.product_id': product_id}  # New combined format
-                ],
+                'sub_categories.products.product_id': product_id,
                 'isDeleted': {'$ne': True}
             })
             
             for category in categories_with_product:
-                # Remove from both formats to ensure clean migration
                 self.collection.update_one(
                     {'_id': category['_id']},
                     {
                         '$pull': {
-                            'sub_categories.$[].product_ids': product_id,  # Remove from old format
-                            'sub_categories.$[].products': {'product_id': product_id}  # Remove from new format
+                            'sub_categories.$[].products': {'product_id': product_id}
                         },
                         '$set': {'last_updated': datetime.utcnow()}
                     }
@@ -339,7 +311,7 @@ class CategoryService:
             raise Exception(f"Error removing product from subcategory: {str(e)}")
 
     def get_subcategory_products_with_details(self, category_id, subcategory_name):
-        """Get products in subcategory with full product details (optimized for combined format)"""
+        """Get products in subcategory with full product details (combined format only)"""
         try:
             category = self.collection.find_one({'_id': ObjectId(category_id)})
             if not category:
@@ -349,9 +321,7 @@ class CategoryService:
                 if subcategory['name'] == subcategory_name:
                     products = subcategory.get('products', [])
                     
-                    # Handle combined format (most efficient - already has names)
                     if products and isinstance(products[0], dict):
-                        # Convert ObjectIds to strings and return
                         return [
                             {
                                 '_id': str(p['product_id']),
@@ -359,14 +329,6 @@ class CategoryService:
                             } 
                             for p in products
                         ]
-                    
-                    # Fallback for old formats during transition
-                    product_ids = subcategory.get('product_ids', [])
-                    if product_ids:
-                        full_products = list(self.product_collection.find({
-                            '_id': {'$in': product_ids}
-                        }))
-                        return [self.convert_object_id(product) for product in full_products]
             
             return []
             
@@ -507,81 +469,31 @@ class CategoryService:
     # NOTIFICATION METHODS
     # ================================================================
     
-    def _send_category_notification(self, action_type, category_data, category_id=None, old_category_data=None):
-        """Send notification for category-related actions"""
+    def _send_category_notification(self, action_type, category_name, category_id=None):
+        """Simple notification helper"""
         try:
-            category_name = category_data.get('category_name', 'Unknown Category')
-            
-            # Notification configurations
-            configs = {
-                'created': {
-                    'title': "New Category Created",
-                    'message': f"A new category '{category_name}' has been added to the system",
-                    'priority': "high"
-                },
-                'updated': {
-                    'title': "Category Updated", 
-                    'message': f"Category '{category_name}' has been updated",
-                    'priority': "medium"
-                },
-                'soft_deleted': {
-                    'title': "Category Deleted",
-                    'message': f"Category '{category_name}' has been deleted",
-                    'priority': "medium"
-                },
-                'hard_deleted': {
-                    'title': "Category Permanently Deleted",
-                    'message': f"Category '{category_name}' has been permanently deleted by admin",
-                    'priority': "high"
-                },
-                'restored': {
-                    'title': "Category Restored",
-                    'message': f"Category '{category_name}' has been restored to the system",
-                    'priority': "medium"
-                }
-            }
-
-            if action_type not in configs:
-                return
-            config = configs[action_type]
-
-            # Add change details for updates
-            if action_type == 'updated' and old_category_data:
-                changes = []
-                for field in ['category_name', 'description', 'status']:
-                    old_val = old_category_data.get(field)
-                    new_val = category_data.get(field)
-                    if old_val != new_val:
-                        changes.append(f"{field}: '{old_val}' → '{new_val}'")
-                
-                if changes:
-                    config['message'] += f" - Changes: {', '.join(changes)}"
-
-            # Create metadata
-            metadata = {
-                "category_id": str(category_id or category_data.get('_id', '')),
-                "category_name": category_name,
-                "description": category_data.get('description', ''),
-                "status": category_data.get('status', 'active'),
-                "action_type": f"category_{action_type}",
-                "source": "category_management"
+            titles = {
+                'created': "New Category Created",
+                'updated': "Category Updated", 
+                'soft_deleted': "Category Deleted",
+                'hard_deleted': "Category Permanently Deleted",
+                'restored': "Category Restored"
             }
             
-            if action_type == 'updated' and 'changes' in locals():
-                metadata["changes"] = changes
-
-            # Send notification
-            notification_service.create_notification(
-                title=config['title'],
-                message=config['message'],
-                priority=config['priority'],
-                notification_type="system",
-                metadata=metadata
-            )
-            
+            if action_type in titles:
+                notification_service.create_notification(
+                    title=titles[action_type],
+                    message=f"Category '{category_name}' has been {action_type.replace('_', ' ')}",
+                    priority="medium" if action_type != 'hard_deleted' else "high",
+                    notification_type="system",
+                    metadata={
+                        "category_id": str(category_id) if category_id else "",
+                        "category_name": category_name,
+                        "action_type": f"category_{action_type}"
+                    }
+                )
         except Exception as e:
-            logger.error(f"Failed to create {action_type} notification for category: {e}")
-
+            logger.error(f"Failed to send notification: {e}")
     # ================================================================
     # CRUD OPERATIONS
     # ================================================================
@@ -624,7 +536,7 @@ class CategoryService:
             created_category = self.convert_object_id(created_category)
             
             # Send notification
-            self._send_category_notification('created', created_category)
+            self._send_category_notification('created', category_name, result.inserted_id)
             
             # Audit logging
             if current_user and self.audit_service:
@@ -772,7 +684,7 @@ class CategoryService:
             updated_category = self.convert_object_id(updated_category)
             
             # Send notification
-            self._send_category_notification('updated', updated_category, category_id, old_category)
+            self._send_category_notification('updated', updated_category['category_name'], category_id)
             
             # Audit logging
             if current_user and self.audit_service:
@@ -839,7 +751,7 @@ class CategoryService:
                 category_to_delete = self.convert_object_id(category_to_delete)
                 
                 # Send notification
-                self._send_category_notification('soft_deleted', category_to_delete, category_id)
+                self._send_category_notification('soft_deleted', category_to_delete['category_name'], category_id)
                 
                 # Audit logging
                 if current_user and self.audit_service:
@@ -911,7 +823,7 @@ class CategoryService:
                 restored_category = self.convert_object_id(restored_category)
                 
                 # Send notification
-                self._send_category_notification('restored', restored_category, category_id)
+                self._send_category_notification('restored', restored_category['category_name'], category_id)
                 
                 # Audit logging
                 if current_user and self.audit_service:
@@ -1419,7 +1331,7 @@ class CategoryDisplayService:
         self._ensure_sales_indexes()
 
     def _ensure_sales_indexes(self):
-        """Add indexes for sales collection performance"""
+        """Create essential indexes for sales performance"""
         try:
             # Critical for sales performance
             self.sales_collection.create_index([
@@ -1432,9 +1344,8 @@ class CategoryDisplayService:
             logger.warning(f"Could not create sales indexes: {e}")
 
     def get_categories_display_optimized(self, include_deleted=False, limit=50):
-        """FIXED: Corrected aggregation pipeline for combined format"""
+        """Optimized aggregation pipeline - combined format only"""
         try:
-            # Build category filter
             category_match = {}
             if not include_deleted:
                 category_match['isDeleted'] = {'$ne': True}
@@ -1443,7 +1354,7 @@ class CategoryDisplayService:
                 {"$match": category_match},
                 {"$limit": limit},
                 
-                # FIXED: Create safe_products field handling combined format
+                # Simplified - combined format only
                 {"$addFields": {
                     "safe_products": {
                         "$reduce": {
@@ -1456,13 +1367,7 @@ class CategoryDisplayService:
                                         "$map": {
                                             "input": {"$ifNull": ["$$this.products", []]},
                                             "as": "product",
-                                            "in": {
-                                                "$cond": {
-                                                    "if": {"$eq": [{"$type": "$$product"}, "object"]},
-                                                    "then": "$$product.product_name",  # Extract name from combined format
-                                                    "else": "$$product"  # Handle old string format during transition
-                                                }
-                                            }
+                                            "in": "$$product.product_name"  # Only handle combined format
                                         }
                                     }
                                 ]
@@ -1471,10 +1376,9 @@ class CategoryDisplayService:
                     }
                 }},
                 
-                # FIXED: Lookup sales data using correct field reference
                 {"$lookup": {
                     "from": "sales_log",
-                    "let": {"safe_products": "$safe_products"},  # FIXED: Matches field name
+                    "let": {"safe_products": "$safe_products"},
                     "pipeline": [
                         {"$unwind": "$item_list"},
                         {"$match": {
@@ -1491,45 +1395,36 @@ class CategoryDisplayService:
                     "as": "sales_data"
                 }},
                 
-                # Calculate totals and convert ObjectId
                 {"$addFields": {
                     "total_sales": {"$sum": "$sales_data.total_sales"},
                     "total_quantity": {"$sum": "$sales_data.total_quantity"},
                     "_id": {"$toString": "$_id"}
                 }},
                 
-                # Remove the temporary safe_products field
                 {"$unset": "safe_products"}
             ]
             
             results = list(self.category_collection.aggregate(pipeline))
             
-            # Process subcategories with sales data
+            # Process subcategories - simplified for combined format only
             for category in results:
                 subcategories_data = []
                 sales_lookup = {item["_id"]: item for item in category.get("sales_data", [])}
                 
-                sub_categories = category.get('sub_categories', []) or []
-                
-                for subcategory in sub_categories:
+                for subcategory in category.get('sub_categories', []):
                     subcategory_sales = 0
                     subcategory_quantity = 0
                     
-                    products = subcategory.get('products', []) or []
+                    products = subcategory.get('products', [])
                     
-                    # Handle both combined format and old string format
-                    product_names = []
+                    # Only handle combined format
                     for product in products:
                         if isinstance(product, dict):
-                            product_names.append(product.get('product_name'))
-                        else:
-                            product_names.append(product)
-                    
-                    for product_name in product_names:
-                        if product_name and product_name in sales_lookup:
-                            product_data = sales_lookup[product_name]
-                            subcategory_quantity += product_data['total_quantity']
-                            subcategory_sales += product_data['total_sales']
+                            product_name = product.get('product_name')
+                            if product_name and product_name in sales_lookup:
+                                product_data = sales_lookup[product_name]
+                                subcategory_quantity += product_data['total_quantity']
+                                subcategory_sales += product_data['total_sales']
                     
                     subcategories_data.append({
                         'name': subcategory.get('name', 'Unknown'),
@@ -1541,109 +1436,19 @@ class CategoryDisplayService:
                 category['subcategories'] = subcategories_data
                 category['subcategory_count'] = len(subcategories_data)
                 
-                # Clean up raw sales_data
                 if 'sales_data' in category:
                     del category['sales_data']
             
-            logger.info(f"Processed {len(results)} categories with fixed pipeline")
+            logger.info(f"Processed {len(results)} categories")
             return results
             
         except Exception as e:
-            logger.error(f"Error in optimized categories display: {e}", exc_info=True)
+            logger.error(f"Error in optimized categories display: {e}")
             raise Exception(f"Error getting categories: {str(e)}")
 
     def get_categories_display(self, include_deleted=False):
-        """Main display method with fallback to original implementation"""
-        try:
-            # Try optimized version first
-            return self.get_categories_display_optimized(include_deleted, limit=100)
-        except Exception as e:
-            logger.warning(f"Optimized method failed, using fallback: {e}")
-            return self._get_categories_display_fallback(include_deleted)
-
-    def _get_categories_display_fallback(self, include_deleted=False):
-        """Fallback method with performance limits"""
-        try:
-            # Fallback with reasonable limits to prevent memory issues
-            projection = {
-                "_id": 1, "item_list.item_name": 1, "item_list.quantity": 1,
-                "item_list.unit_price": 1, "transaction_date": 1
-            }
-            
-            # CRITICAL: Add limit to prevent memory issues
-            invoices = list(self.sales_collection.find({}, projection).limit(10000))
-            logger.info(f"Processing {len(invoices)} invoices (limited for performance)")
-            
-            # Build sales lookup
-            item_sales_lookup = {}
-            for invoice in invoices:
-                for item in invoice.get('item_list', []):
-                    item_name = item['item_name']
-                    if item_name not in item_sales_lookup:
-                        item_sales_lookup[item_name] = {'quantity': 0, 'total_sales': 0}
-                    
-                    item_total = round(item['quantity'] * item['unit_price'], 2)
-                    item_sales_lookup[item_name]['quantity'] += item['quantity']
-                    item_sales_lookup[item_name]['total_sales'] += item_total
-
-            # Process categories
-            category_filter = {}
-            if not include_deleted:
-                category_filter['isDeleted'] = {'$ne': True}
-                
-            categories = list(self.category_collection.find(category_filter).limit(100))
-            categories_with_sales = []
-
-            for category in categories:
-                category_name = category['category_name']
-                category_total_sales = 0
-                category_total_quantity = 0
-                subcategories_data = []
-                
-                for subcategory in category.get('sub_categories', []):
-                    subcategory_name = subcategory['name']
-                    subcategory_total_quantity = 0
-                    subcategory_total_sales = 0
-                    
-                    products_in_subcategory = subcategory.get('products', [])
-                    
-                    for product_name in products_in_subcategory:
-                        if product_name in item_sales_lookup:
-                            product_data = item_sales_lookup[product_name]
-                            subcategory_total_quantity += product_data['quantity']
-                            subcategory_total_sales += product_data['total_sales']
-                    
-                    category_total_sales += subcategory_total_sales
-                    category_total_quantity += subcategory_total_quantity
-                    
-                    subcategories_data.append({
-                        'name': subcategory_name,
-                        'quantity_sold': subcategory_total_quantity,
-                        'total_sales': subcategory_total_sales,
-                        'product_count': len(products_in_subcategory)
-                    })
-                
-                categories_with_sales.append({
-                    '_id': str(category['_id']),
-                    'category_name': category_name,
-                    'description': category.get('description', ''),
-                    'status': category.get('status', ''),
-                    'isDeleted': category.get('isDeleted', False),
-                    'deleted_at': category.get('deleted_at'),
-                    'date_created': category.get('date_created'),
-                    'last_updated': category.get('last_updated'),
-                    'total_quantity_sold': category_total_quantity,
-                    'total_sales': category_total_sales,
-                    'subcategories': subcategories_data,
-                    'subcategory_count': len(subcategories_data)
-                })
-
-            logger.info(f"Returning {len(categories_with_sales)} categories with sales data (fallback)")
-            return categories_with_sales
-            
-        except Exception as e:
-            logger.error(f"ERROR in fallback categories display: {e}", exc_info=True)
-            raise Exception(f"Error getting categories: {str(e)}")
+        """Main display method - optimized only"""
+        return self.get_categories_display_optimized(include_deleted, limit=100)
 
     def export_categories_csv(self, include_sales_data=True, date_filter=None, include_deleted=False):
         """
@@ -1910,13 +1715,9 @@ class CategoryDisplayService:
             return 'Invalid Date'
 
     def get_categories_display_with_date_filter(self, start_date=None, end_date=None, frequency='monthly', include_deleted=False):
-        """
-        Get categories with sales data filtered by date range
-        """
+        """Get categories with date-filtered sales data - combined format only"""
         try:
-            logger.info(f"=== Starting get_categories_display with date filter: {start_date} to {end_date} ===")
-            
-            # Build date filter query
+            # Build date filter
             date_filter = {}
             if start_date or end_date:
                 date_filter["transaction_date"] = {}
@@ -1936,27 +1737,14 @@ class CategoryDisplayService:
                         end_datetime = datetime.combine(end_date, time.max)
                         date_filter["transaction_date"]["$lte"] = end_datetime
             
-            # Apply the filter to the query
-            query_filter = date_filter if date_filter else {}
-            logger.info(f"MongoDB Query Filter: {query_filter}")
-            
-            # Use same logic as get_categories_display but with date filter
-            projection = {
-                "_id": 1,
+            # Get filtered invoices
+            invoices = list(self.sales_collection.find(date_filter, {
                 "item_list.item_name": 1,
-                "customer_id": 1,
-                "transaction_date": 1,
-                "payment_method": 1,
-                "sales_type": 1,
-                "total_amount": 1,
                 "item_list.quantity": 1,
-                "item_list.unit_price": 1, 
-            }
-            
-            invoices = list(self.sales_collection.find(query_filter, projection))
-            logger.info(f"Fetched {len(invoices)} invoices for date range")
+                "item_list.unit_price": 1
+            }))
 
-            # Build sales lookup from filtered invoices
+            # Build sales lookup
             item_sales_lookup = {}
             for invoice in invoices:
                 for item in invoice.get('item_list', []):
@@ -1968,7 +1756,7 @@ class CategoryDisplayService:
                     item_sales_lookup[item_name]['quantity'] += item['quantity']
                     item_sales_lookup[item_name]['total_sales'] += item_total
 
-            # Process categories with delete filter
+            # Process categories
             category_filter = {}
             if not include_deleted:
                 category_filter['isDeleted'] = {'$ne': True}
@@ -1977,37 +1765,38 @@ class CategoryDisplayService:
             categories_with_sales = []
 
             for category in categories:
-                category_name = category['category_name']
                 category_total_sales = 0
                 category_total_quantity = 0
                 subcategories_data = []
                 
                 for subcategory in category.get('sub_categories', []):
-                    subcategory_name = subcategory['name']
                     subcategory_total_quantity = 0
                     subcategory_total_sales = 0
                     
-                    products_in_subcategory = subcategory.get('products', [])
+                    products = subcategory.get('products', [])
                     
-                    for product_name in products_in_subcategory:
-                        if product_name in item_sales_lookup:
-                            product_data = item_sales_lookup[product_name]
-                            subcategory_total_quantity += product_data['quantity']
-                            subcategory_total_sales += product_data['total_sales']
+                    # Only handle combined format
+                    for product in products:
+                        if isinstance(product, dict):
+                            product_name = product.get('product_name')
+                            if product_name and product_name in item_sales_lookup:
+                                product_data = item_sales_lookup[product_name]
+                                subcategory_total_quantity += product_data['quantity']
+                                subcategory_total_sales += product_data['total_sales']
                     
                     category_total_sales += subcategory_total_sales
                     category_total_quantity += subcategory_total_quantity
                     
                     subcategories_data.append({
-                        'name': subcategory_name,
+                        'name': subcategory['name'],
                         'quantity_sold': subcategory_total_quantity,
                         'total_sales': subcategory_total_sales,
-                        'product_count': len(products_in_subcategory)
+                        'product_count': len(products)
                     })
                 
                 categories_with_sales.append({
                     '_id': str(category['_id']),
-                    'category_name': category_name,
+                    'category_name': category['category_name'],
                     'description': category.get('description', ''),
                     'status': category.get('status', ''),
                     'isDeleted': category.get('isDeleted', False),
@@ -2017,22 +1806,19 @@ class CategoryDisplayService:
                     'total_quantity_sold': category_total_quantity,
                     'total_sales': category_total_sales,
                     'subcategories': subcategories_data,
-                    'subcategory_count': len(subcategories_data),
-                    'date_filter_applied': bool(start_date or end_date),
-                    'frequency': frequency
+                    'subcategory_count': len(subcategories_data)
                 })
 
             return {
                 'categories': categories_with_sales,
                 'total_categories': len(categories_with_sales),
                 'date_filter_applied': bool(start_date or end_date),
-                'frequency': frequency,
                 'total_invoices': len(invoices),
                 'include_deleted': include_deleted
             }
             
         except Exception as e:
-            logger.error(f"ERROR in get_categories_display_with_date_filter: {e}")
+            logger.error(f"Error in date filter display: {e}")
             raise Exception(f"Error getting categories with date filter: {str(e)}")
 # ================================================================
 # PRODUCT SUBCATEGORY SERVICE - Simplified and Aligned
@@ -2064,21 +1850,16 @@ class ProductSubcategoryService:
         """Update product subcategory with validation and audit logging"""
         try:
             logger.info(f"Updating product {product_id} subcategory to '{new_subcategory}' in category {category_id}")
-            if current_user:
-                logger.info(f"Updated by: {current_user['username']}")
             
-            # Validate inputs
             if not product_id or not ObjectId.is_valid(product_id):
                 raise ValueError("Invalid product ID")
             
             if not category_id or not ObjectId.is_valid(category_id):
                 raise ValueError("Invalid category ID")
             
-            # Convert to ObjectIds
             product_obj_id = ObjectId(product_id)
             category_obj_id = ObjectId(category_id)
             
-            # Get product
             product = self.product_collection.find_one({'_id': product_obj_id})
             if not product:
                 raise ValueError(f"Product with ID {product_id} not found")
@@ -2087,7 +1868,6 @@ class ProductSubcategoryService:
             if not product_name:
                 raise ValueError(f"Product {product_id} has no product_name")
             
-            # Get target category
             target_category = self.category_collection.find_one({
                 '_id': category_obj_id,
                 'isDeleted': {'$ne': True}
@@ -2096,18 +1876,20 @@ class ProductSubcategoryService:
             if not target_category:
                 raise ValueError("Target category not found or is deleted")
             
-            # Find current category
+            # Find current category - UPDATED for combined format only
             current_category = self.category_collection.find_one({
-                'sub_categories.products': product_name,
+                'sub_categories.products.product_name': product_name,
                 'isDeleted': {'$ne': True}
             })
             
             current_subcategory = None
             if current_category:
                 for subcategory in current_category.get('sub_categories', []):
-                    if product_name in subcategory.get('products', []):
-                        current_subcategory = subcategory['name']
-                        break
+                    products = subcategory.get('products', [])
+                    if products and isinstance(products[0], dict):
+                        if any(p.get('product_name') == product_name for p in products):
+                            current_subcategory = subcategory['name']
+                            break
             
             # Handle empty/null subcategory (move to uncategorized)
             if not new_subcategory or new_subcategory.strip() == '':
@@ -2131,7 +1913,6 @@ class ProductSubcategoryService:
     def _move_product_to_subcategory(self, product_id, product_name, target_category, new_subcategory, current_category, current_subcategory, current_user=None):
         """Move product to a specific subcategory with validation"""
         try:
-            # Check if target subcategory exists
             target_subcategory_exists = any(
                 sub['name'] == new_subcategory 
                 for sub in target_category.get('sub_categories', [])
@@ -2140,7 +1921,6 @@ class ProductSubcategoryService:
             if not target_subcategory_exists:
                 raise ValueError(f"Subcategory '{new_subcategory}' does not exist in category '{target_category.get('category_name')}'")
             
-            # Check if already in the right place
             if (current_category and 
                 str(current_category['_id']) == str(target_category['_id']) and 
                 current_subcategory == new_subcategory):
@@ -2150,32 +1930,36 @@ class ProductSubcategoryService:
                     'message': f"Product is already in {target_category.get('category_name')} > {new_subcategory}"
                 }
             
-            # Remove from current location
+            # Remove from current location - UPDATED for combined format
             if current_category and current_subcategory:
                 self.category_collection.update_one(
                     {'_id': current_category['_id']},
-                    {'$pull': {'sub_categories.$[elem].products': product_name}},
+                    {'$pull': {'sub_categories.$[elem].products': {'product_name': product_name}}},
                     array_filters=[{'elem.name': current_subcategory}]
                 )
             
-            # Add to new location
+            # Add to new location - UPDATED for combined format
             result = self.category_collection.update_one(
                 {'_id': target_category['_id']},
                 {
-                    '$addToSet': {'sub_categories.$[elem].products': product_name},
+                    '$addToSet': {
+                        'sub_categories.$[elem].products': {
+                            'product_id': ObjectId(product_id),
+                            'product_name': product_name
+                        }
+                    },
                     '$set': {'last_updated': datetime.utcnow()}
                 },
                 array_filters=[{'elem.name': new_subcategory}]
             )
             
             if result.modified_count > 0:
-                # Update product document
                 self.product_collection.update_one(
                     {'_id': ObjectId(product_id)},
                     {
                         '$set': {
                             'category_id': str(target_category['_id']),
-                            'subcategory': new_subcategory,
+                            'subcategory_name': new_subcategory,
                             'updated_at': datetime.utcnow()
                         }
                     }
@@ -2203,35 +1987,38 @@ class ProductSubcategoryService:
         try:
             logger.info(f"Moving {product_name} to Uncategorized category")
             
-            # Ensure uncategorized category exists
             uncategorized_category = self._ensure_uncategorized_category_exists()
             
-            # Remove from current category
+            # Remove from current category - UPDATED for combined format
             if current_category and current_subcategory:
                 self.category_collection.update_one(
                     {'_id': current_category['_id']},
-                    {'$pull': {'sub_categories.$[elem].products': product_name}},
+                    {'$pull': {'sub_categories.$[elem].products': {'product_name': product_name}}},
                     array_filters=[{'elem.name': current_subcategory}]
                 )
             
-            # Add to uncategorized
+            # Add to uncategorized - UPDATED for combined format
             result = self.category_collection.update_one(
                 {'_id': ObjectId(uncategorized_category['_id'])},
                 {
-                    '$addToSet': {'sub_categories.$[elem].products': product_name},
+                    '$addToSet': {
+                        'sub_categories.$[elem].products': {
+                            'product_id': ObjectId(product_id),
+                            'product_name': product_name
+                        }
+                    },
                     '$set': {'last_updated': datetime.utcnow()}
                 },
                 array_filters=[{'elem.name': self.UNCATEGORIZED_SUBCATEGORY_NAME}]
             )
             
             if result.modified_count > 0:
-                # Update product document
                 self.product_collection.update_one(
                     {'_id': ObjectId(product_id)},
                     {
                         '$set': {
                             'category_id': uncategorized_category['_id'],
-                            'subcategory': self.UNCATEGORIZED_SUBCATEGORY_NAME,
+                            'subcategory_name': self.UNCATEGORIZED_SUBCATEGORY_NAME,
                             'updated_at': datetime.utcnow(),
                             'is_uncategorized': True
                         }
@@ -2345,14 +2132,10 @@ class ProductSubcategoryService:
             return {'is_valid': False, 'error': f'Validation error: {str(e)}'}
 
     def move_product_to_uncategorized_category(self, product_id, current_category_id=None):
-        """
-        Public method to move a product to Uncategorized category
-        This is what your views.py is calling
-        """
+        """Public method to move a product to Uncategorized category"""
         try:
             logger.info(f"Moving product {product_id} to Uncategorized category")
             
-            # Get product first to get its name
             if not ObjectId.is_valid(product_id):
                 raise ValueError("Invalid product ID")
             
@@ -2364,7 +2147,7 @@ class ProductSubcategoryService:
             if not product_name:
                 raise ValueError(f"Product {product_id} has no product_name")
             
-            # Find current category if not provided
+            # Find current category - UPDATED for combined format
             current_category = None
             current_subcategory = None
             
@@ -2374,20 +2157,19 @@ class ProductSubcategoryService:
                     'isDeleted': {'$ne': True}
                 })
             else:
-                # Find current category by product name
                 current_category = self.category_collection.find_one({
-                    'sub_categories.products': product_name,
+                    'sub_categories.products.product_name': product_name,
                     'isDeleted': {'$ne': True}
                 })
             
             if current_category:
-                # Find which subcategory contains the product
                 for subcategory in current_category.get('sub_categories', []):
-                    if product_name in subcategory.get('products', []):
-                        current_subcategory = subcategory['name']
-                        break
+                    products = subcategory.get('products', [])
+                    if products and isinstance(products[0], dict):
+                        if any(p.get('product_name') == product_name for p in products):
+                            current_subcategory = subcategory['name']
+                            break
             
-            # Use the existing private method
             result = self._move_to_uncategorized_category(
                 product_id, 
                 product_name, 
@@ -2402,7 +2184,7 @@ class ProductSubcategoryService:
                 'previous_category_id': current_category_id,
                 'new_category_id': self._get_uncategorized_category_id(),
                 'message': result.get('message', 'Product moved to Uncategorized category'),
-                'result': result  # Include the full result for compatibility
+                'result': result
             }
             
         except Exception as e:
@@ -2412,7 +2194,6 @@ class ProductSubcategoryService:
                 'error': str(e),
                 'product_id': product_id
             }
-
     def bulk_move_products_to_uncategorized(self, product_ids, current_category_id=None):
         """
         Public method to bulk move products to Uncategorized category
@@ -2489,3 +2270,296 @@ class ProductSubcategoryService:
         except Exception as e:
             logger.error(f"Error getting uncategorized category ID: {e}")
             return "686a4de143821e2b21f725c6"  # Fallback to your known ID
+        
+
+class POSCategoryService:
+    """Lightweight service optimized specifically for POS operations"""
+    
+    def __init__(self):
+        self.db = db_manager.get_database()
+        self.category_collection = self.db.category
+        self.product_collection = self.db.products
+        self._ensure_pos_indexes()
+
+    def _ensure_pos_indexes(self):
+        """Create indexes specifically optimized for POS operations"""
+        try:
+            # Essential POS indexes
+            pos_indexes = [
+                # For category catalog loading
+                [("status", 1), ("isDeleted", 1)],
+                [("category_name", 1)],
+                
+                # For product batch fetching
+                [("_id", 1)],
+                [("stock_quantity", 1)],
+                
+                # For subcategory product lookups
+                [("sub_categories.products.product_id", 1)]
+            ]
+            
+            for index_fields in pos_indexes:
+                self.category_collection.create_index(index_fields, background=True)
+            
+            # Product collection indexes
+            product_indexes = [
+                [("_id", 1)],
+                [("product_name", 1)],
+                [("stock_quantity", 1)]
+            ]
+            
+            for index_fields in product_indexes:
+                self.product_collection.create_index(index_fields, background=True)
+                
+            logger.info("POS indexes created successfully")
+        except Exception as e:
+            logger.warning(f"Could not create POS indexes: {e}")
+
+    def convert_object_id(self, document):
+        """Convert ObjectId to string for JSON serialization"""
+        if document is None:
+            return document
+        
+        if isinstance(document, list):
+            return [self.convert_object_id(item) for item in document]
+        
+        if isinstance(document, dict):
+            converted = {}
+            for key, value in document.items():
+                if isinstance(value, ObjectId):
+                    converted[key] = str(value)
+                elif isinstance(value, (dict, list)):
+                    converted[key] = self.convert_object_id(value)
+                else:
+                    converted[key] = value
+            return converted
+        
+        if isinstance(document, ObjectId):
+            return str(document)
+        
+        return document
+
+    def get_pos_catalog_structure(self):
+        """
+        Get lightweight catalog structure for POS display
+        Returns active categories with subcategories and basic product info
+        """
+        try:
+            categories = list(self.category_collection.find(
+                {
+                    "status": "active",
+                    "isDeleted": {"$ne": True}
+                },
+                {
+                    "_id": 1,
+                    "category_name": 1,
+                    "sub_categories.name": 1,
+                    "sub_categories.products.product_id": 1,
+                    "sub_categories.products.product_name": 1
+                }
+            ).sort("category_name", 1))
+            
+            return [self.convert_object_id(category) for category in categories]
+            
+        except Exception as e:
+            logger.error(f"POS catalog structure failed: {e}")
+            raise Exception(f"Failed to get POS catalog: {str(e)}")
+
+    def get_products_for_pos_cart(self, product_ids):
+        """
+        Batch fetch multiple products for POS cart operations
+        Optimized for speed with only essential cart fields
+        """
+        try:
+            if not product_ids or not isinstance(product_ids, list):
+                raise ValueError("product_ids must be a non-empty list")
+            
+            # Convert and validate product IDs
+            object_ids = []
+            for pid in product_ids:
+                if isinstance(pid, str) and ObjectId.is_valid(pid):
+                    object_ids.append(ObjectId(pid))
+                elif isinstance(pid, ObjectId):
+                    object_ids.append(pid)
+                else:
+                    logger.warning(f"Invalid product ID skipped: {pid}")
+            
+            if not object_ids:
+                raise ValueError("No valid product IDs provided")
+            
+            # Single batch query with only essential POS fields
+            products = list(self.product_collection.find(
+                {'_id': {'$in': object_ids}},
+                {
+                    '_id': 1,
+                    'product_name': 1,
+                    'unit_price': 1,
+                    'stock_quantity': 1,
+                    'product_code': 1,
+                    'barcode': 1,
+                    'tax_rate': 1,
+                    'category_id': 1,
+                    'subcategory_name': 1
+                }
+            ))
+            
+            return [self.convert_object_id(product) for product in products]
+            
+        except Exception as e:
+            logger.error(f"POS batch product fetch failed: {e}")
+            raise Exception(f"Failed to get products for cart: {str(e)}")
+
+    def get_products_by_subcategory_for_pos(self, category_id, subcategory_name):
+        """
+        Get all products in a subcategory for bulk selection
+        Useful when user wants to add entire subcategory to cart
+        """
+        try:
+            if not ObjectId.is_valid(category_id):
+                raise ValueError("Invalid category ID")
+            
+            # Get the subcategory's product IDs
+            category = self.category_collection.find_one(
+                {
+                    '_id': ObjectId(category_id),
+                    'status': 'active',
+                    'isDeleted': {'$ne': True}
+                },
+                {'sub_categories': 1}
+            )
+            
+            if not category:
+                return []
+            
+            # Find the specific subcategory and extract product IDs
+            product_ids = []
+            for subcategory in category.get('sub_categories', []):
+                if subcategory['name'] == subcategory_name:
+                    products = subcategory.get('products', [])
+                    # Handle combined format only (after your migration)
+                    if products and isinstance(products[0], dict):
+                        product_ids = [p['product_id'] for p in products]
+                    break
+            
+            if not product_ids:
+                return []
+            
+            # Batch fetch all products in this subcategory
+            return self.get_products_for_pos_cart([str(pid) for pid in product_ids])
+            
+        except Exception as e:
+            logger.error(f"POS subcategory products fetch failed: {e}")
+            raise Exception(f"Failed to get subcategory products: {str(e)}")
+
+    def get_product_by_barcode_for_pos(self, barcode):
+        """
+        Quick product lookup by barcode for POS scanner integration
+        """
+        try:
+            if not barcode or not barcode.strip():
+                raise ValueError("Barcode is required")
+            
+            product = self.product_collection.find_one(
+                {'barcode': barcode.strip()},
+                {
+                    '_id': 1,
+                    'product_name': 1,
+                    'unit_price': 1,
+                    'stock_quantity': 1,
+                    'product_code': 1,
+                    'barcode': 1,
+                    'tax_rate': 1,
+                    'category_id': 1,
+                    'subcategory_name': 1
+                }
+            )
+            
+            return self.convert_object_id(product) if product else None
+            
+        except Exception as e:
+            logger.error(f"POS barcode lookup failed: {e}")
+            raise Exception(f"Failed to get product by barcode: {str(e)}")
+
+    def search_products_for_pos(self, search_term, limit=20):
+        """
+        Quick product search for POS - by name or product code
+        """
+        try:
+            if not search_term or not search_term.strip():
+                return []
+            
+            search_term = search_term.strip()
+            regex_pattern = {'$regex': search_term, '$options': 'i'}
+            
+            products = list(self.product_collection.find(
+                {
+                    '$or': [
+                        {'product_name': regex_pattern},
+                        {'product_code': regex_pattern}
+                    ]
+                },
+                {
+                    '_id': 1,
+                    'product_name': 1,
+                    'unit_price': 1,
+                    'stock_quantity': 1,
+                    'product_code': 1,
+                    'barcode': 1
+                }
+            ).limit(limit))
+            
+            return [self.convert_object_id(product) for product in products]
+            
+        except Exception as e:
+            logger.error(f"POS product search failed: {e}")
+            raise Exception(f"Failed to search products: {str(e)}")
+
+    def check_product_stock_for_pos(self, product_id, requested_quantity):
+        """
+        Quick stock check for POS before adding to cart
+        """
+        try:
+            if not ObjectId.is_valid(product_id):
+                return {'available': False, 'error': 'Invalid product ID'}
+            
+            product = self.product_collection.find_one(
+                {'_id': ObjectId(product_id)},
+                {'stock_quantity': 1, 'product_name': 1}
+            )
+            
+            if not product:
+                return {'available': False, 'error': 'Product not found'}
+            
+            current_stock = product.get('stock_quantity', 0)
+            
+            return {
+                'available': current_stock >= requested_quantity,
+                'current_stock': current_stock,
+                'requested_quantity': requested_quantity,
+                'product_name': product.get('product_name', 'Unknown')
+            }
+            
+        except Exception as e:
+            logger.error(f"POS stock check failed: {e}")
+            return {'available': False, 'error': str(e)}
+
+    def get_low_stock_products_for_pos(self, threshold=10):
+        """
+        Get products with low stock for POS alerts
+        """
+        try:
+            products = list(self.product_collection.find(
+                {'stock_quantity': {'$lte': threshold}},
+                {
+                    '_id': 1,
+                    'product_name': 1,
+                    'stock_quantity': 1,
+                    'product_code': 1
+                }
+            ).sort('stock_quantity', 1).limit(50))
+            
+            return [self.convert_object_id(product) for product in products]
+            
+        except Exception as e:
+            logger.error(f"POS low stock check failed: {e}")
+            raise Exception(f"Failed to get low stock products: {str(e)}")
