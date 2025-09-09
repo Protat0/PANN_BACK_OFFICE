@@ -89,7 +89,9 @@ from .kpi_views.category_views import (
     ProductSubcategoryUpdateView,       # Update product subcategory
     ProductMoveToUncategorizedView,     # Move single product to uncategorized
     ProductBulkMoveToUncategorizedView, # Bulk move products to uncategorized
-    UncategorizedCategoryView,  # Uncategorized Category Management
+    UncategorizedCategoryView,          # Uncategorized Category Management
+    ProductToSubcategoryView,           # NEW: Assign products to subcategories
+    SubcategoryProductsView,            # NEW: Get products in subcategory
 )
 
 from .kpi_views.saleslog_views import (
@@ -205,9 +207,24 @@ urlpatterns = [
     path('products/<str:product_id>/stock/history/', StockHistoryView.as_view(), name='stock-history'),  # GET
     path('products/<str:product_id>/restock/', RestockProductView.as_view(), name='restock-product'),  # POST
     
+    # Add product to subcategory (NEW for ObjectID support)
+    path('product/assign-to-subcategory/', ProductToSubcategoryView.as_view(), name='product-assign-to-subcategory'),
+    # Update product subcategory
+    path('product/subcategory/update/', ProductSubcategoryUpdateView.as_view(), name='product-subcategory-update'),
+    # Move products to uncategorized
+    path('product/move-to-uncategorized/', ProductMoveToUncategorizedView.as_view(), name='product-move-to-uncategorized'),
+    path('product/bulk-move-to-uncategorized/', ProductBulkMoveToUncategorizedView.as_view(), name='product-bulk-move-to-uncategorized'),
+
     # Product sync endpoints with ID parameters - MOVED DOWN
     path('products/<str:product_id>/sync/status/', SyncStatusView.as_view(), name='sync-status'),  # GET, PUT
     
+     # ========== PRODUCT OPERATIONS ==========
+    # Update product subcategory
+    path('product/subcategory/update/', ProductSubcategoryUpdateView.as_view(), name='product-subcategory-update'),
+    # Move products to uncategorized
+    path('product/move-to-uncategorized/', ProductMoveToUncategorizedView.as_view(), name='product-move-to-uncategorized'),
+    path('product/bulk-move-to-uncategorized/', ProductBulkMoveToUncategorizedView.as_view(), name='product-bulk-move-to-uncategorized'),
+
     # Authentication endpoints
     path('auth/login/', LoginView.as_view(), name='login'),
     path('auth/logout/', LogoutView.as_view(), name='logout'),
@@ -255,12 +272,10 @@ urlpatterns = [
     path('category/<str:category_id>/restore/', CategoryRestoreView.as_view(), name='category-restore'),
     path('category/<str:category_id>/subcategories/', CategorySubcategoryView.as_view(), name='category-subcategories'),
     
-    # ========== PRODUCT OPERATIONS ==========
-    # Update product subcategory
-    path('product/subcategory/update/', ProductSubcategoryUpdateView.as_view(), name='product-subcategory-update'),
-    # Move products to uncategorized
-    path('product/move-to-uncategorized/', ProductMoveToUncategorizedView.as_view(), name='product-move-to-uncategorized'),
-    path('product/bulk-move-to-uncategorized/', ProductBulkMoveToUncategorizedView.as_view(), name='product-bulk-move-to-uncategorized'),
+    # Get products in subcategory with details (NEW)
+    path('category/<str:category_id>/subcategories/<str:subcategory_name>/products/', SubcategoryProductsView.as_view(), name='subcategory-products'),
+    # Individual category operations (Get, Update, Soft Delete)
+    path('category/<str:category_id>/', CategoryDetailView.as_view(), name='category-detail'),
 
     # Bulk import and template endpoints
     path('invoices/bulk-import/', SalesLogBulkImportView.as_view(), name='invoice-bulk-import'),

@@ -188,35 +188,43 @@ class CategoryDetailView(APIView):
     
     @require_authentication
     def delete(self, request, category_id):
-        """Soft delete a category"""
+        """Remove a subcategory from a category"""
         try:
-            logger.info(f"Soft deleting category {category_id} by user: {request.current_user['username']}")
+            logger.info(f"Removing subcategory from {category_id} by user: {request.current_user['username']}")
             
             category_service = CategoryService()
-            deletion_context = request.data.get('deletion_context', 'user_initiated_deletion')
+            subcategory_name = request.data.get('subcategory_name')
             
-            result = category_service.soft_delete_category(
+            if not subcategory_name:
+                return Response(
+                    {"error": "Subcategory name is required"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            result = category_service.remove_subcategory(
                 category_id, 
-                request.current_user, 
-                deletion_context
+                subcategory_name, 
+                request.current_user
             )
             
             if not result:
                 return Response(
-                    {"error": "Category not found or already deleted"}, 
+                    {"error": "Failed to remove subcategory or category not found"}, 
                     status=status.HTTP_404_NOT_FOUND
                 )
             
             return Response({
-                "message": "Category soft deleted successfully",
-                "category_id": category_id,
-                "action": "soft_delete",
-                "can_restore": True,
-                "deleted_by": request.current_user['username']
+                "message": "Subcategory removed successfully",
+                "removed_by": request.current_user['username']
             }, status=status.HTTP_200_OK)
         
+        except ValueError as ve:
+            return Response(
+                {"error": str(ve)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         except Exception as e:
-            logger.error(f"Error soft deleting category {category_id}: {e}")
+            logger.error(f"Error removing subcategory: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -853,3 +861,119 @@ class UncategorizedCategoryView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+class ProductToSubcategoryView(APIView):
+    """Assign products to subcategories"""
+    
+    @require_authentication
+    def post(self, request):
+        """Add product to subcategory (for imports and manual assignments)"""
+        try:
+            logger.info(f"Adding product to subcategory by user: {request.current_user['username']}")
+            
+            # Extract data
+            category_id = request.data.get('category_id')
+            subcategory_name = request.data.get('subcategory_name')
+            product_identifier = request.data.get('product_identifier')  # Can be ID or name
+            
+            if not all([category_id, subcategory_name, product_identifier]):
+                return Response(
+                    {"error": "category_id, subcategory_name, and product_identifier are required"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Use CategoryService to add product
+            category_service = CategoryService()
+            result = category_service.add_product_to_subcategory(
+                category_id, 
+                subcategory_name, 
+                product_identifier, 
+                request.current_user
+            )
+            
+            if result.get('success'):
+                return Response({
+                    "message": result.get('message'),
+                    "result": result,
+                    "added_by": request.current_user['username']
+                }, status=status.HTTP_201_CREATED)
+            else:
+                return Response(
+                    {"error": result.get('message', 'Failed to add product to subcategory')}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        except ValueError as ve:
+            return Response(
+                {"error": str(ve)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error adding product to subcategory: {e}")
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @require_authentication
+    def delete(self, request, category_id):
+        """Soft delete a category"""
+        try:
+            logger.info(f"Soft deleting category {category_id} by user: {request.current_user['username']}")
+            
+            category_service = CategoryService()
+            deletion_context = request.data.get('deletion_context', 'user_initiated_deletion')
+            
+            result = category_service.soft_delete_category(
+                category_id, 
+                request.current_user, 
+                deletion_context
+            )
+            
+            if not result:
+                return Response(
+                    {"error": "Category not found or already deleted"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            return Response({
+                "message": "Category soft deleted successfully",
+                "category_id": category_id,
+                "action": "soft_delete",
+                "can_restore": True,
+                "deleted_by": request.current_user['username']
+            }, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            logger.error(f"Error soft deleting category {category_id}: {e}")
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class SubcategoryProductsView(APIView):
+    """Get products in a subcategory with details"""
+    
+    def get(self, request, category_id, subcategory_name):
+        """Get all products in a subcategory with full details"""
+        try:
+            category_service = CategoryService()
+            products = category_service.get_subcategory_products_with_details(
+                category_id, 
+                subcategory_name
+            )
+            
+            return Response({
+                "message": "Subcategory products retrieved successfully",
+                "category_id": category_id,
+                "subcategory_name": subcategory_name,
+                "products": products,
+                "count": len(products)
+            }, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            logger.error(f"Error getting subcategory products: {e}")
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

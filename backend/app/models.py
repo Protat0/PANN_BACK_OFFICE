@@ -115,6 +115,8 @@ class Category:
         self.status = kwargs.get('status', 'active')
         self.date_created = kwargs.get('date_created', datetime.utcnow())
         self.last_updated = kwargs.get('last_updated', datetime.utcnow())
+        
+        # UPDATED: Subcategories now store ObjectIDs
         self.sub_categories = kwargs.get('sub_categories', [])
         
         # Soft delete fields
@@ -122,12 +124,12 @@ class Category:
         self.deleted_at = kwargs.get('deleted_at', None)
         self.restored_at = kwargs.get('restored_at', None)
         
-        # NEW: Image fields
-        self.image_url = kwargs.get('image_url', None)  # URL to the stored image
-        self.image_filename = kwargs.get('image_filename', None)  # Original filename
-        self.image_size = kwargs.get('image_size', None)  # File size in bytes
-        self.image_type = kwargs.get('image_type', None)  # MIME type (e.g., 'image/jpeg')
-        self.image_uploaded_at = kwargs.get('image_uploaded_at', None)  # When image was uploaded
+        # Image fields
+        self.image_url = kwargs.get('image_url', None)
+        self.image_filename = kwargs.get('image_filename', None)
+        self.image_size = kwargs.get('image_size', None)
+        self.image_type = kwargs.get('image_type', None)
+        self.image_uploaded_at = kwargs.get('image_uploaded_at', None)
     
     def to_dict(self):
         """Convert Category object to dictionary for MongoDB insertion"""
@@ -161,6 +163,18 @@ class Category:
             category_dict['image_uploaded_at'] = self.image_uploaded_at
             
         return category_dict
+
+    @staticmethod
+    def create_subcategory(name, description="", product_ids=None):
+        """Helper method to create a properly formatted subcategory"""
+        return {
+            '_id': ObjectId(),
+            'name': name,
+            'description': description,
+            'products': [],  # Array of {product_id, product_name} objects
+            'created_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow()
+        }
 
     @classmethod
     def from_dict(cls, data):

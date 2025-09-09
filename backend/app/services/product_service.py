@@ -4,6 +4,10 @@ from datetime import datetime
 from ..database import db_manager
 from ..models import Product
 from notifications.services import notification_service
+from .category_service import CategoryService
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ProductService:
     def __init__(self):
@@ -12,6 +16,7 @@ class ProductService:
         self.category_collection = self.db.category
         self.supplier_collection = self.db.suppliers
         self.branch_collection = self.db.branches
+        self.category_service = CategoryService()
     
     def convert_object_id(self, document):
         """Convert ObjectId to string for JSON serialization"""
@@ -55,6 +60,85 @@ class ProductService:
             'details': details or {}
         }
     
+    def _ensure_product_has_category_assignment(self, product_data, product_id=None):
+        """
+        Ensure product is assigned to a category/subcategory
+        If no assignment, automatically assign to 'No Category' > 'General'
+        """
+        try:
+            # Check if product already has category assignment
+            has_category = product_data.get('category_id') is not None
+            has_subcategory = product_data.get('subcategory_name') is not None
+            
+            if has_category and has_subcategory:
+                # Validate the assignment exists
+                try:
+                    if ObjectId.is_valid(product_data['category_id']):
+                        category = self.category_collection.find_one({'_id': ObjectId(product_data['category_id'])})
+                        if category:
+                            subcategory_exists = any(
+                                sub['name'] == product_data['subcategory_name'] 
+                                for sub in category.get('sub_categories', [])
+                            )
+                            if subcategory_exists:
+                                return product_data  # Valid assignment, no changes needed
+                except Exception:
+                    pass  # Fall through to auto-assignment
+            
+            # Auto-assign to "No Category" > "General"
+            no_category = self.category_collection.find_one({
+                'category_name': 'No Category',
+                'isDeleted': {'$ne': True}
+            })
+            
+            if not no_category:
+                # Create "No Category" if it doesn't exist
+                logger.info("Creating 'No Category' for auto-assignment")
+                from ..models import Category
+                
+                no_category_data = {
+                    'category_name': 'No Category',
+                    'description': 'Auto-generated category for products without specific categorization',
+                    'status': 'active',
+                    'sub_categories': [
+                        Category.create_subcategory(
+                            name='General',
+                            description='General uncategorized products'
+                        )
+                    ],
+                    'isDeleted': False,
+                    'is_system_category': True,
+                    'auto_created': True,
+                    'date_created': datetime.utcnow(),
+                    'last_updated': datetime.utcnow()
+                }
+                
+                category_obj = Category(**no_category_data)
+                result = self.category_collection.insert_one(category_obj.to_dict())
+                no_category = self.category_collection.find_one({'_id': result.inserted_id})
+            
+            # Assign product to "No Category" > "General"
+            product_data['category_id'] = str(no_category['_id'])
+            product_data['subcategory_name'] = 'General'
+            
+            # If product already exists, add it to the subcategory
+            if product_id:
+                try:
+                    self.category_service.add_product_to_subcategory(
+                        category_id=str(no_category['_id']),
+                        subcategory_name='General',
+                        product_identifier=product_id
+                    )
+                    logger.info(f"Auto-assigned product {product_id} to 'No Category' > 'General'")
+                except Exception as e:
+                    logger.warning(f"Failed to auto-assign product to category: {e}")
+            
+            return product_data
+            
+        except Exception as e:
+            logger.error(f"Error in category auto-assignment: {e}")
+            return product_data  # Return original data if assignment fails
+
     def update_sync_status(self, product_id, sync_status='pending', source='cloud'):
         """Update sync status for a product - called when data changes"""
         try:
@@ -160,7 +244,7 @@ class ProductService:
                 return 0.0
     
     def create_product(self, product_data):
-        """Create a new product - ENHANCED WITH DUPLICATE PREVENTION"""
+        """Create a new product - ENHANCED WITH CATEGORY AUTO-ASSIGNMENT"""
         try:
             print(f"Creating single product: {product_data.get('product_name', 'Unknown')}")
             
@@ -175,8 +259,6 @@ class ProductService:
                 )
             
             # ENHANCED DUPLICATE VALIDATION FOR SINGLE PRODUCT
-            
-            # Check if SKU already exists among non-deleted products
             existing_product = self.product_collection.find_one({
                 'SKU': product_data['SKU'], 
                 'isDeleted': {'$ne': True}
@@ -184,7 +266,6 @@ class ProductService:
             if existing_product:
                 raise ValueError(f"Product with SKU '{product_data['SKU']}' already exists")
             
-            # Check if product name already exists (case-insensitive)
             product_name = product_data.get('product_name', '').strip()
             if product_name:
                 existing_name = self.product_collection.find_one({
@@ -205,12 +286,12 @@ class ProductService:
                 'date_received': product_data.get('date_received', current_time),
                 'status': product_data.get('status', 'active'),
                 'is_taxable': product_data.get('is_taxable', True),
-                'isDeleted': False,  # Initialize as not deleted
+                'isDeleted': False,
                 'created_at': current_time,
                 'updated_at': current_time
             })
             
-            # Initialize sync logs - mark as needing sync since it's a new record
+            # Initialize sync logs
             product_data['sync_logs'] = [
                 self.add_sync_log(source='cloud', status='pending', details={'action': 'created'})
             ]
@@ -227,34 +308,52 @@ class ProductService:
                     except (ValueError, TypeError):
                         product_data[field] = 0
             
-            # Insert product
+            # Insert product first
             result = self.product_collection.insert_one(product_data)
-
+            product_id = str(result.inserted_id)
+            
+            # AUTO-ASSIGN TO CATEGORY/SUBCATEGORY AFTER CREATION
+            try:
+                self._ensure_product_has_category_assignment(product_data, product_id)
+                
+                # Update the product document with category assignment
+                if 'category_id' in product_data and 'subcategory_name' in product_data:
+                    self.product_collection.update_one(
+                        {'_id': result.inserted_id},
+                        {
+                            '$set': {
+                                'category_id': product_data['category_id'],
+                                'subcategory_name': product_data['subcategory_name']
+                            }
+                        }
+                    )
+            except Exception as assignment_error:
+                logger.error(f"Category auto-assignment failed for product {product_id}: {assignment_error}")
+            
             # Return created product
             created_product = self.product_collection.find_one({'_id': result.inserted_id})
             
-             # Create general notification for new products
+            # Create notification
             try:
                 product_name = product_data.get("product_name", product_data.get("SKU", "Unknown Product"))
                 
                 notification_service.create_notification(
                     title="New Product Added",
-                    message=f"A new product '{product_name}' has been added to the system",
+                    message=f"A new product '{product_name}' has been added to the system and auto-assigned to 'No Category'",
                     priority="low",
                     notification_type="system",
                     metadata={
-                        "product_id": str(result.inserted_id),  # Fixed
+                        "product_id": str(result.inserted_id),
                         "SKU": product_data["SKU"],
-                        "product_name": product_name,  # Fixed
+                        "product_name": product_name,
                         "registration_source": "product_creation",
-                        "action_type": "product_created"
+                        "action_type": "product_created",
+                        "auto_assigned_category": created_product.get('category_id'),
+                        "auto_assigned_subcategory": created_product.get('subcategory_name')
                     }
                 )
-                
             except Exception as notification_error:
-                # Log the notification error but don't fail the product creation
                 print(f"Failed to create notification for the new product: {notification_error}")
-                # You can add proper logging here instead of print
 
             return self.convert_object_id(created_product)
         
@@ -916,15 +1015,15 @@ class ProductService:
             raise Exception(f"Error preparing sync to local: {str(e)}")
         
     def bulk_create_products(self, products_data):
-        """Create multiple products in batch with validation - ENHANCED DUPLICATE PREVENTION"""
+        """Create multiple products in batch with validation and auto-category assignment"""
         try:
             print("=== BULK CREATE SERVICE DEBUG START ===")
             print(f"Processing {len(products_data)} products")
             
             validated_products = []
             errors = []
-            seen_skus = set()  # Track SKUs in current batch
-            seen_names = set()  # Track product names in current batch
+            seen_skus = set()
+            seen_names = set()
             
             for i, product_data in enumerate(products_data):
                 try:
@@ -939,15 +1038,11 @@ class ProductService:
                             product_data.get('product_name', 'Product'),
                             product_data.get('category_id')
                         )
-                        print(f"Generated SKU: {product_data['SKU']}")
                     
-                    # ENHANCED DUPLICATE VALIDATION
-                    
-                    # 1. Check for duplicate SKUs in current batch
+                    # DUPLICATE VALIDATION (same as before)
                     if product_data['SKU'] in seen_skus:
                         raise ValueError(f"Duplicate SKU in current batch: {product_data['SKU']}")
                     
-                    # 2. Check for duplicate SKUs in database
                     existing_sku = self.product_collection.find_one({
                         'SKU': product_data['SKU'], 
                         'isDeleted': {'$ne': True}
@@ -955,12 +1050,10 @@ class ProductService:
                     if existing_sku:
                         raise ValueError(f"Product with SKU '{product_data['SKU']}' already exists in database")
                     
-                    # 3. Check for duplicate product names in current batch
                     product_name_lower = product_data.get('product_name', '').strip().lower()
                     if product_name_lower in seen_names:
                         raise ValueError(f"Duplicate product name in current batch: {product_data.get('product_name')}")
                     
-                    # 4. Check for duplicate product names in database (case-insensitive)
                     if product_name_lower:
                         existing_name = self.product_collection.find_one({
                             'product_name': {'$regex': f'^{re.escape(product_data.get("product_name", ""))}$', '$options': 'i'}, 
@@ -969,28 +1062,17 @@ class ProductService:
                         if existing_name:
                             raise ValueError(f"Product with name '{product_data.get('product_name')}' already exists in database")
                     
-                    # 5. Check for similar product names (optional - helps prevent near-duplicates)
-                    if product_name_lower:
-                        # Look for very similar names (90% similarity)
-                        similar_products = list(self.product_collection.find({
-                            'isDeleted': {'$ne': True}
-                        }, {'product_name': 1}))
-                        
-                        for similar_product in similar_products:
-                            existing_name = similar_product.get('product_name', '').strip().lower()
-                            if self.calculate_similarity(product_name_lower, existing_name) > 0.9:
-                                raise ValueError(f"Very similar product already exists: '{similar_product.get('product_name')}' vs '{product_data.get('product_name')}'")
-                    
-                    # Track this product's identifiers
                     seen_skus.add(product_data['SKU'])
                     seen_names.add(product_name_lower)
                     
-                    # Convert string IDs to ObjectIds
+                    # AUTO-ASSIGN CATEGORY FOR BULK PRODUCTS
+                    product_data = self._ensure_product_has_category_assignment(product_data)
+                    
+                    # Convert string IDs to ObjectIds and set defaults (same as before)
                     for field in ['category_id', 'supplier_id', 'branch_id']:
                         if field in product_data and product_data[field] and ObjectId.is_valid(product_data[field]):
                             product_data[field] = ObjectId(product_data[field])
                     
-                    # Set default values
                     current_time = datetime.utcnow()
                     product_data.update({
                         'date_received': product_data.get('date_received', current_time),
@@ -1002,24 +1084,22 @@ class ProductService:
                         'sync_logs': [self.add_sync_log(source='cloud', status='pending', details={'action': 'bulk_created'})]
                     })
                     
-                    # Ensure numeric fields are properly typed
+                    # Handle numeric fields (same as before)
                     numeric_fields = ['stock', 'low_stock_threshold', 'cost_price', 'selling_price']
                     for field in numeric_fields:
                         if field in product_data:
                             try:
                                 if field in ['stock', 'low_stock_threshold']:
-                                        product_data[field] = int(product_data[field])
+                                    product_data[field] = int(product_data[field])
                                 else:
-                                        # Handle price fields with currency symbols
-                                        price_str = str(product_data[field])
-                                        # Remove peso symbol, commas, and whitespace
-                                        clean_price = price_str.replace('₱', '').replace(',', '').strip()
-                                        product_data[field] = float(clean_price)
+                                    price_str = str(product_data[field])
+                                    clean_price = price_str.replace('₱', '').replace(',', '').strip()
+                                    product_data[field] = float(clean_price)
                             except (ValueError, TypeError):
                                 product_data[field] = 0
                     
                     validated_products.append(product_data)
-                    print(f"✅ Product {i+1} validated successfully")
+                    print(f"✅ Product {i+1} validated and auto-assigned to category")
                     
                 except Exception as e:
                     print(f"❌ Product {i+1} validation failed: {str(e)}")
@@ -1029,7 +1109,7 @@ class ProductService:
                         'error': str(e)
                     })
             
-            # Perform bulk insert for validated products
+            # Perform bulk insert and assign to subcategories
             results = {
                 'successful': [],
                 'failed': errors,
@@ -1041,7 +1121,6 @@ class ProductService:
             if validated_products:
                 print(f"Inserting {len(validated_products)} validated products...")
                 
-                # Use MongoDB's insert_many for better performance
                 insert_result = self.product_collection.insert_many(validated_products, ordered=False)
                 
                 # Get inserted products
@@ -1049,30 +1128,34 @@ class ProductService:
                     '_id': {'$in': insert_result.inserted_ids}
                 }))
                 
+                # ADD PRODUCTS TO SUBCATEGORIES AFTER BULK INSERT
+                for product in inserted_products:
+                    try:
+                        if product.get('category_id') and product.get('subcategory_name'):
+                            self.category_service.add_product_to_subcategory(
+                                category_id=str(product['category_id']),
+                                subcategory_name=product['subcategory_name'],
+                                product_identifier=str(product['_id'])
+                            )
+                    except Exception as subcategory_error:
+                        logger.warning(f"Failed to assign product {product['_id']} to subcategory: {subcategory_error}")
+                
                 results['successful'] = [self.convert_object_id(product) for product in inserted_products]
                 results['total_successful'] = len(inserted_products)
                 
-                # Create bulk creation notification
+                # Create notification (same as before)
                 try:
                     total_processed = len(products_data)
                     successful_count = len(inserted_products)
                     failed_count = len(errors)
                     
-                    # Determine priority based on success rate
                     if failed_count == 0:
                         priority = "low"
                         notification_type = "system"
-                    elif failed_count < successful_count:
-                        priority = "medium"
-                        notification_type = "alert"
+                        message = f"Bulk product creation completed successfully: {successful_count} products created and auto-assigned to categories"
                     else:
-                        priority = "high"
+                        priority = "medium" if failed_count < successful_count else "high"
                         notification_type = "alert"
-                    
-                    # Create summary message
-                    if failed_count == 0:
-                        message = f"Bulk product creation completed successfully: {successful_count} products created"
-                    else:
                         message = f"Bulk product creation completed: {successful_count} successful, {failed_count} failed out of {total_processed} total"
                     
                     notification_service.create_notification(
@@ -1086,13 +1169,12 @@ class ProductService:
                             "total_products": total_processed,
                             "successful_creations": successful_count,
                             "failed_creations": failed_count,
-                            "success_rate": round((successful_count / total_processed) * 100, 2) if total_processed > 0 else 0
+                            "success_rate": round((successful_count / total_processed) * 100, 2) if total_processed > 0 else 0,
+                            "auto_assigned_to_no_category": True
                         }
                     )
                 except Exception as notification_error:
                     print(f"Failed to create notification for bulk product creation: {notification_error}")
-                
-                print(f"✅ Successfully inserted {len(inserted_products)} products")
             
             print("=== BULK CREATE SERVICE DEBUG END ===")
             return results
