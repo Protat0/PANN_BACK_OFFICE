@@ -20,21 +20,26 @@ class UserService:
     # UTILITY METHODS
     # ================================================================
     
-    def convert_object_id(self, document):
-        """Convert ObjectId to string for JSON serialization - Enhanced version"""
+    def convert_object_id(self, document, fields=None):
+        """Convert ObjectId to string with optional field selection for performance"""
         if document is None:
             return document
         
         if isinstance(document, list):
-            return [self.convert_object_id(item) for item in document]
+            return [self.convert_object_id(item, fields) for item in document]
         
         if isinstance(document, dict):
             converted = {}
-            for key, value in document.items():
+            # If fields specified, only process requested fields
+            items_to_process = document.items()
+            if fields:
+                items_to_process = [(k, v) for k, v in document.items() if k in fields]
+            
+            for key, value in items_to_process:
                 if isinstance(value, ObjectId):
                     converted[key] = str(value)
                 elif isinstance(value, (dict, list)):
-                    converted[key] = self.convert_object_id(value)
+                    converted[key] = self.convert_object_id(value, fields)
                 else:
                     converted[key] = value
             return converted
@@ -209,8 +214,8 @@ class UserService:
         except Exception as e:
             raise Exception(f"Error getting users: {str(e)}")
     
-    def get_user_by_id(self, user_id, include_deleted=False):
-        """Get user by ID"""
+    def get_user_by_id(self, user_id, operation_mode="admin", include_deleted=False):
+        """Get user by ID with operation mode optimization"""
         try:
             if not user_id or not ObjectId.is_valid(user_id):
                 return None
@@ -219,8 +224,24 @@ class UserService:
             if not include_deleted:
                 query['isDeleted'] = {'$ne': True}
 
-            user = self.collection.find_one(query)
-            return self.convert_object_id(user) if user else None
+            # Field selection based on operation mode
+            projection = None
+            if operation_mode == "pos":
+                projection = {
+                    '_id': 1, 'username': 1, 'full_name': 1, 'role': 1, 
+                    'status': 1, 'email': 1, 'isDeleted': 1
+                }
+            elif operation_mode == "website":
+                projection = {
+                    '_id': 1, 'username': 1, 'full_name': 1, 'email': 1,
+                    'role': 1, 'status': 1, 'date_created': 1, 'isDeleted': 1
+                }
+
+            user = self.collection.find_one(query, projection)
+            
+            # Convert with appropriate fields
+            fields = list(projection.keys()) if projection else None
+            return self.convert_object_id(user, fields) if user else None
         except Exception as e:
             raise Exception(f"Error getting user: {str(e)}")
         
@@ -239,17 +260,34 @@ class UserService:
         except Exception as e:
             raise Exception(f"Error getting user by email: {str(e)}")
 
-    def get_user_by_username(self, username, include_deleted=False):
-        """Get user by username"""
+    def get_user_by_username(self, username, operation_mode="admin", include_deleted=False):
+        """Get user by username with operation mode optimization"""
         try:
             if not username:
                 return None
+                
             query = {'username': username}
             if not include_deleted:
                 query['isDeleted'] = {'$ne': True}
-                
-            user = self.collection.find_one(query)
-            return self.convert_object_id(user) if user else None
+            
+            # Field selection based on operation mode
+            projection = None
+            if operation_mode == "pos":
+                projection = {
+                    '_id': 1, 'username': 1, 'full_name': 1, 'role': 1,
+                    'password': 1, 'status': 1, 'isDeleted': 1
+                }
+            elif operation_mode == "website":
+                projection = {
+                    '_id': 1, 'username': 1, 'full_name': 1, 'email': 1,
+                    'role': 1, 'password': 1, 'status': 1, 'isDeleted': 1
+                }
+                    
+            user = self.collection.find_one(query, projection)
+            
+            # Convert with appropriate fields
+            fields = list(projection.keys()) if projection else None
+            return self.convert_object_id(user, fields) if user else None
         except Exception as e:
             raise Exception(f"Error getting user by username: {str(e)}")
 
