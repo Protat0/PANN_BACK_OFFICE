@@ -26,18 +26,35 @@ class UserListView(APIView):
     
     @require_authentication
     def get(self, request):
-        """Get all users (with optional deleted users) - Requires admin authentication"""
+        """Get users with pagination and filters"""
         try:
+            page = int(request.query_params.get('page', 1))
+            limit = int(request.query_params.get('limit', 50))
+            status_filter = request.query_params.get('status')
             include_deleted = request.query_params.get('include_deleted', 'false').lower() == 'true'
-            users = self.user_service.get_all_users(include_deleted=include_deleted)
-            return Response(users, status=status.HTTP_200_OK)
+            
+            # Only admins can view deleted users
+            if include_deleted and request.current_user.get('role', '').lower() != 'admin':
+                return Response(
+                    {"error": "Admin permissions required to view deleted users"}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            result = self.user_service.get_users(
+                page=page, 
+                limit=limit, 
+                status=status_filter, 
+                include_deleted=include_deleted
+            )
+            return Response(result, status=status.HTTP_200_OK)
             
         except Exception as e:
-            logger.error(f"Error getting all users: {e}")
+            logger.error(f"Error getting users: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
     
     @require_authentication
     def post(self, request):
@@ -98,18 +115,43 @@ class UserDetailView(APIView):
     
     @require_authentication
     def put(self, request, user_id):
-        """Update user - Requires admin authentication"""
+        """Update user - Admin only OR self-service password change"""
         try:
-            updated_user = self.user_service.update_user(user_id, request.data, request.current_user)
+            current_user = request.current_user
+            
+            # Determine role context
+            if current_user.get('_id') == user_id:
+                # Self-service: only password changes
+                if set(request.data.keys()) - {'password'} != set():
+                    return Response(
+                        {"error": "You can only update your own password"}, 
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+                role_context = 'self_service'
+            else:
+                # Admin updating another user
+                if current_user.get('role', '').lower() != 'admin':
+                    return Response(
+                        {"error": "Admin permissions required"}, 
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+                role_context = 'admin'
+            
+            updated_user = self.user_service.update_user_profile(
+                user_id, 
+                request.data, 
+                current_user, 
+                role_context
+            )
             
             if not updated_user:
                 return Response(
-                    {"error": "User not found or already deleted"}, 
+                    {"error": "User not found"}, 
                     status=status.HTTP_404_NOT_FOUND
                 )
             
             return Response(updated_user, status=status.HTTP_200_OK)
-        
+            
         except Exception as e:
             logger.error(f"Error updating user {user_id}: {e}")
             return Response(
@@ -179,52 +221,66 @@ class UserHardDeleteView(APIView):
 
     @require_authentication
     def delete(self, request, user_id):
-        """PERMANENTLY delete user - Requires admin authentication and confirmation"""
+        """PERMANENTLY delete user"""
         try:
-            # Require explicit confirmation
             confirm = request.query_params.get('confirm', '').lower()
             if confirm != 'yes':
-                return Response(
-                    {
-                        "error": "Permanent deletion requires confirmation", 
-                        "message": "Add ?confirm=yes to permanently delete this user",
-                        "warning": "THIS ACTION CANNOT BE UNDONE"
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({
+                    "error": "Permanent deletion requires confirmation", 
+                    "message": "Add ?confirm=yes to permanently delete this user"
+                }, status=status.HTTP_400_BAD_REQUEST)
             
-            deleted = self.user_service.hard_delete_user(user_id, request.current_user)
+            # Use the confirmation token from service
+            deleted = self.user_service.hard_delete_user(
+                user_id, 
+                request.current_user, 
+                confirmation_token="PERMANENT_DELETE_CONFIRMED"
+            )
             
             if not deleted:
                 return Response(
-                    {"error": "User not found"},
+                    {"error": "User not found"}, 
                     status=status.HTTP_404_NOT_FOUND
                 )
 
-            return Response(
-                {"message": "User permanently deleted", "warning": "This action cannot be undone"},
-                status=status.HTTP_200_OK
-            )
+            return Response({
+                "message": "User permanently deleted"
+            }, status=status.HTTP_200_OK)
 
         except Exception as e:
-            logger.error(f"Error permanently deleting user {user_id}: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 class DeletedUsersView(APIView):
-    """View for managing deleted users"""
     def __init__(self):
         super().__init__()
         self.user_service = UserService()
 
     @require_authentication
     def get(self, request):
-        """Get all soft-deleted users - Requires admin authentication"""
+        """Get soft-deleted users - Admin only"""
         try:
-            deleted_users = self.user_service.get_deleted_users()
-            return Response(deleted_users, status=status.HTTP_200_OK)
+            page = int(request.query_params.get('page', 1))
+            limit = int(request.query_params.get('limit', 50))
+            
+            # Use get_users with include_deleted=True and deleted_only filter
+            result = self.user_service.get_users(
+                page=page, 
+                limit=limit, 
+                include_deleted=True
+            )
+            
+            # Filter only deleted users
+            deleted_users = [user for user in result['users'] if user.get('isDeleted') == True]
+            
+            return Response({
+                'users': deleted_users,
+                'total': len(deleted_users),
+                'page': page,
+                'limit': limit
+            }, status=status.HTTP_200_OK)
             
         except Exception as e:
             logger.error(f"Error getting deleted users: {e}")

@@ -18,6 +18,9 @@ from .kpi_views.user_views import (
     UserDetailView, 
     UserByEmailView, 
     UserByUsernameView,
+    UserRestoreView,       
+    UserHardDeleteView,     
+    DeletedUsersView,       
 )
 
 from .kpi_views.customer_views import (
@@ -173,10 +176,13 @@ urlpatterns = [
     
     # ========== USER MANAGEMENT ==========
     path('users/', UserListView.as_view(), name='user-list'),
+    path('users/deleted/', DeletedUsersView.as_view(), name='deleted-users'),
     path('users/email/<str:email>/', UserByEmailView.as_view(), name='user-by-email'),
     path('users/username/<str:username>/', UserByUsernameView.as_view(), name='user-by-username'),
     path('users/<str:user_id>/', UserDetailView.as_view(), name='user-detail'),
-   
+    path('users/<str:user_id>/restore/', UserRestoreView.as_view(), name='user-restore'),
+    path('users/<str:user_id>/hard-delete/', UserHardDeleteView.as_view(), name='user-hard-delete'),
+    
     # ========== CUSTOMER MANAGEMENT ==========
     path('customers/', CustomerListView.as_view(), name='customer-list'),
     path('customers/search/', CustomerSearchView.as_view(), name='customer-search'),
