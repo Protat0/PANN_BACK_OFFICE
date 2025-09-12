@@ -13,11 +13,27 @@ class CustomerListView(APIView):
 
     @require_admin  
     def get(self, request):
-        """Get all customers - Admin only"""
+        """Get customers with pagination and filters - Admin only"""
         try:
-            # Always include deleted customers, let frontend filter
-            customers = self.customer_service.get_all_customers(include_deleted=True)
-            return Response(customers, status=status.HTTP_200_OK)
+            page = int(request.query_params.get('page', 1))
+            limit = int(request.query_params.get('limit', 50))
+            status_filter = request.query_params.get('status')
+            min_loyalty_points = request.query_params.get('min_loyalty_points')
+            include_deleted = request.query_params.get('include_deleted', 'false').lower() == 'true'
+            sort_by = request.query_params.get('sort_by')
+            
+            if min_loyalty_points:
+                min_loyalty_points = int(min_loyalty_points)
+            
+            result = self.customer_service.get_customers(
+                page=page,
+                limit=limit,
+                status=status_filter,
+                min_loyalty_points=min_loyalty_points,
+                include_deleted=include_deleted,
+                sort_by=sort_by
+            )
+            return Response(result, status=status.HTTP_200_OK)
         except Exception as e:
             logger.error(f"Error getting customers: {e}")
             return Response(
@@ -154,28 +170,23 @@ class CustomerHardDeleteView(APIView):
     def delete(self, request, customer_id):
         """PERMANENTLY delete customer - Admin only with confirmation"""
         try:
-            # Require explicit confirmation
             confirm = request.query_params.get('confirm', '').lower()
             if confirm != 'yes':
-                return Response(
-                    {
-                        "error": "Permanent deletion requires confirmation", 
-                        "message": "Add ?confirm=yes to permanently delete this customer",
-                        "warning": "THIS ACTION CANNOT BE UNDONE"
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({
+                    "error": "Permanent deletion requires confirmation", 
+                    "message": "Add ?confirm=yes to permanently delete this customer"
+                }, status=status.HTTP_400_BAD_REQUEST)
             
             deleted = self.customer_service.hard_delete_customer(
                 customer_id, 
-                request.current_user
+                request.current_user,
+                confirmation_token="PERMANENT_DELETE_CONFIRMED"  # Add this
             )
             
             if deleted:
-                return Response(
-                    {"message": "Customer permanently deleted", "warning": "This action cannot be undone"},
-                    status=status.HTTP_200_OK
-                )
+                return Response({
+                    "message": "Customer permanently deleted"
+                }, status=status.HTTP_200_OK)
             return Response(
                 {"error": "Customer not found"},
                 status=status.HTTP_404_NOT_FOUND
