@@ -5,11 +5,13 @@ from django.http import HttpResponse
 from ..services.product_service import ProductService
 import logging
 
+logger = logging.getLogger(__name__)
+
 # ================ PRODUCT VIEWS ================
 
 class ProductListView(APIView):
     def get(self, request):
-        """Get all products with optional filters"""
+        """Get all products with optional filters and pagination"""
         try:
             product_service = ProductService()
             
@@ -26,9 +28,17 @@ class ProductListView(APIView):
             
             include_deleted = request.GET.get('include_deleted', 'false').lower() == 'true'
             
-            products = product_service.get_all_products(filters if filters else None, include_deleted)
-            return Response(products, status=status.HTTP_200_OK)
+            products = product_service.get_all_products(
+                filters=filters if filters else None, 
+                include_deleted=include_deleted
+            )
+            
+            return Response({
+                'message': f'Found {len(products)} products',
+                'data': products
+            }, status=status.HTTP_200_OK)
         except Exception as e:
+            logger.error(f"Error in ProductListView.get: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -44,11 +54,18 @@ class ProductListView(APIView):
                 'message': 'Product created successfully', 
                 'data': new_product
             }, status=status.HTTP_201_CREATED)
-        except Exception as e:
+        except ValueError as ve:
             return Response(
-                {"error": str(e)}, 
+                {"error": str(ve)}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
+        except Exception as e:
+            logger.error(f"Error in ProductListView.post: {e}")
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
 class ProductCreateView(APIView):
     def post(self, request):
@@ -79,8 +96,11 @@ class ProductDetailView(APIView):
                     {"error": "Product not found"}, 
                     status=status.HTTP_404_NOT_FOUND
                 )
-            return Response(product, status=status.HTTP_200_OK)
+            return Response({
+                'data': product
+            }, status=status.HTTP_200_OK)
         except Exception as e:
+            logger.error(f"Error in ProductDetailView.get: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -101,10 +121,16 @@ class ProductDetailView(APIView):
                 'message': 'Product updated successfully', 
                 'data': updated_product
             }, status=status.HTTP_200_OK)
+        except ValueError as ve:
+            return Response(
+                {"error": str(ve)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         except Exception as e:
+            logger.error(f"Error in ProductDetailView.put: {e}")
             return Response(
                 {"error": str(e)}, 
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
     def delete(self, request, product_id):
@@ -124,6 +150,34 @@ class ProductDetailView(APIView):
                 status=status.HTTP_200_OK
             )
         except Exception as e:
+            logger.error(f"Error in ProductDetailView.delete: {e}")
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+    def patch(self, request, product_id):
+        """Partial update product"""
+        try:
+            product_service = ProductService()
+            product_data = request.data
+            updated_product = product_service.update_product(product_id, product_data, partial_update=True)
+            if not updated_product:
+                return Response(
+                    {"error": "Product not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            return Response({
+                'message': 'Product updated successfully', 
+                'data': updated_product
+            }, status=status.HTTP_200_OK)
+        except ValueError as ve:
+            return Response(
+                {"error": str(ve)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error in ProductDetailView.patch: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -194,10 +248,12 @@ class ProductRestoreView(APIView):
                 status=status.HTTP_200_OK
             )
         except Exception as e:
+            logger.error(f"Error in ProductRestoreView.post: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
 
 class ProductBySkuView(APIView):
     def get(self, request, sku):
@@ -211,8 +267,11 @@ class ProductBySkuView(APIView):
                     {"error": "Product not found"}, 
                     status=status.HTTP_404_NOT_FOUND
                 )
-            return Response(product, status=status.HTTP_200_OK)
+            return Response({
+                'data': product
+            }, status=status.HTTP_200_OK)
         except Exception as e:
+            logger.error(f"Error in ProductBySkuView.get: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -258,10 +317,16 @@ class ProductStockUpdateView(APIView):
                 'data': updated_product
             }, status=status.HTTP_200_OK)
             
+        except ValueError as ve:
+            return Response(
+                {"error": str(ve)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         except Exception as e:
+            logger.error(f"Error in ProductStockUpdateView.put: {e}")
             return Response(
                 {"error": str(e)}, 
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
     def patch(self, request, product_id):
@@ -294,10 +359,16 @@ class StockAdjustmentView(APIView):
                 'data': updated_product
             }, status=status.HTTP_200_OK)
             
+        except ValueError as ve:
+            return Response(
+                {"error": str(ve)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         except Exception as e:
+            logger.error(f"Error in StockAdjustmentView.post: {e}")
             return Response(
                 {"error": str(e)}, 
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 class RestockProductView(APIView):
@@ -327,10 +398,16 @@ class RestockProductView(APIView):
                 'data': updated_product
             }, status=status.HTTP_200_OK)
             
+        except ValueError as ve:
+            return Response(
+                {"error": str(ve)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         except Exception as e:
+            logger.error(f"Error in RestockProductView.post: {e}")
             return Response(
                 {"error": str(e)}, 
-                status=status.HTTP_400_BAD_REQUEST
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 class BulkStockUpdateView(APIView):
@@ -354,11 +431,12 @@ class BulkStockUpdateView(APIView):
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
+            logger.error(f"Error in BulkStockUpdateView.post: {e}")
             return Response(
                 {'error': str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
+        
 class StockHistoryView(APIView):
     def get(self, request, product_id):
         """Get stock change history for a specific product"""
@@ -373,7 +451,6 @@ class StockHistoryView(APIView):
                     status=status.HTTP_404_NOT_FOUND
                 )
             
-            # Get stock history from the product's stock_history field
             stock_history = product.get('stock_history', [])
             
             # Sort by most recent first
@@ -390,6 +467,7 @@ class StockHistoryView(APIView):
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
+            logger.error(f"Error in StockHistoryView.get: {e}")
             return Response(
                 {'error': str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -409,6 +487,7 @@ class LowStockProductsView(APIView):
                 'data': products
             }, status=status.HTTP_200_OK)
         except Exception as e:
+            logger.error(f"Error in LowStockProductsView.get: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -426,6 +505,7 @@ class ExpiringProductsView(APIView):
                 'data': products
             }, status=status.HTTP_200_OK)
         except Exception as e:
+            logger.error(f"Error in ExpiringProductsView.get: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -442,6 +522,7 @@ class ProductsByCategoryView(APIView):
                 'data': products
             }, status=status.HTTP_200_OK)
         except Exception as e:
+            logger.error(f"Error in ProductsByCategoryView.get: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -458,6 +539,7 @@ class DeletedProductsView(APIView):
                 'data': products
             }, status=status.HTTP_200_OK)
         except Exception as e:
+            logger.error(f"Error in DeletedProductsView.get: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -470,7 +552,7 @@ class ProductSyncView(APIView):
         """Sync products between local and cloud"""
         try:
             product_service = ProductService()
-            sync_direction = request.data.get('direction', 'to_cloud')  # 'to_cloud' or 'to_local'
+            sync_direction = request.data.get('direction', 'to_cloud')
             
             if sync_direction == 'to_cloud':
                 local_products = request.data.get('products', [])
@@ -489,6 +571,7 @@ class ProductSyncView(APIView):
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
+            logger.error(f"Error in ProductSyncView.post: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -496,20 +579,17 @@ class ProductSyncView(APIView):
 
 class UnsyncedProductsView(APIView):
     def get(self, request):
-        """Get products that need to be synced"""
+        """Get products that need synchronization"""
         try:
             product_service = ProductService()
-            source = request.GET.get('source', 'local')  # 'local' or 'cloud'
+            source = request.GET.get('source', 'local')
             products = product_service.get_unsynced_products(source)
             return Response({
-                'message': f'Found {len(products)} unsynced products from {source}',
+                'message': f'Found {len(products)} unsynced products',
                 'data': products
             }, status=status.HTTP_200_OK)
         except Exception as e:
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class SyncStatusView(APIView):
     def get(self, request, product_id):
@@ -517,24 +597,15 @@ class SyncStatusView(APIView):
         try:
             product_service = ProductService()
             product = product_service.get_product_by_id(product_id)
-            
             if not product:
-                return Response(
-                    {"error": "Product not found"}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
+                return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
             
-            sync_logs = product.get('sync_logs', [])
             return Response({
                 'product_id': product_id,
-                'sync_logs': sync_logs
+                'sync_logs': product.get('sync_logs', [])
             }, status=status.HTTP_200_OK)
-            
         except Exception as e:
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def put(self, request, product_id):
         """Update sync status for a product"""
@@ -565,83 +636,34 @@ class SyncStatusView(APIView):
 
 class BulkCreateProductsView(APIView):
     def post(self, request):
-        """Create multiple products in batch - ENHANCED WITH DEBUGGING"""
+        """Create multiple products in batch"""
         try:
-            # DEBUG: Add extensive logging
-            print("=== BULK CREATE VIEW DEBUG START ===")
-            print(f"Request method: {request.method}")
-            print(f"Request path: {request.path}")
-            print(f"Content type: {request.content_type}")
-            print(f"Raw request data type: {type(request.data)}")
-            print(f"Raw request data keys: {list(request.data.keys()) if isinstance(request.data, dict) else 'Not a dict'}")
-            
             product_service = ProductService()
             
-            # ENHANCED: Handle different payload structures more robustly
+            # Handle different payload structures
             products_data = None
             
             if isinstance(request.data, list):
-                # If data is sent as array directly: [product1, product2, ...]
                 products_data = request.data
-                print("✅ Data received as direct array")
-                
             elif isinstance(request.data, dict):
                 if 'products' in request.data:
-                    # If data is sent as object: {"products": [product1, product2, ...]}
                     products_data = request.data.get('products', [])
-                    print("✅ Data received as object with 'products' key")
                 else:
-                    # Check if it's a single product object that should be an array
+                    # Check if it's a single product object
                     if any(key in request.data for key in ['product_name', 'SKU', 'cost_price']):
-                        products_data = [request.data]  # Wrap single product in array
-                        print("✅ Data received as single product object, wrapped in array")
+                        products_data = [request.data]
                     else:
-                        # Fallback - try to find products in the data
                         products_data = request.data.get('products', [])
-                        print("⚠️ Fallback: trying to extract 'products' key")
-            else:
-                print("❌ Unknown data format received")
+            
+            # Validation
+            if not products_data or not isinstance(products_data, list) or len(products_data) == 0:
                 return Response(
-                    {"error": f"Invalid data format. Expected array or object, got {type(request.data)}"}, 
+                    {"error": "No valid products provided. Expected 'products' array in request body."}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            print(f"Extracted products_data type: {type(products_data)}")
-            print(f"Products count: {len(products_data) if isinstance(products_data, list) else 'Not a list'}")
-            
-            if products_data and isinstance(products_data, list) and len(products_data) > 0:
-                print(f"Sample product (first): {products_data[0]}")
-            
-            # VALIDATION: Check if we have valid data
-            if not products_data:
-                print("❌ No products provided in request")
-                return Response(
-                    {"error": "No products provided. Expected 'products' array in request body."}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            if not isinstance(products_data, list):
-                print(f"❌ Products data is not a list: {type(products_data)}")
-                return Response(
-                    {"error": f"Products data must be an array, got {type(products_data)}"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            if len(products_data) == 0:
-                print("❌ Empty products array")
-                return Response(
-                    {"error": "Products array is empty"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            print(f"✅ Calling ProductService.bulk_create_products with {len(products_data)} products")
-            
-            # Call the service method
+            # Call service method
             results = product_service.bulk_create_products(products_data)
-            
-            print(f"✅ Service method returned: {type(results)}")
-            print(f"Results keys: {results.keys() if isinstance(results, dict) else 'Not a dict'}")
-            print("=== BULK CREATE VIEW DEBUG END ===")
             
             return Response({
                 'message': 'Bulk product creation completed',
@@ -649,16 +671,7 @@ class BulkCreateProductsView(APIView):
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
-            print("=== BULK CREATE VIEW ERROR ===")
-            print(f"Error type: {type(e)}")
-            print(f"Error message: {str(e)}")
-            
-            # Print full traceback for debugging
-            import traceback
-            print("Full traceback:")
-            traceback.print_exc()
-            print("=== END ERROR DEBUG ===")
-            
+            logger.error(f"Error in BulkCreateProductsView.post: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -670,7 +683,6 @@ class ProductImportView(APIView):
         try:
             product_service = ProductService()
             
-            # Handle file upload
             if 'file' not in request.FILES:
                 return Response(
                     {"error": "No file provided"}, 
@@ -703,10 +715,10 @@ class ProductImportView(APIView):
                 }, status=status.HTTP_200_OK)
                 
             finally:
-                # Clean up temporary file
                 os.unlink(temp_file_path)
             
         except Exception as e:
+            logger.error(f"Error in ProductImportView.post: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -726,7 +738,6 @@ class ProductExportView(APIView):
             if request.GET.get('status'):
                 filters['status'] = request.GET.get('status')
             
-            # Get products
             products = product_service.get_all_products(filters if filters else None)
             
             if file_type == 'csv':
@@ -734,7 +745,7 @@ class ProductExportView(APIView):
                 from io import StringIO
                 
                 output = StringIO()
-                fieldnames = ['product_name', 'SKU', 'category_id', 'supplier_id', 'stock', 
+                fieldnames = ['_id', 'product_name', 'SKU', 'category_id', 'supplier_id', 'stock', 
                              'low_stock_threshold', 'cost_price', 'selling_price', 'unit', 'status']
                 writer = csv.DictWriter(output, fieldnames=fieldnames)
                 writer.writeheader()
@@ -770,6 +781,7 @@ class ProductExportView(APIView):
                 )
             
         except Exception as e:
+            logger.error(f"Error in ProductExportView.get: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -796,14 +808,15 @@ class ImportTemplateView(APIView):
                     )
                     response['Content-Disposition'] = 'attachment; filename="product_import_template.xlsx"'
             
-            # Clean up template file
             import os
             os.unlink(template_path)
             
             return response
             
         except Exception as e:
+            logger.error(f"Error in ImportTemplateView.get: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+        

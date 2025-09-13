@@ -34,6 +34,20 @@ from .kpi_views.customer_views import (
     CustomerLoyaltyView,
 )
 
+from .kpi_views.supplier_views import (
+    SupplierHealthCheckView,
+    SupplierListView, 
+    SupplierDetailView,
+    SupplierRestoreView,
+    SupplierHardDeleteView,
+    DeletedSuppliersView,
+    PurchaseOrderListView,
+    PurchaseOrderDetailView,
+    PurchaseOrderRestoreView,
+    PurchaseOrderHardDeleteView,
+    DeletedPurchaseOrdersView
+)
+
 from .kpi_views.authentication_views import (
     LoginView,
     LogoutView,
@@ -47,9 +61,6 @@ from .kpi_views.product_views import (
     ProductListView,
     ProductDetailView,
     ProductBySkuView,
-    ProductCreateView,
-    ProductUpdateView,
-    ProductDeleteView,
     ProductRestoreView,
     
     # Stock management views
@@ -67,8 +78,6 @@ from .kpi_views.product_views import (
     
     # Product sync views
     ProductSyncView,
-    UnsyncedProductsView,
-    SyncStatusView,
     
     # Product import/export views
     ProductImportView,
@@ -193,6 +202,23 @@ urlpatterns = [
     path('customers/<str:customer_id>/hard-delete/', CustomerHardDeleteView.as_view(), name='customer-hard-delete'),
     path('customers/<str:customer_id>/loyalty/', CustomerLoyaltyView.as_view(), name='customer-loyalty'),
     
+    # ========== SUPPLIER MANAGEMENT ==========
+    path('health/', SupplierHealthCheckView.as_view(), name='health-check'),
+    # Supplier CRUD operations
+    path('', SupplierListView.as_view(), name='supplier-list'),  # GET (list), POST (create)
+    path('<str:supplier_id>/', SupplierDetailView.as_view(), name='supplier-detail'),  # GET, PUT, DELETE
+    # Supplier management operations
+    path('<str:supplier_id>/restore/', SupplierRestoreView.as_view(), name='supplier-restore'),
+    path('<str:supplier_id>/hard-delete/', SupplierHardDeleteView.as_view(), name='supplier-hard-delete'),
+    path('deleted/', DeletedSuppliersView.as_view(), name='deleted-suppliers'),
+    # Purchase Order operations
+    path('<str:supplier_id>/orders/', PurchaseOrderListView.as_view(), name='purchase-order-list'),  # GET (list), POST (create)
+    path('<str:supplier_id>/orders/<str:order_id>/', PurchaseOrderDetailView.as_view(), name='purchase-order-detail'),  # GET, PUT, DELETE
+    # Purchase Order management operations
+    path('<str:supplier_id>/orders/<str:order_id>/restore/', PurchaseOrderRestoreView.as_view(), name='purchase-order-restore'),
+    path('<str:supplier_id>/orders/<str:order_id>/hard-delete/', PurchaseOrderHardDeleteView.as_view(), name='purchase-order-hard-delete'),
+    path('<str:supplier_id>/orders/deleted/', DeletedPurchaseOrdersView.as_view(), name='deleted-purchase-orders'),
+
     # ========== SESSION MANAGEMENT ==========
     path('session-logs/', SessionLogsView.as_view(), name='session-logs'),
     path('session-logs/display/', SessionDisplayView.as_view(), name='session-logs-display'),
@@ -206,7 +232,6 @@ urlpatterns = [
     # ========== PRODUCT MANAGEMENT ==========
     # Product CRUD (static paths first)
     path('products/', ProductListView.as_view(), name='product-list'),  # GET (list), POST (create)
-    path('products/create/', ProductCreateView.as_view(), name='product-create'),  # POST
     path('products/sku/<str:sku>/', ProductBySkuView.as_view(), name='product-by-sku'),  # GET by SKU
     path('products/deleted/', DeletedProductsView.as_view(), name='deleted-products'),  # GET deleted products
     
@@ -219,31 +244,22 @@ urlpatterns = [
     # Product reports
     path('products/reports/low-stock/', LowStockProductsView.as_view(), name='low-stock-products'),  # GET
     path('products/reports/expiring/', ExpiringProductsView.as_view(), name='expiring-products'),  # GET
-    path('products/category/<str:category_id>/', ProductsByCategoryView.as_view(), name='products-by-category'),  # GET
+    path('products/reports/by-category/<str:category_id>/', ProductsByCategoryView.as_view(), name='products-by-category'),  # GET
     
     # Product synchronization
     path('products/sync/', ProductSyncView.as_view(), name='product-sync'),  # POST
-    path('products/sync/unsynced/', UnsyncedProductsView.as_view(), name='unsynced-products'),  # GET
     
     # Bulk stock management
     path('products/stock/bulk-update/', BulkStockUpdateView.as_view(), name='bulk-stock-update'),  # POST
     
     # Product detail operations (parameterized paths last)
     path('products/<str:product_id>/', ProductDetailView.as_view(), name='product-detail'),  # GET, PUT, DELETE
-    path('products/<str:product_id>/update/', ProductUpdateView.as_view(), name='product-update'),  # PUT/PATCH
-    path('products/<str:product_id>/delete/', ProductDeleteView.as_view(), name='product-delete'),  # DELETE
     path('products/<str:product_id>/restore/', ProductRestoreView.as_view(), name='product-restore'),  # POST
     path('products/<str:product_id>/stock/', ProductStockUpdateView.as_view(), name='product-stock-update'),  # PUT/PATCH
     path('products/<str:product_id>/stock/adjust/', StockAdjustmentView.as_view(), name='stock-adjustment'),  # POST
     path('products/<str:product_id>/stock/history/', StockHistoryView.as_view(), name='stock-history'),  # GET
     path('products/<str:product_id>/restock/', RestockProductView.as_view(), name='restock-product'),  # POST
-    path('products/<str:product_id>/sync/status/', SyncStatusView.as_view(), name='sync-status'),  # GET, PUT
-    
-    # ========== PRODUCT-CATEGORY ASSIGNMENTS ==========
-    path('product/assign-to-subcategory/', ProductToSubcategoryView.as_view(), name='product-assign-to-subcategory'),
-    path('product/subcategory/update/', ProductSubcategoryUpdateView.as_view(), name='product-subcategory-update'),
-    path('product/move-to-uncategorized/', ProductMoveToUncategorizedView.as_view(), name='product-move-to-uncategorized'),
-    path('product/bulk-move-to-uncategorized/', ProductBulkMoveToUncategorizedView.as_view(), name='product-bulk-move-to-uncategorized'),
+
     
     # ========== CATEGORY MANAGEMENT ==========
     # Category operations (static paths first)
