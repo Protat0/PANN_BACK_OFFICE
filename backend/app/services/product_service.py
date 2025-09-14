@@ -6,6 +6,7 @@ from ..models import Product
 from notifications.services import notification_service
 from .category_service import CategoryService
 import logging
+from .product_subcategory_service import ProductSubcategoryService
 
 logger = logging.getLogger(__name__)
 
@@ -149,79 +150,24 @@ class ProductService:
         }
     
     def _ensure_product_has_category_assignment(self, product_data, product_id=None):
-        """
-        Ensure product is assigned to a category/subcategory
-        If no assignment, automatically assign to 'No Category' > 'General'
-        """
-        try:
-            # Check if product already has category assignment
-            has_category = product_data.get('category_id') is not None
-            has_subcategory = product_data.get('subcategory_name') is not None
-            
-            if has_category and has_subcategory:
-                # Validate the assignment exists (string-based lookup)
-                try:
-                    category = self.category_collection.find_one({'_id': product_data['category_id']})
-                    if category:
-                        subcategory_exists = any(
-                            sub['name'] == product_data['subcategory_name'] 
-                            for sub in category.get('sub_categories', [])
-                        )
-                        if subcategory_exists:
-                            return product_data  # Valid assignment, no changes needed
-                except Exception:
-                    pass  # Fall through to auto-assignment
-            
-            # Auto-assign to "No Category" > "General"
-            no_category = self.category_collection.find_one({
-                'category_name': 'No Category',
-                'isDeleted': {'$ne': True}
-            })
-            
-            if not no_category:
-                # Use CategoryService to create "No Category" - DELEGATION PATTERN
-                logger.info("Creating 'No Category' for auto-assignment")
+        """Auto-assign to 'Uncategorized' > 'General' if no category specified"""
+        if not product_data.get('category_id') and not product_data.get('subcategory_name'):
+            try:
+                # Use the ProductSubcategoryService for proper category assignment
+                subcategory_service = ProductSubcategoryService()
                 
-                no_category_data = {
-                    'category_name': 'No Category',
-                    'description': 'Auto-generated category for products without specific categorization',
-                    'status': 'active',
-                    'sub_categories': [
-                        {
-                            'name': 'General',
-                            'description': 'General uncategorized products',
-                            'products': []
-                        }
-                    ],
-                    'is_system_category': True,
-                    'auto_created': True
-                }
-                
-                # Delegate to CategoryService for proper ID generation
-                created_category = self.category_service.create_category(no_category_data)
-                no_category = self.category_collection.find_one({'_id': created_category['_id']})
-            
-            # Assign product to "No Category" > "General"
-            product_data['category_id'] = no_category['_id']
-            product_data['subcategory_name'] = 'General'
-            
-            # If product already exists, add it to the subcategory
-            if product_id:
-                try:
-                    self.category_service.add_product_to_subcategory(
-                        category_id=no_category['_id'],
-                        subcategory_name='General',
-                        product_identifier=product_id
-                    )
-                    logger.info(f"Auto-assigned product {product_id} to 'No Category' > 'General'")
-                except Exception as e:
-                    logger.warning(f"Failed to auto-assign product to category: {e}")
-            
-            return product_data
-            
-        except Exception as e:
-            logger.error(f"Error in category auto-assignment: {e}")
-            return product_data  # Return original data if assignment fails 
+                if product_id:
+                    # Move existing product to uncategorized
+                    result = subcategory_service.move_product_to_uncategorized_category(product_id)
+                    if result.get('success'):
+                        product_data['category_id'] = result.get('new_category_id')
+                        product_data['subcategory_name'] = subcategory_service.UNCATEGORIZED_SUBCATEGORY_NAME
+                        
+            except Exception as e:
+                logger.error(f"Error auto-assigning category: {e}")
+                # Fallback to basic assignment
+                product_data['category_id'] = "CTGY-001"  # Fallback category ID
+                product_data['subcategory_name'] = "General"
 
     def update_sync_status(self, product_id, sync_status='pending', source='cloud'):
         """Update sync status for a product - using string IDs"""

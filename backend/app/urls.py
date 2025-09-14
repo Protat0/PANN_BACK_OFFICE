@@ -87,32 +87,37 @@ from .kpi_views.product_views import (
 )
 
 from .kpi_views.category_views import (
-    CategoryKPIView,                    # Create & List categories
-    CategoryDetailView,                 # Get, Update individual category
-    CategoryDataView,                   # Categories with sales data
-    CategoryExportView,                 # Export categories (CSV/JSON)
-    CategoryStatsView,                  # Category statistics
-    CategoryHardDeleteView,             # Hard delete (Admin only)
-    CategorySoftDeleteView,             # Soft delete
-    CategoryRestoreView,                # Restore deleted (Admin only) 
-    CategoryDeletedListView,            # List deleted categories (Admin only)
-    CategoryDeleteInfoView,             # Pre-delete information
-    CategoryBulkOperationsView,         # Bulk operations (centralized)
-    CategorySubcategoryView,            # Add/Remove/Get subcategories
-    ProductSubcategoryUpdateView,       # Update product subcategory
-    ProductMoveToUncategorizedView,     # Move single product to uncategorized
-    ProductBulkMoveToUncategorizedView, # Bulk move products to uncategorized
-    UncategorizedCategoryView,          # Uncategorized Category Management
-    ProductToSubcategoryView,           # Assign products to subcategories
-    SubcategoryProductsView,            # Get products in subcategory
-    # POS Category views
-    POSCatalogView,                     # POS catalog structure
-    POSProductBatchView,                # Batch fetch products for POS
-    POSSubcategoryProductsView,         # POS subcategory products
-    POSBarcodeView,                     # POS barcode scanning
-    POSSearchView,                      # POS product search
-    POSStockCheckView,                  # POS stock validation
-    POSLowStockView,                    # POS low stock alerts
+     CategoryKPIView,
+    CategoryDetailView,
+    CategorySoftDeleteView,
+    CategoryHardDeleteView,
+    CategoryRestoreView,                  
+    CategoryDeletedListView,               
+    CategoryBulkOperationsView,         
+    CategoryDeleteInfoView,               
+    CategorySubcategoryView,              
+    UncategorizedCategoryView,              
+    SubcategoryProductsView,                
+    ProductSubcategoryUpdateView,
+    ProductMoveToUncategorizedView,
+)
+
+# POS Operations
+from .kpi_views.category_pos_views import (
+    POSCatalogView,
+    POSProductBatchView,
+    POSBarcodeView,
+    POSSearchView,
+    POSStockCheckView,
+    POSLowStockView,
+    POSSubcategoryProductsView,  
+)
+
+# Display/Export Operations
+from .kpi_views.category_display_views import (
+    CategoryDataView,
+    CategoryExportView,
+    CategoryStatsView,
 )
 
 from .kpi_views.saleslog_views import (
@@ -262,23 +267,38 @@ urlpatterns = [
 
     
     # ========== CATEGORY MANAGEMENT ==========
-    # Category operations (static paths first)
-    path('category/', CategoryKPIView.as_view(), name='category-operations'),  # GET (list), POST (create)
-    path('category/stats/', CategoryStatsView.as_view(), name='category-stats'),  # GET statistics
-    path('category/display/', CategoryDataView.as_view(), name='category-display'),  # GET with sales data
-    path('category/export/', CategoryExportView.as_view(), name='category-export'),  # GET CSV/JSON export
-    path('category/deleted/', CategoryDeletedListView.as_view(), name='category-deleted-list'),  # GET deleted categories
-    path('category/bulk/', CategoryBulkOperationsView.as_view(), name='category-bulk-operations'),  # POST bulk operations
-    path('category/uncategorized/', UncategorizedCategoryView.as_view(), name='uncategorized-category'),  # GET/POST uncategorized
-    
-    # Category detail operations (parameterized paths last)
-    path('category/<str:category_id>/', CategoryDetailView.as_view(), name='category-detail'),  # GET, PUT
-    path('category/<str:category_id>/delete-info/', CategoryDeleteInfoView.as_view(), name='category-delete-info'),  # GET pre-delete info
-    path('category/<str:category_id>/soft-delete/', CategorySoftDeleteView.as_view(), name='category-soft-delete'),  # DELETE (soft)
-    path('category/<str:category_id>/hard-delete/', CategoryHardDeleteView.as_view(), name='category-hard-delete'),  # DELETE (permanent) - Admin only
-    path('category/<str:category_id>/restore/', CategoryRestoreView.as_view(), name='category-restore'),  # POST restore - Admin only
-    path('category/<str:category_id>/subcategories/', CategorySubcategoryView.as_view(), name='category-subcategories'),  # GET/POST/DELETE subcategories
-    path('category/<str:category_id>/subcategories/<str:subcategory_name>/products/', SubcategoryProductsView.as_view(), name='subcategory-products'),  # GET products in subcategory
+    # Core Category Operations
+    path('category/', CategoryKPIView.as_view(), name='category-operations'),
+    path('category/stats/', CategoryStatsView.as_view(), name='category-stats'),
+    path('category/display/', CategoryDataView.as_view(), name='category-display'),
+    path('category/export/', CategoryExportView.as_view(), name='category-export'),
+    path('category/bulk/', CategoryBulkOperationsView.as_view(), name='category-bulk-operations'),
+
+    # Admin-only Category Operations
+    path('category/deleted/', CategoryDeletedListView.as_view(), name='category-deleted-list'),
+    path('category/uncategorized/', UncategorizedCategoryView.as_view(), name='uncategorized-category'),
+
+    # Individual Category Operations
+    path('category/<str:category_id>/', CategoryDetailView.as_view(), name='category-detail'),
+    path('category/<str:category_id>/delete-info/', CategoryDeleteInfoView.as_view(), name='category-delete-info'),
+    path('category/<str:category_id>/soft-delete/', CategorySoftDeleteView.as_view(), name='category-soft-delete'),
+    path('category/<str:category_id>/hard-delete/', CategoryHardDeleteView.as_view(), name='category-hard-delete'),
+    path('category/<str:category_id>/restore/', CategoryRestoreView.as_view(), name='category-restore'),
+    path('category/<str:category_id>/subcategories/', CategorySubcategoryView.as_view(), name='category-subcategories'),
+    path('category/<str:category_id>/subcategories/<str:subcategory_name>/products/', SubcategoryProductsView.as_view(), name='subcategory-products'),
+
+    # ========== POS OPERATIONS ==========
+    path('pos/catalog/', POSCatalogView.as_view(), name='pos-catalog'),
+    path('pos/products/batch/', POSProductBatchView.as_view(), name='pos-product-batch'),
+    path('pos/search/', POSSearchView.as_view(), name='pos-search'),
+    path('pos/barcode/<str:barcode>/', POSBarcodeView.as_view(), name='pos-barcode'),
+    path('pos/stock/check/', POSStockCheckView.as_view(), name='pos-stock-check'),
+    path('pos/stock/low/', POSLowStockView.as_view(), name='pos-low-stock'),
+    path('pos/category/<str:category_id>/subcategory/<str:subcategory_name>/products/', POSSubcategoryProductsView.as_view(), name='pos-subcategory-products'),
+
+    # ========== PRODUCT-CATEGORY RELATIONSHIPS ==========
+    path('product/subcategory/update/', ProductSubcategoryUpdateView.as_view(), name='product-subcategory-update'),
+    path('product/move-uncategorized/', ProductMoveToUncategorizedView.as_view(), name='product-move-uncategorized'),  
     
     # ========== SALES & INVOICES ==========
     # Sales log operations
