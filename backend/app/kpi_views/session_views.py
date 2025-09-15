@@ -1,16 +1,19 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from django.http import HttpResponse, JsonResponse
 from ..services.session_services import SessionLogService, SessionDisplayService
 from ..services.customer_service import CustomerService
 from ..services.product_service import ProductService
 from ..services.user_service import UserService
 from ..decorators.authenticationDecorator import require_authentication, require_admin
 import logging
+import json
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-# ================ SESSION MANAGEMENT VIEWS ================
+# ================ CORE SESSION VIEWS ================
 
 class SessionLogsView(APIView):
     """Get session logs with filtering options"""
@@ -20,25 +23,21 @@ class SessionLogsView(APIView):
     
     @require_authentication
     def get(self, request):
-        """Get all session logs with optional filtering"""
+        """Get session logs with filtering"""
         try:
-            # Get query parameters
             limit = int(request.query_params.get('limit', 100))
             status_filter = request.query_params.get('status', None)
+            user_filter = request.query_params.get('user', None)
             
-            # Use the optimized service method
-            sessions = self.session_service.get_active_sessions() if status_filter == 'active' else []
+            # Use display service for formatted output
+            display_service = SessionDisplayService()
+            result = display_service.get_session_logs(
+                limit=limit, 
+                status_filter=status_filter,
+                user_filter=user_filter
+            )
             
-            # If no specific filter, get all sessions with conversion
-            if not status_filter:
-                sessions = list(self.session_service.collection.find().limit(limit))
-                sessions = [self.session_service.convert_object_id(session) for session in sessions]
-            
-            return Response({
-                'success': True,
-                'data': sessions,
-                'count': len(sessions)
-            }, status=status.HTTP_200_OK)
+            return Response(result, status=status.HTTP_200_OK)
             
         except Exception as e:
             logger.error(f"Error in SessionLogsView: {e}")
@@ -48,57 +47,43 @@ class SessionLogsView(APIView):
                 'data': []
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-class SystemStatusView(APIView):
-    """Get comprehensive system status and statistics"""
+class SessionDetailView(APIView):
+    """Get specific session details"""
     
     def __init__(self):
-        self.user_service = UserService()
-        self.customer_service = CustomerService()
-        self.product_service = ProductService()
         self.session_service = SessionLogService()
     
     @require_authentication
-    def get(self, request):
-        """Get system status with optimized statistics"""
+    def get(self, request, session_id):
+        """Get specific session by session_id (SESS-#####)"""
         try:
-            # Use optimized service methods instead of raw database calls
-            session_stats = self.session_service.get_session_statistics()
+            session = self.session_service.get_session_by_id(session_id)
             
-            # Get other statistics efficiently
-            users = self.user_service.get_all_users()
-            customers = self.customer_service.get_all_customers()
-            products = self.product_service.get_all_products()
+            if not session:
+                return Response({
+                    'success': False,
+                    'error': f'Session {session_id} not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Check permissions - users can only view their own sessions
+            current_user = request.current_user
+            if (current_user.get('user_id') != session.get('user_id') and 
+                current_user.get('role') != 'admin'):
+                return Response({
+                    'success': False,
+                    'error': 'Permission denied'
+                }, status=status.HTTP_403_FORBIDDEN)
             
             return Response({
-                "system": "PANN User Management System",
-                "status": "operational",
-                "version": "1.0.0",
-                "statistics": {
-                    "total_users": len(users),
-                    "total_customers": len(customers),
-                    "total_products": len(products),
-                    "active_sessions": session_stats.get('active_sessions', 0),
-                    "today_sessions": session_stats.get('today_sessions', 0),
-                    "avg_session_duration": session_stats.get('avg_session_duration', 0)
-                },
-                "endpoints": {
-                    "health": "/api/v1/health/",
-                    "users": "/api/v1/users/",
-                    "customers": "/api/v1/customers/",
-                    "products": "/api/v1/products/",
-                    "auth_login": "/api/v1/auth/login/",
-                    "auth_logout": "/api/v1/auth/logout/",
-                    "session_logs": "/api/v1/session-logs/",
-                    "combined_logs": "/api/v1/logs/combined/"
-                }
+                'success': True,
+                'data': session
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
-            logger.error(f"Error in SystemStatusView: {e}")
+            logger.error(f"Error in SessionDetailView: {e}")
             return Response({
-                "system": "PANN User Management System",
-                "status": "error",
-                "error": str(e)
+                'success': False,
+                'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class ActiveSessionsView(APIView):
@@ -107,9 +92,9 @@ class ActiveSessionsView(APIView):
     def __init__(self):
         self.session_service = SessionLogService()
     
-    @require_admin  # Only admins should see active sessions
+    @require_admin
     def get(self, request):
-        """Get all active sessions"""
+        """Get all active sessions - admin only"""
         try:
             sessions = self.session_service.get_active_sessions()
             return Response({
@@ -136,12 +121,12 @@ class UserSessionsView(APIView):
     def get(self, request, user_id):
         """Get sessions for specific user"""
         try:
-            # Get query parameters
             limit = int(request.query_params.get('limit', 50))
             
-            # Check if user is requesting their own sessions or is admin
+            # Permission check
             current_user = request.current_user
-            if current_user.get('user_id') != user_id and current_user.get('role') != 'admin':
+            if (current_user.get('user_id') != user_id and 
+                current_user.get('role') != 'admin'):
                 return Response({
                     'success': False,
                     'error': 'Permission denied. You can only view your own sessions.'
@@ -151,7 +136,8 @@ class UserSessionsView(APIView):
             return Response({
                 'success': True,
                 'data': sessions,
-                'count': len(sessions)
+                'count': len(sessions),
+                'user_id': user_id
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
@@ -190,23 +176,282 @@ class SessionStatisticsView(APIView):
                 }
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+# ================ CLEANUP AND ADMIN VIEWS ================
+
+class SessionCleanupView(APIView):
+    """Manual session cleanup with export"""
+    
+    def __init__(self):
+        self.session_service = SessionLogService()
+    
+    @require_admin
+    def post(self, request):
+        """Manual cleanup with date range and CSV export"""
+        try:
+            start_date = request.data.get('start_date')
+            end_date = request.data.get('end_date')
+            export_path = request.data.get('export_path')
+            dry_run = request.data.get('dry_run', False)
+            
+            # Validate dates if provided
+            if start_date:
+                try:
+                    datetime.fromisoformat(start_date)
+                except ValueError:
+                    return Response({
+                        'success': False,
+                        'error': 'Invalid start_date format. Use ISO format (YYYY-MM-DD)'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if end_date:
+                try:
+                    datetime.fromisoformat(end_date)
+                except ValueError:
+                    return Response({
+                        'success': False,
+                        'error': 'Invalid end_date format. Use ISO format (YYYY-MM-DD)'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Perform cleanup with export
+            result = self.session_service.manual_cleanup_with_export(
+                start_date=start_date,
+                end_date=end_date,
+                export_path=export_path,
+                dry_run=dry_run
+            )
+            
+            return Response(result, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error in SessionCleanupView: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class CleanupStatusView(APIView):
+    """Get cleanup status and preview"""
+    
+    def __init__(self):
+        self.session_service = SessionLogService()
+    
+    @require_admin
+    def get(self, request):
+        """Get cleanup status and what would be cleaned"""
+        try:
+            status_data = self.session_service.get_cleanup_status()
+            preview_data = self.session_service.get_cleanup_preview()
+            
+            return Response({
+                'success': True,
+                'status': status_data,
+                'preview': preview_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error in CleanupStatusView: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class AutoCleanupControlView(APIView):
+    """Control automated cleanup system"""
+    
+    def __init__(self):
+        self.session_service = SessionLogService()
+    
+    @require_admin
+    def post(self, request):
+        """Start automated cleanup"""
+        try:
+            action = request.data.get('action', 'start')
+            cleanup_interval_hours = int(request.data.get('cleanup_interval_hours', 720))  # Default monthly
+            months_old = int(request.data.get('months_old', 6))
+            
+            if action == 'start':
+                result = self.session_service.start_automated_cleanup(
+                    cleanup_interval_hours=cleanup_interval_hours,
+                    months_old=months_old
+                )
+            elif action == 'stop':
+                result = self.session_service.stop_automated_cleanup()
+            else:
+                return Response({
+                    'success': False,
+                    'error': 'Invalid action. Use "start" or "stop"'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            return Response(result, status=status.HTTP_200_OK)
+            
+        except ValueError as e:
+            return Response({
+                'success': False,
+                'error': 'Invalid parameter values'
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as e:
+            logger.error(f"Error in AutoCleanupControlView: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class SessionExportView(APIView):
+    """Export session data to CSV"""
+    
+    def __init__(self):
+        self.display_service = SessionDisplayService()
+    
+    @require_admin
+    def post(self, request):
+        """Export session logs to CSV"""
+        try:
+            export_format = request.data.get('format', 'csv')
+            date_filter = request.data.get('date_filter')
+            status_filter = request.data.get('status_filter')
+            
+            # Validate date filter if provided
+            if date_filter:
+                try:
+                    if 'start_date' in date_filter:
+                        datetime.fromisoformat(date_filter['start_date'])
+                    if 'end_date' in date_filter:
+                        datetime.fromisoformat(date_filter['end_date'])
+                except ValueError:
+                    return Response({
+                        'success': False,
+                        'error': 'Invalid date format in date_filter'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            result = self.display_service.export_session_logs(
+                export_format=export_format,
+                date_filter=date_filter,
+                status_filter=status_filter
+            )
+            
+            if result['success']:
+                # Return CSV as file download
+                if export_format == 'csv':
+                    response = HttpResponse(content_type='text/csv')
+                    response['Content-Disposition'] = f'attachment; filename="session_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
+                    
+                    # Write CSV data
+                    import csv
+                    import io
+                    output = io.StringIO()
+                    writer = csv.DictWriter(output, fieldnames=[
+                        'session_id', 'user_id', 'username', 'login_time', 
+                        'logout_time', 'duration', 'status', 'branch_id', 
+                        'ip_address', 'logout_reason'
+                    ])
+                    writer.writeheader()
+                    for row in result['data']:
+                        writer.writerow(row)
+                    
+                    response.write(output.getvalue())
+                    return response
+                else:
+                    return Response(result, status=status.HTTP_200_OK)
+            else:
+                return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        except Exception as e:
+            logger.error(f"Error in SessionExportView: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# ================ ADMIN CONTROL VIEWS ================
+
+class ForceLogoutView(APIView):
+    """Force logout specific users"""
+    
+    def __init__(self):
+        self.session_service = SessionLogService()
+    
+    @require_admin
+    def post(self, request, user_id):
+        """Force logout a specific user"""
+        try:
+            result = self.session_service.log_logout(user_id, reason="admin_forced")
+            
+            if result.get('success'):
+                return Response({
+                    'success': True,
+                    'message': f'User {user_id} logged out successfully',
+                    'duration': result.get('duration', 0),
+                    'session_id': result.get('session_id')
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'success': False,
+                    'message': result.get('message', 'Failed to logout user')
+                }, status=status.HTTP_404_NOT_FOUND)
+                
+        except Exception as e:
+            logger.error(f"Error in ForceLogoutView: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class BulkSessionControlView(APIView):
+    """Bulk session operations"""
+    
+    def __init__(self):
+        self.session_service = SessionLogService()
+    
+    @require_admin
+    def post(self, request):
+        """Bulk expire sessions for multiple users"""
+        try:
+            action = request.data.get('action', 'expire')
+            user_ids = request.data.get('user_ids', [])
+            
+            if not user_ids or not isinstance(user_ids, list):
+                return Response({
+                    'success': False,
+                    'error': 'user_ids must be a non-empty list'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if action == 'expire':
+                result = self.session_service.bulk_expire_user_sessions(user_ids)
+                return Response(result, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'success': False,
+                    'error': 'Invalid action. Only "expire" is supported'
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            logger.error(f"Error in BulkSessionControlView: {e}")
+            return Response({
+                'success': False,
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# ================ DISPLAY AND LOGGING VIEWS ================
+
 class SessionDisplayView(APIView):
     """Get formatted session logs for display"""
     
     def __init__(self):
-        self.display_service = SessionDisplayService()  # Updated class name
+        self.display_service = SessionDisplayService()
     
     @require_authentication
     def get(self, request):
         """Get formatted session logs"""
         try:
-            # Get query parameters
             limit = int(request.query_params.get('limit', 100))
             status_filter = request.query_params.get('status', None)
+            user_filter = request.query_params.get('user', None)
             
             result = self.display_service.get_session_logs(
                 limit=limit, 
-                status_filter=status_filter
+                status_filter=status_filter,
+                user_filter=user_filter
             )
             return Response(result, status=status.HTTP_200_OK)
             
@@ -222,33 +467,25 @@ class CombinedLogsView(APIView):
     """Get both session and audit logs combined"""
     
     def __init__(self):
-        self.display_service = SessionDisplayService()  # Updated class name
+        self.display_service = SessionDisplayService()
     
     @require_authentication
     def get(self, request):
         """Get combined session and audit logs"""
         try:
-            # Get query parameters with validation
-            limit = min(int(request.query_params.get('limit', 100)), 500)  # Max 500
+            limit = min(int(request.query_params.get('limit', 100)), 500)
             log_type = request.query_params.get('type', 'all')
             
-            # Validate log_type
             if log_type not in ['all', 'session', 'audit']:
                 return Response({
                     'success': False,
                     'error': 'Invalid log type. Must be: all, session, or audit'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            logger.info(f"Getting {log_type} logs (limit: {limit}) for user {request.current_user.get('username')}")
-            
-            # Use the optimized service method
             result = self.display_service.get_combined_logs(limit=limit, log_type=log_type)
-            
-            logger.info(f"Returning {len(result.get('data', []))} logs")
             return Response(result, status=status.HTTP_200_OK)
             
         except ValueError as e:
-            logger.warning(f"Invalid parameter in CombinedLogsView: {e}")
             return Response({
                 'success': False,
                 'error': 'Invalid parameters provided'
@@ -262,75 +499,61 @@ class CombinedLogsView(APIView):
                 'data': []
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-class SessionCleanupView(APIView):
-    """Admin endpoint for cleaning up old sessions"""
+# ================ SYSTEM STATUS VIEW ================
+
+class SystemStatusView(APIView):
+    """Get comprehensive system status"""
     
     def __init__(self):
+        self.user_service = UserService()
+        self.customer_service = CustomerService()
+        self.product_service = ProductService()
         self.session_service = SessionLogService()
     
-    @require_admin
-    def post(self, request):
-        """Clean up old sessions"""
+    @require_authentication
+    def get(self, request):
+        """Get system status with statistics"""
         try:
-            # Get days parameter with default
-            days_old = int(request.data.get('days_old', 30))
+            session_stats = self.session_service.get_session_statistics()
+            cleanup_status = self.session_service.get_cleanup_status()
             
-            # Validate days parameter
-            if days_old < 1 or days_old > 365:
-                return Response({
-                    'success': False,
-                    'error': 'days_old must be between 1 and 365'
-                }, status=status.HTTP_400_BAD_REQUEST)
-            
-            deleted_count = self.session_service.cleanup_old_sessions(days_old=days_old)
+            # Get counts efficiently
+            users = self.user_service.get_all_users()
+            customers = self.customer_service.get_all_customers()
+            products = self.product_service.get_all_products()
             
             return Response({
-                'success': True,
-                'message': f'Cleaned up {deleted_count} old sessions',
-                'deleted_count': deleted_count
+                "system": "PANN User Management System",
+                "status": "operational",
+                "version": "2.0.0",
+                "timestamp": datetime.utcnow().isoformat(),
+                "statistics": {
+                    "total_users": len(users),
+                    "total_customers": len(customers), 
+                    "total_products": len(products),
+                    "active_sessions": session_stats.get('active_sessions', 0),
+                    "today_sessions": session_stats.get('today_sessions', 0),
+                    "avg_session_duration": session_stats.get('avg_session_duration', 0)
+                },
+                "cleanup_status": {
+                    "automated_cleanup_running": cleanup_status.get('automated_cleanup_running', False),
+                    "sessions_older_than_6_months": cleanup_status.get('sessions_older_than_6_months', 0),
+                    "cleanup_schedule": cleanup_status.get('cleanup_schedule', 'Not scheduled')
+                },
+                "endpoints": {
+                    "session_logs": "/api/v1/session-logs/",
+                    "active_sessions": "/api/v1/sessions/active/",
+                    "session_cleanup": "/api/v1/sessions/cleanup/",
+                    "cleanup_status": "/api/v1/sessions/cleanup/status/",
+                    "session_export": "/api/v1/sessions/export/",
+                    "combined_logs": "/api/v1/logs/combined/"
+                }
             }, status=status.HTTP_200_OK)
             
-        except ValueError as e:
-            return Response({
-                'success': False,
-                'error': 'Invalid days_old parameter'
-            }, status=status.HTTP_400_BAD_REQUEST)
-            
         except Exception as e:
-            logger.error(f"Error in SessionCleanupView: {e}")
+            logger.error(f"Error in SystemStatusView: {e}")
             return Response({
-                'success': False,
-                'error': str(e)
+                "system": "PANN User Management System",
+                "status": "error",
+                "error": str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-class ForceLogoutView(APIView):
-    """Admin endpoint to force logout a user"""
-    
-    def __init__(self):
-        self.session_service = SessionLogService()
-    
-    @require_admin
-    def post(self, request, user_id):
-        """Force logout a specific user"""
-        try:
-            result = self.session_service.log_logout(user_id, reason="admin_forced")
-            
-            if result.get('success'):
-                return Response({
-                    'success': True,
-                    'message': f'User {user_id} logged out successfully',
-                    'duration': result.get('duration', 0)
-                }, status=status.HTTP_200_OK)
-            else:
-                return Response({
-                    'success': False,
-                    'message': result.get('message', 'Failed to logout user')
-                }, status=status.HTTP_404_NOT_FOUND)
-                
-        except Exception as e:
-            logger.error(f"Error in ForceLogoutView: {e}")
-            return Response({
-                'success': False,
-                'error': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-

@@ -2,13 +2,18 @@ from django.urls import path
 
 from .kpi_views.session_views import (
     SessionLogsView,
+    SessionDetailView,  
     SessionDisplayView, 
     CombinedLogsView,
     ActiveSessionsView,
     UserSessionsView,
     SessionStatisticsView,
     SessionCleanupView,
+    CleanupStatusView,  
+    AutoCleanupControlView,  
+    SessionExportView,  
     ForceLogoutView,
+    BulkSessionControlView, 
     SystemStatusView
 )
 
@@ -226,13 +231,22 @@ urlpatterns = [
 
     # ========== SESSION MANAGEMENT ==========
     path('session-logs/', SessionLogsView.as_view(), name='session-logs'),
+    path('session-logs/<str:session_id>/', SessionDetailView.as_view(), name='session-detail'),  
     path('session-logs/display/', SessionDisplayView.as_view(), name='session-logs-display'),
     path('session-logs/combined/', CombinedLogsView.as_view(), name='combined-logs'),
+    # Session management
     path('sessions/active/', ActiveSessionsView.as_view(), name='active-sessions'),
     path('sessions/user/<str:user_id>/', UserSessionsView.as_view(), name='user-sessions'),
     path('sessions/statistics/', SessionStatisticsView.as_view(), name='session-statistics'),
-    path('sessions/cleanup/', SessionCleanupView.as_view(), name='session-cleanup'),  # Admin only
-    path('sessions/force-logout/<str:user_id>/', ForceLogoutView.as_view(), name='force-logout'),  # Admin only
+    # Cleanup and maintenance (Admin only)
+    path('sessions/cleanup/', SessionCleanupView.as_view(), name='session-cleanup'),
+    path('sessions/cleanup/status/', CleanupStatusView.as_view(), name='cleanup-status'),  
+    path('sessions/cleanup/auto/', AutoCleanupControlView.as_view(), name='auto-cleanup-control'),  
+    # Export functionality (Admin only)
+    path('sessions/export/', SessionExportView.as_view(), name='session-export'), 
+    # Admin control endpoints
+    path('sessions/force-logout/<str:user_id>/', ForceLogoutView.as_view(), name='force-logout'),
+    path('sessions/bulk-control/', BulkSessionControlView.as_view(), name='bulk-session-control'),  
     
     # ========== PRODUCT MANAGEMENT ==========
     # Product CRUD (static paths first)
