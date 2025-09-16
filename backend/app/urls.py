@@ -140,13 +140,22 @@ from .kpi_views.sales_bulk_views import (
 )
 
 from .kpi_views.promotion_views import (
-    PromotionHealthCheckView,
+     PromotionHealthCheckView,
     PromotionListView,
     PromotionDetailView,
     PromotionByNameView,
     PromotionRestoreView,
-    PromotionDeletedListView,
+    DeletedPromotionsView,  
     PromotionHardDeleteView,
+    ActivePromotionsView,
+    PromotionActivationView,
+    PromotionDeactivationView,
+    PromotionExpirationView,
+    PromotionApplicationView,
+    PromotionStatisticsView,
+    PromotionAuditView,
+    PromotionSearchView,
+    PromotionReportView,
 )
 
 from .kpi_views.pos.salesReportView import (
@@ -344,12 +353,22 @@ urlpatterns = [
     # ========== PROMOTIONS ==========
     path('promotions/', PromotionListView.as_view(), name='promotion-list'),  # GET (list), POST (create)
     path('promotions/health/', PromotionHealthCheckView.as_view(), name='promotion-health'),  # GET
-    path('promotions/deleted/', PromotionDeletedListView.as_view(), name='promotion-deleted-list'),  # GET
+    path('promotions/active/', ActivePromotionsView.as_view(), name='active-promotions'),  # GET
+    path('promotions/deleted/', DeletedPromotionsView.as_view(), name='promotion-deleted-list'),  # GET - Admin only
+    path('promotions/search/', PromotionSearchView.as_view(), name='promotion-search'),  # GET
+    path('promotions/statistics/', PromotionStatisticsView.as_view(), name='promotion-statistics'),  # GET - Admin only
+    path('promotions/apply/', PromotionApplicationView.as_view(), name='promotion-apply'),  # POST
     path('promotions/by-name/<str:promotion_name>/', PromotionByNameView.as_view(), name='promotion-by-name'),  # GET
     path('promotions/<str:promotion_id>/', PromotionDetailView.as_view(), name='promotion-detail'),  # GET, PUT, DELETE
-    path('promotions/<str:promotion_id>/hard-delete/', PromotionHardDeleteView.as_view(), name='promotion-hard-delete'),  # DELETE - Admin only
+    path('promotions/<str:promotion_id>/activate/', PromotionActivationView.as_view(), name='promotion-activate'),  # POST - Admin only
+    path('promotions/<str:promotion_id>/deactivate/', PromotionDeactivationView.as_view(), name='promotion-deactivate'),  # POST - Admin only
+    path('promotions/<str:promotion_id>/expire/', PromotionExpirationView.as_view(), name='promotion-expire'),  # POST - Admin only
     path('promotions/<str:promotion_id>/restore/', PromotionRestoreView.as_view(), name='promotion-restore'),  # POST - Admin only
-    
+    path('promotions/<str:promotion_id>/hard-delete/', PromotionHardDeleteView.as_view(), name='promotion-hard-delete'),  # DELETE - Admin only
+    path('promotions/<str:promotion_id>/audit/', PromotionAuditView.as_view(), name='promotion-audit'),  # GET - Admin only
+    path('promotions/<str:promotion_id>/report/', PromotionReportView.as_view(), name='promotion-report'),  # GET - Admin only
+
+
     # ========== POS OPERATIONS ==========
     # POS health and core functionality
     path('pos/health/', POSHealthCheckView.as_view(), name='pos_health_check'),  # GET
