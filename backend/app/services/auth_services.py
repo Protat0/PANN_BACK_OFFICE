@@ -1,11 +1,10 @@
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-from bson import ObjectId
 import bcrypt
 from ..database import db_manager
 
 # JWT settings
-SECRET_KEY = "your-secret-key-here-change-in-production"  #Default is your-secret-key-here-change-in-production
+SECRET_KEY = "your-secret-key-here-change-in-production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 REFRESH_TOKEN_EXPIRE_DAYS = 7
@@ -15,12 +14,6 @@ class AuthService:
         self.db = db_manager.get_database()
         self.user_collection = self.db.users
         self.blacklist_collection = self.db.token_blacklist
-    
-    def convert_object_id(self, document):
-        """Convert ObjectId to string for JSON serialization"""
-        if document and '_id' in document:
-            document['_id'] = str(document['_id'])
-        return document
     
     def verify_password(self, password: str, hashed: str) -> bool:
         """Verify password against hash"""
@@ -65,68 +58,65 @@ class AuthService:
             return None
     
     def login(self, email: str, password: str):
-        """Authenticate user and return tokens - ADMIN ONLY"""
         try:
             # Find user by email
             user = self.user_collection.find_one({"email": email})
             if not user:
                 raise Exception("Invalid email or password")
             
-            # Verify password
+            # Password verification
             if not self.verify_password(password, user["password"]):
                 raise Exception("Invalid email or password")
             
-            # Check if user is active (default to active if status is missing)
+            # Status check
             user_status = user.get("status", "active")
             if user_status != "active":
                 raise Exception("Account is not active")
             
-            # ADMIN-ONLY CHECK: Verify user has admin role
+            # Role check
             user_role = user.get("role", "").lower()
             if user_role != "admin":
-                # Log unauthorized access attempt
                 print(f"Non-admin login attempt blocked: {email} (role: {user_role})")
                 raise Exception("Access denied. This system is restricted to administrators only.")
             
-            # Update last login 
+            # ✅ SIMPLIFIED: Just get the user_id (no generation needed)
+            user_id = user["user_id"]  # This should always exist now
+            
+            # Update last login
             self.user_collection.update_one(
-                {"_id": user["_id"]},
+                {"user_id": user_id},  # ✅ Use user_id instead of _id
                 {"$set": {"last_login": datetime.utcnow()}}
             )
             
-            # Create tokens
-            token_data = {"sub": str(user["_id"]), "email": user["email"], "role": user["role"]}
+            # Create tokens with USER-#### format
+            token_data = {"sub": user_id, "email": user["email"], "role": user["role"]}
             access_token = self.create_access_token(token_data)
             refresh_token = self.create_refresh_token(token_data)
             
-            # Log the admin login session
+            # Session logging with USER-#### format
             try:
                 from .session_services import SessionLogService
                 session_service = SessionLogService()
                 session_user = {
-                    "user_id": str(user["_id"]),
+                    "user_id": user_id,
                     "username": user.get("username", user["email"]),
                     "email": user["email"],
-                    "branch_id": 1,  # Default branch
-                    "role": "admin"  # Explicitly mark as admin session
+                    "branch_id": 1,
+                    "role": "admin"
                 }
                 session_service.log_login(session_user)
                 print(f"Admin login successful: {user['email']}")
             except Exception as session_error:
                 print(f"Session logging error: {session_error}")
-                # Don't fail login if session logging fails
             
-            # Prepare user info for response
-            user_info = self.convert_object_id(user.copy())
-            user_info.pop("password", None)  # Remove password from response
-            
+            # Response with USER-#### format
             return {
                 "access_token": access_token,
                 "refresh_token": refresh_token,
                 "token_type": "bearer",
                 "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
                 "user": {
-                    "id": str(user["_id"]),
+                    "id": user_id,  # USER-#### format
                     "email": user["email"],
                     "role": user["role"],
                     "name": user.get("full_name", ""),
@@ -136,7 +126,6 @@ class AuthService:
             }
             
         except Exception as e:
-            # Log failed login attempts for security monitoring
             print(f"Login failed for {email}: {str(e)}")
             raise e
     
@@ -196,18 +185,44 @@ class AuthService:
             if not payload or payload.get("type") != "access":
                 return None
             
-            user_id = payload["sub"]
-            user = self.user_collection.find_one({"_id": ObjectId(user_id)})
+            user_id = payload["sub"]  # This is now always USER-#### format
+            
+            # ✅ SIMPLIFIED: Only look up by user_id
+            user = self.user_collection.find_one({"user_id": user_id})
+            
             if user:
-                user_info = self.convert_object_id(user.copy())
-                user_info.pop("password", None)  # Remove password
                 return {
-                    "user_id": str(user["_id"]),
+                    "user_id": user["user_id"],  # Always USER-#### format
                     "email": user["email"],
                     "role": user["role"],
-                    "user_data": user_info
+                    "user_data": user  # No need for convert_object_id if no ObjectIds
                 }
             return None
         
         except Exception as e:
             raise Exception(f"Error getting current user: {str(e)}")
+    
+    def refresh_access_token(self, refresh_token: str):
+        """Refresh access token using refresh token"""
+        try:
+            payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+            if payload.get("type") != "refresh":
+                raise Exception("Invalid token type")
+            
+            user_id = payload["sub"]
+            user = self.user_collection.find_one({"user_id": user_id})
+            
+            if not user:
+                raise Exception("User not found")
+            
+            # Create new access token
+            token_data = {"sub": user_id, "email": user["email"], "role": user["role"]}
+            new_access_token = self.create_access_token(token_data)
+            
+            return {
+                "access_token": new_access_token,
+                "token_type": "bearer",
+                "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            }
+        except JWTError:
+            raise Exception("Invalid refresh token")

@@ -1,0 +1,93 @@
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.http import HttpResponse, JsonResponse
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
+from ..services import category_service
+import logging
+
+logger = logging.getLogger(__name__)
+
+# ================ DISPLAY AND EXPORT VIEWS ================
+
+class CategoryDataView(APIView):
+    """Get categories with sales data"""
+    
+    def get(self, request):
+        """Get all categories with sales data"""
+        try:
+            include_deleted = request.query_params.get('include_deleted', 'false').lower() == 'true'
+            result = category_service.display.get_categories_display(include_deleted=include_deleted)
+            
+            return Response({
+                "categories": result,
+                "count": len(result),
+                "include_deleted": include_deleted
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error in CategoryDataView: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class CategoryExportView(APIView):
+    """Export categories in CSV or JSON format"""
+    
+    def get(self, request):
+        """Export categories with optional filters"""
+        try:
+            format_type = request.GET.get('format', 'csv').lower()
+            include_sales_data = request.GET.get('include_sales_data', 'true').lower() == 'true'
+            include_deleted = request.GET.get('include_deleted', 'false').lower() == 'true'
+            
+            if format_type not in ['csv', 'json']:
+                return JsonResponse({'error': 'Invalid format. Use csv or json.'}, status=400)
+            
+            # Parse date filter
+            date_filter = None
+            start_date = request.GET.get('start_date')
+            end_date = request.GET.get('end_date')
+            if start_date or end_date:
+                date_filter = {'start_date': start_date, 'end_date': end_date}
+            
+            # Validate and export
+            category_service.display.validate_export_params(format_type, include_sales_data, date_filter, include_deleted)
+            
+            if format_type == 'csv':
+                export_result = category_service.display.export_categories_csv(
+                    include_sales_data=include_sales_data, date_filter=date_filter, include_deleted=include_deleted
+                )
+            else:
+                export_result = category_service.display.export_categories_json(
+                    include_sales_data=include_sales_data, date_filter=date_filter, include_deleted=include_deleted
+                )
+            
+            response = HttpResponse(export_result['content'], content_type=export_result['content_type'])
+            response['Content-Disposition'] = f'attachment; filename="{export_result["filename"]}"'
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error in CategoryExportView: {e}")
+            return JsonResponse({'error': f'Export failed: {str(e)}'}, status=500)
+
+
+class CategoryStatsView(APIView):
+    """Get category statistics"""
+    
+    def get(self, request):
+        """Get comprehensive category statistics"""
+        try:
+            stats = category_service.category.get_category_stats()
+            
+            return Response({
+                'success': True,
+                'message': 'Category statistics retrieved successfully',
+                'stats': stats
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error getting category stats: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
