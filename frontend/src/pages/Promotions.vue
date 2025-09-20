@@ -1,15 +1,15 @@
 <template>
-  <div class="promotions-page">
+  <div class="promotions-page surface-secondary text-secondary transition-theme">
     <!-- Main Content -->
     <div class="container-fluid py-4">
       <!-- Action Bar and Filters -->
-      <div class="action-bar-container mb-3">
+      <div class="action-bar-container surface-primary shadow-md transition-theme mb-3">
         <div class="action-row">
           <!-- Left Side: Main Actions (Always visible when no selection) -->
           <div v-if="selectedPromotions.length === 0" class="d-flex gap-2">
             <!-- Add Promo Button -->
             <button 
-              class="btn btn-add btn-sm btn-with-icon"
+              class="btn btn-add btn-sm btn-with-icon transition-all-theme"
               @click="handleSinglePromo"
             >
               <Plus :size="14" />
@@ -17,9 +17,10 @@
             </button>
 
             <button 
-              class="btn btn-outline-secondary btn-sm"
+              class="btn btn-export btn-sm btn-with-icon transition-all-theme"
               @click="exportData"
             >
+              <Download :size="14" />
               EXPORT
             </button>
           </div>
@@ -27,7 +28,7 @@
           <!-- Selection Actions (Visible when items are selected) -->
           <div v-if="selectedPromotions.length > 0" class="d-flex gap-2">
             <button 
-              class="btn btn-delete btn-sm btn-with-icon"
+              class="btn btn-delete btn-sm btn-with-icon transition-all-theme"
               @click="deleteSelected"
             >
               <Trash2 :size="14" />
@@ -39,9 +40,9 @@
           <div class="filters-section d-flex align-items-center gap-2">
             <!-- Search Toggle -->
             <button 
-              class="btn btn-secondary btn-sm search-toggle-btn"
+              class="btn btn-icon-only btn-sm search-toggle-btn transition-all-theme"
+              :class="searchMode ? 'btn-filter state-selected' : 'btn-filter'"
               @click="toggleSearchMode"
-              :class="{ 'active': searchMode }"
             >
               <Search :size="16" />
             </button>
@@ -49,9 +50,9 @@
             <!-- Filter Dropdowns (Hidden when search is active) -->
             <template v-if="!searchMode">
               <div class="filter-group">
-                <label class="filter-label">Discount Type</label>
+                <label class="filter-label text-tertiary">Discount Type</label>
                 <select 
-                  class="form-select form-select-sm" 
+                  class="form-select form-select-sm input-complete transition-theme" 
                   v-model="discountTypeFilter" 
                   @change="applyFilters"
                 >
@@ -63,9 +64,9 @@
               </div>
 
               <div class="filter-group">
-                <label class="filter-label">Status</label>
+                <label class="filter-label text-tertiary">Status</label>
                 <select 
-                  class="form-select form-select-sm" 
+                  class="form-select form-select-sm input-complete transition-theme" 
                   v-model="statusFilter" 
                   @change="applyFilters"
                 >
@@ -86,13 +87,13 @@
                   v-model="searchFilter" 
                   @input="applyFilters"
                   type="text" 
-                  class="form-control form-control-sm search-input"
+                  class="form-control form-control-sm input-complete transition-theme"
                   placeholder="Search promotions..."
                 />
                 <button 
-                  class="btn btn-sm btn-link position-absolute end-0 top-50 translate-middle-y"
+                  class="btn btn-sm btn-cancel position-absolute end-0 top-50 translate-middle-y border-0"
                   @click="clearSearch"
-                  style="border: none; padding: 0.25rem;"
+                  style="padding: 0.25rem;"
                 >
                   <X :size="16" />
                 </button>
@@ -116,7 +117,7 @@
                 <th class="text-center" style="width: 50px;">
                   <div class="form-check">
                     <input 
-                      class="form-check-input" 
+                      class="form-check-input focus-ring-theme" 
                       type="checkbox" 
                       :checked="isAllSelected"
                       :indeterminate="isIndeterminate"
@@ -124,14 +125,14 @@
                     >
                   </div>
                 </th>
-                <th>Promotion Name</th>
-                <th>Discount Type</th>
-                <th>Discount Value</th>
-                <th>Start Date</th>
-                <th>End Date</th>
-                <th>Status</th>
-                <th>Last Updated</th>
-                <th class="text-center" style="width: 120px;">Actions</th>
+                <th class="text-inverse">Promotion Name</th>
+                <th class="text-inverse">Discount Type</th>
+                <th class="text-inverse">Discount Value</th>
+                <th class="text-inverse">Start Date</th>
+                <th class="text-inverse">End Date</th>
+                <th class="text-inverse">Status</th>
+                <th class="text-inverse">Last Updated</th>
+                <th class="text-center text-inverse" style="width: 120px;">Actions</th>
               </tr>
             </template>
 
@@ -139,12 +140,13 @@
               <tr 
                 v-for="promotion in paginatedPromotions" 
                 :key="promotion.promotion_id"
-                :class="{ 'table-primary': selectedPromotions.includes(promotion.promotion_id) }"
+                :class="{ 'state-selected': selectedPromotions.includes(promotion.promotion_id) }"
+                class="hover-surface transition-theme"
               >
                 <td class="text-center">
                   <div class="form-check">
                     <input 
-                      class="form-check-input" 
+                      class="form-check-input focus-ring-theme" 
                       type="checkbox" 
                       :value="promotion.promotion_id"
                       v-model="selectedPromotions"
@@ -152,20 +154,20 @@
                   </div>
                 </td>
                 <td>
-                  <div class="fw-medium text-tertiary-dark">{{ promotion.promotion_name }}</div>
+                  <div class="fw-medium text-primary">{{ promotion.promotion_name }}</div>
                 </td>
                 <td>
                   <span class="badge" :class="getDiscountTypeBadgeClass(promotion.discount_type)">
                     {{ formatDiscountType(promotion.discount_type) }}
                   </span>
                 </td>
-                <td class="text-tertiary-dark">
+                <td class="text-secondary">
                   {{ formatDiscountValue(promotion.discount_value, promotion.discount_type) }}
                 </td>
-                <td class="text-tertiary-medium">
+                <td class="text-tertiary">
                   {{ formatDate(promotion.start_date) }}
                 </td>
-                <td class="text-tertiary-medium">
+                <td class="text-tertiary">
                   {{ formatDate(promotion.end_date) }}
                 </td>
                 <td>
@@ -173,27 +175,27 @@
                     {{ formatStatus(promotion.status) }}
                   </span>
                 </td>
-                <td class="text-tertiary-medium">
+                <td class="text-tertiary">
                   {{ formatDateTime(promotion.last_updated) }}
                 </td>
                 <td class="text-center">
                   <div class="d-flex justify-content-center gap-1">
                     <button 
-                      class="btn btn-outline-primary action-btn action-btn-view"
+                      class="btn btn-outline-primary action-btn action-btn-view focus-ring-theme"
                       @click="viewPromotion(promotion)"
                       title="View Details"
                     >
                       <Eye :size="12" />
                     </button>
                     <button 
-                      class="btn btn-outline-secondary action-btn action-btn-edit"
+                      class="btn btn-outline-secondary action-btn action-btn-edit focus-ring-theme"
                       @click="editPromotion(promotion)"
                       title="Edit"
                     >
                       <Edit :size="12" />
                     </button>
                     <button 
-                      class="btn btn-outline-danger action-btn action-btn-delete"
+                      class="btn btn-outline-danger action-btn action-btn-delete focus-ring-theme"
                       @click="deletePromotion(promotion)"
                       title="Delete"
                     >
@@ -206,10 +208,10 @@
               <!-- Empty State -->
               <tr v-if="promotions.length === 0">
                 <td colspan="9" class="text-center py-5">
-                  <div class="text-tertiary-medium">
+                  <div class="text-tertiary">
                     <Package :size="48" class="mb-3 opacity-50" />
-                    <div>No promotions found</div>
-                    <small>Start by creating your first promotional campaign</small>
+                    <div class="text-secondary">No promotions found</div>
+                    <small class="text-tertiary">Start by creating your first promotional campaign</small>
                   </div>
                 </td>
               </tr>
@@ -225,6 +227,7 @@
 </template>
 
 <script>
+import { Plus, Trash2, Search, X, Eye, Edit, Package, Download } from 'lucide-vue-next'
 import DataTable from '@/components/common/TableTemplate.vue'
 import AddPromoModal from '@/components/promotions/AddPromoModal.vue'
 
@@ -232,7 +235,15 @@ export default {
   name: 'Promotions',
   components: {
     DataTable,
-    AddPromoModal
+    AddPromoModal,
+    Plus,
+    Trash2,
+    Search,
+    X,
+    Eye,
+    Edit,
+    Package,
+    Download
   },
   data() {
     return {
@@ -430,20 +441,20 @@ export default {
     },
     getDiscountTypeBadgeClass(type) {
       const classes = {
-        'percentage': 'bg-primary text-white',
-        'fixed': 'bg-success text-white',
-        'buy_one_get_one': 'bg-info text-white'
+        'percentage': 'text-status-info surface-elevated border-primary',
+        'fixed': 'text-status-success surface-elevated border-success',
+        'buy_one_get_one': 'text-accent surface-elevated border-accent'
       }
-      return classes[type] || 'bg-secondary text-white'
+      return classes[type] || 'text-secondary surface-elevated border-secondary'
     },
     getStatusBadgeClass(status) {
       const classes = {
-        'active': 'bg-success text-white',
-        'inactive': 'bg-secondary text-white',
-        'expired': 'bg-danger text-white',
-        'scheduled': 'bg-warning text-dark'
+        'active': 'text-status-success surface-elevated border-success',
+        'inactive': 'text-secondary surface-elevated border-secondary',
+        'expired': 'text-status-error surface-elevated border-error',
+        'scheduled': 'text-status-warning surface-elevated border-warning'
       }
-      return classes[status] || 'bg-secondary text-white'
+      return classes[status] || 'text-secondary surface-elevated border-secondary'
     },
     viewPromotion(promotion) {
       if (this.$refs.addPromoModal && this.$refs.addPromoModal.openView) {
@@ -464,38 +475,12 @@ export default {
 </script>
 
 <style scoped>
-.promotions-page {
-  min-height: 100vh;
-  background-color: var(--neutral-light);
-}
-
-@media (max-width: 768px) {
-  .action-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 1rem;
-  }
-  
-  .filters-section {
-    justify-content: flex-start;
-  }
-  
-  .filter-group {
-    min-width: 120px;
-  }
-  
-  .search-container {
-    min-width: 100%;
-  }
-}
-
 /* Action Bar Styles */
 .action-bar-container {
-  background: white;
   border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   overflow: hidden;
   padding: 1rem;
+  border: 1px solid var(--border-secondary);
 }
 
 /* Single Row Layout */
@@ -531,7 +516,6 @@ export default {
 .filter-label {
   font-size: 0.75rem;
   font-weight: 500;
-  color: var(--tertiary-medium);
   margin-bottom: 0.25rem;
   display: block;
 }
@@ -541,7 +525,7 @@ export default {
   min-width: 300px;
 }
 
-.search-input {
+.search-container .form-control {
   padding-right: 2.5rem;
   height: calc(1.5em + 0.75rem + 2px);
 }
@@ -553,17 +537,33 @@ export default {
   justify-content: center;
 }
 
-/* Button States */
-.btn.active {
-  background-color: var(--primary);
-  border-color: var(--primary);
-  color: white;
+/* Badge Styles */
+.badge {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  border: 1px solid;
 }
 
-/* Form controls focus states */
-.form-select:focus,
-.form-control:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
+/* Responsive Design */
+@media (max-width: 768px) {
+  .action-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+  
+  .filters-section {
+    justify-content: flex-start;
+  }
+  
+  .filter-group {
+    min-width: 120px;
+  }
+  
+  .search-container {
+    min-width: 100%;
+  }
 }
 </style>
