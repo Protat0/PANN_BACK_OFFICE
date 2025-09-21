@@ -5,9 +5,8 @@
       <!-- Action Bar and Filters -->
       <div class="action-bar-container mb-3">
         <div class="action-row">
-          <!-- Left Side: Main Actions (Always visible when no selection) -->
+          <!-- Left Side: Main Actions -->
           <div v-if="selectedPromotions.length === 0" class="d-flex gap-2">
-            <!-- Add Promo Button -->
             <button 
               class="btn btn-add btn-sm btn-with-icon"
               @click="handleSinglePromo"
@@ -19,16 +18,27 @@
             <button 
               class="btn btn-outline-secondary btn-sm"
               @click="exportData"
+              :disabled="loading"
             >
               EXPORT
             </button>
+
+            <button 
+              class="btn btn-outline-info btn-sm"
+              @click="refreshPromotions"
+              :disabled="loading"
+            >
+              <RotateCcw :size="14" />
+              REFRESH
+            </button>
           </div>
 
-          <!-- Selection Actions (Visible when items are selected) -->
+          <!-- Selection Actions -->
           <div v-if="selectedPromotions.length > 0" class="d-flex gap-2">
             <button 
               class="btn btn-delete btn-sm btn-with-icon"
               @click="deleteSelected"
+              :disabled="loading"
             >
               <Trash2 :size="14" />
               DELETE ({{ selectedPromotions.length }})
@@ -46,7 +56,7 @@
               <Search :size="16" />
             </button>
 
-            <!-- Filter Dropdowns (Hidden when search is active) -->
+            <!-- Filter Dropdowns -->
             <template v-if="!searchMode">
               <div class="filter-group">
                 <label class="filter-label">Discount Type</label>
@@ -57,8 +67,8 @@
                 >
                   <option value="all">All types</option>
                   <option value="percentage">Percentage</option>
-                  <option value="fixed">Fixed Amount</option>
-                  <option value="buy_one_get_one">BOGO</option>
+                  <option value="fixed_amount">Fixed Amount</option>
+                  <option value="buy_x_get_y">BOGO</option>
                 </select>
               </div>
 
@@ -78,13 +88,14 @@
               </div>
             </template>
 
-            <!-- Search Bar (Visible when search mode is active) -->
+            <!-- Search Bar -->
             <div v-if="searchMode" class="search-container">
               <div class="position-relative">
                 <input 
                   ref="searchInput"
                   v-model="searchFilter" 
-                  @input="applyFilters"
+                  @input="debounceSearch"
+                  @keyup.enter="performSearch"
                   type="text" 
                   class="form-control form-control-sm search-input"
                   placeholder="Search promotions..."
@@ -102,13 +113,28 @@
         </div>
       </div>
 
-      <div class="row">
+      <!-- Loading State -->
+      <div v-if="loading" class="text-center py-4">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      </div>
+
+      <!-- Error State -->
+      <div v-if="error" class="alert alert-danger" role="alert">
+        <strong>Error:</strong> {{ error }}
+        <button class="btn btn-sm btn-outline-danger ms-2" @click="refreshPromotions">
+          Try Again
+        </button>
+      </div>
+
+      <div class="row" v-if="!loading">
         <div class="col-12">
           <!-- Promotions Table -->
           <DataTable
-            :total-items="totalPromotions"
-            :current-page="currentPage"
-            :items-per-page="itemsPerPage"
+            :total-items="pagination.total_items"
+            :current-page="pagination.current_page"
+            :items-per-page="pagination.items_per_page"
             @page-changed="handlePageChange"
           >
             <template #header>
@@ -137,7 +163,7 @@
 
             <template #body>
               <tr 
-                v-for="promotion in paginatedPromotions" 
+                v-for="promotion in promotions" 
                 :key="promotion.promotion_id"
                 :class="{ 'table-primary': selectedPromotions.includes(promotion.promotion_id) }"
               >
@@ -204,7 +230,7 @@
               </tr>
 
               <!-- Empty State -->
-              <tr v-if="promotions.length === 0">
+              <tr v-if="promotions.length === 0 && !loading">
                 <td colspan="9" class="text-center py-5">
                   <div class="text-tertiary-medium">
                     <Package :size="48" class="mb-3 opacity-50" />
@@ -220,13 +246,14 @@
     </div>
 
     <!-- Add Promo Modal -->
-    <AddPromoModal ref="addPromoModal" />
+    <AddPromoModal ref="addPromoModal" @promotion-saved="handlePromotionSaved" />
   </div>
 </template>
 
 <script>
 import DataTable from '@/components/common/TableTemplate.vue'
 import AddPromoModal from '@/components/promotions/AddPromoModal.vue'
+import promotionApiService from '@/services/apiPromotions.js'
 
 export default {
   name: 'Promotions',
@@ -236,93 +263,139 @@ export default {
   },
   data() {
     return {
-      promotions: [
-        {
-          promotion_id: '1',
-          promotion_name: 'New Year Special',
-          discount_type: 'percentage',
-          discount_value: 20,
-          start_date: '2025-01-01',
-          end_date: '2025-01-31',
-          status: 'active',
-          last_updated: '2025-01-15T10:30:00Z',
-          applicable_products: ['prod1', 'prod2']
-        },
-        {
-          promotion_id: '2',
-          promotion_name: 'Student Discount',
-          discount_type: 'fixed',
-          discount_value: 50,
-          start_date: '2025-01-01',
-          end_date: '2025-12-31',
-          status: 'active',
-          last_updated: '2025-01-10T14:20:00Z',
-          applicable_products: ['prod3']
-        },
-        {
-          promotion_id: '3',
-          promotion_name: 'Weekend Sale',
-          discount_type: 'percentage',
-          discount_value: 15,
-          start_date: '2025-01-20',
-          end_date: '2025-01-22',
-          status: 'expired',
-          last_updated: '2025-01-23T09:15:00Z',
-          applicable_products: ['prod1', 'prod4']
-        }
-      ],
-      filteredPromotions: [],
+      promotions: [],
       selectedPromotions: [],
-      currentPage: 1,
-      itemsPerPage: 10,
+      pagination: {
+        current_page: 1,
+        total_pages: 1,
+        total_items: 0,
+        items_per_page: 20
+      },
       
       // UI State
+      loading: false,
+      error: null,
       searchMode: false,
       
       // Filters
       discountTypeFilter: 'all',
       statusFilter: 'all',
-      searchFilter: ''
+      searchFilter: '',
+      searchTimeout: null
     }
   },
   computed: {
-    totalPromotions() {
-      return this.filteredPromotions.length
-    },
-    paginatedPromotions() {
-      const start = (this.currentPage - 1) * this.itemsPerPage
-      const end = start + this.itemsPerPage
-      return this.filteredPromotions.slice(start, end)
-    },
     isAllSelected() {
-      return this.selectedPromotions.length === this.paginatedPromotions.length && this.paginatedPromotions.length > 0
+      return this.selectedPromotions.length === this.promotions.length && this.promotions.length > 0
     },
     isIndeterminate() {
-      return this.selectedPromotions.length > 0 && this.selectedPromotions.length < this.paginatedPromotions.length
+      return this.selectedPromotions.length > 0 && this.selectedPromotions.length < this.promotions.length
     }
   },
-  mounted() {
-    this.filteredPromotions = [...this.promotions]
+  async mounted() {
+    await this.loadPromotions()
   },
   methods: {
+    async loadPromotions() {
+      try {
+        this.loading = true
+        this.error = null
+        
+        const params = {
+          page: this.pagination.current_page,
+          limit: this.pagination.items_per_page
+        }
+        
+        // Add filters
+        if (this.discountTypeFilter !== 'all') {
+          params.discount_type = this.discountTypeFilter
+        }
+        if (this.statusFilter !== 'all') {
+          params.status = this.statusFilter
+        }
+        if (this.searchFilter.trim()) {
+          params.search_query = this.searchFilter.trim()
+        }
+        
+        const response = await promotionApiService.getAllPromotions(params)
+        
+        if (response.success) {
+          this.promotions = response.promotions
+          this.pagination = response.pagination
+        } else {
+          this.error = response.message || 'Failed to load promotions'
+        }
+        
+      } catch (error) {
+        console.error('Error loading promotions:', error)
+        this.error = error.message
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async refreshPromotions() {
+      this.selectedPromotions = []
+      await this.loadPromotions()
+    },
+
     handleSinglePromo() {
       if (this.$refs.addPromoModal && this.$refs.addPromoModal.openAdd) {
         this.$refs.addPromoModal.openAdd()
       }
     },
-    exportData() {
-      console.log('Export promotions data')
-      // Implement export functionality
+
+    async exportData() {
+      try {
+        const filters = {}
+        if (this.discountTypeFilter !== 'all') {
+          filters.discount_type = this.discountTypeFilter
+        }
+        if (this.statusFilter !== 'all') {
+          filters.status = this.statusFilter
+        }
+        
+        const exportData = await promotionApiService.exportPromotions(filters, 'json')
+        
+        // Create and download file
+        const blob = new Blob([exportData], { type: 'application/json' })
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `promotions_${new Date().toISOString().split('T')[0]}.json`
+        link.click()
+        window.URL.revokeObjectURL(url)
+        
+      } catch (error) {
+        console.error('Export error:', error)
+        alert('Export failed: ' + error.message)
+      }
     },
-    deleteSelected() {
+
+    async deleteSelected() {
       if (this.selectedPromotions.length === 0) return
       
       const confirmed = confirm(`Are you sure you want to delete ${this.selectedPromotions.length} promotion(s)?`)
       if (!confirmed) return
 
-      console.log('Delete selected promotions:', this.selectedPromotions)
-      // Implement bulk delete
+      try {
+        this.loading = true
+        const result = await promotionApiService.deleteMultiplePromotions(this.selectedPromotions)
+        
+        if (result.success) {
+          const successCount = result.results.filter(r => r.success).length
+          alert(`Successfully deleted ${successCount} promotion(s)`)
+          this.selectedPromotions = []
+          await this.loadPromotions()
+        }
+      } catch (error) {
+        console.error('Bulk delete error:', error)
+        alert('Delete failed: ' + error.message)
+      } finally {
+        this.loading = false
+      }
     },
+
     toggleSearchMode() {
       this.searchMode = !this.searchMode
       
@@ -337,72 +410,67 @@ export default {
         this.applyFilters()
       }
     },
+
     clearSearch() {
       this.searchFilter = ''
       this.searchMode = false
       this.applyFilters()
     },
-    applyFilters() {
-      let filtered = [...this.promotions]
 
-      // Filter by discount type
-      if (this.discountTypeFilter !== 'all') {
-        filtered = filtered.filter(promo => promo.discount_type === this.discountTypeFilter)
-      }
+    debounceSearch() {
+      clearTimeout(this.searchTimeout)
+      this.searchTimeout = setTimeout(() => {
+        this.performSearch()
+      }, 500)
+    },
 
-      // Filter by status
-      if (this.statusFilter !== 'all') {
-        filtered = filtered.filter(promo => promo.status === this.statusFilter)
-      }
+    async performSearch() {
+      this.pagination.current_page = 1
+      await this.loadPromotions()
+    },
 
-      // Filter by search
-      if (this.searchFilter.trim()) {
-        const search = this.searchFilter.toLowerCase()
-        filtered = filtered.filter(promo => 
-          promo.promotion_name?.toLowerCase().includes(search) ||
-          promo.promotion_id?.toLowerCase().includes(search)
-        )
-      }
-
-      this.currentPage = 1
+    async applyFilters() {
+      this.pagination.current_page = 1
       this.selectedPromotions = []
-      this.filteredPromotions = filtered
-    },
-    clearFilters() {
-      this.discountTypeFilter = 'all'
-      this.statusFilter = 'all'
-      this.searchFilter = ''
-      this.searchMode = false
-      this.applyFilters()
+      await this.loadPromotions()
     },
 
-    // Table methods
-    handlePageChange(page) {
-      this.currentPage = page
+    async handlePageChange(page) {
+      this.pagination.current_page = page
+      await this.loadPromotions()
     },
+
     toggleSelectAll() {
       if (this.isAllSelected) {
         this.selectedPromotions = []
       } else {
-        this.selectedPromotions = this.paginatedPromotions.map(p => p.promotion_id)
+        this.selectedPromotions = this.promotions.map(p => p.promotion_id)
       }
     },
+
+    async handlePromotionSaved() {
+      await this.refreshPromotions()
+    },
+
+    // Formatting methods
     formatDiscountType(type) {
       const types = {
         'percentage': 'Percentage',
-        'fixed': 'Fixed Amount',
-        'buy_one_get_one': 'BOGO'
+        'fixed_amount': 'Fixed Amount',
+        'buy_x_get_y': 'BOGO'
       }
       return types[type] || type
     },
+
     formatDiscountValue(value, type) {
       if (type === 'percentage') {
         return `${value}%`
-      } else if (type === 'fixed') {
+      } else if (type === 'fixed_amount') {
         return `₱${value}`
       }
       return value
     },
+
     formatStatus(status) {
       const statuses = {
         'active': 'Active',
@@ -412,14 +480,18 @@ export default {
       }
       return statuses[status] || status
     },
+
     formatDate(dateString) {
+      if (!dateString) return '-'
       return new Date(dateString).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
       })
     },
+
     formatDateTime(dateString) {
+      if (!dateString) return '-'
       return new Date(dateString).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
@@ -428,14 +500,16 @@ export default {
         minute: '2-digit'
       })
     },
+
     getDiscountTypeBadgeClass(type) {
       const classes = {
         'percentage': 'bg-primary text-white',
-        'fixed': 'bg-success text-white',
-        'buy_one_get_one': 'bg-info text-white'
+        'fixed_amount': 'bg-success text-white',
+        'buy_x_get_y': 'bg-info text-white'
       }
       return classes[type] || 'bg-secondary text-white'
     },
+
     getStatusBadgeClass(status) {
       const classes = {
         'active': 'bg-success text-white',
@@ -445,28 +519,106 @@ export default {
       }
       return classes[status] || 'bg-secondary text-white'
     },
+
     viewPromotion(promotion) {
       if (this.$refs.addPromoModal && this.$refs.addPromoModal.openView) {
         this.$refs.addPromoModal.openView(promotion)
       }
     },
+
     editPromotion(promotion) {
       if (this.$refs.addPromoModal && this.$refs.addPromoModal.openEdit) {
         this.$refs.addPromoModal.openEdit(promotion)
       }
     },
-    deletePromotion(promotion) {
-      console.log('Delete promotion:', promotion)
-      // Implement delete logic
+
+    async deletePromotion(promotion) {
+      const confirmed = confirm(`Are you sure you want to delete "${promotion.promotion_name}"?`)
+      if (!confirmed) return
+
+      try {
+        this.loading = true
+        const result = await promotionApiService.deletePromotion(promotion.promotion_id)
+        
+        if (result.success) {
+          alert('Promotion deleted successfully')
+          await this.loadPromotions()
+        } else {
+          alert('Delete failed: ' + result.message)
+        }
+      } catch (error) {
+        console.error('Delete error:', error)
+        alert('Delete failed: ' + error.message)
+      } finally {
+        this.loading = false
+      }
     }
   }
 }
 </script>
 
 <style scoped>
+/* Keep existing styles */
 .promotions-page {
   min-height: 100vh;
   background-color: var(--neutral-light);
+}
+
+.action-bar-container {
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  padding: 1rem;
+}
+
+.action-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.filters-section {
+  flex-shrink: 0;
+}
+
+.search-toggle-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.filter-group {
+  min-width: 140px;
+}
+
+.filter-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--tertiary-medium);
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+.search-container {
+  min-width: 300px;
+}
+
+.search-input {
+  padding-right: 2.5rem;
+  height: calc(1.5em + 0.75rem + 2px);
+}
+
+.btn.active {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: white;
 }
 
 @media (max-width: 768px) {
@@ -487,83 +639,5 @@ export default {
   .search-container {
     min-width: 100%;
   }
-}
-
-/* Action Bar Styles */
-.action-bar-container {
-  background: white;
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  padding: 1rem;
-}
-
-/* Single Row Layout */
-.action-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-}
-
-/* Filters Section */
-.filters-section {
-  flex-shrink: 0;
-}
-
-/* Search Toggle Button */
-.search-toggle-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  flex-shrink: 0;
-}
-
-/* Filter Groups */
-.filter-group {
-  min-width: 140px;
-}
-
-.filter-label {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--tertiary-medium);
-  margin-bottom: 0.25rem;
-  display: block;
-}
-
-/* Search Container */
-.search-container {
-  min-width: 300px;
-}
-
-.search-input {
-  padding-right: 2.5rem;
-  height: calc(1.5em + 0.75rem + 2px);
-}
-
-.search-container .position-relative .btn {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Button States */
-.btn.active {
-  background-color: var(--primary);
-  border-color: var(--primary);
-  color: white;
-}
-
-/* Form controls focus states */
-.form-select:focus,
-.form-control:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
 }
 </style>

@@ -129,12 +129,32 @@ class ApiService {
 
   // Helper method to handle errors
   handleError(error) {
-    const message = error.response?.data?.error || 
-                   error.response?.data?.message || 
-                   error.message || 
-                   'An unexpected error occurred';
-    throw new Error(message);
+  console.log('=== FULL ERROR DEBUG ===')
+  console.log('Error object:', error)
+  console.log('Response status:', error.response?.status)
+  
+  // Force expansion of the response data object
+  if (error.response?.data) {
+    console.log('Response data keys:', Object.keys(error.response.data))
+    console.log('Response data values:', Object.values(error.response.data))
+    
+    // Try different ways to see the data
+    for (const [key, value] of Object.entries(error.response.data)) {
+      console.log(`${key}:`, value)
+    }
   }
+  
+  console.log('Raw response text:', error.response?.request?.responseText)
+  console.log('========================')
+  
+  const message = error.response?.data?.error || 
+                 error.response?.data?.message ||
+                 JSON.stringify(error.response?.data) ||
+                 error.message || 
+                 'An unexpected error occurred'
+  
+  throw new Error(message)
+}
 
   // AUTH METHODS
   async login(email, password) {
@@ -183,23 +203,22 @@ class ApiService {
   }
 
   // USER METHODS
-  async getUsers() {
+  async getUsers(params = {}) {
     try {
-      console.log('Making API call to get users...');
-      const response = await api.get('/users/');
-      console.log('Users API response:', response);
+      const response = await api.get('/users/', { params });
       
-      // Extract users array from paginated response
-      const data = this.handleResponse(response);
-      if (data && data.users) {
-        return data.users; // Return just the users array
-      } else if (Array.isArray(data)) {
-        return data; // Fallback for direct array response
-      } else {
-        return []; // Return empty array if no users
-      }
+      return {
+        users: response.data.users || [],
+        pagination: {
+          current_page: response.data.page || 1,
+          total_pages: Math.ceil((response.data.total || 0) / (params.limit || 50)),
+          total_items: response.data.total || 0,
+          items_per_page: params.limit || 50,
+          has_next: response.data.has_more || false,
+          has_previous: (response.data.page || 1) > 1
+        }
+      };
     } catch (error) {
-      console.error('Error in getUsers:', error);
       this.handleError(error);
     }
   }

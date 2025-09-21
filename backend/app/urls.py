@@ -222,22 +222,22 @@ urlpatterns = [
     path('customers/<str:customer_id>/loyalty/', CustomerLoyaltyView.as_view(), name='customer-loyalty'),
     
     # ========== SUPPLIER MANAGEMENT ==========
-    path('health/', SupplierHealthCheckView.as_view(), name='health-check'),
+    path('suppliers/health/', SupplierHealthCheckView.as_view(), name='health-check'),
     # Supplier CRUD operations
-    path('', SupplierListView.as_view(), name='supplier-list'),  # GET (list), POST (create)
-    path('<str:supplier_id>/', SupplierDetailView.as_view(), name='supplier-detail'),  # GET, PUT, DELETE
+    path('suppliers/', SupplierListView.as_view(), name='supplier-list'),  # GET (list), POST (create)
+    path('suppliers/<str:supplier_id>/', SupplierDetailView.as_view(), name='supplier-detail'),  # GET, PUT, DELETE
     # Supplier management operations
-    path('<str:supplier_id>/restore/', SupplierRestoreView.as_view(), name='supplier-restore'),
-    path('<str:supplier_id>/hard-delete/', SupplierHardDeleteView.as_view(), name='supplier-hard-delete'),
-    path('deleted/', DeletedSuppliersView.as_view(), name='deleted-suppliers'),
+    path('suppliers/<str:supplier_id>/restore/', SupplierRestoreView.as_view(), name='supplier-restore'),
+    path('suppliers/<str:supplier_id>/hard-delete/', SupplierHardDeleteView.as_view(), name='supplier-hard-delete'),
+    path('suppliers/deleted/', DeletedSuppliersView.as_view(), name='deleted-suppliers'),
     # Purchase Order operations
-    path('<str:supplier_id>/orders/', PurchaseOrderListView.as_view(), name='purchase-order-list'),  # GET (list), POST (create)
-    path('<str:supplier_id>/orders/<str:order_id>/', PurchaseOrderDetailView.as_view(), name='purchase-order-detail'),  # GET, PUT, DELETE
+    path('suppliers/<str:supplier_id>/orders/', PurchaseOrderListView.as_view(), name='purchase-order-list'),
+    path('suppliers/<str:supplier_id>/orders/<str:order_id>/', PurchaseOrderDetailView.as_view(), name='purchase-order-detail'),
     # Purchase Order management operations
-    path('<str:supplier_id>/orders/<str:order_id>/restore/', PurchaseOrderRestoreView.as_view(), name='purchase-order-restore'),
-    path('<str:supplier_id>/orders/<str:order_id>/hard-delete/', PurchaseOrderHardDeleteView.as_view(), name='purchase-order-hard-delete'),
-    path('<str:supplier_id>/orders/deleted/', DeletedPurchaseOrdersView.as_view(), name='deleted-purchase-orders'),
-
+    path('suppliers/<str:supplier_id>/orders/<str:order_id>/restore/', PurchaseOrderRestoreView.as_view(), name='purchase-order-restore'),
+    path('suppliers/<str:supplier_id>/orders/<str:order_id>/hard-delete/', PurchaseOrderHardDeleteView.as_view(), name='purchase-order-hard-delete'),
+    path('suppliers/<str:supplier_id>/orders/deleted/', DeletedPurchaseOrdersView.as_view(), name='deleted-purchase-orders'),
+    
     # ========== SESSION MANAGEMENT ==========
     path('session-logs/', SessionLogsView.as_view(), name='session-logs'),
     path('session-logs/<str:session_id>/', SessionDetailView.as_view(), name='session-detail'),  

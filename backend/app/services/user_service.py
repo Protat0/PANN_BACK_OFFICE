@@ -49,7 +49,7 @@ class UserService:
             titles = {
                 'created': "New User Created",
                 'updated': "User Updated", 
-                'password_changed': "Password Updated",  # Add this line
+                'password_changed': "Password Updated", 
                 'soft_deleted': "User Deleted",
                 'hard_deleted': "User Permanently Deleted",
                 'restored': "User Restored"
@@ -200,7 +200,7 @@ class UserService:
             logger.error(f"Error creating user: {str(e)}")
             raise Exception(f"Error creating user: {str(e)}")
         
-    def get_users(self, page=1, limit=50, status=None, include_deleted=False):
+    def get_users(self, page=1, limit=50, status=None, include_deleted=False, search=None):
         try:
             query = {}
             if not include_deleted:
@@ -210,6 +210,16 @@ class UserService:
                 
             # Only get users with string IDs (USER-#### format)
             query['_id'] = {'$regex': '^USER-'}
+            
+            # Add search functionality
+            if search:
+                search_conditions = [
+                    {'username': {'$regex': search, '$options': 'i'}},
+                    {'email': {'$regex': search, '$options': 'i'}},
+                    {'first_name': {'$regex': search, '$options': 'i'}},
+                    {'last_name': {'$regex': search, '$options': 'i'}}
+                ]
+                query['$or'] = search_conditions
             
             skip = (page - 1) * limit
             users = list(self.collection.find(query).skip(skip).limit(limit))

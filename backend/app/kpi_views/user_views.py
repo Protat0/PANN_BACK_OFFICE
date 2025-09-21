@@ -66,7 +66,8 @@ class UserListView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            new_user = self.user_service.create_user(serializer.validated_data, request.current_user)
+            current_user = getattr(request, 'current_user', None)
+            new_user = self.user_service.create_user(serializer.validated_data, current_user )
             return Response(new_user, status=status.HTTP_201_CREATED)
             
         except Exception as e:

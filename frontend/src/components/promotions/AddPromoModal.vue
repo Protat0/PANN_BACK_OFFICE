@@ -23,12 +23,12 @@
                 </div>
                 <div class="col-md-6 mb-3">
                   <label class="form-label">Discount Type <span class="text-danger">*</span></label>
-                  <select class="form-select" v-model="formData.discount_type" required>
-                    <option value="">Select discount type</option>
-                    <option value="percentage">Percentage</option>
-                    <option value="fixed">Fixed Amount</option>
-                    <option value="buy_one_get_one">Buy One Get One (BOGO)</option>
-                  </select>
+                 <select class="form-select" v-model="formData.discount_type" required>
+                  <option value="">Select discount type</option>
+                  <option value="percentage">Percentage</option>
+                  <option value="fixed_amount">Fixed Amount</option>  <!-- Changed from 'fixed' -->
+                  <option value="buy_x_get_y">Buy One Get One (BOGO)</option>  <!-- Changed from 'buy_one_get_one' -->
+                </select>
                 </div>
                 <div class="col-md-6 mb-3">
                   <label class="form-label">Discount Value <span class="text-danger">*</span></label>
@@ -260,6 +260,7 @@
 </template>
 
 <script>
+import promotionApiService from '@/services/apiPromotions.js'
 export default {
   name: 'AddPromoModal',
   data() {
@@ -389,20 +390,32 @@ export default {
     },
 
     // Action methods
-    savePromotion() {
+    async savePromotion() {
       if (!this.validateForm()) return
       
-      console.log('Save new promotion:', this.formData)
-      // Implement save logic here
-      // Example: API call to save promotion
-      
-      // Emit success event to parent
-      this.$emit('promotion-saved', {
-        action: 'add',
-        data: this.formData
-      })
-      
-      this.closeModal()
+      try {
+        console.log('Save new promotion:', this.formData)
+        
+        // Call the API to create the promotion
+        const result = await promotionApiService.createPromotion(this.formData)
+        
+        if (result.success) {
+          alert('Promotion created successfully!')
+          
+          // Emit success event to parent
+          this.$emit('promotion-saved', {
+            action: 'add',
+            data: result.promotion
+          })
+          
+          this.closeModal()
+        } else {
+          alert('Failed to create promotion: ' + result.message)
+        }
+      } catch (error) {
+        console.error('Error saving promotion:', error)
+        alert('Error creating promotion: ' + error.message)
+      }
     },
     updatePromotion() {
       if (!this.validateForm()) return

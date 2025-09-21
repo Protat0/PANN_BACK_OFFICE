@@ -301,7 +301,7 @@
                 v-model="userForm.username" 
                 type="text" 
                 required 
-                :disabled="formLoading || isEditMode"
+                :disabled="formLoading"
                 placeholder="Enter username"
                 :class="{ 'error': validationErrors.username }"
                 @input="validateField('username', $event.target.value)"
@@ -680,10 +680,21 @@ export default {
     },
 
     validateField(fieldName, value) {
+      console.log(`Validating ${fieldName} with value: "${value}"`)
       const errors = { ...this.validationErrors }
       const excludeId = this.isEditMode ? this.selectedUser._id : null
 
       switch (fieldName) {
+        case 'full_name':
+          if (!value) {
+            errors.full_name = 'Full name is required'
+          } else if (value.length > 200) {
+            errors.full_name = 'Full name must be less than 200 characters'
+          } else {
+            delete errors.full_name
+          }
+          break
+
         case 'email':
           if (!value) {
             errors.email = 'Email is required'
@@ -742,6 +753,7 @@ export default {
       }
 
       this.validationErrors = errors
+      console.log('Validation errors after validating:', this.validationErrors)
       return !errors[fieldName]
     },
 
@@ -765,120 +777,146 @@ export default {
     },
 
     // ============ ENHANCED DATA FETCHING WITH CACHING ============
-    async fetchUsers(isAutoRefresh = false, isEmergencyReconnect = false) {
-      if (this.loading && !isAutoRefresh && !isEmergencyReconnect) return
+    // In AccountsPage.vue, update the fetchUsers method:
+
+  async fetchUsers(isAutoRefresh = false, isEmergencyReconnect = false) {
+    if (this.loading && !isAutoRefresh && !isEmergencyReconnect) return
+    
+    // Check cache first
+    if (!isEmergencyReconnect && this.cache.metadata.enabled) {
+      const cachedUsers = this.cache.getUsers()
+      if (cachedUsers && !isAutoRefresh) {
+        this.users = cachedUsers
+        this.applyFilters()
+        console.log('✅ Users loaded from cache instantly')
+        return
+      }
+    }
+
+    this.loading = true
+    if (!isEmergencyReconnect) {
+      this.error = null
+    }
+    this.refreshStartTime = Date.now()
+    
+    try {
+      const previousLength = this.users.length
       
-      // Check cache first
-      if (!isEmergencyReconnect && this.cache.metadata.enabled) {
-        const cachedUsers = this.cache.getUsers()
-        if (cachedUsers && !isAutoRefresh) {
-          this.users = cachedUsers
-          this.applyFilters()
-          console.log('✅ Users loaded from cache instantly')
+      // Simulate progress updates
+      const progressInterval = setInterval(() => {
+        if (!this.loading) {
+          clearInterval(progressInterval)
           return
         }
+        
+        const elapsed = Date.now() - this.refreshStartTime
+        if (elapsed < 1000) {
+          this.refreshProgress = 'Connecting to server...'
+        } else if (elapsed < 2000) {
+          this.refreshProgress = 'Fetching user data...'
+        } else {
+          this.refreshProgress = 'Processing user roles...'
+        }
+      }, 500)
+      
+      console.log(`📡 Fetching users from API... (${isAutoRefresh ? 'auto-refresh' : isEmergencyReconnect ? 'emergency-reconnect' : 'manual'})`)
+      
+      // Build query parameters
+      const params = {
+        page: 1,
+        limit: 50,
+        status: this.statusFilter !== 'all' ? this.statusFilter : undefined
       }
 
-      this.loading = true
-      if (!isEmergencyReconnect) {
-        this.error = null
+      // Add search to API call if your backend supports it
+      if (this.searchFilter.trim()) {
+        params.search = this.searchFilter.trim()
       }
-      this.refreshStartTime = Date.now()
+
+      const response = await apiService.getUsers(params)
       
-      try {
-        const previousLength = this.users.length
-        
-        // Simulate progress updates
-        const progressInterval = setInterval(() => {
-          if (!this.loading) {
-            clearInterval(progressInterval)
-            return
+      clearInterval(progressInterval)
+      
+      // Connection health tracking
+      this.connectionLost = false
+      this.consecutiveErrors = 0
+      this.lastSuccessfulLoad = Date.now()
+      this.error = null
+      
+      // Transform users data to match frontend expectations
+      const transformedUsers = response.users.map(user => ({
+        _id: user._id,
+        username: user.username || '',
+        full_name: user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username,
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
+        email: user.email || '',
+        role: user.role || 'employee',
+        status: user.status || 'inactive', // ← Use user.status directly, not user.is_active
+        last_login: user.last_login || null,
+        date_created: user.date_created || user.created_at || null,
+        last_updated: user.last_updated || user.updated_at || null,
+        source: 'system'
+      }))
+
+      // Smart refresh rate adjustment
+      this.trackActivityAndAdjustRefreshRate(transformedUsers, previousLength)
+      
+      // Track new entries for highlighting
+      if (isAutoRefresh && this.users.length > 0) {
+        const existingIds = new Set(this.users.map(user => user._id))
+        transformedUsers.forEach(user => {
+          if (!existingIds.has(user._id)) {
+            this.newEntryIds.add(user._id)
+            this.recentActivity.push({
+              timestamp: Date.now(),
+              userId: user._id
+            })
           }
-          
-          const elapsed = Date.now() - this.refreshStartTime
-          if (elapsed < 1000) {
-            this.refreshProgress = 'Connecting to server...'
-          } else if (elapsed < 2000) {
-            this.refreshProgress = 'Fetching user data...'
-          } else {
-            this.refreshProgress = 'Processing user roles...'
-          }
-        }, 500)
+        })
         
-        console.log(`📡 Fetching users from API... (${isAutoRefresh ? 'auto-refresh' : isEmergencyReconnect ? 'emergency-reconnect' : 'manual'})`)
-        const data = await apiService.getUsers()
-        
-        clearInterval(progressInterval)
-        
-        // Connection health tracking
-        this.connectionLost = false
-        this.consecutiveErrors = 0
-        this.lastSuccessfulLoad = Date.now()
-        this.error = null
-        
-        // Smart refresh rate adjustment
-        this.trackActivityAndAdjustRefreshRate(data, previousLength)
-        
-        // Track new entries for highlighting
-        if (isAutoRefresh && this.users.length > 0) {
-          const existingIds = new Set(this.users.map(user => user._id))
-          data.forEach(user => {
-            if (!existingIds.has(user._id)) {
-              this.newEntryIds.add(user._id)
-              this.recentActivity.push({
-                timestamp: Date.now(),
-                userId: user._id
-              })
-            }
-          })
-          
-          setTimeout(() => {
-            this.newEntryIds.clear()
-          }, 5000)
-        }
-        
-        // Filter for admin and employee roles only
-        const filteredUsers = data.filter(user => 
-          user.role === 'admin' || user.role === 'employee'
-        )
-        
-        // Store in cache
-        if (this.cache.metadata.enabled) {
-          this.cache.setUsers(filteredUsers)
-        }
-        
-        this.users = filteredUsers
-        this.applyFilters()
-        this.lastRefresh = new Date()
-        this.lastLoadTime = Date.now()
-        
-        console.log(`✅ Users loaded successfully: ${filteredUsers.length} users`)
-        
-      } catch (error) {
-        console.error('❌ Error fetching users:', error)
-        
-        this.consecutiveErrors++
-        this.error = this.getDetailedErrorMessage(error)
-        
-        if (this.consecutiveErrors >= 3) {
-          this.connectionLost = true
-          console.log('Connection marked as lost after 3 consecutive errors')
-        }
-        
-        if (this.consecutiveErrors >= 2) {
-          this.autoRefreshInterval = Math.min(this.baseRefreshInterval * 2, 120000) // Max 2 minutes
-          console.log(`Slowing refresh rate to ${this.autoRefreshInterval / 1000}s due to errors`)
-        }
-        
-        if (!isAutoRefresh) {
-          this.users = []
-          this.filteredUsers = []
-        }
-      } finally {
-        this.loading = false
-        this.refreshProgress = ''
+        setTimeout(() => {
+          this.newEntryIds.clear()
+        }, 5000)
       }
-    },
+      
+      // Store in cache
+      if (this.cache.metadata.enabled) {
+        this.cache.setUsers(transformedUsers)
+      }
+      
+      this.users = transformedUsers
+      this.applyFilters()
+      this.lastRefresh = new Date()
+      this.lastLoadTime = Date.now()
+      
+      console.log(`✅ Users loaded successfully: ${transformedUsers.length} users`)
+      
+    } catch (error) {
+      console.error('❌ Error fetching users:', error)
+      
+      this.consecutiveErrors++
+      this.error = this.getDetailedErrorMessage(error)
+      
+      if (this.consecutiveErrors >= 3) {
+        this.connectionLost = true
+        console.log('Connection marked as lost after 3 consecutive errors')
+      }
+      
+      if (this.consecutiveErrors >= 2) {
+        this.autoRefreshInterval = Math.min(this.baseRefreshInterval * 2, 120000) // Max 2 minutes
+        console.log(`Slowing refresh rate to ${this.autoRefreshInterval / 1000}s due to errors`)
+      }
+      
+      if (!isAutoRefresh) {
+        this.users = []
+        this.filteredUsers = []
+      }
+    } finally {
+      this.loading = false
+      this.refreshProgress = ''
+    }
+  },
 
     // Smart refresh rate adjustment based on activity
     trackActivityAndAdjustRefreshRate(newData, previousLength) {
@@ -1307,7 +1345,21 @@ export default {
       this.formError = null
 
       try {
+        console.log('=== FORM DEBUG ===')
+        console.log('userForm.full_name:', `"${this.userForm.full_name}"`)
+        console.log('userForm.full_name length:', this.userForm.full_name?.length)
+        console.log('userForm.full_name type:', typeof this.userForm.full_name)
+        console.log('All form data:', this.userForm)
+        console.log('==================')
+
         const isValid = this.validateForm()
+        
+        if (!isValid) {
+          const errorMessages = Object.values(this.validationErrors)
+          this.formError = errorMessages.join(', ')
+          this.formLoading = false
+          return
+        }
         
         if (!isValid) {
           const errorMessages = Object.values(this.validationErrors)
@@ -1318,8 +1370,10 @@ export default {
 
         if (this.isEditMode) {
           const updateData = {
+            username: this.userForm.username,
             email: this.userForm.email,
-            full_name: this.userForm.full_name,
+            first_name: this.userForm.full_name.split(' ')[0] || '',
+            last_name: this.userForm.full_name.split(' ').slice(1).join(' ') || '',
             role: this.userForm.role,
             status: this.userForm.status
           }
@@ -1327,7 +1381,22 @@ export default {
           await apiService.updateUser(this.selectedUser._id, updateData)
           this.successMessage = `User account "${this.userForm.username}" updated successfully`
         } else {
-          await apiService.createUser(this.userForm)
+          const createData = {
+            username: this.userForm.username,
+            email: this.userForm.email,
+            password: this.userForm.password,
+            full_name: this.userForm.full_name,
+            role: this.userForm.role,
+            status: this.userForm.status
+          }
+          
+          console.log('=== CREATE DATA DEBUG ===')
+          console.log('createData:', createData)
+          console.log('createData.full_name:', `"${createData.full_name}"`)
+          console.log('createData stringified:', JSON.stringify(createData))
+          console.log('=========================')
+          
+          await apiService.createUser(createData)
           this.successMessage = `User account "${this.userForm.username}" created successfully`
         }
 
@@ -1339,7 +1408,7 @@ export default {
         setTimeout(() => {
           this.successMessage = null
         }, 3000)
-      } catch (error) {
+       } catch (error) {
         console.error('Error saving user:', error)
         this.formError = error.message
       } finally {
