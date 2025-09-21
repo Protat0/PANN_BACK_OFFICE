@@ -44,7 +44,7 @@ class LogoutView(APIView):
                     status=status.HTTP_401_UNAUTHORIZED
                 )
             
-            # Extract token and let AuthService handle everything including session logout
+            # Let AuthService handle everything including session logout
             token = authorization.replace("Bearer ", "").strip()
             result = auth_service.logout(token)
             

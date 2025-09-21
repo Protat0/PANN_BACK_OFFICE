@@ -30,6 +30,11 @@
           </div>
           
           <div class="row mb-2">
+            <div class="col-4 fw-bold detail-label">Username:</div>
+            <div class="col-8 detail-value">{{ customer.username }}</div>
+          </div>
+
+          <div class="row mb-2">
             <div class="col-4 fw-bold detail-label">Email:</div>
             <div class="col-8 detail-value">{{ customer.email }}</div>
           </div>
@@ -116,6 +121,24 @@
               placeholder="Enter email address"
             />
             <div v-if="errors.email" class="invalid-feedback">{{ errors.email }}</div>
+          </div>
+
+          <!-- NEW PASSWORD FIELD -->
+          <div v-if="mode === 'add'" class="mb-3">
+            <label for="password" class="form-label">Password <span class="text-danger">*</span></label>
+            <input 
+              id="password"
+              v-model="form.password" 
+              type="password" 
+              class="form-control"
+              :class="{ 'is-invalid': errors.password }"
+              required 
+              :disabled="formLoading"
+              placeholder="Enter customer password"
+              minlength="6"
+            />
+            <div v-if="errors.password" class="invalid-feedback">{{ errors.password }}</div>
+        
           </div>
 
           <div class="mb-3">
@@ -276,11 +299,12 @@ export default {
       formatDate
     } = useCustomers()
 
-    // Local form state
+    // Local form state - Added password field
     const form = ref({
       username: '',
       full_name: '',
       email: '',
+      password: '', // ← NEW FIELD ADDED
       phone: '',
       delivery_address: {
         street: '',
@@ -299,6 +323,7 @@ export default {
           username: '',
           full_name: '',
           email: '',
+          password: '', // ← NEW FIELD ADDED
           phone: '',
           delivery_address: {
             street: '',
@@ -312,6 +337,7 @@ export default {
           username: props.customer.username || '',
           full_name: props.customer.full_name || '',
           email: props.customer.email || '',
+          password: '', // ← Don't populate password for edit mode
           phone: props.customer.phone || '',
           delivery_address: {
             street: props.customer.delivery_address?.street || '',
@@ -350,6 +376,17 @@ export default {
         isValid = false
       }
 
+      // Password validation - only required for add mode
+      if (props.mode === 'add') {
+        if (!form.value.password?.trim()) {
+          errors.value.password = 'Password is required'
+          isValid = false
+        } else if (form.value.password.length < 6) {
+          errors.value.password = 'Password must be at least 6 characters long'
+          isValid = false
+        }
+      }
+
       // Loyalty points validation
       if (form.value.loyalty_points < 0) {
         errors.value.loyalty_points = 'Loyalty points cannot be negative'
@@ -364,21 +401,38 @@ export default {
       return emailRegex.test(email)
     }
 
-    const handleSubmit = async () => {
-      clearErrors()
-      
-      if (!validateForm()) {
-        return
-      }
-
-      try {
-        await saveCustomer({ ...form.value })
-        emit('close')
-      } catch (error) {
-        // Error is handled in the composable
-        console.error('Form submission error:', error)
-      }
+    // In AddCustomerModal.vue - modify the handleSubmit function
+  const handleSubmit = async () => {
+    clearErrors()
+    
+    if (!validateForm()) {
+      return
     }
+
+    try {
+      const submitData = { ...form.value }
+      if (props.mode === 'edit' && !submitData.password) {
+        delete submitData.password
+      }
+      
+      console.log('=== MODAL SUBMIT DEBUG ===')
+      console.log('Props mode:', props.mode)
+      console.log('Props customer:', props.customer)
+      console.log('Submit data:', submitData)
+      
+      // Pass mode and customer info directly to saveCustomer
+      if (props.mode === 'edit' && props.customer) {
+        const customerId = props.customer._id || props.customer.customer_id
+        await saveCustomer(submitData, 'edit', customerId)
+      } else {
+        await saveCustomer(submitData, 'add')
+      }
+      
+      emit('close')
+    } catch (error) {
+      console.error('Form submission error:', error)
+    }
+  }
 
     const switchToEditMode = () => {
       emit('edit-mode', props.customer)
@@ -491,6 +545,12 @@ export default {
 .form-select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 0.25rem rgba(115, 146, 226, 0.25);
+}
+
+.form-text {
+  font-size: 0.875em;
+  color: #6c757d;
+  margin-top: 0.25rem;
 }
 
 /* Detail View Styles */

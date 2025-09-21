@@ -536,3 +536,37 @@ class AuditLogService:
             }
         except Exception as e:
             return {'success': False, 'error': str(e)}
+        
+    def log_customer_update(self, user_data, customer_id, old_customer_data, new_customer_data):
+        """Log customer update - CUST-##### format"""
+        
+        # Find what fields actually changed
+        changed_fields = {}
+        old_values = {}
+        new_values = {}
+        
+        for key, new_value in new_customer_data.items():
+            if key in old_customer_data:
+                old_value = old_customer_data[key]
+                if old_value != new_value:
+                    old_values[key] = old_value
+                    new_values[key] = new_value
+                    changed_fields[key] = {"old": old_value, "new": new_value}
+        
+        return self._create_audit_log(
+            event_type="customer_update",
+            user_data=user_data,
+            target_data={
+                "type": "customer",
+                "id": customer_id,  # CUST-#####
+                "name": old_customer_data.get("full_name", old_customer_data.get("username", "Unknown"))
+            },
+            old_values=old_values,
+            new_values=new_values,
+            metadata={
+                "action": "update",
+                "module": "customers",
+                "fields_changed": list(changed_fields.keys()),
+                "change_count": len(changed_fields)
+            }
+        )

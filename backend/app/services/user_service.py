@@ -201,14 +201,16 @@ class UserService:
             raise Exception(f"Error creating user: {str(e)}")
         
     def get_users(self, page=1, limit=50, status=None, include_deleted=False):
-        """Get users with optional status filter"""
         try:
             query = {}
             if not include_deleted:
                 query['isDeleted'] = {'$ne': True}
-            if status:  # 'active', 'disabled', 'pending', etc.
+            if status:
                 query['status'] = status
                 
+            # Only get users with string IDs (USER-#### format)
+            query['_id'] = {'$regex': '^USER-'}
+            
             skip = (page - 1) * limit
             users = list(self.collection.find(query).skip(skip).limit(limit))
             total = self.collection.count_documents(query)

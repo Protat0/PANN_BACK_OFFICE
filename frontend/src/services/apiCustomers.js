@@ -76,7 +76,7 @@ class CustomerApiService {
   async getAllCustomers(params = {}) {
     try {
       console.log("Fetching all customers with params:", params);
-      const response = await api.get('/customers', { params });
+      const response = await api.get('/customers/', { params });
       return this.handleResponse(response);
     } catch (error) {
       console.error("Error fetching customers:", error);
@@ -108,7 +108,7 @@ class CustomerApiService {
   async createCustomer(customerData) {
     try {
       console.log("Creating new customer:", customerData);
-      const response = await api.post('/customers', customerData);
+      const response = await api.post('/customers/', customerData);
       return this.handleResponse(response);
     } catch (error) {
       console.error("Error creating customer:", error);
@@ -125,7 +125,7 @@ class CustomerApiService {
   async updateCustomer(customerId, customerData) {
     try {
       console.log(`Updating customer ${customerId}:`, customerData);
-      const response = await api.put(`/customers/${customerId}`, customerData);
+      const response = await api.put(`/customers/${customerId}/`, customerData);  // Added trailing slash
       return this.handleResponse(response);
     } catch (error) {
       console.error(`Error updating customer ${customerId}:`, error);
@@ -141,7 +141,7 @@ class CustomerApiService {
   async deleteCustomer(customerId) {
     try {
       console.log(`Deleting customer with ID: ${customerId}`);
-      const response = await api.delete(`/customers/${customerId}`);
+      const response = await api.delete(`/customers/${customerId}/`);
       return this.handleResponse(response);
     } catch (error) {
       console.error(`Error deleting customer ${customerId}:`, error);
@@ -475,6 +475,18 @@ class CustomerApiService {
       this.handleError(error);
     }
   }
+
+  async getCustomerStatistics() {
+    try {
+      console.log("Fetching customer statistics");
+      const response = await api.get('/customers/statistics/');
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error("Error fetching customer statistics:", error);
+      this.handleError(error);
+    }
+  }
+
 }
 
 // Create and export singleton instance

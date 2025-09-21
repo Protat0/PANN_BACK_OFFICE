@@ -185,9 +185,21 @@ class ApiService {
   // USER METHODS
   async getUsers() {
     try {
+      console.log('Making API call to get users...');
       const response = await api.get('/users/');
-      return this.handleResponse(response);
+      console.log('Users API response:', response);
+      
+      // Extract users array from paginated response
+      const data = this.handleResponse(response);
+      if (data && data.users) {
+        return data.users; // Return just the users array
+      } else if (Array.isArray(data)) {
+        return data; // Fallback for direct array response
+      } else {
+        return []; // Return empty array if no users
+      }
     } catch (error) {
+      console.error('Error in getUsers:', error);
       this.handleError(error);
     }
   }

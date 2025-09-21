@@ -105,14 +105,19 @@ class CustomerDetailView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
-    @require_admin
+    @require_authentication
     def delete(self, request, customer_id):
         """Delete customer - Admin only"""
         try:
+            print(f"DELETE request received for: '{customer_id}' (type: {type(customer_id)})")
+            print(f"Current user: {request.current_user.get('username') if request.current_user else 'None'}")
+            
             deleted = self.customer_service.delete_customer(
                 customer_id, 
-                request.current_user  # Set by decorator
+                request.current_user
             )
+            
+            print(f"Delete result: {deleted}")
             
             if deleted:
                 return Response(
@@ -124,6 +129,7 @@ class CustomerDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
+            print(f"Exception in delete: {e}")
             logger.error(f"Error deleting customer {customer_id}: {e}")
             return Response(
                 {"error": str(e)}, 

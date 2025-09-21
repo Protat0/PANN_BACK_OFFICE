@@ -128,7 +128,7 @@ class CustomerService:
             # Create customer record
             customer_record = {
                 "_id": customer_id,
-                "customer_id": customer_id,
+                "username": customer_data.get("username", customer_data["email"]),
                 "full_name": customer_data.get("full_name", ""),
                 "email": customer_data["email"],
                 "phone": customer_data.get("phone", ""),
@@ -236,18 +236,48 @@ class CustomerService:
             raise Exception(f"Error updating customer: {str(e)}")
     
     def delete_customer(self, customer_id, current_user=None):
-        """Delete customer by delegating to UserService"""
+        """Soft delete customer by marking isDeleted=True"""
         try:
-            from .user_service import UserService
-            user_service = UserService()
+            print(f"=== DELETE_CUSTOMER DEBUG ===")
+            print(f"Looking for customer ID: '{customer_id}'")
             
-            customer = self.get_customer_by_id(customer_id)
+            # Check if customer exists with any status
+            any_customer = self.customer_collection.find_one({"_id": customer_id})
+            print(f"Customer exists (any status): {any_customer is not None}")
+            
+            if any_customer:
+                print(f"Customer details: name='{any_customer.get('full_name')}', isDeleted={any_customer.get('isDeleted')}")
+            
+            # Check if customer exists and is not deleted
+            customer = self.customer_collection.find_one({"_id": customer_id, "isDeleted": {"$ne": True}})
+            print(f"Customer exists (not deleted): {customer is not None}")
+            
             if not customer:
+                print(f"❌ Customer not found or already deleted")
                 return False
             
-            return user_service.soft_delete_user(customer_id, current_user)
+            # If we get here, delete should work
+            now = datetime.utcnow()
+            
+            # Update customer record
+            customer_result = self.customer_collection.update_one(
+                {"_id": customer_id},
+                {"$set": {"isDeleted": True, "last_updated": now}}
+            )
+            
+            # Update user record  
+            user_result = self.user_collection.update_one(
+                {"_id": customer_id},
+                {"$set": {"isDeleted": True, "last_updated": now}}
+            )
+            
+            print(f"✅ Customer update result: {customer_result.modified_count}")
+            print(f"✅ User update result: {user_result.modified_count}")
+            
+            return True
             
         except Exception as e:
+            print(f"Exception in delete_customer: {e}")
             raise Exception(f"Error deleting customer: {str(e)}")
     
     def restore_customer(self, customer_id, current_user=None):

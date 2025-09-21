@@ -1,7 +1,6 @@
 from rest_framework.response import Response
 from rest_framework import status
 from ..services.auth_services import AuthService
-from bson import ObjectId
 import logging
 from functools import wraps
 
@@ -26,8 +25,10 @@ def get_authenticated_user_from_jwt(request):
         if not user_data or not user_data.get('user_id'):
             return None
         
-        user_id = user_data.get('user_id')
-        user_doc = auth_service.user_collection.find_one({"_id": ObjectId(user_id)})
+        user_id = user_data.get('user_id')  # This is "USER-0001" format
+        
+        # Use _id field instead of ObjectId conversion since user_id is already the correct format
+        user_doc = auth_service.user_collection.find_one({"_id": user_id})
         
         if not user_doc:
             return None

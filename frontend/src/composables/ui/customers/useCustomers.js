@@ -1,6 +1,6 @@
 // composables/ui/customers/useCustomers.js
 import { ref, computed, readonly, nextTick } from 'vue'
-import CustomerApiService from '@/services/apiCustomers'
+import CustomerApiService from '@/services/apiCustomers.js'
 
 export function useCustomers() {
   // Reactive state
@@ -32,6 +32,12 @@ export function useCustomers() {
   const activeUsersCount = ref('Loading...')
   const monthlyUsersCount = ref('Loading...')
   const dailyUsersCount = ref('Loading...')
+
+  const autoRefreshEnabled = ref(true)
+  const countdown = ref(30)
+  const connectionLost = ref(false)
+  const exporting = ref(false)
+  const refreshProgress = ref('')
 
   // Computed properties
   const allSelected = computed(() => {
@@ -73,20 +79,26 @@ export function useCustomers() {
 
   // Core data fetching methods
   const fetchCustomers = async () => {
-    loading.value = true
-    error.value = null
-    
     try {
       console.log('Fetching customers from API...')
-      const data = await CustomerApiService.getAllCustomers()
-      customers.value = data
+      const response = await CustomerApiService.getAllCustomers()
+      
+      // Handle paginated response structure
+      if (response && response.customers) {
+        customers.value = response.customers || []
+        console.log(`Loaded ${customers.value.length} customers`)
+      } else if (Array.isArray(response)) {
+        // Fallback for direct array response
+        customers.value = response
+      } else {
+        customers.value = []
+      }
+      
       applyFilters()
-      console.log('Customers loaded:', data)
-    } catch (err) {
-      console.error('Error fetching customers:', err)
-      error.value = `Failed to load customers: ${err.message}`
-    } finally {
-      loading.value = false
+    } catch (error) {
+      console.error('Error fetching customers:', error)
+      error.value = error.message
+      customers.value = []
     }
   }
 
@@ -98,29 +110,17 @@ export function useCustomers() {
   // KPI data fetching
   const fetchKPIData = async () => {
     try {
-      // Fetch active users
-      const activeResult = await CustomerApiService.ActiveUser()
-      activeUsersCount.value = activeResult.active_customers.toString()
+      const stats = await CustomerApiService.getCustomerStatistics()
+      
+      // Extract the values from the stats response
+      activeUsersCount.value = stats.active_customers?.toString() || '0'
+      monthlyUsersCount.value = stats.monthly_customers?.toString() || '0'
+      dailyUsersCount.value = stats.daily_customers?.toString() || '0'
+      
     } catch (error) {
-      console.error('Failed to load active users:', error)
+      console.error('Failed to load customer statistics:', error)
       activeUsersCount.value = 'Error'
-    }
-
-    try {
-      // Fetch monthly users
-      const monthlyResult = await CustomerApiService.MonthlyUser()
-      monthlyUsersCount.value = monthlyResult.monthly_customers.toString()
-    } catch (error) {
-      console.error('Failed to load monthly users:', error)
       monthlyUsersCount.value = 'Error'
-    }
-
-    try {
-      // Fetch daily users
-      const dailyResult = await CustomerApiService.DailyUser()
-      dailyUsersCount.value = dailyResult.daily_customers.toString()
-    } catch (error) {
-      console.error('Failed to load daily users:', error)
       dailyUsersCount.value = 'Error'
     }
   }
@@ -270,7 +270,7 @@ export function useCustomers() {
     if (!confirmed) return
 
     try {
-      await CustomerApiService.deleteCustomer(customer._id || customer.customer_id)
+      await CustomerApiService.deleteCustomer(customer._id)
       successMessage.value = `Customer "${customer.full_name}" deleted successfully`
       await fetchCustomers()
       clearSuccessMessage()
@@ -347,10 +347,18 @@ export function useCustomers() {
     formError.value = null
   }
 
-  const saveCustomer = async (formData) => {
-    if (modalMode.value === 'edit') {
-      const customerId = modalCustomer.value._id || modalCustomer.value.customer_id
-      await updateCustomer(customerId, formData)
+  const saveCustomer = async (formData, mode = null, customerId = null) => {
+    // Use passed parameters or fall back to modal state
+    const actualMode = mode || modalMode.value
+    const actualCustomerId = customerId || (modalCustomer.value?._id || modalCustomer.value?.customer_id)
+    
+    console.log('=== SAVE CUSTOMER DEBUG ===')
+    console.log('actualMode:', actualMode)
+    console.log('actualCustomerId:', actualCustomerId)
+    console.log('formData:', formData)
+    
+    if (actualMode === 'edit' && actualCustomerId) {
+      await updateCustomer(actualCustomerId, formData)
     } else {
       await createCustomer(formData)
     }
@@ -442,6 +450,54 @@ export function useCustomers() {
       fetchKPIData()
     ])
   }
+    const getConnectionStatus = () => {
+    if (connectionLost.value) return 'connection-lost'
+    if (error.value) return 'connection-unstable'
+    if (loading.value) return 'connection-unknown'
+    return 'connection-good'
+  }
+
+  const getConnectionIcon = () => {
+    const status = getConnectionStatus()
+    switch (status) {
+      case 'connection-good':
+        return 'bi bi-wifi'
+      case 'connection-unstable':
+        return 'bi bi-wifi-1'
+      case 'connection-lost':
+        return 'bi bi-wifi-off'
+      default:
+        return 'bi bi-question-circle'
+    }
+  }
+
+  const getConnectionText = () => {
+    const status = getConnectionStatus()
+    switch (status) {
+      case 'connection-good':
+        return 'Connected'
+      case 'connection-unstable':
+        return 'Unstable'
+      case 'connection-lost':
+        return 'Disconnected'
+      default:
+        return 'Unknown'
+    }
+  }
+
+  const toggleAutoRefresh = () => {
+    autoRefreshEnabled.value = !autoRefreshEnabled.value
+    // Add your auto-refresh logic here
+  }
+
+  const emergencyReconnect = async () => {
+    connectionLost.value = false
+    await fetchCustomers()
+  }
+
+  const deleteSelected = async () => {
+    await deleteSelectedCustomers()
+  }
 
   // Return reactive state and methods
   return {
@@ -474,6 +530,12 @@ export function useCustomers() {
     activeUsersCount: readonly(activeUsersCount),
     monthlyUsersCount: readonly(monthlyUsersCount),
     dailyUsersCount: readonly(dailyUsersCount),
+
+    autoRefreshEnabled: readonly(autoRefreshEnabled),
+    countdown: readonly(countdown),
+    connectionLost: readonly(connectionLost),
+    exporting: readonly(exporting),
+    refreshProgress: readonly(refreshProgress),
 
     // Computed properties
     allSelected,
@@ -514,6 +576,12 @@ export function useCustomers() {
     exportData,
     formatAddress,
     formatDate,
-    highlightMatch
+    highlightMatch,
+    getConnectionStatus,
+    getConnectionIcon,
+    getConnectionText,
+    toggleAutoRefresh,
+    emergencyReconnect,
+    deleteSelected
   }
 }

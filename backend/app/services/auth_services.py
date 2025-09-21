@@ -45,7 +45,6 @@ class AuthService:
     def verify_token(self, token: str):
         """Verify JWT token"""
         try:
-            # Check if token is blacklisted
             if self.blacklist_collection.find_one({"token": token}):
                 return None
             
@@ -68,23 +67,21 @@ class AuthService:
             if not self.verify_password(password, user["password"]):
                 raise Exception("Invalid email or password")
             
-            # Status check
+            # Status and role checks
             user_status = user.get("status", "active")
             if user_status != "active":
                 raise Exception("Account is not active")
             
-            # Role check
             user_role = user.get("role", "").lower()
             if user_role != "admin":
-                print(f"Non-admin login attempt blocked: {email} (role: {user_role})")
                 raise Exception("Access denied. This system is restricted to administrators only.")
             
-            # ✅ SIMPLIFIED: Just get the user_id (no generation needed)
-            user_id = user["user_id"]  # This should always exist now
+            # ✅ Use _id instead of user_id
+            user_id = user["_id"]  # This is your USER-0001 format
             
-            # Update last login
+            # Update last login using _id
             self.user_collection.update_one(
-                {"user_id": user_id},  # ✅ Use user_id instead of _id
+                {"_id": user_id},  # Use _id for lookup
                 {"$set": {"last_login": datetime.utcnow()}}
             )
             
@@ -98,14 +95,13 @@ class AuthService:
                 from .session_services import SessionLogService
                 session_service = SessionLogService()
                 session_user = {
-                    "user_id": user_id,
+                    "user_id": user_id,  # Pass the USER-#### ID
                     "username": user.get("username", user["email"]),
                     "email": user["email"],
                     "branch_id": 1,
                     "role": "admin"
                 }
                 session_service.log_login(session_user)
-                print(f"Admin login successful: {user['email']}")
             except Exception as session_error:
                 print(f"Session logging error: {session_error}")
             
@@ -130,52 +126,34 @@ class AuthService:
             raise e
     
     def logout(self, token: str):
-        print(f"🚀🚀🚀 AUTH SERVICE LOGOUT CALLED! 🚀🚀🚀")
-        print(f"Logout attempt with token: {token[:20]}...")
-        
         try:
             clean_token = token.replace("Bearer ", "").strip()
             
-            # ✅ NEW: Get user info from token BEFORE blacklisting
+            # Get user info and log session logout
             try:
                 current_user = self.get_current_user(clean_token)
-                print(f"🔍 LOGOUT: Got current user: {current_user}")
-                
                 if current_user and current_user.get('user_id'):
                     user_id = current_user.get('user_id')
-                    print(f"🔍 LOGOUT: Extracted user_id: {user_id}")
                     
-                    # ✅ NEW: Log session logout
+                    # Log session logout
                     try:
                         from .session_services import SessionLogService
                         session_service = SessionLogService()
-                        print(f"🔍 LOGOUT: About to call session_service.log_logout({user_id})")
-                        session_result = session_service.log_logout(user_id)
-                        print(f"✅ LOGOUT: Session logout result: {session_result}")
+                        session_service.log_logout(user_id)
                     except Exception as session_error:
-                        print(f"❌ LOGOUT: Session logout failed: {session_error}")
-                        # Continue with token blacklisting even if session logout fails
-                else:
-                    print(f"⚠️ LOGOUT: Could not extract user_id from token")
-                    
+                        print(f"Session logout failed: {session_error}")
+                        
             except Exception as user_error:
-                print(f"❌ LOGOUT: Could not get current user: {user_error}")
-                # Continue with token blacklisting even if we can't get user info
+                print(f"Could not get current user: {user_error}")
             
-            # Check if already blacklisted
-            existing = self.blacklist_collection.find_one({"token": clean_token})
-            print(f"Token already blacklisted: {existing is not None}")
-            
-            # Add to blacklist
-            result = self.blacklist_collection.insert_one({
+            # Blacklist token
+            self.blacklist_collection.insert_one({
                 "token": clean_token,
                 "blacklisted_at": datetime.utcnow()
             })
-            print(f"Blacklist insert result: {result.inserted_id}")
             
             return {"message": "Successfully logged out"}
         except Exception as e:
-            print(f"Logout error: {str(e)}")
             raise e
     
     def get_current_user(self, token: str):
@@ -185,17 +163,17 @@ class AuthService:
             if not payload or payload.get("type") != "access":
                 return None
             
-            user_id = payload["sub"]  # This is now always USER-#### format
+            user_id = payload["sub"]  # USER-#### format
             
-            # ✅ SIMPLIFIED: Only look up by user_id
-            user = self.user_collection.find_one({"user_id": user_id})
+            # Look up by _id field instead of user_id
+            user = self.user_collection.find_one({"_id": user_id})
             
             if user:
                 return {
-                    "user_id": user["user_id"],  # Always USER-#### format
+                    "user_id": user["_id"],  # USER-#### format
                     "email": user["email"],
                     "role": user["role"],
-                    "user_data": user  # No need for convert_object_id if no ObjectIds
+                    "user_data": user
                 }
             return None
         
@@ -210,7 +188,7 @@ class AuthService:
                 raise Exception("Invalid token type")
             
             user_id = payload["sub"]
-            user = self.user_collection.find_one({"user_id": user_id})
+            user = self.user_collection.find_one({"_id": user_id})  # Use _id
             
             if not user:
                 raise Exception("User not found")
