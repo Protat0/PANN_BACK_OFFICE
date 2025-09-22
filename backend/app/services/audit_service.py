@@ -570,3 +570,20 @@ class AuditLogService:
                 "change_count": len(changed_fields)
             }
         )
+    
+    def log_action(self, action, resource_type, resource_id, user_id=None, changes=None, metadata=None):
+        """Generic audit logging method for backward compatibility"""
+        user_data = {'user_id': user_id or 'system'}
+        target_data = {
+            'type': resource_type,
+            'id': resource_id,
+            'name': f"{resource_type.title()} {resource_id}"
+        }
+        
+        return self._create_audit_log(
+            event_type=action,
+            user_data=user_data,
+            target_data=target_data,
+            new_values=changes or {},
+            metadata=metadata or {}
+        )

@@ -117,8 +117,8 @@
                   <select class="form-select" v-model="formData.discount_type" required>
                     <option value="">Select discount type</option>
                     <option value="percentage">Percentage</option>
-                    <option value="fixed">Fixed Amount</option>
-                    <option value="buy_one_get_one">Buy One Get One (BOGO)</option>
+                    <option value="fixed_amount">Fixed Amount</option>  <!-- Changed -->
+                    <option value="buy_x_get_y">Buy One Get One (BOGO)</option>  <!-- Changed -->
                   </select>
                 </div>
                 <div class="col-md-6 mb-3">
@@ -175,6 +175,26 @@
                       required
                     />
                   </div>
+                </div>
+                <div class="col-12 mb-3">
+                  <label class="form-label">Description</label>
+                  <textarea 
+                    class="form-control" 
+                    v-model="formData.description"
+                    placeholder="Enter promotion description (optional)"
+                    rows="3"
+                  ></textarea>
+                </div>
+                <div class="col-12 mb-3">
+                  <label class="form-label">Affected Products <span class="text-danger">*</span></label>
+                  <select class="form-select" v-model="formData.affected_products" required>
+                    <option value="">Select product category</option>
+                    <option value="all">All Products</option>
+                    <option value="noodles">Noodles</option>
+                    <option value="drinks">Drinks</option>
+                    <option value="toppings">Toppings</option>
+                  </select>
+                  <small class="form-text text-muted">Choose which category of products this promotion applies to</small>
                 </div>
               </div>
             </form>
@@ -321,7 +341,8 @@ export default {
         status: 'active',
         start_date: '',
         end_date: '',
-        affected_products: ''
+        affected_products: '',
+        description: ''  
       }
     },
     populateForm(promotion) {
@@ -332,7 +353,8 @@ export default {
         status: promotion.status || 'active',
         start_date: promotion.start_date || '',
         end_date: promotion.end_date || '',
-        affected_products: this.mapApplicableProductsToCategory(promotion.applicable_products) || ''
+        affected_products: this.mapApplicableProductsToCategory(promotion.applicable_products) || '',
+        description: promotion.description || ''  // Add this
       }
     },
     validateForm() {
@@ -417,23 +439,39 @@ export default {
         alert('Error creating promotion: ' + error.message)
       }
     },
-    updatePromotion() {
+    async updatePromotion() {
       if (!this.validateForm()) return
       
-      console.log('Update promotion:', {
-        id: this.selectedPromotion.promotion_id,
-        data: this.formData
-      })
-      // Implement update logic here
-      
-      // Emit success event to parent
-      this.$emit('promotion-updated', {
-        action: 'edit',
-        id: this.selectedPromotion.promotion_id,
-        data: this.formData
-      })
-      
-      this.closeModal()
+      try {
+        console.log('Update promotion:', {
+          id: this.selectedPromotion.promotion_id,
+          data: this.formData
+        })
+        
+        // Call the API to update the promotion
+        const result = await promotionApiService.updatePromotion(
+          this.selectedPromotion.promotion_id, 
+          this.formData
+        )
+        
+        if (result.success) {
+          alert('Promotion updated successfully!')
+          
+          // Emit success event to parent
+          this.$emit('promotion-saved', {
+            action: 'edit',
+            id: this.selectedPromotion.promotion_id,
+            data: result.promotion
+          })
+          
+          this.closeModal()
+        } else {
+          alert('Failed to update promotion: ' + result.message)
+        }
+      } catch (error) {
+        console.error('Error updating promotion:', error)
+        alert('Error updating promotion: ' + error.message)
+      }
     },
 
     // Formatting methods (same as Promotions page)

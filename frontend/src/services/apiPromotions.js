@@ -16,22 +16,44 @@ class PromotionApiService {
 
   // Data transformation methods
   transformToBackend(frontendData) {
-    return {
-        name: frontendData.promotion_name,
-        type: frontendData.discount_type,
-        discount_value: frontendData.discount_value,
-        target_type: frontendData.target_type || 'all',
-        start_date: frontendData.start_date ? new Date(frontendData.start_date).toISOString() : null,
-        end_date: frontendData.end_date ? new Date(frontendData.end_date).toISOString() : null,
-        description: frontendData.description || '',
-        usage_limit: frontendData.usage_limit,
-        created_by: frontendData.created_by
-    };
+    // Map affected_products to target_type and target_ids
+    let targetType = 'all';
+    let targetIds = [];
+    
+    if (frontendData.affected_products) {
+      if (frontendData.affected_products === 'all') {
+        targetType = 'all';
+        targetIds = [];
+      } else {
+        targetType = 'categories';
+        // Map the category selection to actual category IDs
+        const categoryMapping = {
+          'noodles': ['CTGY-001'],
+          'drinks': ['CTGY-002'], 
+          'toppings': ['CTGY-003']
+        };
+        targetIds = categoryMapping[frontendData.affected_products] || [];
+      }
     }
+
+    return {
+      name: frontendData.promotion_name,
+      type: frontendData.discount_type,
+      discount_value: frontendData.discount_value,
+      target_type: targetType,
+      target_ids: targetIds,
+      start_date: frontendData.start_date,
+      end_date: frontendData.end_date,
+      description: frontendData.description || '',
+      usage_limit: frontendData.usage_limit,
+      created_by: frontendData.created_by,
+      status: frontendData.status  // Add this line
+    };
+  }
 
   transformToFrontend(backendData) {
     return {
-      promotion_id: backendData.promotion_id,
+      promotion_id: backendData.promotion_id || backendData._id,
       promotion_name: backendData.name,
       discount_type: backendData.type,
       discount_value: backendData.discount_value,
@@ -50,37 +72,62 @@ class PromotionApiService {
 
   async getAllPromotions(params = {}) {
     try {
-        console.log("Fetching all promotions with params:", params);
-        
-        // Transform frontend filter params to backend format
-        const backendParams = { ...params };
-        if (params.discount_type && params.discount_type !== 'all') {
+      console.log("Fetching all promotions with params:", params);
+      
+      // Transform frontend filter params to backend format
+      const backendParams = { ...params };
+      if (params.discount_type && params.discount_type !== 'all') {
         backendParams.type = params.discount_type;
         delete backendParams.discount_type;
-        }
+      }
+      
+      const response = await api.get('/promotions/', { params: backendParams });
+      const data = this.handleResponse(response);
+      
+      console.log("Response data:", data);
+      console.log("Response data keys:", Object.keys(data));
+      
+      // Check if we have promotions to transform
+      if (data.promotions && Array.isArray(data.promotions)) {
+        // Transform each promotion - make sure transformToFrontend exists
+        const transformedPromotions = data.promotions.map(promotion => {
+          try {
+            return this.transformToFrontend(promotion);
+          } catch (transformError) {
+            console.warn('Transform error for promotion:', promotion, transformError);
+            // Return the original promotion if transform fails
+            return promotion;
+          }
+        });
         
-        const response = await api.get('/promotions/', { params: backendParams });
-        const data = this.handleResponse(response);
-        
-        console.log("Response data:", data);
-        console.log("Response data keys:", Object.keys(data));
-        
-        // Transform response data to frontend format
         return {
-        success: data.success || true,
-        promotions: data.promotions?.map(p => this.transformToFrontend(p)) || [],
-        pagination: data.pagination || {
+          success: data.success || true,
+          promotions: transformedPromotions,
+          pagination: data.pagination || {
             current_page: 1,
             total_pages: 1,
-            total_items: data.promotions?.length || 0,
+            total_items: data.promotions.length,
             items_per_page: params.limit || 20
-        }
+          }
         };
+      }
+      
+      // If no promotions, return empty array
+      return {
+        success: data.success || true,
+        promotions: [],
+        pagination: data.pagination || {
+          current_page: 1,
+          total_pages: 1,
+          total_items: 0,
+          items_per_page: params.limit || 20
+        }
+      };
     } catch (error) {
-        console.error("Error fetching promotions:", error);
-        this.handleError(error);
+      console.error("Error fetching promotions:", error);
+      this.handleError(error);
     }
-    }
+  }
 
   async getPromotionById(promotionId) {
     try {

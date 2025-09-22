@@ -83,7 +83,7 @@ class PromotionService:
                 'created_by': promotion_data.get('created_by'),
                 'created_at': datetime.utcnow(),
                 'updated_at': datetime.utcnow(),
-                'status': 'scheduled'
+                'status': promotion_data.get('status', 'scheduled'),
             }
             
             # Insert promotion - now _id will be the string promotion_id
@@ -223,7 +223,7 @@ class PromotionService:
                 'success': True,
                 'message': f'Promotion {promotion_id} updated successfully',
                 'changes': changes,
-                'promotion': updated_promotion
+                'promotion': self._serialize_promotion_data(updated_promotion.copy())  # Add serialization
             }
             
         except Exception as e:
@@ -1448,31 +1448,38 @@ class PromotionService:
             return {'success': False, 'message': f'Error deactivating promotion: {str(e)}'}
         
     def _send_promotion_notification(self, action_type, promotion_data, additional_metadata=None):
-        """Centralized notification helper for promotion actions"""
+        """Simple notification helper for promotion actions"""
         try:
-            base_metadata = {
-                'promotion_id': promotion_data['promotion_id'],
-                'promotion_name': promotion_data['name'],
-                'promotion_type': promotion_data['type'],
-                'discount_value': promotion_data['discount_value'],
-                'target_type': promotion_data['target_type'],
+            titles = {
+                'created': "New Promotion Created",
+                'updated': "Promotion Updated", 
+                'activated': "Promotion Activated",
+                'deactivated': "Promotion Deactivated",
+                'expired': "Promotion Expired",
+                'deleted': "Promotion Deleted",
+                'restored': "Promotion Restored"
             }
             
-            if additional_metadata:
-                base_metadata.update(additional_metadata)
+            promotion_name = promotion_data.get('name', 'Unknown Promotion')
+            promotion_id = promotion_data.get('promotion_id', 'Unknown')
             
-            notification_data = {
-                'type': f'promotion_{action_type}',
-                'title': f'Promotion {action_type.title()}',
-                'message': f"Promotion '{promotion_data['name']}' ({promotion_data['promotion_id']}) {action_type}",
-                'metadata': base_metadata,
-                'timestamp': datetime.utcnow()
-            }
-            
-            self.notification_service.send_notification(notification_data)
-            
+            if action_type in titles:
+                self.notification_service.create_notification(
+                    title=titles[action_type],
+                    message=f"Promotion '{promotion_name}' ({promotion_id}) has been {action_type.replace('_', ' ')}",
+                    priority="high" if action_type in ['activated', 'expired'] else "medium",
+                    notification_type="system",
+                    metadata={
+                        "promotion_id": str(promotion_id),
+                        "promotion_name": promotion_name,
+                        "action_type": f"promotion_{action_type}",
+                        "discount_type": promotion_data.get('type', 'unknown'),
+                        "discount_value": str(promotion_data.get('discount_value', 0)),
+                        **(additional_metadata or {})
+                    }
+                )
         except Exception as e:
-            logger.error(f"Error sending promotion notification: {e}")
+            logger.error(f"Failed to send promotion notification: {e}")
 
     def _requires_notification(self, changes):
         """Determine if changes warrant notifications"""
