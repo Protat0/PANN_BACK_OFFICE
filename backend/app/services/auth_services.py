@@ -17,9 +17,17 @@ class AuthService:
     
     def verify_password(self, password: str, hashed: str) -> bool:
         """Verify password against hash"""
+        print(f"🔐 Password verification debug:")
+        print(f"🔐 Input password length: {len(password) if password else 0}")
+        print(f"🔐 Stored hash length: {len(hashed) if hashed else 0}")
+        print(f"🔐 Hash starts with: {hashed[:10] if hashed else 'None'}...")
+        
         try:
-            return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
-        except:
+            result = bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+            print(f"🔐 bcrypt.checkpw result: {result}")
+            return result
+        except Exception as e:
+            print(f"❌ Password verification exception: {e}")
             return False
     
     def create_access_token(self, data: dict, expires_delta: timedelta = None):
@@ -58,42 +66,83 @@ class AuthService:
             return None
     
     def login(self, email: str, password: str):
+        print(f"🚀 AUTH SERVICE LOGIN START")
+        print(f"📧 Email: {email}")
+        print(f"🔍 Password length: {len(password) if password else 0}")
+        
         try:
             # Find user by email
+            print(f"🔍 Looking up user by email: {email}")
             user = self.user_collection.find_one({"email": email})
+            
             if not user:
+                print(f"❌ User not found with email: {email}")
                 raise Exception("Invalid email or password")
+            else:
+                print(f"✅ User found: {user.get('email', 'N/A')}")
+                print(f"🆔 User ID: {user.get('_id', 'N/A')}")
+                print(f"👤 Username: {user.get('username', 'N/A')}")
+                print(f"🎭 Role: {user.get('role', 'N/A')}")
+                print(f"📊 Status: {user.get('status', 'N/A')}")
             
             # Password verification
-            if not self.verify_password(password, user["password"]):
+            print(f"🔐 Starting password verification...")
+            password_valid = self.verify_password(password, user["password"])
+            print(f"🔐 Password verification result: {password_valid}")
+            
+            if not password_valid:
+                print(f"❌ Password verification failed for: {email}")
                 raise Exception("Invalid email or password")
             
             # Status check
             user_status = user.get("status", "active")
+            print(f"📊 Checking user status: {user_status}")
             if user_status != "active":
+                print(f"❌ User status not active: {user_status}")
                 raise Exception("Account is not active")
             
             # Role check
             user_role = user.get("role", "").lower()
+            print(f"🎭 Checking user role: '{user_role}'")
             if user_role != "admin":
-                print(f"Non-admin login attempt blocked: {email} (role: {user_role})")
+                print(f"❌ Non-admin login attempt blocked: {email} (role: {user_role})")
                 raise Exception("Access denied. This system is restricted to administrators only.")
             
-            # ✅ SIMPLIFIED: Just get the user_id (no generation needed)
-            user_id = user["user_id"]  # This should always exist now
+            # Convert ObjectId to string
+            user_id = str(user["_id"])
+            print(f"🆔 Converting ObjectId to string: {user_id}")
             
             # Update last login
-            self.user_collection.update_one(
-                {"user_id": user_id},  # ✅ Use user_id instead of _id
+            print(f"⏰ Updating last login timestamp...")
+            update_result = self.user_collection.update_one(
+                {"_id": user["_id"]},
                 {"$set": {"last_login": datetime.utcnow()}}
             )
+            print(f"⏰ Last login update result - matched: {update_result.matched_count}, modified: {update_result.modified_count}")
             
-            # Create tokens with USER-#### format
+            # Create tokens
+            print(f"🎫 Creating JWT tokens...")
             token_data = {"sub": user_id, "email": user["email"], "role": user["role"]}
+            print(f"🎫 Token data: {token_data}")
+            
             access_token = self.create_access_token(token_data)
             refresh_token = self.create_refresh_token(token_data)
+            print(f"🎫 Access token created: {access_token[:50]}...")
+            print(f"🎫 Refresh token created: {refresh_token[:50]}...")
             
-            # Session logging with USER-#### format
+            # Prepare user data for response
+            user_response_data = {
+                "id": user_id,
+                "email": user["email"],
+                "role": user["role"],
+                "name": user.get("full_name", ""),
+                "username": user.get("username", ""),
+                "status": user.get("status", "active")
+            }
+            print(f"👤 User response data prepared: {user_response_data}")
+            
+            # Session logging
+            print(f"📝 Starting session logging...")
             try:
                 from .session_services import SessionLogService
                 session_service = SessionLogService()
@@ -104,29 +153,32 @@ class AuthService:
                     "branch_id": 1,
                     "role": "admin"
                 }
-                session_service.log_login(session_user)
-                print(f"Admin login successful: {user['email']}")
+                print(f"📝 Session user data: {session_user}")
+                session_result = session_service.log_login(session_user)
+                print(f"✅ Session logged successfully: {session_result}")
+                print(f"✅ Admin login successful: {user['email']}")
             except Exception as session_error:
-                print(f"Session logging error: {session_error}")
+                print(f"❌ Session logging error: {session_error}")
             
-            # Response with USER-#### format
-            return {
+            # Final response
+            final_response = {
                 "access_token": access_token,
                 "refresh_token": refresh_token,
                 "token_type": "bearer",
                 "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-                "user": {
-                    "id": user_id,  # USER-#### format
-                    "email": user["email"],
-                    "role": user["role"],
-                    "name": user.get("full_name", ""),
-                    "username": user.get("username", ""),
-                    "status": user.get("status", "active")
-                }
+                "user": user_response_data
             }
+            print(f"🎉 LOGIN SUCCESSFUL - Response prepared")
+            print(f"🎉 Final response keys: {list(final_response.keys())}")
+            return final_response
             
         except Exception as e:
-            print(f"Login failed for {email}: {str(e)}")
+            print(f"💥 LOGIN FAILED for {email}")
+            print(f"💥 Error type: {type(e).__name__}")
+            print(f"💥 Error message: {str(e)}")
+            import traceback
+            print(f"💥 Full traceback:")
+            traceback.print_exc()
             raise e
     
     def logout(self, token: str):
@@ -185,17 +237,18 @@ class AuthService:
             if not payload or payload.get("type") != "access":
                 return None
             
-            user_id = payload["sub"]  # This is now always USER-#### format
+            user_id = payload["sub"]  # This is the ObjectId string
             
-            # ✅ SIMPLIFIED: Only look up by user_id
-            user = self.user_collection.find_one({"user_id": user_id})
+            # Convert back to ObjectId for lookup
+            from bson import ObjectId
+            user = self.user_collection.find_one({"_id": ObjectId(user_id)})
             
             if user:
                 return {
-                    "user_id": user["user_id"],  # Always USER-#### format
+                    "user_id": str(user["_id"]),
                     "email": user["email"],
                     "role": user["role"],
-                    "user_data": user  # No need for convert_object_id if no ObjectIds
+                    "user_data": user
                 }
             return None
         

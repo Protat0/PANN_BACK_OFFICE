@@ -73,11 +73,10 @@
 
 <script>
 import { useToast } from '../composables/useToast.js'
+import { useAuth } from '@/composables/auth/useAuth.js'
 import Sidebar from './Sidebar.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 import DarkModeToggle from '@/components/common/DarkModeToggle.vue'
-import { X } from 'lucide-vue-next'
-
 import ToastContainer from '@/components/common/ToastContainer.vue'
 
 export default {
@@ -86,14 +85,17 @@ export default {
     Sidebar,
     NotificationBell,
     DarkModeToggle,
-    X,
     ToastContainer
   },
   setup() {
+    // Use the auth composable
+    const { logout } = useAuth()
+    
     // Make toast available globally in this layout if needed
     const { success, error, warning, info } = useToast()
     
     return {
+      authLogout: logout,
       toast: { success, error, warning, info }
     }
   },
@@ -122,7 +124,6 @@ export default {
         '/allNotifications': 'All Notifications'
       }
       
-      // Handle dynamic product detail routes
       if (this.$route.path.startsWith('/products/') && this.$route.path !== '/products/bulk') {
         return 'Product Details'
       }
@@ -130,14 +131,14 @@ export default {
       return titles[this.$route.path] || 'Product Details'
     },
     userInfo() {
-      const userData = localStorage.getItem('userData')
+      // Try both possible storage keys for backward compatibility
+      let userData = localStorage.getItem('user') || localStorage.getItem('userData')
       return userData ? JSON.parse(userData) : {}
     }
   },
   methods: {
     handleMenuChange(menu) {
       console.log('Menu changed to:', menu)
-      // Navigate using router instead of changing currentPage
       this.$router.push(`/${menu}`)
     },
     handleShowProfile() {
@@ -151,74 +152,47 @@ export default {
       this.sidebarCollapsed = collapsed
     },
     async handleLogout() {
-      console.log('User logging out')
+      console.log('MainLayout: User logging out')
       
-      // Show logout toast
       const logoutToastId = this.toast.loading('Logging out...')
       
       try {
-        // Call logout API
-        const token = localStorage.getItem('authToken')
-        if (token) {
-          await fetch('http://localhost:8000/api/v1/auth/logout/', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            }
-          })
-        }
+        // Use the auth composable logout method
+        await this.authLogout()
         
-        // Success toast
         this.toast.dismiss(logoutToastId)
         this.toast.success('Successfully logged out', { duration: 2000 })
         
+        // Small delay before redirect
+        setTimeout(() => {
+          this.$router.push('/login')
+        }, 1500)
+        
       } catch (error) {
-        console.error('Logout API error:', error)
+        console.error('Logout error:', error)
         this.toast.dismiss(logoutToastId)
         this.toast.warning('Logged out with connection issues', { duration: 3000 })
-      } finally {
-        // Clear stored data
-        localStorage.removeItem('authToken')
-        localStorage.removeItem('refreshToken')
-        localStorage.removeItem('userData')
         
-        // Small delay to show the toast before redirecting
+        // Still redirect even if logout API failed
         setTimeout(() => {
-          // Redirect to login
           this.$router.push('/login')
         }, 1500)
       }
     }
   },
   mounted() {
+    console.log('MainLayout: Component mounted')
+    
     // Load sidebar state from localStorage
     const savedState = localStorage.getItem('sidebar-collapsed')
     if (savedState !== null) {
       this.sidebarCollapsed = JSON.parse(savedState)
     }
-  },
-  mounted() {
-    // Load sidebar state from localStorage
-    const savedState = localStorage.getItem('sidebar-collapsed')
-    if (savedState !== null) {
-      this.sidebarCollapsed = JSON.parse(savedState)
-    }
-  },
-  beforeRouteEnter(to, from, next) {
-    // Check if user is authenticated before entering any protected route
-    const token = localStorage.getItem('authToken')
-    if (token) {
-      next()
-    } else {
-      next('/login')
-    }
-  },
-  mounted() {
-    // Show welcome toast when user first loads the app (optional)
+    
+    // Show welcome toast (optional)
     const userData = this.userInfo
-    if (userData.full_name) {
-      this.toast.success(`Welcome back, ${userData.full_name}!`, {
+    if (userData.full_name || userData.name) {
+      this.toast.success(`Welcome back, ${userData.full_name || userData.name}!`, {
         duration: 3000
       })
     }

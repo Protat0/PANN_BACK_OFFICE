@@ -1,545 +1,478 @@
 <template>
-  <div v-if="show" class="modal-overlay" @click="handleOverlayClick">
-    <div class="modal-content" @click.stop>
+  <!-- Modal Backdrop -->
+  <div 
+    v-if="isVisible" 
+    class="modal-backdrop"
+    @click="handleBackdropClick"
+  >
+    <!-- Modal Container -->
+    <div 
+      class="modal-container"
+      @click.stop
+    >
       <!-- Modal Header -->
       <div class="modal-header">
-        <h2 class="modal-title">
-          {{ mode === 'add' ? 'Add New Customer' : mode === 'edit' ? 'Edit Customer' : 'Customer Details' }}
-        </h2>
+        <h3 class="text-primary mb-0 fw-semibold">
+          {{ mode === 'edit' ? 'Edit Customer' : 'Add New Customer' }}
+        </h3>
         <button 
-          type="button" 
-          class="btn btn-cancel btn-sm btn-icon-only"
+          class="btn-close"
           @click="closeModal"
+          :disabled="isLoading"
+          aria-label="Close"
         >
-          <X :size="16" />
+          <X :size="20" />
         </button>
       </div>
 
       <!-- Modal Body -->
       <div class="modal-body">
-        <!-- View Mode -->
-        <div v-if="mode === 'view'" class="customer-details">
-          <div class="row mb-2">
-            <div class="col-4 fw-bold detail-label">ID:</div>
-            <div class="col-8 detail-value">{{ customer.customer_id || customer._id }}</div>
-          </div>
-          
-          <div class="row mb-2">
-            <div class="col-4 fw-bold detail-label">Name:</div>
-            <div class="col-8 detail-value">{{ customer.full_name }}</div>
-          </div>
-          
-          <div class="row mb-2">
-            <div class="col-4 fw-bold detail-label">Email:</div>
-            <div class="col-8 detail-value">{{ customer.email }}</div>
-          </div>
-          
-          <div class="row mb-2">
-            <div class="col-4 fw-bold detail-label">Phone:</div>
-            <div class="col-8 detail-value">{{ customer.phone || 'N/A' }}</div>
-          </div>
-          
-          <div class="row mb-2">
-            <div class="col-4 fw-bold detail-label">Address:</div>
-            <div class="col-8 detail-value">{{ formatAddress(customer.delivery_address) }}</div>
-          </div>
-          
-          <div class="row mb-2">
-            <div class="col-4 fw-bold detail-label">Loyalty Points:</div>
-            <div class="col-8">
-              <span class="badge bg-success">{{ customer.loyalty_points || 0 }}</span>
-            </div>
-          </div>
-          
-          <div class="row mb-2">
-            <div class="col-4 fw-bold detail-label">Status:</div>
-            <div class="col-8">
-              <span class="badge" :class="customer.status === 'active' ? 'bg-success' : 'bg-secondary'">
-                {{ customer.status || 'active' }}
-              </span>
-            </div>
-          </div>
-          
-          <div class="row mb-2">
-            <div class="col-4 fw-bold detail-label">Date Created:</div>
-            <div class="col-8 detail-value">{{ formatDate(customer.date_created) }}</div>
-          </div>
-          
-          <div class="row mb-3">
-            <div class="col-4 fw-bold detail-label">Last Updated:</div>
-            <div class="col-8 detail-value">{{ formatDate(customer.last_updated) }}</div>
+        <!-- Error Message -->
+        <div v-if="error" class="status-error mb-4">
+          <div class="d-flex align-items-center gap-2">
+            <AlertTriangle :size="16" />
+            <span class="text-status-error fw-medium">{{ error }}</span>
           </div>
         </div>
 
-        <!-- Add/Edit Mode -->
-        <form v-else @submit.prevent="handleSubmit">
-          <div class="mb-3">
-            <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
-            <input 
-              id="username"
-              v-model="form.username" 
-              type="text" 
+        <!-- Customer Form -->
+        <form @submit.prevent="handleSubmit">
+          <!-- Full Name -->
+          <div class="mb-4">
+            <label class="form-label text-secondary fw-medium mb-2">
+              Full Name <span class="text-error">*</span>
+            </label>
+            <input
+              v-model="form.full_name"
+              type="text"
               class="form-control"
-              :class="{ 'is-invalid': errors.username }"
-              required 
-              :disabled="formLoading"
-              placeholder="Enter username"
+              placeholder="Enter customer's full name"
+              required
+              :disabled="isLoading"
             />
-            <div v-if="errors.username" class="invalid-feedback">{{ errors.username }}</div>
           </div>
-          
-          <div class="mb-3">
-            <label for="full_name" class="form-label">Full Name <span class="text-danger">*</span></label>
-            <input 
-              id="full_name"
-              v-model="form.full_name" 
-              type="text" 
+
+          <!-- Email -->
+          <div class="mb-4">
+            <label class="form-label text-secondary fw-medium mb-2">
+              Email Address <span class="text-error">*</span>
+            </label>
+            <input
+              v-model="form.email"
+              type="email"
               class="form-control"
-              :class="{ 'is-invalid': errors.full_name }"
-              required 
-              :disabled="formLoading"
-              placeholder="Enter full name"
+              placeholder="customer@example.com"
+              required
+              :disabled="isLoading"
             />
-            <div v-if="errors.full_name" class="invalid-feedback">{{ errors.full_name }}</div>
           </div>
 
-          <div class="mb-3">
-            <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
-            <input 
-              id="email"
-              v-model="form.email" 
-              type="email" 
+          <!-- Phone -->
+          <div class="mb-4">
+            <label class="form-label text-secondary fw-medium mb-2">
+              Phone Number
+            </label>
+            <input
+              v-model="form.phone"
+              type="tel"
               class="form-control"
-              :class="{ 'is-invalid': errors.email }"
-              required 
-              :disabled="formLoading"
-              placeholder="Enter email address"
+              placeholder="+1 (555) 123-4567"
+              :disabled="isLoading"
             />
-            <div v-if="errors.email" class="invalid-feedback">{{ errors.email }}</div>
           </div>
 
-          <div class="mb-3">
-            <label for="phone" class="form-label">Phone</label>
-            <input 
-              id="phone"
-              v-model="form.phone" 
-              type="tel" 
+          <!-- Password (only for new customers) -->
+          <div v-if="mode === 'create'" class="mb-4">
+            <label class="form-label text-secondary fw-medium mb-2">
+              Password <span class="text-error">*</span>
+            </label>
+            <input
+              v-model="form.password"
+              type="password"
               class="form-control"
-              :class="{ 'is-invalid': errors.phone }"
-              :disabled="formLoading"
-              placeholder="Enter phone number"
+              placeholder="Enter password for customer account"
+              required
+              :disabled="isLoading"
             />
-            <div v-if="errors.phone" class="invalid-feedback">{{ errors.phone }}</div>
           </div>
 
-          <div class="mb-3">
-            <label for="street" class="form-label">Street Address</label>
-            <input 
-              id="street"
-              v-model="form.delivery_address.street" 
-              type="text" 
+          <!-- Delivery Address -->
+          <div class="mb-4">
+            <label class="form-label text-secondary fw-medium mb-2">
+              Delivery Address
+            </label>
+            <textarea
+              v-model="form.delivery_address"
               class="form-control"
-              :class="{ 'is-invalid': errors.street }"
-              :disabled="formLoading"
-              placeholder="Enter street address"
-            />
-            <div v-if="errors.street" class="invalid-feedback">{{ errors.street }}</div>
+              rows="3"
+              placeholder="Street address, city, state, zip code"
+              :disabled="isLoading"
+            ></textarea>
           </div>
 
-          <div class="row mb-3">
-            <div class="col-md-6">
-              <label for="city" class="form-label">City</label>
-              <input 
-                id="city"
-                v-model="form.delivery_address.city" 
-                type="text" 
-                class="form-control"
-                :class="{ 'is-invalid': errors.city }"
-                :disabled="formLoading"
-                placeholder="Enter city"
-              />
-              <div v-if="errors.city" class="invalid-feedback">{{ errors.city }}</div>
-            </div>
-
-            <div class="col-md-6">
-              <label for="postal_code" class="form-label">Postal Code</label>
-              <input 
-                id="postal_code"
-                v-model="form.delivery_address.postal_code" 
-                type="text" 
-                class="form-control"
-                :class="{ 'is-invalid': errors.postal_code }"
-                :disabled="formLoading"
-                placeholder="Enter postal code"
-              />
-              <div v-if="errors.postal_code" class="invalid-feedback">{{ errors.postal_code }}</div>
-            </div>
-          </div>
-
-          <div class="mb-3">
-            <label for="loyalty_points" class="form-label">Loyalty Points</label>
-            <input 
-              id="loyalty_points"
-              v-model.number="form.loyalty_points" 
-              type="number" 
-              class="form-control"
-              :class="{ 'is-invalid': errors.loyalty_points }"
+          <!-- Loyalty Points (only for edit mode) -->
+          <div v-if="mode === 'edit'" class="mb-4">
+            <label class="form-label text-secondary fw-medium mb-2">
+              Loyalty Points
+            </label>
+            <input
+              v-model.number="form.loyalty_points"
+              type="number"
               min="0"
-              :disabled="formLoading"
+              class="form-control"
               placeholder="0"
+              :disabled="isLoading"
             />
-            <div v-if="errors.loyalty_points" class="invalid-feedback">{{ errors.loyalty_points }}</div>
           </div>
 
-          <!-- Error Display -->
-          <div v-if="generalError" class="alert alert-danger">
-            {{ generalError }}
+          <!-- Status (only for edit mode) -->
+          <div v-if="mode === 'edit'" class="mb-4">
+            <label class="form-label text-secondary fw-medium mb-2">
+              Status
+            </label>
+            <select
+              v-model="form.status"
+              class="form-select"
+              :disabled="isLoading"
+            >
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
           </div>
         </form>
       </div>
 
       <!-- Modal Footer -->
       <div class="modal-footer">
-        <div class="d-flex justify-content-end gap-2">
-          <button 
-            type="button" 
-            class="btn btn-cancel" 
-            @click="closeModal" 
-            :disabled="formLoading"
+        <div class="d-flex justify-content-end gap-3">
+          <button
+            type="button"
+            class="btn btn-cancel"
+            @click="closeModal"
+            :disabled="isLoading"
           >
             Cancel
           </button>
-          
-          <!-- View Mode Actions -->
-          <template v-if="mode === 'view'">
-            <button 
-              class="btn btn-edit btn-with-icon" 
-              @click="switchToEditMode"
-              :disabled="loading"
-            >
-              <Edit :size="16" />
-              <span>Edit</span>
-            </button>
-          </template>
-          
-          <!-- Add/Edit Mode Actions -->
-          <template v-else>
-            <button 
-              type="submit" 
-              class="btn btn-save" 
-              @click="handleSubmit"
-              :disabled="formLoading"
-            >
-              {{ formLoading ? 'Saving...' : (mode === 'edit' ? 'Update' : 'Create') }}
-            </button>
-          </template>
+          <button
+            type="button"
+            class="btn btn-submit btn-with-icon"
+            @click="handleSubmit"
+            :disabled="isLoading || !isFormValid"
+          >
+            <div v-if="isLoading" class="spinner-border spinner-border-sm me-2"></div>
+            {{ isLoading ? 'Saving...' : (mode === 'edit' ? 'Update Customer' : 'Add Customer') }}
+          </button>
         </div>
       </div>
     </div>
   </div>
 </template>
 
-<script>
-import { X, Edit } from 'lucide-vue-next'
-import { useCustomers } from '@/composables/ui/customers/useCustomers'
-import { ref, watch, computed } from 'vue'
+<script setup>
+import { ref, computed, watch } from 'vue'
+import { useModal } from '@/composables/ui/useModal.js'
+import { useCustomers } from '@/composables/api/useCustomers.js'
 
-export default {
-  name: 'AddCustomerModal',
-  components: {
-    X,
-    Edit
+// Props
+const props = defineProps({
+  mode: {
+    type: String,
+    default: 'create',
+    validator: (value) => ['create', 'edit'].includes(value)
   },
-  props: {
-    show: {
-      type: Boolean,
-      default: false
-    },
-    mode: {
-      type: String,
-      default: 'add',
-      validator: value => ['add', 'edit', 'view'].includes(value)
-    },
-    customer: {
-      type: Object,
-      default: () => null
-    }
-  },
-  emits: ['close', 'edit-mode'],
-  setup(props, { emit }) {
-    // Use the customers composable
-    const {
-      formLoading,
-      formError,
-      saveCustomer,
-      formatAddress,
-      formatDate
-    } = useCustomers()
+  customer: {
+    type: Object,
+    default: null
+  }
+})
 
-    // Local form state
-    const form = ref({
-      username: '',
-      full_name: '',
-      email: '',
-      phone: '',
-      delivery_address: {
-        street: '',
-        city: '',
-        postal_code: ''
-      },
-      loyalty_points: 0
-    })
+// Emits
+const emit = defineEmits(['close', 'success'])
 
-    const errors = ref({})
+// Composables
+const { isVisible, isLoading, error, show, hide, setLoading, setError, clearError } = useModal()
+const { createCustomer, updateCustomer } = useCustomers()
 
-    // Initialize form when modal opens or customer changes
-    const initializeForm = () => {
-      if (props.mode === 'add') {
-        form.value = {
-          username: '',
-          full_name: '',
-          email: '',
-          phone: '',
-          delivery_address: {
-            street: '',
-            city: '',
-            postal_code: ''
-          },
-          loyalty_points: 0
-        }
-      } else if (props.customer && (props.mode === 'edit' || props.mode === 'view')) {
-        form.value = {
-          username: props.customer.username || '',
-          full_name: props.customer.full_name || '',
-          email: props.customer.email || '',
-          phone: props.customer.phone || '',
-          delivery_address: {
-            street: props.customer.delivery_address?.street || '',
-            city: props.customer.delivery_address?.city || '',
-            postal_code: props.customer.delivery_address?.postal_code || ''
-          },
-          loyalty_points: props.customer.loyalty_points || 0
-        }
-      }
-    }
+// Form data
+const form = ref({
+  full_name: '',
+  email: '',
+  phone: '',
+  password: '',
+  delivery_address: '',
+  loyalty_points: 0,
+  status: 'active'
+})
 
-    const clearErrors = () => {
-      errors.value = {}
-    }
+// Computed
+const isFormValid = computed(() => {
+  const hasRequiredFields = form.value.full_name.trim() && form.value.email.trim()
+  const hasPasswordForCreate = props.mode === 'edit' || form.value.password.trim()
+  return hasRequiredFields && hasPasswordForCreate
+})
 
-    const validateForm = () => {
-      errors.value = {}
-      let isValid = true
+// Methods
+const openModal = () => {
+  clearError()
+  if (props.mode === 'edit' && props.customer) {
+    populateForm()
+  } else {
+    resetForm()
+  }
+  show()
+}
 
-      // Required field validations
-      if (!form.value.username?.trim()) {
-        errors.value.username = 'Username is required'
-        isValid = false
-      }
+const closeModal = () => {
+  if (!isLoading.value) {
+    hide()
+    emit('close')
+  }
+}
 
-      if (!form.value.full_name?.trim()) {
-        errors.value.full_name = 'Full name is required'
-        isValid = false
-      }
+const handleBackdropClick = () => {
+  if (!isLoading.value) {
+    closeModal()
+  }
+}
 
-      if (!form.value.email?.trim()) {
-        errors.value.email = 'Email is required'
-        isValid = false
-      } else if (!isValidEmail(form.value.email)) {
-        errors.value.email = 'Please enter a valid email address'
-        isValid = false
-      }
+const resetForm = () => {
+  form.value = {
+    full_name: '',
+    email: '',
+    phone: '',
+    password: '',
+    delivery_address: '',
+    loyalty_points: 0,
+    status: 'active'
+  }
+}
 
-      // Loyalty points validation
-      if (form.value.loyalty_points < 0) {
-        errors.value.loyalty_points = 'Loyalty points cannot be negative'
-        isValid = false
-      }
-
-      return isValid
-    }
-
-    const isValidEmail = (email) => {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      return emailRegex.test(email)
-    }
-
-    const handleSubmit = async () => {
-      clearErrors()
-      
-      if (!validateForm()) {
-        return
-      }
-
-      try {
-        await saveCustomer({ ...form.value })
-        emit('close')
-      } catch (error) {
-        // Error is handled in the composable
-        console.error('Form submission error:', error)
-      }
-    }
-
-    const switchToEditMode = () => {
-      emit('edit-mode', props.customer)
-    }
-
-    const closeModal = () => {
-      emit('close')
-    }
-
-    const handleOverlayClick = () => {
-      if (!formLoading.value) {
-        closeModal()
-      }
-    }
-
-    // Watch for prop changes
-    watch(() => props.show, (newVal) => {
-      if (newVal) {
-        initializeForm()
-        clearErrors()
-      }
-    })
-
-    watch(() => props.customer, (newVal) => {
-      if (newVal && props.show) {
-        initializeForm()
-      }
-    })
-
-    // Computed property for general error display
-    const generalError = computed(() => formError.value)
-
-    return {
-      form,
-      errors,
-      generalError,
-      formLoading,
-      initializeForm,
-      clearErrors,
-      validateForm,
-      isValidEmail,
-      handleSubmit,
-      switchToEditMode,
-      closeModal,
-      handleOverlayClick,
-      formatAddress,
-      formatDate
+const populateForm = () => {
+  if (props.customer) {
+    form.value = {
+      full_name: props.customer.full_name || '',
+      email: props.customer.email || '',
+      phone: props.customer.phone || '',
+      password: '',
+      delivery_address: typeof props.customer.delivery_address === 'string' 
+        ? props.customer.delivery_address 
+        : props.customer.delivery_address?.street || '',
+      loyalty_points: props.customer.loyalty_points || 0,
+      status: props.customer.status || 'active'
     }
   }
 }
+
+const handleSubmit = async () => {
+  if (!isFormValid.value || isLoading.value) return
+
+  setLoading(true)
+  clearError()
+
+  try {
+    const customerData = {
+      full_name: form.value.full_name.trim(),
+      email: form.value.email.trim(),
+      phone: form.value.phone.trim(),
+      delivery_address: form.value.delivery_address.trim(),
+    }
+
+    if (props.mode === 'create') {
+      customerData.password = form.value.password
+    }
+
+    if (props.mode === 'edit') {
+      customerData.loyalty_points = form.value.loyalty_points
+      customerData.status = form.value.status
+    }
+
+    let result
+    if (props.mode === 'edit') {
+      const customerId = props.customer._id || props.customer.customer_id
+      result = await updateCustomer(customerId, customerData)
+    } else {
+      result = await createCustomer(customerData)
+    }
+
+    emit('success', result)
+    closeModal()
+    
+  } catch (err) {
+    setError(err.message || `Failed to ${props.mode === 'edit' ? 'update' : 'create'} customer`)
+  } finally {
+    setLoading(false)
+  }
+}
+
+// Watch for customer prop changes
+watch(() => props.customer, () => {
+  if (props.mode === 'edit' && props.customer && isVisible.value) {
+    populateForm()
+  }
+})
+
+// Expose methods for parent component
+defineExpose({
+  openModal,
+  closeModal
+})
 </script>
 
 <style scoped>
-/* Modal Styles */
-.modal-overlay {
+/* Modal Backdrop - Fixed positioning */
+.modal-backdrop {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1050;
   display: flex;
+  align-items: center;
   justify-content: center;
-  align-items: center;
-  z-index: 2000;
+  padding: 1rem;
+  animation: fadeIn 0.2s ease-out;
 }
 
-.modal-content {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  max-width: 600px;
-  width: 90%;
+/* Modal Container */
+.modal-container {
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-primary);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-2xl);
+  width: 100%;
+  max-width: 500px;
   max-height: 90vh;
-  overflow-y: auto;
+  overflow: hidden;
+  animation: slideUp 0.3s ease-out;
+  position: relative;
 }
 
+/* Modal Header */
 .modal-header {
-  padding: 1.5rem 2rem 1rem;
-  border-bottom: 1px solid var(--neutral-light);
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-secondary);
+  background-color: var(--surface-primary);
   display: flex;
-  justify-content: between;
+  justify-content: space-between;
   align-items: center;
 }
 
-.modal-title {
-  color: var(--tertiary-dark);
-  font-weight: 600;
-  margin: 0;
-  flex-grow: 1;
-}
-
+/* Modal Body */
 .modal-body {
-  padding: 1.5rem 2rem;
+  padding: 1.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  background-color: var(--surface-primary);
 }
 
+/* Modal Footer */
 .modal-footer {
-  padding: 1rem 2rem 1.5rem;
-  border-top: 1px solid var(--neutral-light);
+  padding: 1.5rem;
+  border-top: 1px solid var(--border-secondary);
+  background-color: var(--surface-secondary);
 }
 
-/* Form Styles */
-.form-label {
-  color: var(--tertiary-dark);
-  font-weight: 500;
-  margin-bottom: 0.5rem;
-}
-
+/* Form styling */
 .form-control:focus,
 .form-select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 0.25rem rgba(115, 146, 226, 0.25);
+  border-color: var(--border-accent) !important;
+  box-shadow: 0 0 0 0.25rem rgba(160, 123, 227, 0.25) !important;
 }
 
-/* Detail View Styles */
-.customer-details .detail-label {
-  color: var(--tertiary-dark);
+.form-label {
+  display: block;
 }
 
-.customer-details .detail-value {
-  color: var(--tertiary-medium);
+/* Loading spinner */
+.spinner-border {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  vertical-align: text-bottom;
+  border: 0.125em solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spinner-border 0.75s linear infinite;
 }
 
-/* Button Icon Styles */
-.btn-icon-only {
-  display: inline-flex;
+.spinner-border-sm {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-width: 0.125em;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 1;
-  padding: 0.375rem;
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-  .modal-content {
-    width: 95%;
-    max-width: none;
+.btn-close:hover {
+  background-color: var(--state-hover);
+  color: var(--text-secondary);
+}
+
+.btn-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(1rem) scale(0.95);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes spinner-border {
+  to { transform: rotate(360deg); }
+}
+
+/* Utility classes */
+.d-flex { display: flex; }
+.justify-content-between { justify-content: space-between; }
+.justify-content-end { justify-content: flex-end; }
+.align-items-center { align-items: center; }
+.gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 0.75rem; }
+.mb-0 { margin-bottom: 0; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-4 { margin-bottom: 1rem; }
+.me-2 { margin-right: 0.5rem; }
+.fw-medium { font-weight: 500; }
+.fw-semibold { font-weight: 600; }
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .modal-container {
+    margin: 0.5rem;
+    max-height: 95vh;
   }
   
   .modal-header,
   .modal-body,
   .modal-footer {
-    padding-left: 1rem;
-    padding-right: 1rem;
-  }
-}
-
-@media (max-width: 576px) {
-  .modal-header,
-  .modal-body,
-  .modal-footer {
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
-  }
-  
-  .modal-header {
-    padding-top: 1rem;
-  }
-  
-  .modal-footer {
-    padding-bottom: 1rem;
+    padding: 1rem;
   }
 }
 </style>
