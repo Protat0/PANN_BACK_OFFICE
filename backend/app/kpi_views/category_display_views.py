@@ -4,7 +4,7 @@ from rest_framework import status
 from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from ..services import category_service
+from ..services import category_display_service
 import logging
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ class CategoryDataView(APIView):
         """Get all categories with sales data"""
         try:
             include_deleted = request.query_params.get('include_deleted', 'false').lower() == 'true'
-            result = category_service.display.get_categories_display(include_deleted=include_deleted)
+            result = category_display_service.get_categories_display(include_deleted=include_deleted)
             
             return Response({
                 "categories": result,
@@ -53,14 +53,14 @@ class CategoryExportView(APIView):
                 date_filter = {'start_date': start_date, 'end_date': end_date}
             
             # Validate and export
-            category_service.display.validate_export_params(format_type, include_sales_data, date_filter, include_deleted)
+            category_display_service.validate_export_params(format_type, include_sales_data, date_filter, include_deleted)
             
             if format_type == 'csv':
-                export_result = category_service.display.export_categories_csv(
+                export_result = category_display_service.export_categories_csv(
                     include_sales_data=include_sales_data, date_filter=date_filter, include_deleted=include_deleted
                 )
             else:
-                export_result = category_service.display.export_categories_json(
+                export_result = category_display_service.export_categories_json(
                     include_sales_data=include_sales_data, date_filter=date_filter, include_deleted=include_deleted
                 )
             
@@ -80,7 +80,7 @@ class CategoryStatsView(APIView):
     def get(self, request):
         """Get comprehensive category statistics"""
         try:
-            stats = category_service.category.get_category_stats()
+            stats = category_display_service.get_category_stats()
             
             return Response({
                 'success': True,

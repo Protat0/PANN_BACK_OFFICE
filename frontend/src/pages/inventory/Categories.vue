@@ -299,8 +299,18 @@ export default {
 
   async mounted() {
     try {
-      // Initialize categories using composable
       await this.initializeCategories()
+      
+      // Debug: Check category IDs
+      console.log('Categories loaded:', this.categories.length)
+      this.categories.forEach((cat, index) => {
+        console.log(`Category ${index}:`, {
+          _id: cat._id,
+          category_id: cat.category_id,
+          name: cat.category_name
+        })
+      })
+      
       await this.fetchUncategorizedCount()
     } catch (error) {
       console.error('Error initializing categories page:', error)
@@ -346,17 +356,19 @@ export default {
 
     // Navigation
     viewCategory(categoryId) {
-      console.log('View category:', categoryId)
+      console.log('View category ID:', categoryId)
+      console.log('ID type:', typeof categoryId)
+      console.log('ID starts with CTGY:', categoryId?.startsWith?.('CTGY-'))
       
-      if (!categoryId) {
-        console.error('No valid category ID provided')
-        this.handleCategoryError({ message: 'Invalid category ID' })
+      // Add this check
+      if (!categoryId || !categoryId.startsWith('CTGY-')) {
+        console.error('Invalid category ID format:', categoryId)
+        alert(`Invalid category ID format: ${categoryId}. Expected CTGY-XXX format.`)
         return
       }
       
-      console.log('Navigating with ID:', categoryId)
       this.$router.push({
-        name: 'Category Details',
+        name: 'Category Details', 
         params: { id: categoryId }
       })
     },
@@ -384,21 +396,17 @@ export default {
     },
 
     // Export handler
+    // In your Categories.vue component
     async handleExport() {
       try {
-        console.log('Exporting categories...')
-        
-        await this.exportCategories({
-          format: 'csv',
-          include_sales_data: true,
-          include_deleted: this.statusFilter === 'deleted'
+        // Use all categories (including uncategorized) for export
+        await categoryApiService.ExportCategoryData({
+          categories: this.categories // Use full categories list, not filtered
         })
-        
         console.log('Export completed successfully')
-        
       } catch (error) {
         console.error('Export failed:', error)
-        this.handleCategoryError({ message: `Export failed: ${error.message}` })
+        alert('Export failed. Please try again.')
       }
     },
 

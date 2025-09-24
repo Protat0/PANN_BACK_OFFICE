@@ -20,7 +20,7 @@ class CategoryApiService {
   async CategoryData(params = {}) {
     try {
         console.log("This API call is getting all Category");
-        const response = await api.get('/category/dataview', { params });
+        const response = await api.get('/category/', { params });
         return response.data;
     } catch (error) {
         console.error("Error fetching all category data:", error);
@@ -71,7 +71,7 @@ class CategoryApiService {
       
       // Try the dataview endpoint first (since you have CategoryData working)
       try {
-        const response = await api.get('/category/dataview', { params });
+        const response = await api.get('/category/', { params });
         console.log("✅ getAllCategories: Got response from /category/dataview:", response.data);
         
         // Handle different response formats
@@ -492,46 +492,75 @@ class CategoryApiService {
    * @returns {Promise<Blob>} Export file blob
    */
   async ExportCategoryData(params = {}) {
-      try {
-          console.log('🚀 Starting export with params:', params);
-          
-          const queryParams = {
-              format: params.format || 'csv',
-              include_sales_data: params.include_sales_data !== false,
-              include_deleted: params.include_deleted || false
-          };
-          
-          console.log('📤 Request params:', queryParams);
-          
-          const baseURL = 'http://localhost:8000/api/v1/category/exportcat/';
-          
-          console.log('🔍 Full URL:', baseURL);
-          
-          const response = await fetch(baseURL, {
-              method: 'GET',
-              headers: {
-                  'Accept': 'text/csv, application/json, application/octet-stream, */*'
-              }
-          });
-          
-          console.log('📥 Response status:', response.status);
-          
-          if (!response.ok) {
-              const errorText = await response.text();
-              throw new Error(`HTTP ${response.status}: ${errorText}`);
-          }
-          
-          const blob = await response.blob();
-          console.log('✅ Export successful! Blob size:', blob.size);
-          
-          return blob;
-          
-      } catch (error) {
-          console.error('❌ Export failed:', error);
-          throw error;
+    try {
+      console.log('Exporting categories:', params.categories?.length)
+      
+      const categories = params.categories || [];
+      
+      if (categories.length === 0) {
+        throw new Error('No categories to export')
       }
-  }
+      
+      // Helper functions
+      const formatSubcategories = (subcategories) => {
+        if (!subcategories || subcategories.length === 0) return 'None'
+        return subcategories.map(sub => sub.name).join('; ')
+      }
 
+      const getTotalProducts = (subcategories) => {
+        if (!subcategories) return 0
+        return subcategories.reduce((total, sub) => total + (sub.products?.length || 0), 0)
+      }
+
+      const formatDate = (dateString) => {
+        if (!dateString) return 'N/A'
+        return new Date(dateString).toLocaleDateString('en-US')
+      }
+
+      // Create CSV content
+      const headers = [
+        'Category ID',
+        'Category Name', 
+        'Description',
+        'Status',
+        'Sub-Categories',
+        'Total Products',
+        'Date Created',
+        'Last Updated'
+      ]
+      
+      const csvContent = [
+        headers.join(','),
+        ...categories.map(category => [
+          category._id || category.category_id,
+          `"${category.category_name}"`,
+          `"${category.description || ''}"`,
+          category.status || 'active',
+          `"${formatSubcategories(category.sub_categories)}"`,
+          getTotalProducts(category.sub_categories),
+          formatDate(category.date_created),
+          formatDate(category.last_updated)
+        ].join(','))
+      ].join('\n')
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `categories_${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+
+      return { success: true, message: 'Export completed successfully' }
+
+    } catch (error) {
+      console.error('Export failed:', error)
+      throw error
+    }
+  }
   // ================ UTILITY METHODS ================
 
   /**

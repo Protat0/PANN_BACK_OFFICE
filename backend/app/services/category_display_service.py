@@ -31,7 +31,7 @@ class CategoryDisplayService:
         except Exception as e:
             logger.warning(f"Could not create sales indexes: {e}")
 
-    def get_categories_display_optimized(self, include_deleted=False, limit=50):
+    def get_categories_display(self, include_deleted=False, limit=50):
         """Optimized aggregation pipeline - string ID format only"""
         try:
             category_match = {}
