@@ -147,7 +147,7 @@ class CategoryApiService {
    * @param {Object} params - Parameters including id and update data
    * @returns {Promise<Object>} Updated category data
    */
-  async UpdateCategoryData(params = {}) {
+    async UpdateCategoryData(params = {}) {
       try {
           console.log(`This API call is updating category ${params.id}`);
           
@@ -183,7 +183,8 @@ class CategoryApiService {
           });
           
           console.log('Sending update data:', updateData);
-          const response = await api.put(`/category/${params.id}`, updateData);
+          // Add trailing slash here
+          const response = await api.put(`/category/${params.id}/`, updateData);
           
           console.log('Category updated successfully:', response.data);
           return response.data;
@@ -316,6 +317,7 @@ class CategoryApiService {
    * @param {Object} subcategoryData - Subcategory data
    * @returns {Promise<Object>} API response
    */
+  // In apiCategory.js
   async AddSubCategoryData(categoryId, subcategoryData) {
     try {
       console.log(`➕ Adding subcategory to category: ${categoryId}`);
@@ -330,7 +332,7 @@ class CategoryApiService {
       
     } catch (error) {
       console.error('❌ Error adding subcategory:', error);
-      this.handleError(error);
+      throw error;
     }
   }
 

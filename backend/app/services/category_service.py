@@ -17,6 +17,8 @@ class CategoryService:
         self.audit_service = AuditLogService()
         self._ensure_indexes()
 
+        self.ensure_uncategorized_category_exists()
+
     # ================================================================
     # UTILITY METHODS
     # ================================================================
@@ -380,11 +382,8 @@ class CategoryService:
             raise Exception(f"Error creating category: {str(e)}")
     
     def get_all_categories(self, include_deleted=False, limit=None, skip=None):
-        """Get all categories with string ID operations"""
+        """Get all categories - no longer checks uncategorized every time"""
         try:
-            # Ensure uncategorized category exists first
-            self.ensure_uncategorized_category_exists()
-            
             query = {}
             if not include_deleted:
                 query['isDeleted'] = {'$ne': True}
@@ -428,18 +427,19 @@ class CategoryService:
             if not category_id or not category_id.startswith('CTGY-'):
                 return None
             
-            # Get current category data for audit
+            # Get current category data for audit - USE _id instead of category_id
             old_category = self.collection.find_one({
-                '_id': category_id,
+                '_id': category_id,  # Changed from 'category_id': category_id
                 'isDeleted': {'$ne': True}
             })
             
             if not old_category:
+                logger.error(f"Category {category_id} not found for update")
                 return None
             
             # Prepare update data
             update_data = category_data.copy()
-            update_data['last_updated'] = datetime.utcnow()
+            update_data['last_updated'] = datetime.utcnow().isoformat()  # Use ISO string
             
             # Validate category name if being updated
             if 'category_name' in update_data:
@@ -448,14 +448,15 @@ class CategoryService:
                     existing = self.collection.find_one({
                         'category_name': new_name,
                         'isDeleted': {'$ne': True},
-                        '_id': {'$ne': category_id}
+                        '_id': {'$ne': category_id}  # Changed from 'category_id': {'$ne': category_id}
                     })
                     if existing:
                         raise ValueError(f"Category name '{new_name}' already exists")
 
+            # Update using _id instead of category_id
             result = self.collection.update_one(
                 {
-                    '_id': category_id,
+                    '_id': category_id,  # Changed from 'category_id': category_id
                     'isDeleted': {'$ne': True}
                 },
                 {'$set': update_data}
@@ -464,6 +465,7 @@ class CategoryService:
             if result.modified_count == 0:
                 return None
 
+            # Get updated category using _id
             updated_category = self.collection.find_one({'_id': category_id})
             
             # Send notification
@@ -964,9 +966,9 @@ class CategoryService:
             if not subcategory_data or not subcategory_data.get('name', '').strip():
                 raise ValueError("Subcategory name is required")
             
-            # Check if category exists and is not deleted
+            # Check if category exists and is not deleted - USE _id instead of category_id
             category = self.collection.find_one({
-                'category_id': category_id,
+                '_id': category_id,  # Changed from 'category_id': category_id
                 'isDeleted': {'$ne': True}
             })
             
@@ -984,14 +986,14 @@ class CategoryService:
             if 'products' not in subcategory_data:
                 subcategory_data['products'] = []
             if 'created_at' not in subcategory_data:
-                subcategory_data['created_at'] = datetime.utcnow()
+                subcategory_data['created_at'] = datetime.utcnow().isoformat()  # Use ISO string
             
-            # Add subcategory
+            # Add subcategory - USE _id instead of category_id
             result = self.collection.update_one(
-                {'category_id': category_id},
+                {'_id': category_id},  # Changed from 'category_id': category_id
                 {
                     '$addToSet': {'sub_categories': subcategory_data},
-                    '$set': {'last_updated': datetime.utcnow()}
+                    '$set': {'last_updated': datetime.utcnow().isoformat()}  # Use ISO string
                 }
             )
             
