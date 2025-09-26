@@ -1,261 +1,224 @@
 <template>
-  <div class="logs-page">
-    <!-- Page Title -->
-    <div class="page-header">
-      <h1 class="page-title">System Logs</h1>
-      <div class="header-actions">
-        <!-- Auto-refresh status and controls in one line -->
-        <div class="auto-refresh-status">
-          <i class="bi bi-arrow-repeat text-success" :class="{ 'spinning': loading }"></i>
-          <span class="status-text">
-            <span v-if="autoRefreshEnabled">Updates in {{ countdown }}s</span>
-            <span v-else>Auto-refresh disabled</span>
-          </span>
+  <div class="page-container">
+    <!-- Page Header -->
+    <div class="header-theme">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="text-primary mb-0">System Logs</h1>
+        
+        <div class="d-flex gap-3 align-items-center">
+          <!-- Auto-refresh Controls -->
+          <div class="surface-card d-flex align-items-center gap-2 px-3 py-2 rounded">
+            <i class="bi bi-arrow-repeat text-success" :class="{ 'spinning': loading }"></i>
+            <span class="text-secondary small">
+              <span v-if="autoRefreshEnabled">Updates in {{ countdown }}s</span>
+              <span v-else>Auto-refresh disabled</span>
+            </span>
+            <button 
+              class="btn btn-sm"
+              :class="autoRefreshEnabled ? 'btn-outline-secondary' : 'btn-outline-success'"
+              @click="toggleAutoRefresh"
+            >
+              {{ autoRefreshEnabled ? 'Disable' : 'Enable' }}
+            </button>
+          </div>
           
-          <!-- Toggle button -->
+          <!-- Connection Status -->
+          <div class="d-flex align-items-center gap-2 px-3 py-2 rounded" :class="getConnectionStatusClass()">
+            <i :class="getConnectionIcon()"></i>
+            <span class="small fw-medium">{{ getConnectionText() }}</span>
+          </div>
+          
+          <!-- Emergency Reconnect -->
           <button 
-            class="btn btn-sm"
-            :class="autoRefreshEnabled ? 'btn-outline-secondary' : 'btn-outline-success'"
-            @click="toggleAutoRefresh"
+            v-if="error || connectionLost" 
+            class="btn btn-warning btn-sm" 
+            @click="emergencyReconnect"
+            :disabled="loading"
           >
-            {{ autoRefreshEnabled ? 'Disable' : 'Enable' }}
+            <i class="bi bi-arrow-clockwise" :class="{ 'spinning': loading }"></i>
+            {{ loading ? 'Reconnecting...' : 'Reconnect' }}
           </button>
         </div>
-        
-        <!-- Connection health indicator -->
-        <div class="connection-indicator" :class="getConnectionStatus()">
-          <i :class="getConnectionIcon()"></i>
-          <span class="connection-text">{{ getConnectionText() }}</span>
-        </div>
-        
-        <!-- Hidden/Emergency Refresh - Only show if error or connection lost -->
-        <button 
-          v-if="error || connectionLost" 
-          class="btn btn-warning" 
-          @click="emergencyReconnect"
-          :disabled="loading"
-        >
-          <i class="bi bi-arrow-clockwise" :class="{ 'spinning': loading }"></i>
-          {{ loading ? 'Reconnecting...' : 'Reconnect' }}
-        </button>
       </div>
     </div>
 
     <!-- Filters Section -->
-    <div class="filters-section">
-      <div class="filter-group">
-        <label for="categoryFilter">Filter by Category:</label>
-        <select id="categoryFilter" v-model="categoryFilter" @change="handleFilterChange" :disabled="loading">
-          <option value="all">All Categories</option>
-          <option value="session">Sessions</option>
-          <option value="login">Login</option>
-          <option value="logout">Logout</option>
-          <option value="category">Categories</option>
-          <option value="product">Products</option>
-          <option value="customer">Customers</option>
-          <option value="user">Users</option>
-          <option value="create">Create Actions</option>
-          <option value="update">Update Actions</option>
-          <option value="delete">Delete Actions</option>
-        </select>
-      </div>
+    <div class="surface-card border-theme rounded mb-4 p-4">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label for="categoryFilter" class="form-label text-primary">Filter by Category</label>
+          <select 
+            id="categoryFilter" 
+            v-model="categoryFilter" 
+            @change="handleFilterChange" 
+            :disabled="loading"
+            class="form-select input-complete"
+          >
+            <option value="all">All Categories</option>
+            <option value="session">Sessions</option>
+            <option value="login">Login</option>
+            <option value="logout">Logout</option>
+            <option value="category">Categories</option>
+            <option value="product">Products</option>
+            <option value="customer">Customers</option>
+            <option value="user">Users</option>
+            <option value="create">Create Actions</option>
+            <option value="update">Update Actions</option>
+            <option value="delete">Delete Actions</option>
+          </select>
+        </div>
 
-      <div class="filter-group">
-        <label for="searchFilter">Search User ID:</label>
-        <input 
-          id="searchFilter" 
-          v-model="searchFilter" 
-          @input="handleFilterChange"
-          type="text" 
-          placeholder="Search specific user ID..."
-          :disabled="loading"
-        />
-      </div>
+        <div class="col-md-4">
+          <label for="searchFilter" class="form-label text-primary">Search User ID</label>
+          <input 
+            id="searchFilter" 
+            v-model="searchFilter" 
+            @input="handleFilterChange"
+            type="text" 
+            placeholder="Search specific user ID..."
+            :disabled="loading"
+            class="form-control input-complete"
+          />
+        </div>
 
-      <div class="filter-group">
-        <label for="pageSize">Records per page:</label>
-        <select 
-          id="pageSize" 
-          v-model="pageSize" 
-          @change="handlePageSizeChange"
-          :disabled="loading"
-        >
-          <option value="10">10</option>
-          <option value="25">25</option>
-          <option value="50">50</option>
-          <option value="100">100</option>
-        </select>
+        <div class="col-md-4">
+          <label for="pageSize" class="form-label text-primary">Records per page</label>
+          <select 
+            id="pageSize" 
+            v-model="pageSize" 
+            @change="handlePageSizeChange"
+            :disabled="loading"
+            class="form-select input-complete"
+          >
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
       </div>
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading && session_logs.length === 0" class="loading-state">
-      <div class="spinner-border text-accent"></div>
-      <p class="text-secondary">Loading session logs...</p>
+    <div v-if="loading && session_logs.length === 0" class="text-center py-5">
+      <div class="spinner-border text-accent mb-3"></div>
+      <p class="text-secondary">Loading system logs...</p>
     </div>
 
     <!-- Error State -->
-    <div v-if="error" class="error-state">
-      <div class="alert alert-danger text-center" role="alert">
-        <i class="bi bi-exclamation-triangle"></i>
-        <p class="mb-3">{{ error }}</p>
-        <button class="btn btn-submit" @click="loadLogs" :disabled="loading">
-          <i class="bi bi-arrow-clockwise"></i>
-          {{ loading ? 'Retrying...' : 'Try Again' }}
-        </button>
-      </div>
+    <div v-if="error" class="status-error rounded p-4 text-center mb-4">
+      <i class="bi bi-exclamation-triangle fs-2 mb-3"></i>
+      <p class="mb-3">{{ error }}</p>
+      <button class="btn btn-submit" @click="loadLogs" :disabled="loading">
+        <i class="bi bi-arrow-clockwise"></i>
+        {{ loading ? 'Retrying...' : 'Try Again' }}
+      </button>
     </div>
 
-    <!-- Refresh Progress Indicator -->
-    <div v-if="loading && session_logs.length > 0" class="refresh-indicator">
-      <div class="alert alert-info d-flex align-items-center" role="alert">
-        <div class="spinner-border spinner-border-sm me-2" role="status">
-          <span class="visually-hidden">Loading...</span>
-        </div>
+    <!-- Refresh Indicator -->
+    <div v-if="loading && session_logs.length > 0" class="status-info rounded p-3 mb-4">
+      <div class="d-flex align-items-center">
+        <div class="spinner-border spinner-border-sm me-2"></div>
         Refreshing logs data...
       </div>
     </div>
 
     <!-- Table Info -->
-    <div v-if="!loading && paginatedLogs.length > 0" class="table-info">
-      <span>
-        Showing positions {{ startRecord }} to {{ endRecord }} of {{ filteredLogs.length }} entries
-        <span v-if="hasActiveFilters" class="filter-indicator">
+    <div v-if="!loading && paginatedLogs.length > 0" class="surface-card border-theme-subtle rounded-top p-3 mb-0">
+      <small class="text-tertiary">
+        Showing {{ startRecord }}-{{ endRecord }} of {{ filteredLogs.length }} entries
+        <span v-if="hasActiveFilters" class="text-accent">
           (filtered from {{ totalLogsCount }} total records)
         </span>
-      </span>
+      </small>
     </div>
 
     <!-- Data Table -->
-    <div v-if="!loading || session_logs.length > 0" class="table-container">
-      <table class="logs-table">
-        <thead>
-          <tr>
-            <th>Log ID</th>
-            <th>User ID</th>
-            <th>Ref. ID</th>
-            <th>Event Type</th>
-            <th style="text-align: center;">Amount/Qty</th>
-            <th style="text-align: center;">Status</th>
-            <th>Timestamp</th>
-            <th>Remarks</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr 
-            v-for="sessionLog in paginatedLogs" 
-            :key="sessionLog.log_id || sessionLog._id"
-            :class="{ 'new-entry': isNewEntry(sessionLog) }"
-          >
-            <td class="log-id-column">
-              <span class="position-number" :class="sessionLog.logType">{{ sessionLog.formattedLogId }}</span>
-            </td>
-            <td class="user-id-column">{{ sessionLog.user_id }}</td>
-            <td class="ref-id-column">{{ sessionLog.ref_id }}</td>
-            <td class="event-type-column">{{ sessionLog.event_type }}</td>
-            <td class="amount-column">{{ getAmountQty(sessionLog) }}</td>
-            <td class="status-column">
-              <span :class="['status-badge', getStatusClass(sessionLog.status)]">
-                {{ sessionLog.status }}
-              </span>
-            </td>
-            <td class="timestamp-column">{{ formatTimestamp(sessionLog.timestamp) }}</td>
-            <td class="remarks-column" :title="sessionLog.remarks">{{ sessionLog.remarks }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <TableTemplate
+      v-if="!loading || session_logs.length > 0"
+      :items-per-page="parseInt(pageSize)"
+      :total-items="filteredLogs.length"
+      :current-page="currentPage"
+      :show-pagination="true"
+      @page-changed="goToPage"
+    >
+      <template #header>
+        <tr>
+          <th style="width: 10%;">Log ID</th>
+          <th style="width: 12%;">User ID</th>
+          <th style="width: 12%;">Ref. ID</th>
+          <th style="width: 15%;">Event Type</th>
+          <th style="width: 10%; text-align: center;">Amount/Qty</th>
+          <th style="width: 10%; text-align: center;">Status</th>
+          <th style="width: 15%;">Timestamp</th>
+          <th style="width: 16%;">Remarks</th>
+        </tr>
+      </template>
+
+      <template #body>
+        <tr 
+          v-for="sessionLog in paginatedLogs" 
+          :key="sessionLog.log_id || sessionLog._id"
+          :class="{ 'table-warning': isNewEntry(sessionLog) }"
+        >
+          <td>
+            <span class="badge fw-semibold" :class="getLogTypeBadgeClass(sessionLog.logType)">
+              {{ sessionLog.formattedLogId }}
+            </span>
+          </td>
+          <td class="text-secondary">{{ sessionLog.user_id }}</td>
+          <td class="text-secondary">{{ sessionLog.ref_id }}</td>
+          <td class="text-secondary">{{ sessionLog.event_type }}</td>
+          <td class="text-center text-tertiary">{{ getAmountQty(sessionLog) }}</td>
+          <td class="text-center">
+            <span class="badge" :class="getStatusBadgeClass(sessionLog.status)">
+              {{ sessionLog.status }}
+            </span>
+          </td>
+          <td class="text-secondary small">{{ formatTimestamp(sessionLog.timestamp) }}</td>
+          <td class="text-tertiary small" :title="sessionLog.remarks">
+            {{ truncateRemarks(sessionLog.remarks) }}
+          </td>
+        </tr>
+      </template>
+    </TableTemplate>
 
     <!-- Empty State -->
-    <div v-if="!loading && paginatedLogs.length === 0 && !error" class="empty-state">
-      <div class="card">
-        <div class="card-body text-center py-5">
-          <i class="bi bi-file-text empty-state-icon"></i>
-          <p class="mt-3 mb-3 text-tertiary">
-            {{ session_logs.length === 0 ? 'No session logs found' : 'No logs match the current filters' }}
-          </p>
-          <button v-if="session_logs.length === 0" class="btn btn-submit" @click="loadLogs">
-            <i class="bi bi-arrow-clockwise"></i>
-            Refresh Logs
+    <div v-if="!loading && paginatedLogs.length === 0 && !error" class="card-theme text-center py-5">
+      <i class="bi bi-file-text text-tertiary" style="font-size: 3rem;"></i>
+      <p class="mt-3 mb-4 text-tertiary">
+        {{ session_logs.length === 0 ? 'No system logs found' : 'No logs match the current filters' }}
+      </p>
+      <div class="d-flex gap-2 justify-content-center">
+        <button v-if="session_logs.length === 0" class="btn btn-submit" @click="loadLogs">
+          <i class="bi bi-arrow-clockwise"></i>
+          Refresh Logs
+        </button>
+        <template v-else>
+          <button class="btn btn-cancel" @click="clearFilters">
+            <i class="bi bi-funnel"></i>
+            Clear Filters
           </button>
-          <div v-else class="d-flex gap-2 justify-content-center">
-            <button class="btn btn-cancel" @click="clearFilters">
-              <i class="bi bi-funnel"></i>
-              Clear Filters
-            </button>
-            <button class="btn btn-refresh" @click="loadLogs">
-              <i class="bi bi-arrow-clockwise"></i>
-              Refresh Data
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Pagination Controls -->
-    <div v-if="totalPages > 1" class="pagination-container">
-      <nav aria-label="Logs pagination">
-        <ul class="pagination pagination-sm justify-content-center">
-          <!-- Previous button -->
-          <li class="page-item" :class="{ disabled: currentPage === 1 }">
-            <button 
-              class="page-link" 
-              @click="goToPage(currentPage - 1)"
-              :disabled="currentPage === 1"
-            >
-              <i class="bi bi-chevron-left"></i> Previous
-            </button>
-          </li>
-          
-          <!-- Page numbers -->
-          <li 
-            v-for="(page, index) in visiblePages" 
-            :key="index"
-            class="page-item" 
-            :class="{ 
-              active: page === currentPage,
-              disabled: page === '...'
-            }"
-          >
-            <button 
-              v-if="page !== '...'"
-              class="page-link" 
-              @click="goToPage(page)"
-            >
-              {{ page }}
-            </button>
-            <span v-else class="page-link">{{ page }}</span>
-          </li>
-          
-          <!-- Next button -->
-          <li class="page-item" :class="{ disabled: currentPage === totalPages }">
-            <button 
-              class="page-link" 
-              @click="goToPage(currentPage + 1)"
-              :disabled="currentPage === totalPages"
-            >
-              Next <i class="bi bi-chevron-right"></i>
-            </button>
-          </li>
-        </ul>
-      </nav>
-      
-      <!-- Pagination info -->
-      <div class="pagination-info">
-        <small class="text-tertiary">
-          Page {{ currentPage }} of {{ totalPages }} 
-          ({{ filteredLogs.length }} filtered records out of {{ totalLogsCount }} total)
-        </small>
+          <button class="btn btn-refresh" @click="loadLogs">
+            <i class="bi bi-arrow-clockwise"></i>
+            Refresh Data
+          </button>
+        </template>
       </div>
     </div>
   </div>
 </template>
 
 <script>
+import TableTemplate from '@/components/common/TableTemplate.vue'
 import APILogs from '@/services/apiLogs'
 
 export default {
   name: 'SystemLogs',
+  components: {
+    TableTemplate
+  },
+  
   data() {
     return {
       session_logs: [],
@@ -266,11 +229,11 @@ export default {
       categoryFilter: 'all',
       searchFilter: '',
       
-      // Pagination data
+      // Pagination
       currentPage: 1,
       pageSize: 25,
       
-      // Auto-refresh functionality
+      // Auto-refresh
       autoRefreshEnabled: true,
       autoRefreshInterval: 30000,
       baseRefreshInterval: 30000,
@@ -278,21 +241,18 @@ export default {
       countdown: 30,
       countdownTimer: null,
       
-      // Connection health tracking
+      // Connection tracking
       connectionLost: false,
       consecutiveErrors: 0,
       lastSuccessfulLoad: null,
       
-      // Smart refresh rate tracking
-      recentActivity: [],
-      activityCheckInterval: 60000,
-      
-      // Performance optimizations
+      // Performance
       filterDebounceTimer: null,
       lastLoadTime: null,
       newEntryIds: new Set(),
+      recentActivity: [],
       
-      // Memoization cache
+      // Memoization
       memoizedFilters: {
         categoryFilter: 'all',
         searchFilter: '',
@@ -302,7 +262,6 @@ export default {
   },
   
   computed: {
-    // Memoized filtered logs for better performance
     filteredLogs() {
       if (
         this.memoizedFilters.categoryFilter === this.categoryFilter &&
@@ -343,18 +302,14 @@ export default {
       return filtered
     },
     
-    totalPages() {
-      return Math.ceil(this.filteredLogs.length / this.pageSize)
-    },
-
     paginatedLogs() {
       const start = (this.currentPage - 1) * this.pageSize
       const end = start + this.pageSize
       const logs = this.filteredLogs.slice(start, end)
       
       return logs.map((log, index) => {
-        const position = start + index + 1;
-        const logType = this.getLogType(log);
+        const position = start + index + 1
+        const logType = this.getLogType(log)
         
         return {
           ...log,
@@ -380,46 +335,11 @@ export default {
 
     hasActiveFilters() {
       return this.categoryFilter !== 'all' || this.searchFilter.trim() !== ''
-    },
-    
-    visiblePages() {
-      const pages = []
-      const delta = 2
-      
-      if (this.totalPages <= 7) {
-        for (let i = 1; i <= this.totalPages; i++) {
-          pages.push(i)
-        }
-        return pages
-      }
-      
-      pages.push(1)
-      
-      const start = Math.max(2, this.currentPage - delta)
-      const end = Math.min(this.totalPages - 1, this.currentPage + delta)
-      
-      if (start > 2) pages.push('...')
-      
-      for (let i = start; i <= end; i++) {
-        if (i !== 1 && i !== this.totalPages) {
-          pages.push(i)
-        }
-      }
-      
-      if (end < this.totalPages - 1) pages.push('...')
-      
-      if (this.totalPages > 1) pages.push(this.totalPages)
-      
-      return pages
     }
   },
   
   methods: {
     async loadLogs(isAutoRefresh = false, isEmergencyReconnect = false) {
-      return await this.loadCombinedLogs(isAutoRefresh, isEmergencyReconnect)
-    },
-
-    async loadCombinedLogs(isAutoRefresh = false, isEmergencyReconnect = false) {
       if (this.loading && !isAutoRefresh && !isEmergencyReconnect) return
       
       this.loading = true
@@ -445,7 +365,6 @@ export default {
         let newLogs = []
         if (response && response.success && response.data) {
           newLogs = response.data
-          console.log(`Loaded ${newLogs.length} combined logs (${response.session_count} session, ${response.audit_count} audit)`)
         } else if (Array.isArray(response)) {
           newLogs = response
         } else if (response && response.data) {
@@ -485,10 +404,6 @@ export default {
           this.currentPage = 1
         }
         
-        if (this.currentPage > this.totalPages && this.totalPages > 0) {
-          this.currentPage = this.totalPages
-        }
-        
       } catch (error) {
         console.error("Error loading combined logs:", error)
         
@@ -497,10 +412,6 @@ export default {
         
         if (this.consecutiveErrors >= 3) {
           this.connectionLost = true
-        }
-        
-        if (this.consecutiveErrors >= 2) {
-          this.autoRefreshInterval = Math.min(this.baseRefreshInterval * 2, 120000)
         }
         
         if (!isAutoRefresh) {
@@ -512,7 +423,6 @@ export default {
     },
 
     async emergencyReconnect() {
-      console.log('Emergency reconnect initiated')
       this.consecutiveErrors = 0
       this.connectionLost = false
       await this.loadLogs(false, true)
@@ -536,13 +446,10 @@ export default {
       
       if (recentCount >= 10) {
         this.autoRefreshInterval = 10000
-        console.log('High activity detected: refresh rate increased to 10s')
       } else if (recentCount >= 5) {
         this.autoRefreshInterval = 20000
-        console.log('Medium activity detected: refresh rate set to 20s')
       } else if (recentCount === 0 && this.recentActivity.length === 0) {
         this.autoRefreshInterval = 60000
-        console.log('No activity detected: refresh rate decreased to 60s')
       } else {
         this.autoRefreshInterval = this.baseRefreshInterval
       }
@@ -550,6 +457,17 @@ export default {
       if (this.autoRefreshEnabled && this.autoRefreshTimer) {
         this.startAutoRefresh()
       }
+    },
+
+    getConnectionStatusClass() {
+      const status = this.getConnectionStatus()
+      const classes = {
+        'connection-good': 'border-success text-success',
+        'connection-unstable': 'border-warning text-warning', 
+        'connection-lost': 'border-danger text-danger',
+        'connection-unknown': 'border-secondary text-tertiary'
+      }
+      return `surface-card border ${classes[status] || classes['connection-unknown']}`
     },
 
     getConnectionStatus() {
@@ -560,32 +478,32 @@ export default {
     },
 
     getConnectionIcon() {
-      switch (this.getConnectionStatus()) {
-        case 'connection-good': return 'bi bi-wifi text-success'
-        case 'connection-unstable': return 'bi bi-wifi-1 text-warning'
-        case 'connection-lost': return 'bi bi-wifi-off text-danger'
-        default: return 'bi bi-wifi text-muted'
+      const icons = {
+        'connection-good': 'bi bi-wifi text-success',
+        'connection-unstable': 'bi bi-wifi-1 text-warning',
+        'connection-lost': 'bi bi-wifi-off text-danger',
+        'connection-unknown': 'bi bi-wifi text-muted'
       }
+      return icons[this.getConnectionStatus()] || icons['connection-unknown']
     },
 
     getConnectionText() {
-      switch (this.getConnectionStatus()) {
-        case 'connection-good': return 'Connected'
-        case 'connection-unstable': return 'Unstable'
-        case 'connection-lost': return 'Connection Lost'
-        default: return 'Connecting...'
+      const texts = {
+        'connection-good': 'Connected',
+        'connection-unstable': 'Unstable',
+        'connection-lost': 'Connection Lost',
+        'connection-unknown': 'Connecting...'
       }
+      return texts[this.getConnectionStatus()] || texts['connection-unknown']
     },
 
     toggleAutoRefresh() {
       if (this.autoRefreshEnabled) {
         this.autoRefreshEnabled = false
         this.stopAutoRefresh()
-        console.log('Auto-refresh disabled by user')
       } else {
         this.autoRefreshEnabled = true
         this.startAutoRefresh()
-        console.log('Auto-refresh enabled by user')
       }
     },
     
@@ -603,8 +521,6 @@ export default {
       this.autoRefreshTimer = setInterval(() => {
         this.loadLogs(true)
       }, this.autoRefreshInterval)
-      
-      console.log(`Auto-refresh started (${this.autoRefreshInterval / 1000}s interval)`)
     },
     
     stopAutoRefresh() {
@@ -617,8 +533,6 @@ export default {
         clearInterval(this.countdownTimer)
         this.countdownTimer = null
       }
-      
-      console.log('Auto-refresh disabled')
     },
 
     handleFilterChange() {
@@ -634,12 +548,6 @@ export default {
     applyFilters() {
       this.currentPage = 1
       this.memoizedFilters.result = []
-      
-      console.log('Filters applied:', {
-        category: this.categoryFilter,
-        search: this.searchFilter,
-        results: this.filteredLogs.length
-      })
     },
 
     clearFilters() {
@@ -650,61 +558,68 @@ export default {
     },
 
     goToPage(page) {
-      if (page >= 1 && page <= this.totalPages && page !== this.currentPage) {
+      if (page >= 1 && page <= Math.ceil(this.filteredLogs.length / this.pageSize) && page !== this.currentPage) {
         this.currentPage = page
       }
     },
     
     handlePageSizeChange() {
       this.currentPage = 1
-      console.log(`Page size changed to: ${this.pageSize}`)
     },
 
     getLogType(log) {
-      const eventType = (log.event_type || '').toLowerCase();
+      const eventType = (log.event_type || '').toLowerCase()
       
       if (eventType.includes('session') || 
           eventType.includes('login') || 
           eventType.includes('logout') || 
           eventType.includes('auth')) {
-        return 'session';
+        return 'session'
       }
       
-      if (eventType.includes('create') || 
-          eventType.includes('update') || 
-          eventType.includes('delete') || 
-          eventType.includes('product') || 
-          eventType.includes('customer') || 
-          eventType.includes('category') || 
-          eventType.includes('user')) {
-        return 'audit';
-      }
-      
-      return 'session';
+      return 'audit'
     },
 
     getFormattedLogId(log, position) {
-      const logType = this.getLogType(log);
-      const prefix = logType === 'session' ? 'SES' : 'AUD';
-      
-      const typeCounter = this.getTypeCounter(position, logType);
-      
-      return `${prefix}-${typeCounter}`;
+      const logType = this.getLogType(log)
+      const prefix = logType === 'session' ? 'SES' : 'AUD'
+      const typeCounter = this.getTypeCounter(position, logType)
+      return `${prefix}-${typeCounter}`
     },
 
     getTypeCounter(currentPosition, logType) {
-      let counter = 0;
+      // Count how many logs of this type come AFTER this position
+      let counter = 0
+      const totalOfType = this.filteredLogs.filter(log => this.getLogType(log) === logType).length
       
+      // Count items of the same type that appear before this position
       for (let i = 0; i < currentPosition; i++) {
         if (i < this.filteredLogs.length) {
-          const log = this.filteredLogs[i];
+          const log = this.filteredLogs[i]
           if (this.getLogType(log) === logType) {
-            counter++;
+            counter++
           }
         }
       }
       
-      return counter;
+      // Return the reverse count
+      return totalOfType - counter + 1
+    },
+
+    getLogTypeBadgeClass(logType) {
+      return logType === 'session' ? 'bg-primary' : 'bg-secondary'
+    },
+
+    getStatusBadgeClass(status) {
+      const statusMap = {
+        'completed': 'bg-success',
+        'success': 'bg-success',
+        'active': 'bg-info',
+        'failed': 'bg-danger',
+        'error': 'bg-danger'
+      }
+      
+      return statusMap[(status || '').toLowerCase()] || 'bg-secondary'
     },
 
     getAmountQty(sessionLog) {
@@ -712,18 +627,6 @@ export default {
       return (eventType === 'session' || eventType === 'session complete') 
         ? 'None' 
         : sessionLog.amount_qty || '-'
-    },
-    
-    getStatusClass(status) {
-      const statusMap = {
-        'completed': 'status-success',
-        'success': 'status-success',
-        'active': 'status-active',
-        'failed': 'status-failed',
-        'error': 'status-failed'
-      }
-      
-      return statusMap[(status || '').toLowerCase()] || 'status-default'
     },
 
     formatTimestamp(timestamp) {
@@ -750,6 +653,11 @@ export default {
         return timestamp
       }
     },
+
+    truncateRemarks(remarks) {
+      if (!remarks) return '-'
+      return remarks.length > 50 ? remarks.substring(0, 50) + '...' : remarks
+    },
     
     isNewEntry(sessionLog) {
       const id = sessionLog.log_id || sessionLog._id
@@ -758,9 +666,7 @@ export default {
   },
   
   async mounted() {
-    console.log('=== System Logs component mounted ===')
     await this.loadLogs()
-    
     this.autoRefreshEnabled = true
     this.startAutoRefresh()
   },
@@ -780,245 +686,17 @@ export default {
 </script>
 
 <style scoped>
-/* ==========================================================================
-   LOGS PAGE - SEMANTIC THEME SYSTEM WITH DARK MODE SUPPORT
-   ========================================================================== */
-
-.logs-page {
-  padding: 1.5rem;
-  max-width: 1400px;
-  margin: 0 auto;
-  background-color: var(--surface-secondary);
-  min-height: 100vh;
-  color: var(--text-secondary);
-  transition: background-color 0.3s ease, color 0.3s ease;
+.spinning {
+  animation: spin 1s linear infinite;
 }
 
-/* ==========================================================================
-   PAGE HEADER
-   ========================================================================== */
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-.page-title {
-  font-size: 2rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-  transition: color 0.3s ease;
-}
-
-.header-actions {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.auto-refresh-status {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  background: var(--surface-primary);
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--border-secondary);
-  min-width: 280px;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
-}
-
-.status-text {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-  flex: 1;
-  transition: color 0.3s ease;
-}
-
-.connection-indicator {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
-}
-
-.connection-good {
-  background: var(--surface-primary);
-  border: 1px solid var(--border-success);
-  color: var(--status-success);
-}
-
-.connection-unstable {
-  background: var(--surface-primary);
-  border: 1px solid var(--status-warning);
-  color: var(--status-warning);
-}
-
-.connection-lost {
-  background: var(--surface-primary);
-  border: 1px solid var(--border-error);
-  color: var(--status-error);
-}
-
-.connection-unknown {
-  background: var(--surface-primary);
-  border: 1px solid var(--border-secondary);
-  color: var(--text-tertiary);
-}
-
-/* ==========================================================================
-   FILTERS SECTION
-   ========================================================================== */
-
-.filters-section {
-  background: var(--surface-primary);
-  padding: 1.5rem;
-  border-radius: 0.75rem;
-  box-shadow: var(--shadow-md);
-  border: 1px solid var(--border-secondary);
-  margin-bottom: 1.5rem;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-  align-items: end;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
-}
-
-.filter-group label {
-  font-weight: 500;
-  color: var(--text-primary);
-  font-size: 0.875rem;
-  display: block;
-  margin-bottom: 0.5rem;
-  transition: color 0.3s ease;
-}
-
-.filter-group select,
-.filter-group input {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid var(--border-primary);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  background-color: var(--input-bg);
-  color: var(--input-text);
-  transition: all 0.3s ease;
-}
-
-.filter-group select:focus,
-.filter-group input:focus {
-  outline: none;
-  border-color: var(--border-accent);
-  box-shadow: 0 0 0 3px rgba(160, 123, 227, 0.25);
-}
-
-.filter-group select::placeholder,
-.filter-group input::placeholder {
-  color: var(--input-placeholder);
-}
-
-/* ==========================================================================
-   LOADING AND ERROR STATES
-   ========================================================================== */
-
-.loading-state, 
-.error-state {
-  text-align: center;
-  padding: 3rem;
-  background: var(--surface-primary);
-  border-radius: 0.75rem;
-  box-shadow: var(--shadow-md);
-  border: 1px solid var(--border-secondary);
-  transition: background-color 0.3s ease, border-color 0.3s ease;
-}
-
-.error-state {
-  color: var(--status-error);
-}
-
-.refresh-indicator {
-  background: var(--surface-primary);
-  padding: 1rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--border-primary);
-  margin-bottom: 1rem;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
-}
-
-.table-info {
-  background: var(--surface-primary);
-  padding: 1rem 1.5rem;
-  border-radius: 0.75rem 0.75rem 0 0;
-  border-bottom: 1px solid var(--border-secondary);
-  font-size: 0.875rem;
-  color: var(--text-tertiary);
-  box-shadow: var(--shadow-md);
-  border: 1px solid var(--border-secondary);
-  border-bottom: none;
-  transition: all 0.3s ease;
-}
-
-.filter-indicator {
-  color: var(--text-accent);
-  font-weight: 500;
-}
-
-/* ==========================================================================
-   TABLE CONTAINER
-   ========================================================================== */
-
-.table-container {
-  background: var(--surface-primary);
-  border-radius: 0.75rem;
-  box-shadow: var(--shadow-md);
-  border: 1px solid var(--border-secondary);
-  overflow: hidden;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
-}
-
-.logs-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.logs-table thead {
-  background-color: var(--primary-medium);
-  color: var(--text-inverse);
-}
-
-.logs-table th {
-  padding: 1rem;
-  text-align: left;
-  font-weight: 600;
-  font-size: 0.875rem;
-  letter-spacing: 0.025em;
-  color: var(--text-inverse);
-  border-bottom: 1px solid var(--primary-dark);
-}
-
-.logs-table td {
-  padding: 1rem;
-  border-bottom: 1px solid var(--border-secondary);
-  font-size: 0.875rem;
-  transition: all 0.3s ease;
-  color: var(--text-secondary);
-}
-
-.logs-table tbody tr:hover {
-  background-color: var(--state-hover);
-}
-
-.logs-table tbody tr.new-entry {
-  background-color: var(--status-warning-bg);
+.table-warning {
+  background-color: var(--status-warning-bg) !important;
   animation: highlight-fade 3s ease-out;
 }
 
@@ -1033,287 +711,15 @@ export default {
   }
 }
 
-/* ==========================================================================
-   LOG-SPECIFIC STYLES
-   ========================================================================== */
-
-.position-number {
-  display: inline-block;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.375rem;
-  font-weight: 600;
-  font-size: 0.75rem;
-  color: var(--text-inverse);
-  border: 2px solid transparent;
-}
-
-.position-number.session {
-  background-color: var(--primary-medium);
-  border-color: var(--primary-dark);
-}
-
-.position-number.audit {
-  background-color: var(--secondary);
-  border-color: var(--secondary-dark);
-}
-
-/* Status badges */
-.status-badge {
-  padding: 0.25rem 0.5rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  display: inline-block;
-  min-width: 60px;
-  text-align: center;
-}
-
-.status-success {
-  background-color: var(--status-success-bg);
-  color: var(--status-success);
-  border: 1px solid var(--status-success);
-}
-
-.status-active {
-  background-color: var(--status-info-bg);
-  color: var(--status-info);
-  border: 1px solid var(--status-info);
-}
-
-.status-failed {
-  background-color: var(--status-error-bg);
-  color: var(--status-error);
-  border: 1px solid var(--status-error);
-}
-
-.status-default {
-  background-color: var(--surface-tertiary);
-  color: var(--text-tertiary);
-  border: 1px solid var(--border-secondary);
-}
-
-/* ==========================================================================
-   EMPTY STATE
-   ========================================================================== */
-
-.empty-state {
-  text-align: center;
-  padding: 3rem;
-  color: var(--text-tertiary);
-  background: var(--surface-primary);
-  border-radius: 0.75rem;
-  box-shadow: var(--shadow-md);
-  border: 1px solid var(--border-secondary);
-  transition: all 0.3s ease;
-}
-
-.empty-state-icon {
-  font-size: 3rem;
-  color: var(--text-tertiary);
-  transition: color 0.3s ease;
-}
-
-.card {
-  background: var(--surface-primary);
-  border-radius: 0.5rem;
-  box-shadow: var(--shadow-md);
-  border: 1px solid var(--border-secondary);
-  transition: all 0.3s ease;
-}
-
-.card-body {
-  padding: 1.5rem;
-}
-
-/* ==========================================================================
-   PAGINATION
-   ========================================================================== */
-
-.pagination-container {
-  background: var(--surface-primary);
-  padding: 1.5rem;
-  border-radius: 0 0 0.75rem 0.75rem;
-  border-top: 1px solid var(--border-secondary);
-  box-shadow: var(--shadow-md);
-  border: 1px solid var(--border-secondary);
-  border-top: none;
-  transition: all 0.3s ease;
-}
-
-.pagination-info {
-  text-align: center;
-  margin-top: 1rem;
-}
-
-.page-link {
-  border: 1px solid var(--border-primary);
-  color: var(--text-accent);
-  background: var(--surface-primary);
-  transition: all 0.3s ease;
-}
-
-.page-link:hover {
-  background-color: var(--state-hover);
-  border-color: var(--border-accent);
-  color: var(--text-accent);
-}
-
-.page-item.active .page-link {
-  background-color: var(--text-accent);
-  border-color: var(--border-accent);
-  color: var(--text-inverse);
-}
-
-.page-item.disabled .page-link {
-  color: var(--text-disabled);
-  background-color: var(--surface-tertiary);
-  border-color: var(--border-secondary);
-  cursor: not-allowed;
-}
-
-/* ==========================================================================
-   ALERT STYLES
-   ========================================================================== */
-
-.alert-danger {
-  background-color: var(--status-error-bg);
-  border-color: var(--border-error);
-  color: var(--status-error);
-}
-
-.alert-info {
-  background-color: var(--status-info-bg);
-  border-color: var(--status-info);
-  color: var(--status-info);
-}
-
-/* ==========================================================================
-   UTILITY CLASSES
-   ========================================================================== */
-
-.text-accent {
-  color: var(--text-accent) !important;
-}
-
-.text-primary {
-  color: var(--text-primary) !important;
-}
-
-.text-secondary {
-  color: var(--text-secondary) !important;
-}
-
-.text-tertiary {
-  color: var(--text-tertiary) !important;
-}
-
-.text-success {
-  color: var(--status-success) !important;
-}
-
-.text-warning {
-  color: var(--status-warning) !important;
-}
-
-.text-muted {
-  color: var(--text-tertiary) !important;
-}
-
-/* ==========================================================================
-   ANIMATIONS
-   ========================================================================== */
-
-.spinning {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* ==========================================================================
-   RESPONSIVE DESIGN
-   ========================================================================== */
-
-@media (max-width: 1024px) {
-  .filters-section {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-  
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-  
-  .header-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-  
-  .auto-refresh-status {
-    min-width: auto;
-    flex: 1;
-  }
-}
-
 @media (max-width: 768px) {
-  .logs-page {
-    padding: 1rem;
-  }
-  
-  .page-title {
-    font-size: 1.5rem;
-  }
-  
-  .header-actions {
+  .d-flex.gap-3 {
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 1rem !important;
   }
   
-  .auto-refresh-status,
-  .connection-indicator {
-    width: 100%;
-  }
-  
-  .logs-table th,
-  .logs-table td {
-    padding: 0.5rem;
-    font-size: 0.8125rem;
-  }
-  
-  .position-number {
-    padding: 0.125rem 0.375rem;
-    font-size: 0.6875rem;
-  }
-}
-
-@media (max-width: 576px) {
-  .logs-page {
-    padding: 0.5rem;
-  }
-  
-  .page-title {
-    font-size: 1.25rem;
-  }
-  
-  .filters-section {
-    padding: 1rem;
-  }
-  
-  .logs-table {
-    font-size: 0.75rem;
-  }
-  
-  .logs-table th,
-  .logs-table td {
-    padding: 0.25rem;
+  .surface-card.d-flex {
+    flex-direction: column;
+    align-items: flex-start !important;
   }
 }
 </style>

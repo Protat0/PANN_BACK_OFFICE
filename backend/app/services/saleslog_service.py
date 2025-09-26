@@ -4,11 +4,13 @@ from ..database import db_manager
 from ..models import SalesLog
 import bcrypt
 from notifications.services import notification_service
+from .pos.SalesService import SalesService
 
 class SalesLogService():
     def __init__(self):
         self.db = db_manager.get_database()  
         self.sales_log_collection = self.db.sales_log  
+        self.sales_service = SalesService()
     
     def convert_object_id(self, document):
         """Convert ObjectId to string for JSON serialization"""
@@ -25,6 +27,20 @@ class SalesLogService():
         return document
     
     def create_invoice(self, invoice_data):
+        try:
+            result = self.sales_service.create_unified_sale(invoice_data,source='manual')
+            if result['success']:
+                return result['data']
+            else:
+                raise Exception(result.get('message', 'Failed to create the invoice'))
+        except Exception as e:
+            raise Exception(f"Error creating invoice: {str(e)}")
+    
+    def _create_invoice_original(self, invoice_data):
+        """
+        Original create_invoice method as fallback
+        Renamed to avoid confusion
+        """
         try:
             # Create SalesLog instance with all invoice data
             invoice = SalesLog(**invoice_data)
@@ -62,10 +78,22 @@ class SalesLogService():
             return invoice.to_dict()
             
         except Exception as e:
-            raise Exception(f"Error creating invoice: {str(e)}")
-    
+            raise Exception(f"Error creating invoice (fallback): {str(e)}")
+
     def get_invoice_by_id(self, invoice_id):
         """Get invoice by ID"""
+        try:
+           
+           result = self.sales_service.get_sales_log_by_id(invoice_id)
+           if result:
+               return result
+           return self._get_invoice_by_id_original(invoice_id)
+
+        except Exception as e:
+            raise Exception(f"Error retrieving invoice: {str(e)}")
+    
+    def _get_invoice_by_id_original(self, invoice_id):
+        """Original get_invoice_by_id as fallback"""
         try:
             if isinstance(invoice_id, str):
                 invoice_id = ObjectId(invoice_id)
@@ -77,8 +105,8 @@ class SalesLogService():
             return None
             
         except Exception as e:
-            raise Exception(f"Error retrieving invoice: {str(e)}")
-    
+            raise Exception(f"Error retrieving invoice (fallback): {str(e)}")
+
     def get_all_invoices(self, limit=100, skip=0):
         """Get all invoices with pagination"""
         try:
