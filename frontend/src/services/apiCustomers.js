@@ -92,17 +92,50 @@ class CustomerApiService {
   }
 
   /**
-   * Delete customer (soft delete)
+   * Delete customer (soft delete - sets isDeleted: true)
    * @param {string} customerId - Customer ID
    * @returns {Promise<Object>} Deletion confirmation
    */
   async deleteCustomer(customerId) {
     try {
-      console.log(`Deleting customer with ID: ${customerId}`);
+      console.log(`Soft deleting customer with ID: ${customerId}`);
+      // Try using DELETE on the main endpoint (same pattern as create but with DELETE)
       const response = await api.delete(`/customers/${customerId}/`);
       return this.handleResponse(response);
     } catch (error) {
-      console.error(`Error deleting customer ${customerId}:`, error);
+      console.error(`Error soft deleting customer ${customerId}:`, error);
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Restore soft deleted customer
+   * @param {string} customerId - Customer ID
+   * @returns {Promise<Object>} Restored customer
+   */
+  async restoreCustomer(customerId) {
+    try {
+      console.log(`Restoring customer ${customerId}`);
+      const response = await api.patch(`/customers/${customerId}/restore/`);
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error(`Error restoring customer ${customerId}:`, error);
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Get deleted customers (for admin to view soft-deleted customers)
+   * @param {Object} params - Query parameters
+   * @returns {Promise<Object>} Deleted customers data
+   */
+  async getDeletedCustomers(params = {}) {
+    try {
+      console.log('Fetching deleted customers');
+      const response = await api.get('/customers/deleted/', { params });
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error('Error fetching deleted customers:', error);
       this.handleError(error);
     }
   }

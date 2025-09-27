@@ -144,6 +144,48 @@
         Add First Customer
       </button>
     </div>
+
+    <!-- Add Delete Confirmation Modal -->
+    <div class="modal fade" ref="deleteModalElement" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header border-theme">
+            <h5 class="modal-title text-error">Confirm Delete</h5>
+            <button type="button" class="btn-close" @click="closeDeleteModal"></button>
+          </div>
+          <div class="modal-body">
+            <div v-if="customerToDelete" class="text-center">
+              <div class="text-5xl mb-3">⚠️</div>
+              <h6 class="text-primary mb-3">Delete Customer</h6>
+              <p class="text-secondary mb-3">
+                Are you sure you want to delete customer 
+                <strong>{{ customerToDelete.full_name }}</strong>?
+              </p>
+              <div class="alert alert-warning" role="alert">
+                <small>
+                  This will hide the customer from the active list, but they can be restored later if needed.
+                </small>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer border-theme">
+            <button type="button" class="btn btn-secondary" @click="closeDeleteModal">
+              Cancel
+            </button>
+            <button 
+              type="button" 
+              class="btn btn-danger" 
+              @click="confirmDelete"
+              :disabled="isLoading"
+            >
+              <span v-if="isLoading">Deleting...</span>
+              <span v-else>Delete Customer</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <AddCustomerModal
@@ -158,10 +200,12 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { Modal } from 'bootstrap'
 import { useCustomers } from '@/composables/api/useCustomers.js'
 import TableTemplate from '@/components/common/TableTemplate.vue'
 import ActionBar from '@/components/common/ActionBar.vue'
 import AddCustomerModal from '@/components/customers/AddCustomerModal.vue'
+import { Eye, Edit, Trash2 } from 'lucide-vue-next'
 
 // Use the customers composable
 const {
@@ -173,6 +217,7 @@ const {
   hasCustomers,
   fetchCustomers,
   fetchStatistics,
+  deleteCustomer: deleteCustomerAPI,
   clearError
 } = useCustomers()
 
@@ -189,6 +234,11 @@ const selectedCustomer = ref(null)
 const selectedCustomers = ref([])
 const searchValue = ref('')
 const exporting = ref(false)
+
+// Delete modal state
+const deleteModalElement = ref(null)
+const customerToDelete = ref(null)
+let deleteModalInstance = null
 
 const addOptions = ref([
   {
@@ -348,18 +398,61 @@ const editCustomer = (customer) => {
   openEditCustomerModal(customer)
 }
 
-const deleteCustomer = (customer) => {
-  console.log('Delete customer:', customer)
-  // TODO: Implement delete confirmation and API call
+// Delete modal methods
+const openDeleteModal = (customer) => {
+  customerToDelete.value = customer
+  if (deleteModalInstance) {
+    deleteModalInstance.show()
+  }
 }
 
-// Initialize on mount
+const closeDeleteModal = () => {
+  customerToDelete.value = null
+  if (deleteModalInstance) {
+    deleteModalInstance.hide()
+  }
+}
+
+const confirmDelete = async () => {
+  if (!customerToDelete.value) return
+
+  try {
+    await deleteCustomerAPI(customerToDelete.value._id || customerToDelete.value.customer_id)
+    
+    // Show success message
+    console.log('Customer deleted successfully')
+    
+    closeDeleteModal()
+  } catch (error) {
+    console.error('Failed to delete customer:', error)
+  }
+}
+
+// Update the delete handler in your table
+const deleteCustomer = (customer) => {
+  openDeleteModal(customer)
+}
+
 onMounted(async () => {
   try {
+    // Initialize data
     await Promise.all([
       fetchCustomers(),
       fetchStatistics()
     ])
+    
+    // Initialize delete modal
+    if (deleteModalElement.value) {
+      deleteModalInstance = new Modal(deleteModalElement.value)
+      
+      deleteModalElement.value.addEventListener('hidden.bs.modal', () => {
+        customerToDelete.value = null
+      })
+      
+      console.log('Delete modal initialized successfully') // Add this for debugging
+    } else {
+      console.error('Delete modal element not found')
+    }
   } catch (err) {
     console.error('Failed to initialize customers page:', err)
   }
