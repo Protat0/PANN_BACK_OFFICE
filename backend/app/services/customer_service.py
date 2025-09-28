@@ -112,8 +112,10 @@ class CustomerService:
     def create_customer(self, customer_data, current_user=None):
         """Create customer with sequential CUST-##### ID"""
         try:
-            if not customer_data.get("email") or not customer_data.get("password"):
-                raise ValueError("Email and password are required")
+            required_fields = ["email", "password", "username", "full_name"]
+            for field in required_fields:
+                if not customer_data.get(field):
+                    raise ValueError(f"{field.replace('_', ' ').title()} is required")
             
             # Check if email already exists
             existing_customer = self.customer_collection.find_one({
@@ -123,15 +125,23 @@ class CustomerService:
             if existing_customer:
                 raise ValueError("Email already exists")
             
+            # Check if username already exists
+            existing_username = self.customer_collection.find_one({
+                "username": customer_data["username"].strip(),
+                "isDeleted": {"$ne": True}
+            })
+            if existing_username:
+                raise ValueError("Username already exists")
+            
             # Generate sequential ID
             customer_id = self.generate_customer_id()
             now = datetime.utcnow()
             
-            # Create customer record with password field
+            # Create customer record with separate username
             customer_record = {
                 "_id": customer_id,
-                "username": customer_data.get("username", customer_data["email"]),
-                "full_name": customer_data.get("full_name", ""),
+                "username": customer_data["username"].strip(),
+                "full_name": customer_data["full_name"].strip(),
                 "email": customer_data["email"].strip().lower(),
                 "password": self.hash_password(customer_data["password"]),
                 "phone": customer_data.get("phone", ""),
@@ -173,7 +183,7 @@ class CustomerService:
            raise Exception(f"Error getting customer: {str(e)}")
     
     def update_customer(self, customer_id, customer_data, current_user=None):
-        """Update customer including password field"""
+        """Update customer including username validation"""
         try:
             if not customer_id:
                 return None
@@ -185,7 +195,6 @@ class CustomerService:
             if not old_customer:
                 return None
 
-            # Include password in allowed fields
             update_data = {}
             allowed_fields = [
                 'username', 'full_name', 'email', 'password', 'phone', 
@@ -202,7 +211,7 @@ class CustomerService:
             if "password" in update_data:
                 update_data["password"] = self.hash_password(update_data["password"])
 
-            # Handle email normalization
+            # Handle email validation
             if "email" in update_data:
                 existing_customer = self.customer_collection.find_one({
                     "email": update_data["email"].strip().lower(),
@@ -212,6 +221,17 @@ class CustomerService:
                 if existing_customer:
                     raise ValueError("Email already exists")
                 update_data["email"] = update_data["email"].strip().lower()
+
+            # Handle username validation
+            if "username" in update_data:
+                existing_username = self.customer_collection.find_one({
+                    "username": update_data["username"].strip(),
+                    "_id": {"$ne": customer_id},
+                    "isDeleted": {"$ne": True}
+                })
+                if existing_username:
+                    raise ValueError("Username already exists")
+                update_data["username"] = update_data["username"].strip()
 
             result = self.customer_collection.update_one(
                 {'_id': customer_id, 'isDeleted': {'$ne': True}},
@@ -374,6 +394,20 @@ class CustomerService:
             
         except Exception as e:
             raise Exception(f"Error permanently deleting customer: {str(e)}")
+        
+    def get_customer_by_username(self, username, include_deleted=False):
+        """Get customer by username"""
+        try:
+            if not username:
+                return None
+                
+            query = {'username': username.strip()}
+            if not include_deleted:
+                query['isDeleted'] = {'$ne': True}
+                
+            return self.customer_collection.find_one(query)
+        except Exception as e:
+            raise Exception(f"Error getting customer by username: {str(e)}")
     
     # ================================================================
     # AUTHENTICATION METHODS
@@ -542,7 +576,7 @@ class CustomerService:
     # ================================================================
     
     def search_customers(self, search_term, include_deleted=False):
-        """Search customers by name, email, or phone"""
+        """Search customers by name, email, phone, or username"""
         try:
             if not search_term or not search_term.strip():
                 return []
@@ -556,7 +590,8 @@ class CustomerService:
                     {'full_name': regex_pattern},
                     {'email': regex_pattern},
                     {'phone': regex_pattern},
-                    {'_id': regex_pattern}  # Also search by customer ID
+                    {'username': regex_pattern},  # Add username to search
+                    {'_id': regex_pattern}
                 ]
             }
             
@@ -568,6 +603,20 @@ class CustomerService:
 
         except Exception as e:
             raise Exception(f"Error searching customers: {str(e)}")
+        
+    def get_customer_by_username(self, username, include_deleted=False):
+        """Get customer by username"""
+        try:
+            if not username:
+                return None
+                
+            query = {'username': username.strip()}
+            if not include_deleted:
+                query['isDeleted'] = {'$ne': True}
+                
+            return self.customer_collection.find_one(query)
+        except Exception as e:
+            raise Exception(f"Error getting customer by username: {str(e)}")
     
     def get_customer_by_email(self, email, include_deleted=False):
         """Get customer by email"""

@@ -53,6 +53,7 @@
       <template #header>
         <tr>
           <th style="width: 150px;">Customer ID</th>
+          <th style="width: 140px;">Username</th>  <!-- Add this line -->
           <th>Full Name</th>
           <th>Email</th>
           <th>Phone</th>
@@ -69,6 +70,12 @@
             <span class="badge bg-light text-primary" style="font-family: monospace;">
               {{ customer.customer_id || customer._id }}
             </span>
+          </td>
+          <!-- Add this username column -->
+          <td>
+            <div class="fw-medium text-tertiary-dark">
+              {{ customer.username || 'N/A' }}
+            </div>
           </td>
           <td>
             <div class="fw-medium text-tertiary-dark">
@@ -383,9 +390,23 @@ const handleModalClose = () => {
   selectedCustomer.value = null
 }
 
-const handleModalSuccess = (customerData) => {
+const handleModalSuccess = async (customerData) => {
   console.log('Customer saved successfully:', customerData)
-  // The table will automatically update via the useCustomers composable
+  
+  // Refresh the customers list to show the new/updated customer
+  try {
+    await fetchCustomers()
+    console.log('Customer list refreshed successfully')
+    
+    // Optional: Reset to first page if adding new customer to show it at the top
+    if (modalMode.value === 'create') {
+      currentPage.value = 1
+    }
+    
+  } catch (error) {
+    console.error('Failed to refresh customer list:', error)
+    // You could add a toast notification here if you have one
+  }
 }
 
 // Table action handlers

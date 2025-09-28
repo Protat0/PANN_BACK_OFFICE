@@ -37,6 +37,24 @@
 
         <!-- Customer Form -->
         <form @submit.prevent="handleSubmit">
+          <!-- Username -->
+          <div class="mb-4">
+            <label class="form-label text-secondary fw-medium mb-2">
+              Username <span class="text-error">*</span>
+            </label>
+            <input
+              v-model="form.username"
+              type="text"
+              class="form-control"
+              placeholder="Enter unique username"
+              required
+              :disabled="isLoading"
+            />
+            <small class="form-text text-tertiary-medium">
+              Username must be unique and cannot be changed later
+            </small>
+          </div>
+
           <!-- Full Name -->
           <div class="mb-4">
             <label class="form-label text-secondary fw-medium mb-2">
@@ -101,13 +119,46 @@
             <label class="form-label text-secondary fw-medium mb-2">
               Delivery Address
             </label>
-            <textarea
-              v-model="form.delivery_address"
-              class="form-control"
-              rows="3"
-              placeholder="Street address, city, state, zip code"
-              :disabled="isLoading"
-            ></textarea>
+            <div class="address-fields">
+              <div class="row g-2">
+                <div class="col-12">
+                  <input
+                    v-model="form.delivery_address.street"
+                    type="text"
+                    class="form-control mb-2"
+                    placeholder="Street address"
+                    :disabled="isLoading"
+                  />
+                </div>
+                <div class="col-6">
+                  <input
+                    v-model="form.delivery_address.city"
+                    type="text"
+                    class="form-control"
+                    placeholder="City"
+                    :disabled="isLoading"
+                  />
+                </div>
+                <div class="col-6">
+                  <input
+                    v-model="form.delivery_address.barangay"
+                    type="text"
+                    class="form-control"
+                    placeholder="Barangay"
+                    :disabled="isLoading"
+                  />
+                </div>
+                <div class="col-6">
+                  <input
+                    v-model="form.delivery_address.postal_code"
+                    type="text"
+                    class="form-control"
+                    placeholder="Postal code"
+                    :disabled="isLoading"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Loyalty Points (only for edit mode) -->
@@ -170,6 +221,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { X, AlertTriangle } from 'lucide-vue-next'
 import { useModal } from '@/composables/ui/useModal.js'
 import { useCustomers } from '@/composables/api/useCustomers.js'
 
@@ -195,18 +247,26 @@ const { createCustomer, updateCustomer } = useCustomers()
 
 // Form data
 const form = ref({
+  username: '',
   full_name: '',
   email: '',
   phone: '',
   password: '',
-  delivery_address: '',
+  delivery_address: {
+    street: '',
+    city: '',
+    barangay: '',
+    postal_code: ''
+  },
   loyalty_points: 0,
   status: 'active'
 })
 
 // Computed
 const isFormValid = computed(() => {
-  const hasRequiredFields = form.value.full_name.trim() && form.value.email.trim()
+  const hasRequiredFields = form.value.username.trim() && 
+                           form.value.full_name.trim() && 
+                           form.value.email.trim()
   const hasPasswordForCreate = props.mode === 'edit' || form.value.password.trim()
   return hasRequiredFields && hasPasswordForCreate
 })
@@ -237,11 +297,17 @@ const handleBackdropClick = () => {
 
 const resetForm = () => {
   form.value = {
+    username: '',
     full_name: '',
     email: '',
     phone: '',
     password: '',
-    delivery_address: '',
+    delivery_address: {
+      street: '',
+      city: '',
+      barangay: '',
+      postal_code: ''
+    },
     loyalty_points: 0,
     status: 'active'
   }
@@ -250,13 +316,17 @@ const resetForm = () => {
 const populateForm = () => {
   if (props.customer) {
     form.value = {
+      username: props.customer.username || '',
       full_name: props.customer.full_name || '',
       email: props.customer.email || '',
       phone: props.customer.phone || '',
-      password: '',
-      delivery_address: typeof props.customer.delivery_address === 'string' 
-        ? props.customer.delivery_address 
-        : props.customer.delivery_address?.street || '',
+      password: '', // Never populate password for security
+      delivery_address: {
+        street: props.customer.delivery_address?.street || '',
+        city: props.customer.delivery_address?.city || '',
+        barangay: props.customer.delivery_address?.barangay || '',
+        postal_code: props.customer.delivery_address?.postal_code || ''
+      },
       loyalty_points: props.customer.loyalty_points || 0,
       status: props.customer.status || 'active'
     }
@@ -271,14 +341,19 @@ const handleSubmit = async () => {
 
   try {
     const customerData = {
+      username: form.value.username.trim(),
       full_name: form.value.full_name.trim(),
       email: form.value.email.trim(),
       phone: form.value.phone.trim(),
-      delivery_address: form.value.delivery_address.trim(),
+      delivery_address: form.value.delivery_address
     }
 
     if (props.mode === 'create') {
       customerData.password = form.value.password
+    } else {
+      if (form.value.password.trim()) {
+        customerData.password = form.value.password
+      }
     }
 
     if (props.mode === 'edit') {
@@ -295,6 +370,10 @@ const handleSubmit = async () => {
     }
 
     emit('success', result)
+
+    await nextTick()
+
+    resetForm()
     closeModal()
     
   } catch (err) {
@@ -319,7 +398,7 @@ defineExpose({
 </script>
 
 <style scoped>
-/* Modal Backdrop - Fixed positioning */
+/* All your existing styles remain the same */
 .modal-backdrop {
   position: fixed;
   top: 0;
@@ -336,7 +415,6 @@ defineExpose({
   animation: fadeIn 0.2s ease-out;
 }
 
-/* Modal Container */
 .modal-container {
   background-color: var(--surface-elevated);
   border: 1px solid var(--border-primary);
@@ -350,7 +428,6 @@ defineExpose({
   position: relative;
 }
 
-/* Modal Header */
 .modal-header {
   padding: 1.5rem;
   border-bottom: 1px solid var(--border-secondary);
@@ -360,7 +437,6 @@ defineExpose({
   align-items: center;
 }
 
-/* Modal Body */
 .modal-body {
   padding: 1.5rem;
   max-height: 60vh;
@@ -368,14 +444,12 @@ defineExpose({
   background-color: var(--surface-primary);
 }
 
-/* Modal Footer */
 .modal-footer {
   padding: 1.5rem;
   border-top: 1px solid var(--border-secondary);
   background-color: var(--surface-secondary);
 }
 
-/* Form styling */
 .form-control:focus,
 .form-select:focus {
   border-color: var(--border-accent) !important;
@@ -386,7 +460,20 @@ defineExpose({
   display: block;
 }
 
-/* Loading spinner */
+.form-text {
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.address-fields .row {
+  margin: 0;
+}
+
+.address-fields .col-12,
+.address-fields .col-6 {
+  padding: 0 0.25rem;
+}
+
 .spinner-border {
   display: inline-block;
   width: 1rem;
@@ -427,7 +514,6 @@ defineExpose({
   cursor: not-allowed;
 }
 
-/* Animations */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -448,7 +534,6 @@ defineExpose({
   to { transform: rotate(360deg); }
 }
 
-/* Utility classes */
 .d-flex { display: flex; }
 .justify-content-between { justify-content: space-between; }
 .justify-content-end { justify-content: flex-end; }
@@ -462,7 +547,6 @@ defineExpose({
 .fw-medium { font-weight: 500; }
 .fw-semibold { font-weight: 600; }
 
-/* Responsive adjustments */
 @media (max-width: 640px) {
   .modal-container {
     margin: 0.5rem;
