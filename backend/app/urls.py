@@ -240,9 +240,9 @@ urlpatterns = [
     
     # ========== SESSION MANAGEMENT ==========
     path('session-logs/', SessionLogsView.as_view(), name='session-logs'),
-    path('session-logs/<str:session_id>/', SessionDetailView.as_view(), name='session-detail'),  
-    path('session-logs/display/', SessionDisplayView.as_view(), name='session-logs-display'),
+    path('session-logs/display/', SessionDisplayView.as_view(), name='session-logs-display'),  # Move this BEFORE the parameterized one
     path('session-logs/combined/', CombinedLogsView.as_view(), name='combined-logs'),
+    path('session-logs/<str:session_id>/', SessionDetailView.as_view(), name='session-detail'),
     # Session management
     path('sessions/active/', ActiveSessionsView.as_view(), name='active-sessions'),
     path('sessions/user/<str:user_id>/', UserSessionsView.as_view(), name='user-sessions'),

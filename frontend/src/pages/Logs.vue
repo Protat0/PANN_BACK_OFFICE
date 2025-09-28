@@ -340,6 +340,7 @@ export default {
   
   methods: {
     async loadLogs(isAutoRefresh = false, isEmergencyReconnect = false) {
+      // Prevent multiple simultaneous requests
       if (this.loading && !isAutoRefresh && !isEmergencyReconnect) return
       
       this.loading = true
@@ -355,22 +356,51 @@ export default {
           logType = 'audit'
         }
 
+        console.log("🔍 Requesting logs with params:", {
+          limit: 100,
+          type: logType,
+          categoryFilter: this.categoryFilter
+        });
+
         const response = await APILogs.DisplayCombinedLogs({
           limit: 100,
           type: logType
         })
         
+        console.log("📦 Raw API Response:", response);
+        
         const previousLogsLength = this.session_logs.length
         
+        // FIXED: Improved response handling with better error checking
         let newLogs = []
-        if (response && response.success && response.data) {
+        
+        // Check for different response formats
+        if (response && response.success && Array.isArray(response.data)) {
           newLogs = response.data
+          console.log("✅ Using response.data (success format)")
         } else if (Array.isArray(response)) {
           newLogs = response
-        } else if (response && response.data) {
+          console.log("✅ Using direct array response")
+        } else if (response && Array.isArray(response.data)) {
           newLogs = response.data
+          console.log("✅ Using response.data (direct format)")
+        } else if (response && response.results && Array.isArray(response.results)) {
+          // Django REST framework pagination format
+          newLogs = response.results
+          console.log("✅ Using response.results (DRF pagination)")
+        } else {
+          console.warn("⚠️ Unexpected response format:", response)
+          newLogs = []
         }
         
+        console.log(`📊 Processed ${newLogs.length} logs`);
+        
+        // FIXED: Validate that we actually have data
+        if (!Array.isArray(newLogs)) {
+          throw new Error('Invalid response format: expected array of logs')
+        }
+        
+        // Reset connection state on successful response
         this.connectionLost = false
         this.consecutiveErrors = 0
         this.lastSuccessfulLoad = Date.now()
@@ -378,11 +408,15 @@ export default {
         
         this.trackActivityAndAdjustRefreshRate(newLogs, previousLogsLength)
         
+        // FIXED: Handle new entries tracking more safely
         if (isAutoRefresh && this.session_logs.length > 0) {
-          const existingIds = new Set(this.session_logs.map(log => log.log_id || log._id))
+          const existingIds = new Set(
+            this.session_logs.map(log => log.log_id || log._id || log.id).filter(Boolean)
+          )
+          
           newLogs.forEach(log => {
-            const id = log.log_id || log._id
-            if (!existingIds.has(id)) {
+            const id = log.log_id || log._id || log.id
+            if (id && !existingIds.has(id)) {
               this.newEntryIds.add(id)
               this.recentActivity.push({
                 timestamp: Date.now(),
@@ -391,32 +425,51 @@ export default {
             }
           })
           
+          // Clear new entry highlights after 5 seconds
           setTimeout(() => {
             this.newEntryIds.clear()
           }, 5000)
         }
         
+        // FIXED: Always assign the data, even if empty
         this.session_logs = newLogs
         this.lastLoadTime = Date.now()
+        
+        // Clear memoized filters to force recalculation
         this.memoizedFilters.result = []
         
+        // Reset to first page on manual refresh
         if (!isAutoRefresh) {
           this.currentPage = 1
         }
         
+        console.log(`✅ Successfully loaded ${newLogs.length} logs`);
+        
       } catch (error) {
-        console.error("Error loading combined logs:", error)
+        console.error("❌ Error loading combined logs:", error)
         
         this.consecutiveErrors++
-        this.error = error.message || 'Failed to load logs'
         
+        // FIXED: Better error message handling
+        const errorMessage = error.response?.data?.message || 
+                            error.response?.data?.error || 
+                            error.message || 
+                            'Failed to load logs'
+        
+        this.error = errorMessage
+        
+        // Mark connection as lost after 3 consecutive errors
         if (this.consecutiveErrors >= 3) {
           this.connectionLost = true
         }
         
+        // FIXED: Only clear logs on manual refresh failure, not auto-refresh
         if (!isAutoRefresh) {
           this.session_logs = []
         }
+        
+        console.log(`❌ Error count: ${this.consecutiveErrors}, Connection lost: ${this.connectionLost}`);
+        
       } finally {
         this.loading = false
       }

@@ -42,8 +42,9 @@
           border-color="accent"
           border-position="start"
           title="Categories"
-          value="3"
-          subtitle="Active"
+          :value="totalCategories"
+          subtitle="Total"
+          :loading="categoryStatsLoading"
         />
       </div>
     </div>
@@ -400,7 +401,7 @@
 
 <script>
 import { useToast } from '@/composables/useToast.js'
-import { onMounted, onBeforeUnmount } from 'vue'
+import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { useProducts } from '../../composables/ui/products/useProducts'
 import AddProductModal from '../../components/products/AddProductModal.vue'
 import StockUpdateModal from '../../components/products/StockUpdateModal.vue'
@@ -410,6 +411,7 @@ import DataTable from '@/components/common/TableTemplate.vue'
 import CardTemplate from '@/components/common/CardTemplate.vue'
 import ImportModal from '../../components/products/ImportModal.vue'
 import ColumnFilterModal from '@/components/products/ColumnFilterModal.vue'
+import productsApiService from '../../services/apiProducts.js'
 import { 
   Plus, Search, X, ChevronUp, Package, Trash2,
   RefreshCw, FileText, Edit, Eye, Lock, Unlock, Settings
@@ -429,8 +431,29 @@ export default {
     const productsComposable = useProducts()
     const { success, error, warning, info, loading, dismiss } = useToast()
     
-    onMounted(() => {
+    // Simple category stats state
+    const totalCategories = ref(0)
+    const categoryStatsLoading = ref(false)
+    
+    // Fetch category stats using the API service
+    const fetchCategoryStats = async () => {
+      try {
+        categoryStatsLoading.value = true
+        const result = await productsApiService.getCategoryStats()
+        
+        if (result.success) {
+          totalCategories.value = result.stats.category_overview.total_categories || 0
+        }
+      } catch (err) {
+        console.error('Error fetching category stats:', err)
+      } finally {
+        categoryStatsLoading.value = false
+      }
+    }
+    
+    onMounted(async () => {
       productsComposable.initializeProducts()
+      await fetchCategoryStats()
     })
     
     onBeforeUnmount(() => {
@@ -438,11 +461,13 @@ export default {
     })
     
     return { 
-    ...productsComposable,
-    toast: { success, error, warning, info, loading, dismiss }
-  }
+      ...productsComposable,
+      totalCategories,
+      categoryStatsLoading,
+      toast: { success, error, warning, info, loading, dismiss }
+    }
   },
-  
+
   methods: {
     showAddProductModal() {
       this.$refs.addProductModal?.openAdd?.()

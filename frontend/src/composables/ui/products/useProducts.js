@@ -89,15 +89,20 @@ export function useProducts() {
     error.value = null
     
     try {
-      const data = await productsApiService.getProducts()
+      console.log('Fetching products from API...')
+      const response = await productsApiService.getProducts()
+      console.log('API response:', response)
       
-      if (data.results) {
-        products.value = data.results
-      } else if (Array.isArray(data)) {
-        products.value = data
+      // Fix: Your Django API returns data in response.data
+      if (response.data && Array.isArray(response.data)) {
+        products.value = response.data
+      } else if (Array.isArray(response)) {
+        products.value = response
       } else {
-        products.value = data.products || []
+        products.value = []
       }
+      
+      console.log(`Loaded ${products.value.length} products`)
       
       // ALWAYS enrich products with category info after fetching categories
       await enrichProductsWithCategoryNames()

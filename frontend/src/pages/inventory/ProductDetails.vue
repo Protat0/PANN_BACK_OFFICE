@@ -248,16 +248,13 @@
 
     <!-- Modals -->
     <AddProductModal
-      :show="showEditModal"
-      :product="currentProduct"
-      @close="closeEditModal"
+      ref="addProductModal"
+      :categories="categories"
       @success="handleModalSuccess"
     />
 
     <StockUpdateModal
-      :show="showStockModal"
-      :product="currentProduct"
-      @close="closeStockModal"
+      ref="stockUpdateModal"
       @success="handleModalSuccess"
     />
   </div>
@@ -283,12 +280,13 @@ export default {
     }
   },
   setup(props) {
-    console.log('ProductDetails component mounted!');
-    console.log('Product ID from route:', props.id);
-
     const router = useRouter();
     
-    // Use the products composable - only retrieve methods
+    // Template refs
+    const addProductModal = ref(null);
+    const stockUpdateModal = ref(null);
+    
+    // Use the products composable
     const {
       products,
       categories,
@@ -298,160 +296,75 @@ export default {
       fetchProducts,
       fetchCategories,
       getCategoryName,
+      deleteProduct,
+      exportData
     } = useProducts();
 
-    // Local state for this component
+    // Local state
     const activeTab = ref('Overview');
     const tabs = ['Overview', 'Purchases', 'Adjustments', 'History'];
 
-    // Modal states
-    const showEditModal = ref(false);
-    const showStockModal = ref(false);
-
-    // Current product computed from the products list
+    // Current product computed
     const currentProduct = computed(() => {
       return products.value.find(product => product._id === props.id) || {};
     });
 
-    // Transform the product data for ProductOverview component
-    const transformedProductData = computed(() => {
-        console.log('Current product:', currentProduct.value); // Debug line
-        console.log('Products array:', products.value.length); 
-      if (!currentProduct.value || Object.keys(currentProduct.value).length === 0) {
-        return {
-          name: '',
-          id: props.id,
-          category: '',
-          batchDate: '',
-          expiryDate: '',
-          thresholdValue: 0,
-          description: '',
-          tags: [],
-          supplier: {
-            name: '',
-            contact: '',
-            email: '',
-            address: ''
-          },
-          stock: {
-            opening: 0,
-            remaining: 0,
-            onTheWay: 0,
-            reserved: 0
-          },
-          pricing: {
-            cost: 0,
-            selling: 0,
-            unitType: ''
-          },
-          image: ''
-        };
+    // Fixed methods
+    const handleEdit = () => {
+      if (currentProduct.value && Object.keys(currentProduct.value).length > 0) {
+        addProductModal.value?.openEdit?.(currentProduct.value);
       }
-
-      return {
-        name: currentProduct.value.product_name || '',
-        id: currentProduct.value._id || props.id,
-        category: currentProduct.value.category_name || getCategoryName(currentProduct.value.category_id),
-        batchDate: currentProduct.value.batch_date || currentProduct.value.created_at || '',
-        expiryDate: currentProduct.value.expiry_date || '',
-        thresholdValue: currentProduct.value.low_stock_threshold || 0,
-        description: currentProduct.value.description || 'Product description not available.',
-        tags: currentProduct.value.tags || [],
-        supplier: {
-          name: currentProduct.value.supplier_name || 'Unknown Supplier',
-          contact: currentProduct.value.supplier_contact || '',
-          email: currentProduct.value.supplier_email || '',
-          address: currentProduct.value.supplier_address || ''
-        },
-        stock: {
-          opening: currentProduct.value.opening_stock || currentProduct.value.stock || 0,
-          remaining: currentProduct.value.stock || 0,
-          onTheWay: currentProduct.value.on_the_way || 0,
-          reserved: currentProduct.value.reserved_stock || 0
-        },
-        pricing: {
-          cost: currentProduct.value.cost_price || 0,
-          selling: currentProduct.value.selling_price || 0,
-          unitType: currentProduct.value.unit || 'pcs'
-        },
-        image: currentProduct.value.image_url || currentProduct.value.image || ''
-      };
-    });
-
-    // Methods
-    const setActiveTab = (tab) => {
-      console.log('Tab changed to:', tab);
-      activeTab.value = tab;
     };
 
-    // Modal trigger methods - no logic, just open modals
-    const handleDelete = () => {
-      console.log('Delete button clicked for product:', props.id);
+    const handleStockAdjustment = () => {
+      if (currentProduct.value && Object.keys(currentProduct.value).length > 0) {
+        stockUpdateModal.value?.openStock?.(currentProduct.value);
+      }
+    };
+
+    const handleImageUpload = () => {
+      // Open the edit modal which has image upload functionality
+      if (currentProduct.value && Object.keys(currentProduct.value).length > 0) {
+        addProductModal.value?.openEdit?.(currentProduct.value);
+      }
+    };
+
+    const handleDelete = async () => {
       if (!currentProduct.value || !currentProduct.value.product_name) {
-        error.value = 'Product data not available for deletion';
         return;
       }
-      // Open delete confirmation modal (you'll need to create this)
-      // For now, just log - the modal will handle the actual deletion
-    };
-
-    const handleEdit = () => {
-      console.log('Edit button clicked for product:', props.id);
-      if (currentProduct.value && Object.keys(currentProduct.value).length > 0) {
-        showEditModal.value = true;
+      
+      const confirmed = confirm(`Are you sure you want to delete "${currentProduct.value.product_name}"?`);
+      if (confirmed) {
+        try {
+          await deleteProduct(currentProduct.value);
+          router.push('/products');
+        } catch (err) {
+          console.error('Error deleting product:', err);
+        }
       }
     };
 
-    const handleUpdateStock = () => {
-      console.log('Update Stock button clicked for product:', props.id);
-      if (currentProduct.value && Object.keys(currentProduct.value).length > 0) {
-        showStockModal.value = true;
+    const handleExport = async () => {
+      try {
+        await exportData();
+      } catch (err) {
+        console.error('Error exporting:', err);
       }
     };
 
-    const handleExport = () => {
-      console.log('Export button clicked for product:', props.id);
-      // Export functionality can be handled here or in a modal
-    };
-
-    // Modal close handlers
-    const closeEditModal = () => {
-      showEditModal.value = false;
-    };
-
-    const closeStockModal = () => {
-      showStockModal.value = false;
-    };
-
-    // Modal success handlers - refresh data when modals complete successfully
-    const handleModalSuccess = async (message) => {
-      if (message) {
-        successMessage.value = message;
+    const handleModalSuccess = async (result) => {
+      if (result?.message) {
+        successMessage.value = result.message;
         setTimeout(() => {
           successMessage.value = null;
         }, 3000);
       }
-      // Refresh the products data to get updated information
       await fetchProducts();
     };
 
-    // ProductOverview event handlers - just trigger modals
-    const handleStockAdjustment = () => {
-      handleUpdateStock();
-    };
-
-    const handleReorder = (product) => {
-      console.log('Reorder requested for:', product);
-      // Could open a reorder modal
-    };
-
-    const handleViewHistory = () => {
-      setActiveTab('History');
-    };
-
-    const handleImageUpload = () => {
-      console.log('Image upload requested');
-      // Could open an image upload modal
+    const setActiveTab = (tab) => {
+      activeTab.value = tab;
     };
 
     // Initialize data
@@ -460,49 +373,34 @@ export default {
       await fetchProducts();
     };
 
-    // Watch for prop changes
-    watch(() => props.id, (newId, oldId) => {
-      console.log('Product ID changed from', oldId, 'to', newId);
-      if (newId && !currentProduct.value) {
-        // If product not found in current products list, refresh
-        fetchProducts();
-      }
-    });
-
-    // Lifecycle
     onMounted(() => {
-      console.log('Component mounted, initializing data...');
       initializeData();
     });
 
     return {
-      // State from composable
+      // State
       loading,
       error,
       successMessage,
-      
-      // Local state
       currentProduct,
-      transformedProductData,
       activeTab,
       tabs,
-      showEditModal,
-      showStockModal,
       router,
+      categories,
+      
+      // Template refs
+      addProductModal,
+      stockUpdateModal,
+      handleImageUpload,
       
       // Methods
       setActiveTab,
       handleDelete,
       handleEdit,
-      handleUpdateStock,
-      handleExport,
-      closeEditModal,
-      closeStockModal,
-      handleModalSuccess,
       handleStockAdjustment,
-      handleReorder,
-      handleViewHistory,
-      handleImageUpload
+      handleExport,
+      handleModalSuccess,
+      initializeData
     };
   }
 };

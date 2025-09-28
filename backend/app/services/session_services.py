@@ -13,7 +13,7 @@ class SessionLogService:
     def __init__(self):
         self.db = db_manager.get_database()
         self.collection = self.db.session_logs
-        self.notification_service = notification_service()
+        self.notification_service = notification_service
         self._cleanup_thread = None
         self._stop_cleanup = False
 
@@ -24,14 +24,14 @@ class SessionLogService:
             pipeline = [
                 {
                     "$match": {
-                        "session_id": {"$regex": "^SESS-"}
+                        "_id": {"$regex": "^SESS-"}
                     }
                 },
                 {
                     "$addFields": {
                         "session_number": {
                             "$toInt": {
-                                "$substr": ["$session_id", 5, -1]
+                                "$substr": ["$_id", 5, -1]
                             }
                         }
                     }
@@ -50,7 +50,7 @@ class SessionLogService:
                 next_number = result[0]["session_number"] + 1
             else:
                 # Fallback to count-based method
-                count = self.collection.count_documents({"session_id": {"$regex": "^SESS-"}})
+                count = self.collection.count_documents({"_id": {"$regex": "^SESS-"}})
                 next_number = count + 1
             
             return f"SESS-{next_number:05d}"
@@ -65,7 +65,7 @@ class SessionLogService:
         """Enhanced notification helper with new cleanup actions"""
         try:
             username = session_data.get("username", "Unknown User")
-            session_id = session_data.get("session_id", "Unknown")
+            session_id = session_data.get("_id", "Unknown")
             
             # Enhanced notification messages for cleanup actions
             notification_config = {
@@ -148,7 +148,7 @@ class SessionLogService:
             # Close sessions older than 24 hours
             expired_result = self.collection.update_many(
                 {
-                    "user_id": user_id,  # Now using string IDs directly
+                    "user_id": user_id,
                     "status": "active",
                     "login_time": {"$lt": cutoff_time - timedelta(hours=24)}
                 },
@@ -167,7 +167,7 @@ class SessionLogService:
                     "user_id": user_id,
                     "status": "active"
                 },
-                {"session_id": 1, "username": 1, "branch_id": 1}
+                {"_id": 1, "username": 1, "branch_id": 1}
             ))
             
             # Close recent active sessions (new login replaces old)
@@ -198,13 +198,13 @@ class SessionLogService:
             logger.error(f"Error closing existing sessions: {e}")
 
     def log_login(self, user_data):
-        """Log user login session with SESS-##### ID"""
+        """Log user login session with string _id"""
         try:  
             user_id = user_data.get("user_id")
             if not user_id:
                 raise ValueError("user_id is required")
             
-            # Ensure user_id is string format (remove any ObjectId conversion)
+            # Ensure user_id is string format
             if not isinstance(user_id, str):
                 user_id = str(user_id)
             
@@ -214,15 +214,15 @@ class SessionLogService:
                 "unknown"
             )
 
-            # Generate sequential session ID
+            # Generate sequential session ID as string _id
             session_id = self.generate_session_id()
 
             # Close any existing active sessions
             self._close_existing_sessions(user_id)
 
             log_data = {
-                "session_id": session_id,  # Primary identifier
-                "user_id": user_id,        # String-based user reference
+                "_id": session_id,           # String _id like "SESS-00001"
+                "user_id": user_id,          # String-based user reference
                 "branch_id": user_data.get("branch_id", 1),
                 "username": username,
                 "login_time": datetime.utcnow(),
@@ -241,8 +241,6 @@ class SessionLogService:
 
             logger.info(f"Login session {session_id} logged for user {username}")
             
-            # Return session data without ObjectId conversion
-            log_data["_id"] = str(result.inserted_id)
             return log_data
         
         except Exception as e:
@@ -272,9 +270,9 @@ class SessionLogService:
             logout_time = datetime.utcnow()
             duration = int((logout_time - session["login_time"]).total_seconds())
 
-            # Update session with logout info
+            # Update session with logout info using string _id
             update_result = self.collection.update_one(
-                {"session_id": session["session_id"]},  # Use session_id instead of ObjectId
+                {"_id": session["_id"]},  # Use string _id directly
                 {
                     "$set": {
                         "logout_time": logout_time,
@@ -288,7 +286,7 @@ class SessionLogService:
             if update_result.modified_count > 0:
                 # Send logout notification
                 logout_data = {
-                    "session_id": session["session_id"],
+                    "_id": session["_id"],
                     "username": session.get("username"),
                     "branch_id": session.get("branch_id"),
                     "user_id": user_id
@@ -303,7 +301,7 @@ class SessionLogService:
                     "success": True, 
                     "message": "Session logged out successfully", 
                     "duration": duration,
-                    "session_id": session["session_id"]
+                    "session_id": session["_id"]
                 }
             else:
                 logger.error("Failed to update session with logout info")
@@ -314,18 +312,14 @@ class SessionLogService:
             raise Exception(f"Error logging logout: {str(e)}")
     
     def get_active_sessions(self):
-        """Get all currently active sessions (no ObjectId conversion needed)"""
+        """Get all currently active sessions (no conversion needed)"""
         try:
             sessions = list(self.collection.find(
                 {"status": "active"},
                 sort=[("login_time", -1)]
             ))
             
-            # Convert ObjectId in _id field only for compatibility
-            for session in sessions:
-                if "_id" in session:
-                    session["_id"] = str(session["_id"])
-            
+            # No ObjectId conversion needed - _id is already string
             return sessions
         except Exception as e:
             logger.error(f"Error getting active sessions: {e}")
@@ -344,29 +338,24 @@ class SessionLogService:
                 limit=limit
             ))
             
-            # Convert ObjectId in _id field only for compatibility
-            for session in sessions:
-                if "_id" in session:
-                    session["_id"] = str(session["_id"])
-            
+            # No ObjectId conversion needed - _id is already string
             return sessions
         except Exception as e:
             logger.error(f"Error getting user sessions: {e}")
             return []
 
     def get_session_by_id(self, session_id):
-        """Get session by session_id (SESS-#####)"""
+        """Get session by string _id (SESS-#####)"""
         try:
-            session = self.collection.find_one({"session_id": session_id})
-            if session and "_id" in session:
-                session["_id"] = str(session["_id"])
+            session = self.collection.find_one({"_id": session_id})
+            # No conversion needed - _id is already string
             return session
         except Exception as e:
             logger.error(f"Error getting session by ID: {e}")
             return None
 
     def get_session_statistics(self):
-        """Get session statistics (no ObjectId dependencies)"""
+        """Get session statistics (no conversion dependencies)"""
         try:
             now = datetime.utcnow()
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -415,7 +404,7 @@ class SessionLogService:
                 # Send bulk cleanup notification
                 self._send_session_notification("bulk_cleanup", {
                     "username": "System",
-                    "session_id": "BULK-CLEANUP"
+                    "_id": "BULK-CLEANUP"
                 }, {
                     "deleted_count": result.deleted_count,
                     "cutoff_date": cutoff_date.isoformat()
@@ -455,7 +444,7 @@ class SessionLogService:
             if result.modified_count > 0:
                 self._send_session_notification("bulk_cleanup", {
                     "username": "System",
-                    "session_id": "BULK-EXPIRE"
+                    "_id": "BULK-EXPIRE"
                 }, {
                     "expired_count": result.modified_count,
                     "user_count": len(user_ids)
@@ -475,7 +464,7 @@ class SessionLogService:
     def auto_cleanup_old_sessions(self, months_old=6):
         """Automatically clean up sessions older than specified months (default 6 months)"""
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=months_old * 30)  # Approximate 6 months
+            cutoff_date = datetime.utcnow() - timedelta(days=months_old * 30)
             
             # Get count of sessions to be deleted for reporting
             sessions_to_delete = self.collection.count_documents({
@@ -493,8 +482,8 @@ class SessionLogService:
             # Get some session details for notification before deletion
             sample_sessions = list(self.collection.find(
                 {"login_time": {"$lt": cutoff_date}},
-                {"session_id": 1, "username": 1, "user_id": 1, "login_time": 1}
-            ).limit(5))  # Get first 5 for notification details
+                {"_id": 1, "username": 1, "user_id": 1, "login_time": 1}
+            ).limit(5))
             
             # Delete old sessions
             result = self.collection.delete_many({
@@ -504,7 +493,7 @@ class SessionLogService:
             # Send comprehensive notification
             self._send_session_notification("auto_cleanup", {
                 "username": "System AutoCleanup",
-                "session_id": "AUTO-CLEANUP-6M"
+                "_id": "AUTO-CLEANUP-6M"
             }, {
                 "deleted_count": result.deleted_count,
                 "cutoff_date": cutoff_date.isoformat(),
@@ -512,7 +501,7 @@ class SessionLogService:
                 "cleanup_type": "automatic_6_month",
                 "sample_sessions": [
                     {
-                        "session_id": s.get("session_id"),
+                        "session_id": s.get("_id"),
                         "username": s.get("username"),
                         "user_id": s.get("user_id"),
                         "login_time": s.get("login_time").isoformat() if s.get("login_time") else None
@@ -536,7 +525,7 @@ class SessionLogService:
             # Send error notification
             self._send_session_notification("auto_cleanup_failed", {
                 "username": "System AutoCleanup",
-                "session_id": "AUTO-CLEANUP-ERROR"
+                "_id": "AUTO-CLEANUP-ERROR"
             }, {
                 "error": str(e),
                 "months_old": months_old,
@@ -548,6 +537,7 @@ class SessionLogService:
                 "error": str(e),
                 "deleted_count": 0
             }
+
 
     def start_automated_cleanup(self, cleanup_interval_hours=24, months_old=6):
         """Start automated cleanup thread that runs every 24 hours"""
@@ -585,10 +575,10 @@ class SessionLogService:
             self._cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
             self._cleanup_thread.start()
             
-            # Send startup notification
+            # Send startup notification - FIXED: use _id
             self._send_session_notification("auto_cleanup_started", {
                 "username": "System AutoCleanup",
-                "session_id": "AUTO-CLEANUP-START"
+                "_id": "AUTO-CLEANUP-START"
             }, {
                 "cleanup_interval_hours": cleanup_interval_hours,
                 "months_old": months_old,
@@ -617,10 +607,10 @@ class SessionLogService:
             self._stop_cleanup = True
             self._cleanup_thread.join(timeout=5)  # Wait up to 5 seconds for thread to stop
             
-            # Send stop notification
+            # Send stop notification - FIXED: use _id
             self._send_session_notification("auto_cleanup_stopped", {
                 "username": "System AutoCleanup",
-                "session_id": "AUTO-CLEANUP-STOP"
+                "_id": "AUTO-CLEANUP-STOP"
             }, {
                 "thread_stopped": True,
                 "stop_time": datetime.utcnow().isoformat()
@@ -706,10 +696,10 @@ class SessionLogService:
                     "dry_run": dry_run
                 }
             
-            # Get sample sessions for reporting
+            # Get sample sessions for reporting - FIXED: use _id instead of session_id
             sample_sessions = list(self.collection.find(
                 query,
-                {"session_id": 1, "username": 1, "login_time": 1, "status": 1}
+                {"_id": 1, "username": 1, "login_time": 1, "status": 1}
             ).limit(10))
             
             deleted_count = 0
@@ -718,10 +708,10 @@ class SessionLogService:
                 result = self.collection.delete_many(query)
                 deleted_count = result.deleted_count
                 
-                # Send notification
+                # Send notification - FIXED: use _id
                 self._send_session_notification("manual_cleanup", {
                     "username": "Manual Cleanup",
-                    "session_id": "MANUAL-CLEANUP"
+                    "_id": "MANUAL-CLEANUP"
                 }, {
                     "deleted_count": deleted_count,
                     "start_date": start_date.isoformat() if start_date else None,
@@ -1022,10 +1012,10 @@ class SessionLogService:
                 delete_result = self.collection.delete_many(query)
                 deleted_count = delete_result.deleted_count
                 
-                # Send notification with export info
+                # Send notification with export info - FIXED: use _id
                 self._send_session_notification("manual_cleanup_with_export", {
                     "username": "Manual Cleanup with Export",
-                    "session_id": "MANUAL-CLEANUP-EXPORT"
+                    "_id": "MANUAL-CLEANUP-EXPORT"
                 }, {
                     "deleted_count": deleted_count,
                     "exported_count": len(sessions_to_export),
@@ -1068,13 +1058,11 @@ class SessionLogService:
                 writer.writeheader()
                 
                 for session in sessions_data:
-                    # Convert ObjectId to string
-                    if "_id" in session:
-                        session["_id"] = str(session["_id"])
+                    # No conversion needed - _id is already string
                     
-                    # Format datetime fields for CSV
+                    # Format datetime fields for CSV - FIXED: use _id for session_id
                     row_data = {
-                        'session_id': session.get('session_id', ''),
+                        'session_id': session.get('_id', ''),  # FIXED: use _id
                         'user_id': session.get('user_id', ''),
                         'username': session.get('username', ''),
                         'branch_id': session.get('branch_id', ''),
@@ -1142,10 +1130,10 @@ class SessionLogService:
                 "login_time": {"$lt": cutoff_date}
             })
             
-            # Send notification
+            # Send notification - FIXED: use _id
             self._send_session_notification("auto_cleanup_with_export", {
                 "username": "System AutoCleanup",
-                "session_id": "AUTO-CLEANUP-EXPORT"
+                "_id": "AUTO-CLEANUP-EXPORT"
             }, {
                 "deleted_count": result.deleted_count,
                 "exported_count": len(sessions_to_delete),
@@ -1191,8 +1179,11 @@ class SessionDisplayService:
         self.audit_collection = self.db.audit_logs
 
     def get_session_logs(self, limit=100, status_filter=None, user_filter=None):
-        """Get formatted session logs (no ObjectId conversion needed)"""
+        """Get formatted session logs - handle mixed ObjectId/string data"""
         try:
+            from bson import ObjectId
+            from datetime import datetime
+            
             query = {}
             if status_filter:
                 query["status"] = status_filter
@@ -1207,40 +1198,62 @@ class SessionDisplayService:
                               .limit(limit))
             
             formatted_logs = []
-            for log in session_logs:
-                # Convert ObjectId in _id field only
-                if "_id" in log:
-                    log["_id"] = str(log["_id"])
-                
-                # Format duration
-                duration = log.get('session_duration', 0)
-                if duration:
-                    if duration < 60:
-                        duration_str = f"{duration}s"
-                    elif duration < 3600:
-                        duration_str = f"{duration // 60}m {duration % 60}s"
+            for i, log in enumerate(session_logs):
+                try:
+                    # Convert ALL values to JSON-safe types immediately
+                    safe_log = {}
+                    for key, value in log.items():
+                        if isinstance(value, ObjectId):
+                            safe_log[key] = str(value)
+                        elif isinstance(value, datetime):
+                            safe_log[key] = value.isoformat()
+                        elif value is None:
+                            safe_log[key] = None
+                        else:
+                            safe_log[key] = value
+                    
+                    # Format duration safely
+                    duration = safe_log.get('session_duration')
+                    if duration and isinstance(duration, (int, float)) and duration > 0:
+                        if duration < 60:
+                            duration_str = f"{int(duration)}s"
+                        elif duration < 3600:
+                            minutes = int(duration // 60)
+                            seconds = int(duration % 60)
+                            duration_str = f"{minutes}m {seconds}s"
+                        else:
+                            hours = int(duration // 3600)
+                            minutes = int((duration % 3600) // 60)
+                            duration_str = f"{hours}h {minutes}m"
                     else:
-                        hours = duration // 3600
-                        minutes = (duration % 3600) // 60
-                        duration_str = f"{hours}h {minutes}m"
-                else:
-                    duration_str = "Active" if log.get('status') == 'active' else "0s"
-            
-                formatted_log = {
-                    "log_id": log.get('session_id', f"SESS-{log.get('_id', '')[:5]}"),  # Use session_id
-                    "username": log.get('username', 'Unknown'),
-                    "ref_id": log.get('session_id', ''),  # Use session_id as reference
-                    "event_type": "Session",
-                    "duration": duration_str,
-                    "status": log.get('status', 'Unknown').title(),
-                    "login_time": log.get('login_time'),
-                    "logout_time": log.get('logout_time'),
-                    "branch_id": log.get('branch_id', 'N/A'),
-                    "ip_address": log.get('ip_address'),
-                    "logout_reason": log.get('logout_reason'),
-                    "user_id": log.get('user_id')  # Include string user_id
-                }
-                formatted_logs.append(formatted_log)
+                        duration_str = "Active" if safe_log.get('status') == 'active' else "0s"
+                
+                    # Use session_id if available, otherwise use _id
+                    log_id = safe_log.get('session_id') or safe_log.get('_id') or f"SESS-{i+1:05d}"
+                    
+                    # Create completely clean formatted log with only JSON-safe values
+                    formatted_log = {
+                        "log_id": str(log_id),
+                        "user_id": str(safe_log.get('user_id', '')),
+                        "ref_id": str(safe_log.get('_id', '')),
+                        "event_type": "Session",
+                        "amount_qty": duration_str,
+                        "status": str(safe_log.get('status', 'Unknown')).title(),
+                        "timestamp": safe_log.get('login_time'),
+                        "remarks": f"User: {safe_log.get('username', 'Unknown')}, Status: {safe_log.get('status', 'Unknown')}, Duration: {duration_str}",
+                        "username": str(safe_log.get('username', 'Unknown')),
+                        "login_time": safe_log.get('login_time'),
+                        "logout_time": safe_log.get('logout_time'),
+                        "branch_id": safe_log.get('branch_id', 'N/A'),
+                        "ip_address": str(safe_log.get('ip_address', '')) if safe_log.get('ip_address') else None,
+                        "logout_reason": str(safe_log.get('logout_reason', '')) if safe_log.get('logout_reason') else None
+                    }
+                    
+                    formatted_logs.append(formatted_log)
+                    
+                except Exception as log_error:
+                    logger.error(f"Error processing session log {i+1}: {log_error}")
+                    continue
             
             return {
                 'success': True,
@@ -1257,52 +1270,63 @@ class SessionDisplayService:
             }
     
     def get_combined_logs(self, limit=100, log_type=None):
-        """Get combined session and audit logs (string-based)"""
+        """Get combined session and audit logs"""
         try:
             all_logs = []
             
             # Get session logs if requested
             if log_type in [None, 'all', 'session']:
                 session_limit = limit//2 if log_type == 'all' else limit
-                session_result = self.get_session_logs(session_limit)
-                if session_result['success']:
-                    for log in session_result['data']:
-                        log['log_source'] = 'session'
-                        log['timestamp'] = log['login_time']
-                        all_logs.append(log)
+                
+                try:
+                    session_result = self.get_session_logs(session_limit)
+                    
+                    if session_result['success']:
+                        for log in session_result['data']:
+                            log['log_source'] = 'session'
+                            all_logs.append(log)
+                        
+                except Exception as session_error:
+                    logger.error(f"Session logs error: {session_error}")
             
             # Get audit logs if requested
             if log_type in [None, 'all', 'audit']:
                 try:
                     audit_limit = limit//2 if log_type == 'all' else limit
-                    audit_logs = list(self.audit_collection.find()
-                                    .sort("timestamp", -1)
-                                    .limit(audit_limit))
                     
-                    for i, audit in enumerate(audit_logs):
-                        # Convert ObjectId in _id field only
-                        if "_id" in audit:
-                            audit["_id"] = str(audit["_id"])
-                            
-                        formatted_audit = {
-                            "log_id": f"AUD-{i+1:04d}",
-                            "username": audit.get('username', 'Unknown'),
-                            "ref_id": audit.get('_id', '')[:12] if audit.get('_id') else '',
-                            "event_type": audit.get('event_type', 'Unknown').replace('_', ' ').title(),
-                            "duration": self._format_audit_changes(audit),
-                            "status": audit.get('status', 'Unknown').title(),
-                            "timestamp": audit.get('timestamp'),
-                            "branch_id": audit.get('branch_id', 'N/A'),
-                            "target_type": audit.get('target_type'),
-                            "log_source": "audit"
-                        }
-                        all_logs.append(formatted_audit)
+                    if self.audit_collection is not None:
+                        audit_count = self.audit_collection.count_documents({})
                         
-                except Exception as e:
-                    logger.warning(f"Could not fetch audit logs: {e}")
+                        if audit_count > 0:
+                            audit_logs = list(self.audit_collection.find()
+                                            .sort("timestamp", -1)
+                                            .limit(audit_limit))
+                            
+                            for i, audit in enumerate(audit_logs):
+                                formatted_audit = {
+                                    "log_id": f"AUD-{i+1:04d}",
+                                    "user_id": audit.get('user_id', 'Unknown'),
+                                    "ref_id": str(audit["_id"]),
+                                    "event_type": audit.get('event_type', 'Unknown').replace('_', ' ').title(),
+                                    "amount_qty": self._format_audit_changes(audit),
+                                    "status": audit.get('status', 'Unknown').title(),
+                                    "timestamp": audit.get('timestamp'),
+                                    "remarks": audit.get('remarks', f"Audit: {audit.get('event_type', 'Unknown')}"),
+                                    "username": audit.get('username', 'Unknown'),
+                                    "branch_id": audit.get('branch_id', 'N/A'),
+                                    "target_type": audit.get('target_type'),
+                                    "log_source": "audit"
+                                }
+                                all_logs.append(formatted_audit)
+                            
+                except Exception as audit_error:
+                    logger.warning(f"Could not fetch audit logs: {audit_error}")
             
             # Sort all logs by timestamp (newest first)
-            all_logs.sort(key=lambda x: x.get('timestamp') or datetime.min, reverse=True)
+            try:
+                all_logs.sort(key=lambda x: x.get('timestamp') or datetime.min, reverse=True)
+            except Exception:
+                pass  # Continue without sorting if there's an issue
             
             return {
                 'success': True,
@@ -1337,6 +1361,9 @@ class SessionDisplayService:
     def export_session_logs(self, export_format="csv", date_filter=None, status_filter=None):
         """Export session logs in specified format"""
         try:
+            from bson import ObjectId
+            from datetime import datetime
+            
             query = {}
             if date_filter:
                 start_date = datetime.fromisoformat(date_filter.get('start_date'))
@@ -1350,21 +1377,27 @@ class SessionDisplayService:
             
             export_data = []
             for session in sessions:
-                # Convert ObjectId in _id field only
-                if "_id" in session:
-                    session["_id"] = str(session["_id"])
+                # Clean the session data
+                clean_session = {}
+                for key, value in session.items():
+                    if isinstance(value, ObjectId):
+                        clean_session[key] = str(value)
+                    elif isinstance(value, datetime):
+                        clean_session[key] = value.isoformat()
+                    else:
+                        clean_session[key] = value
                 
                 export_data.append({
-                    "session_id": session.get("session_id"),
-                    "user_id": session.get("user_id"),
-                    "username": session.get("username"),
-                    "login_time": session.get("login_time"),
-                    "logout_time": session.get("logout_time"),
-                    "duration": session.get("session_duration"),
-                    "status": session.get("status"),
-                    "branch_id": session.get("branch_id"),
-                    "ip_address": session.get("ip_address"),
-                    "logout_reason": session.get("logout_reason")
+                    "session_id": clean_session.get("_id"),
+                    "user_id": clean_session.get("user_id"),
+                    "username": clean_session.get("username"),
+                    "login_time": clean_session.get("login_time"),
+                    "logout_time": clean_session.get("logout_time"),
+                    "duration": clean_session.get("session_duration"),
+                    "status": clean_session.get("status"),
+                    "branch_id": clean_session.get("branch_id"),
+                    "ip_address": clean_session.get("ip_address"),
+                    "logout_reason": clean_session.get("logout_reason")
                 })
             
             return {
