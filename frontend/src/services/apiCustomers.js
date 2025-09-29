@@ -91,11 +91,6 @@ class CustomerApiService {
     }
   }
 
-  /**
-   * Delete customer (soft delete)
-   * @param {string} customerId - Customer ID
-   * @returns {Promise<Object>} Deletion confirmation
-   */
   async deleteCustomer(customerId) {
     try {
       console.log(`Deleting customer with ID: ${customerId}`);
