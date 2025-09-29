@@ -1,74 +1,106 @@
 import { ref, computed } from 'vue'
+import axios from 'axios'
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: { 'Content-Type': 'application/json' }
+})
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
 
 export function useSupplierReports() {
-  // State
   const loading = ref(false)
   const error = ref(null)
-  
-  // Modal states
   const showActiveOrdersModal = ref(false)
   const showTopPerformersModal = ref(false)
-
-  // Mock data - in a real app, this would come from an API
-  const activeOrders = ref([
-    {
-      id: 'PO-2025-001',
-      supplier: 'Bravo Warehouse',
-      orderDate: '2025-01-10',
-      expectedDelivery: '2025-01-15',
-      totalAmount: 25000,
-      status: 'pending',
-      items: [
-        { name: 'Shin Ramyun Spicy', quantity: 100, unitPrice: 45 },
-        { name: 'Buldak Hot Chicken', quantity: 50, unitPrice: 52 }
-      ]
-    },
-    {
-      id: 'PO-2025-002',
-      supplier: 'John Doe Supplies',
-      orderDate: '2025-01-12',
-      expectedDelivery: '2025-01-18',
-      totalAmount: 18500,
-      status: 'confirmed',
-      items: [
-        { name: 'Chapagetti Black Bean', quantity: 80, unitPrice: 48 },
-        { name: 'Jin Ramen Mild', quantity: 120, unitPrice: 42 }
-      ]
-    },
-    {
-      id: 'PO-2025-003',
-      supplier: 'San Juan Groups',
-      orderDate: '2025-01-14',
-      expectedDelivery: '2025-01-20',
-      totalAmount: 32000,
-      status: 'in_transit',
-      items: [
-        { name: 'Neoguri Seafood', quantity: 150, unitPrice: 50 },
-        { name: 'Ottogi Jin Jjamppong', quantity: 90, unitPrice: 55 }
-      ]
-    }
-  ])
-
-  const topPerformers = ref([
-    {
-      id: 1,
-      name: 'San Juan Groups',
-      email: 'info@sanjuangroups.ph',
-      totalOrders: 12,
-      totalValue: 156000,
-      averageOrderValue: 13000,
-      onTimeDelivery: 95,
-      rating: 4.8,
-      lastOrder: '2025-01-14',
-      topProducts: ['Neoguri Seafood', 'Ottogi Jin Jjamppong', 'Shin Ramyun']
-    }
-  ])
-
-  // Computed values
+  const allSuppliers = ref([])
+  
+  // Computed: Active Orders (from all suppliers)
+  const activeOrders = computed(() => {
+    const orders = []
+    
+    allSuppliers.value.forEach(supplier => {
+      if (supplier.purchase_orders) {
+        supplier.purchase_orders
+          .filter(order => !order.isDeleted && (order.status === 'pending' || order.status === 'confirmed'))
+          .forEach(order => {
+            orders.push({
+              id: order.order_id,
+              supplier: supplier.supplier_name,
+              supplierId: supplier._id,
+              orderDate: order.order_date,
+              expectedDelivery: order.expected_delivery_date,
+              totalAmount: order.total_cost || 0,
+              status: order.status,
+              items: (order.items || []).map(item => ({
+                name: item.product_name,
+                quantity: item.quantity,
+                unitPrice: item.unit_price
+              }))
+            })
+          })
+      }
+    })
+    
+    return orders.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate))
+  })
+  
+  // Computed: Top Performers
+  const topPerformers = computed(() => {
+    return allSuppliers.value
+      .filter(supplier => !supplier.isDeleted)
+      .map(supplier => {
+        const orders = supplier.purchase_orders?.filter(o => !o.isDeleted) || []
+        const totalValue = orders.reduce((sum, o) => sum + (o.total_cost || 0), 0)
+        const avgOrderValue = orders.length > 0 ? totalValue / orders.length : 0
+        
+        // Get last order date
+        const sortedOrders = [...orders].sort((a, b) => 
+          new Date(b.order_date) - new Date(a.order_date)
+        )
+        const lastOrderDate = sortedOrders[0]?.order_date || supplier.created_at
+        
+        // Get top products from order items
+        const productCounts = {}
+        orders.forEach(order => {
+          order.items?.forEach(item => {
+            const name = item.product_name
+            productCounts[name] = (productCounts[name] || 0) + item.quantity
+          })
+        })
+        
+        const topProducts = Object.entries(productCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([name]) => name)
+        
+        return {
+          id: supplier._id,
+          name: supplier.supplier_name,
+          email: supplier.email || 'N/A',
+          rating: 4.5,
+          totalOrders: orders.length,
+          totalValue: totalValue,
+          averageOrderValue: avgOrderValue,
+          lastOrder: lastOrderDate,
+          onTimeDelivery: 95,
+          topProducts: topProducts.length > 0 ? topProducts : ['No products yet']
+        }
+      })
+      .filter(s => s.totalOrders >= 10)
+      .sort((a, b) => b.totalValue - a.totalValue)
+      .slice(0, 10)
+  })
+  
   const activeOrdersCount = computed(() => activeOrders.value.length)
   const topPerformersCount = computed(() => topPerformers.value.length)
-
-  // Report data summary
+  
   const reportData = computed(() => ({
     activeOrdersCount: activeOrdersCount.value,
     topSuppliersCount: topPerformersCount.value,
@@ -78,101 +110,68 @@ export function useSupplierReports() {
       ? Math.round(activeOrders.value.reduce((sum, order) => sum + order.totalAmount, 0) / activeOrdersCount.value)
       : 0
   }))
-
-  // Methods
+  
+  // Fetch all suppliers with their purchase orders
+  const fetchAllSuppliers = async () => {
+    loading.value = true
+    error.value = null
+    
+    try {
+      const response = await api.get('/suppliers/', {
+        params: { per_page: 1000 }
+      })
+      
+      allSuppliers.value = response.data.suppliers
+      console.log('Suppliers fetched for reports:', allSuppliers.value.length)
+      console.log('Active orders found:', activeOrders.value.length)
+      console.log('Top performers found:', topPerformers.value.length)
+      
+    } catch (err) {
+      error.value = err.response?.data?.error || 'Failed to fetch supplier reports'
+      console.error('Error fetching suppliers for reports:', err)
+    } finally {
+      loading.value = false
+    }
+  }
+  
   const openActiveOrdersModal = () => {
     showActiveOrdersModal.value = true
   }
-
+  
   const closeActiveOrdersModal = () => {
     showActiveOrdersModal.value = false
   }
-
+  
   const openTopPerformersModal = () => {
     showTopPerformersModal.value = true
   }
-
+  
   const closeTopPerformersModal = () => {
     showTopPerformersModal.value = false
   }
-
-  const fetchActiveOrders = async () => {
-    loading.value = true
-    error.value = null
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
-      // In a real app, you would fetch from an API:
-      // const response = await apiService.getActiveOrders()
-      // activeOrders.value = response.data
-      
-      console.log('Active orders fetched successfully')
-    } catch (err) {
-      error.value = err.message || 'Failed to fetch active orders'
-      console.error('Error fetching active orders:', err)
-    } finally {
-      loading.value = false
-    }
-  }
-
-  const fetchTopPerformers = async () => {
-    loading.value = true
-    error.value = null
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
-      // In a real app, you would fetch from an API:
-      // const response = await apiService.getTopPerformers()
-      // topPerformers.value = response.data
-      
-      console.log('Top performers fetched successfully')
-    } catch (err) {
-      error.value = err.message || 'Failed to fetch top performers'
-      console.error('Error fetching top performers:', err)
-    } finally {
-      loading.value = false
-    }
-  }
-
+  
   const refreshReports = async () => {
-    await Promise.all([
-      fetchActiveOrders(),
-      fetchTopPerformers()
-    ])
+    await fetchAllSuppliers()
   }
-
-  // Navigation actions
+  
   const handleViewAllOrders = () => {
-    console.log('Navigate to orders history page')
-    // In a real app: router.push('/suppliers/orders')
-    return { navigate: true, route: '/suppliers/orders' }
+    return { name: 'OrdersHistory' }
   }
-
+  
   return {
-    // State
     loading,
     error,
     showActiveOrdersModal,
     showTopPerformersModal,
     activeOrders,
     topPerformers,
-    
-    // Computed
     activeOrdersCount,
     topPerformersCount,
     reportData,
-    
-    // Methods
     openActiveOrdersModal,
     closeActiveOrdersModal,
     openTopPerformersModal,
     closeTopPerformersModal,
-    fetchActiveOrders,
-    fetchTopPerformers,
     refreshReports,
     handleViewAllOrders
   }

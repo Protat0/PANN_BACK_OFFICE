@@ -42,6 +42,10 @@ export function useCreateOrder() {
         throw new Error('No supplier selected')
       }
 
+      // SAVE supplier name BEFORE closing modal
+      const supplierName = selectedSupplier.value.name
+      const supplierId = selectedSupplier.value.id
+
       // Transform frontend data to backend format
       const backendOrderData = {
         order_id: orderData.id || orderData.orderId,
@@ -57,7 +61,6 @@ export function useCreateOrder() {
         tax_amount: orderData.tax,
         total_cost: orderData.total,
         items: orderData.items.map((item, index) => ({
-          // Generate temporary product_id if not exists
           product_id: item.productId || `TEMP-${Date.now()}-${index}`,
           product_name: item.name,
           quantity: item.quantity,
@@ -69,17 +72,19 @@ export function useCreateOrder() {
 
       // POST to backend
       const response = await api.post(
-        `/suppliers/${selectedSupplier.value.id}/orders/`,
+        `/suppliers/${supplierId}/orders/`,
         backendOrderData
       )
 
       console.log('Order created:', response.data)
 
+      // Close modal AFTER saving supplier name
       closeCreateOrderModal()
 
+      // Use the saved supplier name instead of accessing selectedSupplier
       return {
         success: true,
-        message: `Purchase order ${orderData.id} created successfully for ${selectedSupplier.value.name}`,
+        message: `Purchase order ${orderData.id} created successfully for ${supplierName}`,
         orderId: orderData.id,
         total: orderData.total,
         data: response.data
