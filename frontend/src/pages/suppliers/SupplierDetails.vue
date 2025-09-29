@@ -686,6 +686,9 @@ import {
 } from 'lucide-vue-next'
 import CreateOrderModal from '@/components/suppliers/CreateOrderModal.vue'
 import OrderDetailsModal from '@/components/suppliers/OrderDetailsModal.vue'
+import axios from 'axios'
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
 export default {
   name: 'SupplierDetails',
@@ -743,16 +746,12 @@ export default {
       selectedOrders: [],
       selectAllOrders: false,
       
-      // Create Order Modal state - Options API style
       showCreateOrderModal: false,
       selectedSupplier: null,
-
-      // Order details modal state
       showOrderDetailsModal: false,
       selectedOrderForView: null,
       orderModalMode: 'view',
       
-      // Edit modal state
       showEditModal: false,
       showDeleteModal: false,
       editForm: {
@@ -766,14 +765,12 @@ export default {
         notes: ''
       },
       
-      // Notes editing
       editingNotes: false,
       editableNotes: ''
     }
   },
   async mounted() {
     console.log('SupplierDetails mounted with ID:', this.supplierId)
-    console.log('Route params:', this.$route.params)
     await this.fetchSupplierDetails()
   },
   watch: {
@@ -792,195 +789,79 @@ export default {
       this.error = null
       
       try {
-        const mockSuppliers = [
+        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+        
+        const supplierResponse = await axios.get(
+          `${API_BASE_URL}/suppliers/${this.supplierId}/`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        )
+        
+        const backendSupplier = supplierResponse.data
+        
+        this.supplier = {
+          id: backendSupplier._id,
+          name: backendSupplier.supplier_name,
+          contactPerson: backendSupplier.contact_person || '',
+          email: backendSupplier.email || '',
+          phone: backendSupplier.phone_number || '',
+          address: backendSupplier.address || '',
+          purchaseOrders: backendSupplier.purchase_orders?.length || 0,
+          status: backendSupplier.isDeleted ? 'inactive' : 'active',
+          type: backendSupplier.type || 'food',
+          rating: 4.5,
+          isFavorite: false,
+          notes: backendSupplier.notes || '',
+          createdAt: backendSupplier.created_at,
+          updatedAt: backendSupplier.updated_at
+        }
+        
+        this.orders = (backendSupplier.purchase_orders || [])
+          .filter(order => !order.isDeleted)
+          .map(order => ({
+            id: order.order_id,
+            date: order.order_date,
+            quantity: order.items?.length || 0,
+            total: order.total_cost || 0,
+            expectedDate: order.expected_delivery_date,
+            status: order.status.charAt(0).toUpperCase() + order.status.slice(1),
+            description: order.description || ''
+          }))
+        
+        this.filteredOrders = [...this.orders]
+        this.editableNotes = this.supplier.notes
+        
+        this.recentActivity = [
           {
             id: 1,
-            name: 'John Doe Supplies',
-            contactPerson: 'John Doe',
-            email: 'john@johndoesupplies.com',
-            phone: '+63 912 345 6789',
-            address: '123 Supply Street, Business District, Manila, Philippines',
-            purchaseOrders: 4,
-            status: 'active',
-            type: 'food',
-            rating: 4.5,
-            isFavorite: false,
-            notes: 'Reliable supplier with consistent quality.',
-            createdAt: '2024-01-15',
-            updatedAt: '2024-12-10'
-          },
-          {
-            id: 2,
-            name: 'Bravo Warehouse',
-            contactPerson: 'Maria Santos',
-            email: 'contact@bravowarehouse.com',
-            phone: '+63 917 888 9999',
-            address: '456 Warehouse Ave, Industrial Park, Quezon City, Philippines',
-            purchaseOrders: 5,
-            status: 'active',
-            type: 'packaging',
-            rating: 4.2,
-            isFavorite: true,
-            notes: 'Good packaging supplier. Fast delivery times.',
-            createdAt: '2024-02-01',
-            updatedAt: '2024-12-08'
-          },
-          {
-            id: 3,
-            name: 'San Juan Groups',
-            contactPerson: 'Carlos Rivera',
-            email: 'info@sanjuangroups.ph',
-            phone: '+63 922 111 2222',
-            address: '789 Corporate Blvd, Makati City, Philippines',
-            purchaseOrders: 12,
-            status: 'active',
-            type: 'equipment',
-            rating: 4.8,
-            isFavorite: false,
-            notes: 'Premium equipment supplier.',
-            createdAt: '2024-01-10',
-            updatedAt: '2024-12-05'
-          },
-          {
-            id: 4,
-            name: 'Bagatayam Inc.',
-            contactPerson: 'Ana Lopez',
-            email: 'sales@bagatayam.com',
-            phone: '+63 933 444 5555',
-            address: '321 Trading St, Pasig City, Philippines',
-            purchaseOrders: 8,
-            status: 'active',
-            type: 'services',
-            rating: 4.0,
-            isFavorite: false,
-            notes: 'Service provider for maintenance.',
-            createdAt: '2024-03-05',
-            updatedAt: '2024-12-01'
+            type: 'supplier_updated',
+            title: 'Supplier Information Updated',
+            description: 'Contact details updated',
+            user: 'Admin User',
+            date: backendSupplier.updated_at
           }
         ]
         
-        const currentSupplierId = this.supplierId || this.$route.params.supplierId
-        console.log('Looking for supplier with ID:', currentSupplierId, 'Type:', typeof currentSupplierId)
-        
-        const foundSupplier = mockSuppliers.find(s => {
-          console.log('Comparing supplier ID', s.id, 'with', currentSupplierId)
-          return s.id === parseInt(currentSupplierId) || s.id.toString() === currentSupplierId.toString()
-        })
-        
-        console.log('Found supplier:', foundSupplier)
-        
-        if (!foundSupplier) {
-          throw new Error(`Supplier with ID ${currentSupplierId} not found`)
-        }
-        
-        // Detailed mock data only for first supplier (ID: 1)
-        let mockOrders = []
-        let mockActivity = []
-        
-        if (foundSupplier.id === 1) {
-          // Detailed orders data for John Doe Supplies
-          mockOrders = [
-            {
-              id: 'PO-001',
-              date: '2024-12-10',
-              quantity: 12,
-              total: 3600.00,
-              expectedDate: '2024-12-25',
-              status: 'Received',
-              description: 'Rice and cooking oil'
-            },
-            {
-              id: 'PO-002',
-              date: '2024-11-15',
-              quantity: 25,
-              total: 7500.00,
-              expectedDate: '2024-12-01',
-              status: 'Pending',
-              description: 'Fresh vegetables and fruits'
-            },
-            {
-              id: 'PO-003',
-              date: '2024-10-05',
-              quantity: 13,
-              total: 3900.00,
-              expectedDate: '2024-10-20',
-              status: 'Cancelled',
-              description: 'Meat products'
-            },
-            {
-              id: 'PO-004',
-              date: '2024-09-11',
-              quantity: 30,
-              total: 9000.00,
-              expectedDate: '2024-09-27',
-              status: 'Received',
-              description: 'Dairy products and beverages'
-            }
-          ]
-
-          // Detailed activity data for John Doe Supplies
-          mockActivity = [
-            {
-              id: 1,
-              type: 'order_created',
-              title: 'New Purchase Order Created',
-              description: 'PO-002 created for ₱7,500.00',
-              user: 'Admin User',
-              date: '2024-11-15T10:30:00Z'
-            },
-            {
-              id: 2,
-              type: 'order_received',
-              title: 'Order Received',
-              description: 'PO-001 marked as received',
-              user: 'Warehouse Manager',
-              date: '2024-12-10T14:20:00Z'
-            },
-            {
-              id: 3,
-              type: 'supplier_updated',
-              title: 'Supplier Information Updated',
-              description: 'Contact details updated',
-              user: 'Admin User',
-              date: '2024-12-10T09:15:00Z'
-            },
-            {
-              id: 4,
-              type: 'payment_processed',
-              title: 'Payment Processed',
-              description: 'Payment of ₱3,600.00 processed for PO-001',
-              user: 'Finance Team',
-              date: '2024-12-11T11:45:00Z'
-            }
-          ]
-        } else {
-          // Empty arrays for other suppliers (no detailed data)
-          mockOrders = []
-          mockActivity = []
-        }
-        
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
-        this.supplier = foundSupplier
-        this.orders = mockOrders
-        this.recentActivity = mockActivity
-        this.editableNotes = foundSupplier.notes
-        this.filteredOrders = [...mockOrders]
-        
         console.log('Supplier loaded successfully:', this.supplier.name)
         console.log('Orders loaded:', this.orders.length)
-        console.log('Activities loaded:', this.recentActivity.length)
         
       } catch (error) {
         console.error('Error fetching supplier details:', error)
-        this.error = `Failed to load supplier details: ${error.message}`
+        
+        if (error.response?.status === 404) {
+          this.error = `Supplier with ID ${this.supplierId} not found`
+        } else {
+          this.error = error.response?.data?.error || `Failed to load supplier details: ${error.message}`
+        }
       } finally {
         this.loading = false
       }
     },
 
-    // Create Order Modal methods - Options API style
     openCreateOrderModal(supplier) {
       this.selectedSupplier = supplier
       this.showCreateOrderModal = true
@@ -991,22 +872,73 @@ export default {
       this.selectedSupplier = null
     },
 
-    handleOrderSave(orderData) {
-      // Handle order save logic here
-      console.log('Order saved:', orderData)
-      this.closeCreateOrderModal()
-      this.successMessage = 'Order created successfully!'
+    async handleOrderSave(orderData) {
+      this.saving = true
       
-      setTimeout(() => {
-        this.successMessage = null
-      }, 3000)
+      try {
+        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+        
+        const backendData = {
+          order_id: orderData.id,
+          status: orderData.status || 'pending',
+          order_date: orderData.orderDate,
+          expected_delivery_date: orderData.expectedDate,
+          priority: orderData.priority,
+          description: orderData.description,
+          notes: orderData.notes,
+          shipping_cost: orderData.shippingCost || 0,
+          tax_rate: 12,
+          subtotal: orderData.subtotal,
+          tax_amount: orderData.tax,
+          total_cost: orderData.total,
+          items: orderData.items.map((item, index) => ({
+            product_id: `TEMP-${Date.now()}-${index}`,
+            product_name: item.name,
+            quantity: item.quantity,
+            unit: item.unit || 'pcs',
+            unit_price: item.unitPrice || 0,
+            notes: item.notes || ''
+          }))
+        }
+        
+        const response = await axios.post(
+          `${API_BASE_URL}/suppliers/${this.supplier.id}/orders/`,
+          backendData,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        )
+        
+        console.log('Order created:', response.data)
+        
+        this.closeCreateOrderModal()
+        this.successMessage = `Purchase order ${orderData.id} created successfully!`
+        
+        await this.fetchSupplierDetails()
+        
+        setTimeout(() => {
+          this.successMessage = null
+        }, 3000)
+        
+      } catch (error) {
+        console.error('Error creating order:', error)
+        this.error = error.response?.data?.error || 'Failed to create order'
+        
+        setTimeout(() => {
+          this.error = null
+        }, 5000)
+      } finally {
+        this.saving = false
+      }
     },
 
     goBack() {
       this.$router.push({ name: 'Suppliers' })
     },
 
-    // Quick action methods
     createOrder() {
       this.openCreateOrderModal(this.supplier)
     },
@@ -1074,14 +1006,45 @@ export default {
       this.saving = true
       
       try {
-        // Mock save - replace with actual API call
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
         
-        // Update local supplier data
+        const backendData = {
+          supplier_name: this.editForm.name,
+          contact_person: this.editForm.contactPerson,
+          email: this.editForm.email,
+          phone_number: this.editForm.phone,
+          address: this.editForm.address,
+          type: this.editForm.type,
+          notes: this.editForm.notes
+        }
+        
+        const response = await axios.put(
+          `${API_BASE_URL}/suppliers/${this.supplier.id}/`,
+          backendData,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        )
+        
+        const updated = response.data
         this.supplier = {
-          ...this.supplier,
-          ...this.editForm,
-          updatedAt: new Date().toISOString()
+          id: updated._id,
+          name: updated.supplier_name,
+          contactPerson: updated.contact_person || '',
+          email: updated.email || '',
+          phone: updated.phone_number || '',
+          address: updated.address || '',
+          purchaseOrders: updated.purchase_orders?.length || 0,
+          status: updated.isDeleted ? 'inactive' : 'active',
+          type: updated.type || 'food',
+          rating: this.supplier.rating,
+          isFavorite: this.supplier.isFavorite,
+          notes: updated.notes || '',
+          createdAt: updated.created_at,
+          updatedAt: updated.updated_at
         }
         
         this.closeEditModal()
@@ -1093,7 +1056,7 @@ export default {
         
       } catch (error) {
         console.error('Error updating supplier:', error)
-        this.error = `Failed to update supplier: ${error.message}`
+        this.error = error.response?.data?.error || `Failed to update supplier: ${error.message}`
       } finally {
         this.saving = false
       }
@@ -1127,8 +1090,17 @@ export default {
       this.deleting = true
       
       try {
-        // Mock delete - replace with actual API call
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+        
+        await axios.delete(
+          `${API_BASE_URL}/suppliers/${this.supplier.id}/`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        )
         
         this.showDeleteModal = false
         this.successMessage = 'Supplier deleted successfully'
@@ -1139,13 +1111,12 @@ export default {
         
       } catch (error) {
         console.error('Error deleting supplier:', error)
-        this.error = `Failed to delete supplier: ${error.message}`
+        this.error = error.response?.data?.error || `Failed to delete supplier: ${error.message}`
       } finally {
         this.deleting = false
       }
     },
 
-    // Order management methods
     filterOrders() {
       if (this.orderStatusFilter === 'all') {
         this.filteredOrders = [...this.orders]
@@ -1241,7 +1212,6 @@ export default {
       return classes[type] || 'bg-secondary'
     },
 
-    // Order action methods
     viewOrder(order) {
       this.selectedOrderForView = order
       this.orderModalMode = 'view'
@@ -1281,11 +1251,10 @@ export default {
     },
 
     handleOrderUpdate(updatedOrder) {
-      // Find and update the order in the orders array
       const index = this.orders.findIndex(o => o.id === updatedOrder.id)
       if (index !== -1) {
         this.orders[index] = updatedOrder
-        this.filterOrders() // Refresh filtered orders
+        this.filterOrders()
         
         this.successMessage = `Order ${updatedOrder.id} updated successfully`
         setTimeout(() => {
@@ -1297,11 +1266,9 @@ export default {
     },
 
     handleOrderEditModeChanged(isEditMode) {
-      // Optional: You can track edit mode state if needed
       console.log('Order edit mode changed:', isEditMode)
     },
 
-    // Bulk operations
     bulkExportOrders() {
       alert(`Export ${this.selectedOrders.length} selected orders - Coming soon!`)
     },
@@ -1324,7 +1291,6 @@ export default {
       }
     },
 
-    // Notes management
     toggleNotesEdit() {
       if (this.editingNotes) {
         this.saveNotes()
@@ -1358,7 +1324,6 @@ export default {
       return classes[status] || 'bg-secondary'
     },
 
-    // Utility methods
     getSupplierTypeLabel(type) {
       const labels = {
         'food': 'Food & Beverages',
@@ -1423,7 +1388,6 @@ export default {
   }
 }
 </script>
-
 <style scoped>
 @import '@/assets/styles/colors.css';
 

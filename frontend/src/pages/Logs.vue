@@ -148,7 +148,7 @@
           <th style="width: 12%;">User ID</th>
           <th style="width: 12%;">Ref. ID</th>
           <th style="width: 15%;">Event Type</th>
-          <th style="width: 10%; text-align: center;">Amount/Qty</th>
+          <th style="width: 10%; text-align: center;">Action</th>
           <th style="width: 10%; text-align: center;">Status</th>
           <th style="width: 15%;">Timestamp</th>
           <th style="width: 16%;">Remarks</th>

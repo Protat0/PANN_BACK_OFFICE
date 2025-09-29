@@ -223,21 +223,29 @@ urlpatterns = [
     
     # ========== SUPPLIER MANAGEMENT ==========
     path('suppliers/health/', SupplierHealthCheckView.as_view(), name='health-check'),
-    # Supplier CRUD operations
-    path('suppliers/', SupplierListView.as_view(), name='supplier-list'),  # GET (list), POST (create)
-    path('suppliers/<str:supplier_id>/', SupplierDetailView.as_view(), name='supplier-detail'),  # GET, PUT, DELETE
-    # Supplier management operations
+
+    # === SPECIFIC PATHS FIRST (no parameters) ===
+    path('suppliers/deleted/', DeletedSuppliersView.as_view(), name='deleted-suppliers'),
+
+    # === SUPPLIER CRUD ===
+    path('suppliers/', SupplierListView.as_view(), name='supplier-list'),
+    path('suppliers/<str:supplier_id>/', SupplierDetailView.as_view(), name='supplier-detail'),
+
+    # === SUPPLIER MANAGEMENT ===
     path('suppliers/<str:supplier_id>/restore/', SupplierRestoreView.as_view(), name='supplier-restore'),
     path('suppliers/<str:supplier_id>/hard-delete/', SupplierHardDeleteView.as_view(), name='supplier-hard-delete'),
-    path('suppliers/deleted/', DeletedSuppliersView.as_view(), name='deleted-suppliers'),
-    # Purchase Order operations
+
+    # === PURCHASE ORDER - SPECIFIC PATHS FIRST ===
+    path('suppliers/<str:supplier_id>/orders/deleted/', DeletedPurchaseOrdersView.as_view(), name='deleted-purchase-orders'),
+
+    # === PURCHASE ORDER CRUD ===
     path('suppliers/<str:supplier_id>/orders/', PurchaseOrderListView.as_view(), name='purchase-order-list'),
     path('suppliers/<str:supplier_id>/orders/<str:order_id>/', PurchaseOrderDetailView.as_view(), name='purchase-order-detail'),
-    # Purchase Order management operations
+
+    # === PURCHASE ORDER MANAGEMENT ===
     path('suppliers/<str:supplier_id>/orders/<str:order_id>/restore/', PurchaseOrderRestoreView.as_view(), name='purchase-order-restore'),
     path('suppliers/<str:supplier_id>/orders/<str:order_id>/hard-delete/', PurchaseOrderHardDeleteView.as_view(), name='purchase-order-hard-delete'),
-    path('suppliers/<str:supplier_id>/orders/deleted/', DeletedPurchaseOrdersView.as_view(), name='deleted-purchase-orders'),
-    
+        
     # ========== SESSION MANAGEMENT ==========
     path('session-logs/', SessionLogsView.as_view(), name='session-logs'),
     path('session-logs/display/', SessionDisplayView.as_view(), name='session-logs-display'),  # Move this BEFORE the parameterized one
