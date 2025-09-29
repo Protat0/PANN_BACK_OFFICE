@@ -27,7 +27,7 @@ def get_authenticated_user_from_jwt(request):
             return None
         
         user_id = user_data.get('user_id')
-        user_doc = auth_service.user_collection.find_one({"_id": ObjectId(user_id)})
+        user_doc = auth_service.user_collection.find_one({"_id": user_id})
         
         if not user_doc:
             return None

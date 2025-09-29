@@ -6,7 +6,7 @@ from ..database import db_manager
 # JWT settings
 SECRET_KEY = "your-secret-key-here-change-in-production"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 10000
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 class AuthService:
@@ -239,9 +239,7 @@ class AuthService:
             
             user_id = payload["sub"]  # This is the ObjectId string
             
-            # Convert back to ObjectId for lookup
-            from bson import ObjectId
-            user = self.user_collection.find_one({"_id": ObjectId(user_id)})
+            user = self.user_collection.find_one({"_id": user_id})
             
             if user:
                 return {
