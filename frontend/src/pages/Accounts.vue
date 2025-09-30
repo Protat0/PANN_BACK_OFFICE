@@ -1345,21 +1345,7 @@ export default {
       this.formError = null
 
       try {
-        console.log('=== FORM DEBUG ===')
-        console.log('userForm.full_name:', `"${this.userForm.full_name}"`)
-        console.log('userForm.full_name length:', this.userForm.full_name?.length)
-        console.log('userForm.full_name type:', typeof this.userForm.full_name)
-        console.log('All form data:', this.userForm)
-        console.log('==================')
-
         const isValid = this.validateForm()
-        
-        if (!isValid) {
-          const errorMessages = Object.values(this.validationErrors)
-          this.formError = errorMessages.join(', ')
-          this.formLoading = false
-          return
-        }
         
         if (!isValid) {
           const errorMessages = Object.values(this.validationErrors)
@@ -1372,15 +1358,15 @@ export default {
           const updateData = {
             username: this.userForm.username,
             email: this.userForm.email,
-            first_name: this.userForm.full_name.split(' ')[0] || '',
-            last_name: this.userForm.full_name.split(' ').slice(1).join(' ') || '',
+            full_name: this.userForm.full_name,
             role: this.userForm.role,
             status: this.userForm.status
           }
+          const response = await apiService.updateUser(this.selectedUser._id, updateData)
+          console.log('Update response:', response)
           
-          await apiService.updateUser(this.selectedUser._id, updateData)
           this.successMessage = `User account "${this.userForm.username}" updated successfully`
-        } else {
+        } else { 
           const createData = {
             username: this.userForm.username,
             email: this.userForm.email,
@@ -1389,13 +1375,7 @@ export default {
             role: this.userForm.role,
             status: this.userForm.status
           }
-          
-          console.log('=== CREATE DATA DEBUG ===')
-          console.log('createData:', createData)
-          console.log('createData.full_name:', `"${createData.full_name}"`)
-          console.log('createData stringified:', JSON.stringify(createData))
-          console.log('=========================')
-          
+         
           await apiService.createUser(createData)
           this.successMessage = `User account "${this.userForm.username}" created successfully`
         }

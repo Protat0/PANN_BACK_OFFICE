@@ -258,12 +258,11 @@
     </div>
 
     <!-- Active Orders Modal -->
-    <ActiveOrdersModal
+     <ActiveOrdersModal
       :show="reportsComposable.showActiveOrdersModal.value"
       :orders="reportsComposable.activeOrders.value"
       :loading="reportsComposable.loading.value"
       @close="reportsComposable.closeActiveOrdersModal"
-      @view-all="handleViewAllOrders"
     />
 
     <!-- Top Performers Modal -->
