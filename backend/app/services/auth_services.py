@@ -227,7 +227,6 @@ class AuthService:
                     "email": user["email"],
                     "role": user["role"],
                     "user_data": user
-                    "user_data": user
                 }
             return None
         
