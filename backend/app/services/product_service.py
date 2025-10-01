@@ -149,25 +149,17 @@ class ProductService:
             'details': details or {}
         }
     
-    def _ensure_product_has_category_assignment(self, product_data, product_id=None):
+    def _ensure_product_has_category_assignment(self, product_document, product_id=None):
         """Auto-assign to 'Uncategorized' > 'General' if no category specified"""
-        if not product_data.get('category_id') and not product_data.get('subcategory_name'):
+        if not product_document.get('category_id') and not product_document.get('subcategory_name'):
             try:
-                # Use the ProductSubcategoryService for proper category assignment
-                subcategory_service = ProductSubcategoryService()
-                
-                if product_id:
-                    # Move existing product to uncategorized
-                    result = subcategory_service.move_product_to_uncategorized_category(product_id)
-                    if result.get('success'):
-                        product_data['category_id'] = result.get('new_category_id')
-                        product_data['subcategory_name'] = subcategory_service.UNCATEGORIZED_SUBCATEGORY_NAME
-                        
+                # Set default category assignment
+                product_document['category_id'] = "UNCTGRY-001"  # or your uncategorized category ID
+                product_document['subcategory_name'] = "General"
             except Exception as e:
                 logger.error(f"Error auto-assigning category: {e}")
-                # Fallback to basic assignment
-                product_data['category_id'] = "CTGY-001"  # Fallback category ID
-                product_data['subcategory_name'] = "General"
+        
+        return product_document  # Return the modified document
 
     def update_sync_status(self, product_id, sync_status='pending', source='cloud'):
         """Update sync status for a product - using string IDs"""
@@ -276,7 +268,6 @@ class ProductService:
             
             # Generate sequential product ID
             product_id = self.generate_product_id()
-            product_data['_id'] = product_id
             
             # Validate foreign keys
             self.validate_foreign_keys(product_data)
@@ -305,49 +296,63 @@ class ProductService:
                 if existing_name:
                     raise ValueError(f"Product with name '{product_name}' already exists")
             
-            # Set default values
+            # Set default values - Create clean product document
             current_time = datetime.utcnow()
-            product_data.update({
-                'date_received': product_data.get('date_received', current_time),
+            product_document = {
+                '_id': product_id,
+                'product_name': product_data.get('product_name', ''),
+                'category_id': product_data.get('category_id', ''),
+                'SKU': product_data['SKU'],
+                'unit': product_data.get('unit', ''),
+                'stock': int(product_data.get('stock', 0)),
+                'low_stock_threshold': int(product_data.get('low_stock_threshold', 10)),
+                'cost_price': float(product_data.get('cost_price', 0)),
+                'selling_price': float(product_data.get('selling_price', 0)),
                 'status': product_data.get('status', 'active'),
                 'is_taxable': product_data.get('is_taxable', True),
+                'date_received': product_data.get('date_received', current_time),
                 'isDeleted': False,
                 'created_at': current_time,
                 'updated_at': current_time
-            })
+            }
             
+            # Add optional fields if present
+            optional_fields = ['expiry_date', 'barcode', 'description']
+            for field in optional_fields:
+                if field in product_data and product_data[field]:
+                    product_document[field] = product_data[field]
+                
+            image_fields = ['image', 'image_url', 'image_filename', 'image_size', 'image_type', 'image_uploaded_at']
+            for field in image_fields:
+                if field in product_data and product_data[field] is not None:
+                    print(f"Adding image field: {field}")
+                    product_document[field] = product_data[field]
+                        
             # Initialize sync logs
-            product_data['sync_logs'] = [
+            product_document['sync_logs'] = [
                 self.add_sync_log(source='cloud', status='pending', details={'action': 'created'})
             ]
             
-            # Ensure numeric fields are properly typed
-            numeric_fields = ['stock', 'low_stock_threshold', 'cost_price', 'selling_price']
-            for field in numeric_fields:
-                if field in product_data:
-                    try:
-                        if field in ['stock', 'low_stock_threshold']:
-                            product_data[field] = int(product_data[field])
-                        else:
-                            product_data[field] = float(product_data[field])
-                    except (ValueError, TypeError):
-                        product_data[field] = 0
-            
             # AUTO-ASSIGN TO CATEGORY/SUBCATEGORY BEFORE CREATION
-            product_data = self._ensure_product_has_category_assignment(product_data, product_id)
+            product_document = self._ensure_product_has_category_assignment(product_document, product_id)
             
-            # Insert product
-            self.product_collection.insert_one(product_data)
+            # Debug before insert
+            print(f"Product document keys: {list(product_document.keys())}")
+            print(f"Has image: {'image' in product_document}")
+            
+            # Insert product directly as dict (NO MODEL INSTANTIATION)
+            self.product_collection.insert_one(product_document)
             
             # Get created product
             created_product = self.product_collection.find_one({'_id': product_id})
+            print(f"Created product has image: {'image' in created_product}")
             
             self._send_product_notification(
                 'created',
-                product_data.get("product_name", product_data.get("SKU", "Unknown Product")),
+                product_document.get("product_name", product_document.get("SKU", "Unknown Product")),
                 product_id,
                 {
-                    "SKU": product_data["SKU"],
+                    "SKU": product_document["SKU"],
                     "auto_assigned_category": created_product.get('category_id'),
                     "auto_assigned_subcategory": created_product.get('subcategory_name')
                 }

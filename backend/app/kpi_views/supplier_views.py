@@ -72,7 +72,10 @@ class SupplierListView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            new_supplier = self.supplier_service.create_supplier(request.data)
+            # Get user ID from authenticated user
+            user_id = request.current_user.get('_id', 'system')
+            
+            new_supplier = self.supplier_service.create_supplier(request.data, user_id=user_id)
             return Response(new_supplier, status=status.HTTP_201_CREATED)
             
         except Exception as e:
@@ -122,7 +125,14 @@ class SupplierDetailView(APIView):
     def put(self, request, supplier_id):
         """Update supplier - Requires authentication"""
         try:
-            updated_supplier = self.supplier_service.update_supplier(supplier_id, request.data)
+            # Get user ID from authenticated user
+            user_id = request.current_user.get('_id', 'system')
+            
+            updated_supplier = self.supplier_service.update_supplier(
+                supplier_id, 
+                request.data,
+                user_id=user_id
+            )
             
             if not updated_supplier:
                 return Response(
@@ -143,7 +153,14 @@ class SupplierDetailView(APIView):
     def delete(self, request, supplier_id):
         """Soft delete supplier - Requires authentication"""
         try:
-            deleted = self.supplier_service.delete_supplier(supplier_id, hard_delete=False)
+            # Get user ID from authenticated user
+            user_id = request.current_user.get('_id', 'system')
+            
+            deleted = self.supplier_service.delete_supplier(
+                supplier_id, 
+                hard_delete=False,
+                user_id=user_id
+            )
             
             if not deleted:
                 return Response(
@@ -180,7 +197,9 @@ class SupplierRestoreView(APIView):
                     status=status.HTTP_403_FORBIDDEN
                 )
             
-            restored = self.supplier_service.restore_supplier(supplier_id)
+            user_id = current_user.get('_id', 'system')
+            
+            restored = self.supplier_service.restore_supplier(supplier_id, user_id=user_id)
             
             if not restored:
                 return Response(
@@ -224,7 +243,13 @@ class SupplierHardDeleteView(APIView):
                     "message": "Add ?confirm=yes to permanently delete this supplier"
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            deleted = self.supplier_service.delete_supplier(supplier_id, hard_delete=True)
+            user_id = current_user.get('_id', 'system')
+            
+            deleted = self.supplier_service.delete_supplier(
+                supplier_id, 
+                hard_delete=True,
+                user_id=user_id
+            )
             
             if not deleted:
                 return Response(
@@ -331,9 +356,13 @@ class PurchaseOrderListView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
+            # Get user ID from authenticated user
+            user_id = request.current_user.get('_id', 'system')
+            
             updated_supplier = self.supplier_service.add_purchase_order(
                 supplier_id, 
-                request.data
+                request.data,
+                user_id=user_id
             )
             
             if not updated_supplier:
@@ -384,10 +413,14 @@ class PurchaseOrderDetailView(APIView):
     def put(self, request, supplier_id, order_id):
         """Update purchase order"""
         try:
+            # Get user ID from authenticated user
+            user_id = request.current_user.get('_id', 'system')
+            
             updated_supplier = self.supplier_service.update_purchase_order(
                 supplier_id, 
                 order_id, 
-                request.data
+                request.data,
+                user_id=user_id
             )
             
             if not updated_supplier:
@@ -412,10 +445,14 @@ class PurchaseOrderDetailView(APIView):
     def delete(self, request, supplier_id, order_id):
         """Soft delete purchase order"""
         try:
+            # Get user ID from authenticated user
+            user_id = request.current_user.get('_id', 'system')
+            
             deleted = self.supplier_service.delete_purchase_order(
                 supplier_id, 
                 order_id, 
-                hard_delete=False
+                hard_delete=False,
+                user_id=user_id
             )
             
             if not deleted:
@@ -452,7 +489,13 @@ class PurchaseOrderRestoreView(APIView):
                     status=status.HTTP_403_FORBIDDEN
                 )
             
-            restored = self.supplier_service.restore_purchase_order(supplier_id, order_id)
+            user_id = current_user.get('_id', 'system')
+            
+            restored = self.supplier_service.restore_purchase_order(
+                supplier_id, 
+                order_id,
+                user_id=user_id
+            )
             
             if not restored:
                 return Response(
@@ -495,10 +538,13 @@ class PurchaseOrderHardDeleteView(APIView):
                     "message": "Add ?confirm=yes to permanently delete this purchase order"
                 }, status=status.HTTP_400_BAD_REQUEST)
             
+            user_id = current_user.get('_id', 'system')
+            
             deleted = self.supplier_service.delete_purchase_order(
                 supplier_id, 
                 order_id, 
-                hard_delete=True
+                hard_delete=True,
+                user_id=user_id
             )
             
             if not deleted:

@@ -13,34 +13,48 @@
         <form @submit.prevent="handleSubmit" class="product-form">
           <!-- Product Image Upload Section -->
           <div class="mb-3">
-            <label class="form-label text-primary fw-medium">Product Image:</label>
-            <div class="image-upload-container">
-              <div class="image-preview-area border-theme-subtle hover-lift" @click="triggerFileInput" :class="{ 'has-image': imagePreview, 'border-theme-accent': imagePreview }">
-                <div v-if="!imagePreview" class="upload-placeholder">
-                  <div class="upload-icon text-accent">📷</div>
-                  <p class="upload-text text-primary">Click to upload product image</p>
-                  <p class="upload-subtext text-tertiary">PNG, JPG, JPEG up to 5MB</p>
-                </div>
-                <div v-else class="image-preview">
-                  <img :src="imagePreview" :alt="form.product_name" class="preview-image" />
-                  <div class="image-overlay surface-overlay">
-                    <button type="button" class="btn btn-sm btn-edit" @click.stop="triggerFileInput">
-                      Change Image
-                    </button>
-                    <button type="button" class="btn btn-sm btn-delete" @click.stop="removeImage">
-                      Remove
-                    </button>
-                  </div>
-                </div>
+  <label class="form-label text-primary fw-medium">Product Image:</label>
+  
+            <!-- Image Preview (if exists) -->
+            <div v-if="imagePreview" class="mb-3">
+              <div class="image-preview-container bg-neutral-light rounded p-3 text-center">
+                <img 
+                  :src="imagePreview" 
+                  alt="Product preview" 
+                  class="img-fluid rounded mb-2" 
+                  style="max-height: 120px;" 
+                />
+                <br>
+                <small class="text-success">Image selected</small>
+                <br>
+                <button 
+                  type="button" 
+                  class="btn btn-outline-danger btn-xs mt-2"
+                  @click="removeImage"
+                >
+                  Remove Image
+                </button>
               </div>
-              <input 
-                ref="fileInput"
-                type="file" 
-                accept="image/*" 
-                @change="handleImageUpload"
-                class="d-none"
-                :disabled="loading"
-              />
+            </div>
+            
+            <!-- File Input (always visible) -->
+            <div class="product-image-upload">
+              <div class="image-upload-container bg-neutral-light rounded p-4 text-center">
+                <div class="upload-icon text-accent">📷</div>
+                <p class="text-primary mb-2">
+                  {{ imagePreview ? 'Change image' : 'Upload product image' }}
+                </p>
+                <input 
+                  type="file" 
+                  class="form-control" 
+                  accept="image/*"
+                  @change="handleImageUpload"
+                  :key="'imageInput-' + (isEditMode ? 'edit' : 'new')"
+                />
+                <small class="text-muted mt-2 d-block">
+                  Maximum file size: 5MB. Supported formats: JPEG, PNG, GIF, WebP
+                </small>
+              </div>
             </div>
           </div>
 
@@ -152,20 +166,21 @@
             </div>
 
             <div class="col-md-6">
-              <label for="selling_price" class="form-label text-primary fw-medium">
-                Selling Price (₱) <span class="text-error">*</span>
-              </label>
-              <input 
-                id="selling_price"
-                v-model.number="form.selling_price" 
-                type="number" 
-                step="0.01"
-                min="0"
-                required 
-                :disabled="loading"
-                placeholder="0.00"
-                class="form-control input-theme"
-              />
+               <label for="selling_price" class="form-label text-primary fw-medium">
+                  Selling Price (₱) <span class="text-error">*</span>
+                </label>
+                <input 
+                  id="selling_price"
+                  v-model.number="form.selling_price" 
+                  type="number" 
+                  step="0.01"
+                  min="0"
+                  required 
+                  :disabled="loading"
+                  placeholder="0.00"
+                  class="form-control input-theme"
+                  @input="handleSellingPriceChange"
+                />
             </div>
           </div>
 
@@ -376,8 +391,11 @@ export default {
     // Methods
     const triggerFileInput = () => {
       if (!loading.value) {
+        // Use the template ref instead of querySelector
         const fileInput = document.querySelector('input[type="file"]')
-        if (fileInput) fileInput.click()
+        if (fileInput) {
+          fileInput.click()
+        }
       }
     }
    

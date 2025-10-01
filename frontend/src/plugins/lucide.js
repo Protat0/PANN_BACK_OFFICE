@@ -1,5 +1,6 @@
 import { 
   Plus, 
+  RotateCcw,
   Download, 
   RefreshCw, 
   Edit, 
@@ -28,6 +29,7 @@ import {
 export default {
   install(app) {
     app.component('Plus', Plus)
+    app.component('RotateCcw', RotateCcw)
     app.component('Download', Download)
     app.component('RefreshCw', RefreshCw)
     app.component('Edit', Edit)

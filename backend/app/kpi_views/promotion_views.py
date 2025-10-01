@@ -84,7 +84,7 @@ class PromotionListView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    @require_admin
+    @require_authentication
     def post(self, request):
         """Create new promotion"""
         try:

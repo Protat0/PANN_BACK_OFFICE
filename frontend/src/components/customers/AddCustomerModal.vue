@@ -106,6 +106,24 @@
             </div>
           </div>
 
+          <!-- NEW PASSWORD FIELD -->
+          <div v-if="mode === 'add'" class="mb-3">
+            <label for="password" class="form-label">Password <span class="text-danger">*</span></label>
+            <input 
+              id="password"
+              v-model="form.password" 
+              type="password" 
+              class="form-control"
+              :class="{ 'is-invalid': errors.password }"
+              required 
+              :disabled="formLoading"
+              placeholder="Enter customer password"
+              minlength="6"
+            />
+            <div v-if="errors.password" class="invalid-feedback">{{ errors.password }}</div>
+        
+          </div>
+
           <!-- Phone -->
           <div class="mb-4">
             <label class="form-label text-secondary fw-medium mb-2">
@@ -541,6 +559,12 @@ defineExpose({
 .form-select:focus {
   border-color: var(--border-accent) !important;
   box-shadow: 0 0 0 0.25rem rgba(160, 123, 227, 0.25) !important;
+}
+
+.form-text {
+  font-size: 0.875em;
+  color: #6c757d;
+  margin-top: 0.25rem;
 }
 
 .form-label {

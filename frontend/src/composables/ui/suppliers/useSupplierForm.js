@@ -1,5 +1,25 @@
-// composables/useSupplierForm.js
+// composables/ui/suppliers/useSupplierForm.js
 import { ref, reactive, computed } from 'vue'
+import axios from 'axios'
+
+// Configure axios
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+// Add auth token interceptor
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
 
 export function useSupplierForm() {
   // State
@@ -38,7 +58,7 @@ export function useSupplierForm() {
 
   const editSupplier = (supplier) => {
     isEditMode.value = true
-    selectedSupplier.value = supplier
+    selectedSupplier.value = 
     formData.name = supplier.name || ''
     formData.contactPerson = supplier.contactPerson || ''
     formData.email = supplier.email || ''
@@ -112,44 +132,117 @@ export function useSupplierForm() {
     }
   }
 
-  const saveSupplier = async (suppliers) => {
-    if (!validateForm()) return
+  const saveSupplier = async (suppliersComposable) => {
+    if (!validateForm()) {
+      return { success: false, error: 'Please fix form errors' }
+    }
 
     formLoading.value = true
 
     try {
-      if (isEditMode.value) {
-        // Mock update - replace with actual API call
-        const index = suppliers.findIndex(s => s.id === selectedSupplier.value.id)
-        if (index !== -1) {
-          suppliers[index] = {
-            ...suppliers[index],
-            ...formData
+      // Prepare data for backend
+      const backendData = {
+        supplier_name: formData.name,
+        contact_person: formData.contactPerson,
+        email: formData.email,
+        phone_number: formData.phone,
+        address: formData.address,
+        type: formData.type,
+        notes: formData.notes
+      }
+
+      let response
+      let message
+
+      if (isEditMode.value && selectedSupplier.value) {
+        // UPDATE existing supplier
+        response = await api.put(`/suppliers/${selectedSupplier.value.id}/`, backendData)
+        message = `Supplier "${formData.name}" updated successfully`
+        
+        // Transform response
+        const updatedSupplier = {
+          id: response.data._id,
+          name: response.data.supplier_name,
+          email: response.data.email || '',
+          phone: response.data.phone_number || '',
+          address: response.data.address || '',
+          contactPerson: response.data.contact_person || '',
+          purchaseOrders: response.data.purchase_orders?.length || 0,
+          status: response.data.isDeleted ? 'inactive' : 'active',
+          type: response.data.type || 'food',
+          createdAt: response.data.created_at,
+          updatedAt: response.data.updated_at,
+          notes: response.data.notes || '',
+          raw: response.data
+        }
+
+        // Update in local state - FIXED
+        if (suppliersComposable.suppliers?.value) {
+          const index = suppliersComposable.suppliers.value.findIndex(
+            s => s.id === selectedSupplier.value.id
+          )
+          if (index !== -1) {
+            suppliersComposable.suppliers.value[index] = updatedSupplier
           }
         }
-        return { success: true, message: `Supplier "${formData.name}" updated successfully` }
+
+        closeAddModal()
+        
       } else {
-        // Mock create - replace with actual API call
+        // CREATE new supplier
+        response = await api.post('/suppliers/', backendData)
+        message = `Supplier "${formData.name}" created successfully`
+        
+        // Add to local state
         const newSupplier = {
-          id: Date.now(),
-          ...formData,
+          id: response.data._id,
+          name: response.data.supplier_name,
+          email: response.data.email || '',
+          phone: response.data.phone_number || '',
+          address: response.data.address || '',
+          contactPerson: response.data.contact_person || '',
           purchaseOrders: 0,
-          createdAt: new Date().toISOString().split('T')[0]
+          status: 'active',
+          type: response.data.type || 'food',
+          createdAt: response.data.created_at,
+          updatedAt: response.data.updated_at,
+          notes: response.data.notes || '',
+          raw: response.data
         }
-        suppliers.push(newSupplier)
+        
+        suppliersComposable.suppliers.value.unshift(newSupplier)
         
         if (!addAnotherAfterSave.value) {
           closeAddModal()
         } else {
           resetForm()
         }
-        
-        return { success: true, message: `Supplier "${formData.name}" created successfully` }
       }
+
+      // Update report data
+      if (suppliersComposable.updateReportData) {
+        suppliersComposable.updateReportData()
+      }
+
+      return { success: true, message }
+      
     } catch (error) {
       console.error('Error saving supplier:', error)
-      formErrors.value.general = error.message
-      return { success: false, error: error.message }
+      
+      let errorMessage = 'Failed to save supplier'
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      } else if (error.response?.statusText) {
+        errorMessage = `Failed to save supplier: ${error.response.statusText}`
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      formErrors.value.general = errorMessage
+      
+      return { success: false, error: errorMessage }
+      
     } finally {
       formLoading.value = false
     }
@@ -177,4 +270,4 @@ export function useSupplierForm() {
     clearFormError,
     saveSupplier
   }
-}
+} 

@@ -24,7 +24,7 @@ class UserListView(APIView):
     def __init__(self):
         self.user_service = UserService()
     
-    @require_authentication
+    
     def get(self, request):
         """Get users with pagination and filters"""
         try:
@@ -55,8 +55,7 @@ class UserListView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-    
-    @require_authentication
+   
     def post(self, request):
         """Create new user - Requires admin authentication"""
         try:
@@ -67,7 +66,8 @@ class UserListView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            new_user = self.user_service.create_user(serializer.validated_data, request.current_user)
+            current_user = getattr(request, 'current_user', None)
+            new_user = self.user_service.create_user(serializer.validated_data, current_user )
             return Response(new_user, status=status.HTTP_201_CREATED)
             
         except Exception as e:

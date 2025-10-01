@@ -247,6 +247,67 @@ class CategoryDisplayService:
             logger.error(f"Error in date filter display: {e}")
             raise Exception(f"Error getting categories with date filter: {str(e)}")
 
+    def get_category_stats(self):
+        """Get comprehensive category statistics"""
+        try:
+            # Basic category counts
+            total_categories = self.category_collection.count_documents({})
+            active_categories = self.category_collection.count_documents({'isDeleted': {'$ne': True}})
+            deleted_categories = total_categories - active_categories
+            
+            # Subcategory stats
+            pipeline = [
+                {'$match': {'isDeleted': {'$ne': True}}},
+                {'$project': {
+                    'subcategory_count': {'$size': {'$ifNull': ['$sub_categories', []]}},
+                    'total_products': {
+                        '$sum': {
+                            '$map': {
+                                'input': {'$ifNull': ['$sub_categories', []]},
+                                'as': 'sub',
+                                'in': {'$size': {'$ifNull': ['$$sub.products', []]}}
+                            }
+                        }
+                    }
+                }},
+                {'$group': {
+                    '_id': None,
+                    'total_subcategories': {'$sum': '$subcategory_count'},
+                    'total_products': {'$sum': '$total_products'},
+                    'avg_subcategories_per_category': {'$avg': '$subcategory_count'},
+                    'avg_products_per_category': {'$avg': '$total_products'}
+                }}
+            ]
+            
+            stats_result = list(self.category_collection.aggregate(pipeline))
+            if stats_result:
+                stats = stats_result[0]
+                total_subcategories = stats.get('total_subcategories', 0)
+                total_products = stats.get('total_products', 0)
+                avg_subcategories = round(stats.get('avg_subcategories_per_category', 0), 2)
+                avg_products = round(stats.get('avg_products_per_category', 0), 2)
+            else:
+                total_subcategories = total_products = avg_subcategories = avg_products = 0
+            
+            return {
+                'category_overview': {
+                    'total_categories': total_categories,
+                    'active_categories': active_categories,
+                    'deleted_categories': deleted_categories
+                },
+                'structure_stats': {
+                    'total_subcategories': total_subcategories,
+                    'total_products': total_products,
+                    'avg_subcategories_per_category': avg_subcategories,
+                    'avg_products_per_category': avg_products
+                },
+                'calculated_at': datetime.utcnow().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting category stats: {e}")
+            raise Exception(f"Error calculating category statistics: {str(e)}")
+
     def export_categories_csv(self, include_sales_data=True, date_filter=None, include_deleted=False):
         """Export categories to CSV format with optional sales data"""
         try:
@@ -498,3 +559,6 @@ class CategoryDisplayService:
             
         except Exception:
             return 'Invalid Date'
+
+# Create service instance
+category_display_service = CategoryDisplayService()

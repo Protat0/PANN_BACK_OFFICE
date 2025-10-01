@@ -48,18 +48,30 @@ class ProductListView(APIView):
         """Create a new product"""
         try:
             product_service = ProductService()
-            product_data = request.data
+            
+            # Debug the incoming data
+            print(f"=== DJANGO VIEW DEBUG ===")
+            print(f"request.data type: {type(request.data)}")
+            print(f"request.data: {request.data}")
+            
+            # Convert to plain dict
+            product_data = dict(request.data)
+            print(f"Converted to dict type: {type(product_data)}")
+            print(f"Converted dict: {product_data}")
+            
             new_product = product_service.create_product(product_data)
             return Response({
                 'message': 'Product created successfully', 
                 'data': new_product
             }, status=status.HTTP_201_CREATED)
         except ValueError as ve:
+            print(f"ValueError: {ve}")
             return Response(
                 {"error": str(ve)}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         except Exception as e:
+            print(f"Exception: {e}")
             logger.error(f"Error in ProductListView.post: {e}")
             return Response(
                 {"error": str(e)}, 

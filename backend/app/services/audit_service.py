@@ -1,6 +1,6 @@
 # ========================================
-# ENHANCED AUDIT SERVICE with Proper ID Formats
-# audit_service.py - All POS System Modules with Correct ID Patterns
+# ENHANCED AUDIT SERVICE with String _id Format
+# audit_service.py - Using generated AUD-###### as MongoDB _id
 # ========================================
 
 from datetime import datetime
@@ -20,13 +20,13 @@ class AuditLogService:
             pipeline = [
                 {
                     '$match': {
-                        'audit_id': {'$regex': '^AUD-\\d{6}$'}
+                        '_id': {'$regex': '^AUD-\\d{6}$'}  # Changed from audit_id to _id
                     }
                 },
                 {
                     '$addFields': {
                         'numeric_part': {
-                            '$toInt': {'$substr': ['$audit_id', 4, 6]}
+                            '$toInt': {'$substr': ['$_id', 4, 6]}  # Changed from audit_id to _id
                         }
                     }
                 },
@@ -56,17 +56,16 @@ class AuditLogService:
             return f"AUD-{fallback_number:06d}"
     
     def convert_object_id(self, document):
-        if document and '_id' in document:
-            document['_id'] = str(document['_id'])
+        # No conversion needed since _id is already a string
         return document
     
     def _create_audit_log(self, event_type, user_data, target_data=None, old_values=None, new_values=None, metadata=None):
-        """Create a standardized audit log entry with sequential AUD-###### ID"""
+        """Create a standardized audit log entry with sequential AUD-###### as _id"""
         try:
             audit_id = self.generate_audit_id()
             
             audit_data = {
-                "audit_id": audit_id,  # AUD-###### (6 digits)
+                "_id": audit_id,  # AUD-###### as the MongoDB _id field
                 "event_type": event_type,
                 "user_id": user_data.get("user_id", user_data.get("username", "system")),  # USER-#### format
                 "username": user_data.get("username", user_data.get("email", "system")),
@@ -100,7 +99,7 @@ class AuditLogService:
                 audit_data["metadata"] = metadata
             
             result = self.collection.insert_one(audit_data)
-            return {"audit_id": audit_id, "db_id": str(result.inserted_id)}
+            return {"_id": audit_id}  # Return the generated AUD-###### ID
             
         except Exception as e:
             raise Exception(f"Error creating audit log: {str(e)}")
@@ -619,6 +618,86 @@ class AuditLogService:
                 'total_logs': total_logs,
                 'by_event_type': stats,
                 'total_audit_id': self.generate_audit_id()  # Shows next ID
+            }
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+        
+    def log_customer_update(self, user_data, customer_id, old_customer_data, new_customer_data):
+        """Log customer update - CUST-##### format"""
+        
+        # Find what fields actually changed
+        changed_fields = {}
+        old_values = {}
+        new_values = {}
+        
+        for key, new_value in new_customer_data.items():
+            if key in old_customer_data:
+                old_value = old_customer_data[key]
+                if old_value != new_value:
+                    old_values[key] = old_value
+                    new_values[key] = new_value
+                    changed_fields[key] = {"old": old_value, "new": new_value}
+        
+        return self._create_audit_log(
+            event_type="customer_update",
+            user_data=user_data,
+            target_data={
+                "type": "customer",
+                "id": customer_id,  # CUST-#####
+                "name": old_customer_data.get("full_name", old_customer_data.get("username", "Unknown"))
+            },
+            old_values=old_values,
+            new_values=new_values,
+            metadata={
+                "action": "update",
+                "module": "customers",
+                "fields_changed": list(changed_fields.keys()),
+                "change_count": len(changed_fields)
+            }
+        )
+    
+    def log_action(self, action, resource_type, resource_id, user_id=None, changes=None, metadata=None):
+        """Generic audit logging method for backward compatibility"""
+        user_data = {'user_id': user_id or 'system'}
+        target_data = {
+            'type': resource_type,
+            'id': resource_id,
+            'name': f"{resource_type.title()} {resource_id}"
+        }
+        
+        return self._create_audit_log(
+            event_type=action,
+            user_data=user_data,
+            target_data=target_data,
+            new_values=changes or {},
+            metadata=metadata or {}
+        )
+    
+
+    def get_audit_statistics(self):
+        """Get audit log statistics"""
+        try:
+            pipeline = [
+                {
+                    '$group': {
+                        '_id': '$event_type',
+                        'count': {'$sum': 1},
+                        'latest': {'$max': '$timestamp'}
+                    }
+                },
+                {
+                    '$sort': {'count': -1}
+                }
+            ]
+            
+            stats = list(self.collection.aggregate(pipeline))
+            total_logs = sum(stat['count'] for stat in stats)
+            
+            return {
+                'success': True,
+                'total_logs': total_logs,
+                'by_event_type': stats,
+                'next_audit_id': self.generate_audit_id()  # Shows what the next ID would be
             }
         except Exception as e:
             return {'success': False, 'error': str(e)}

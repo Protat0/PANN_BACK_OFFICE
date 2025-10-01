@@ -268,6 +268,7 @@ class CustomerService:
             })
             
             if not customer:
+                print(f"❌ Customer not found or already deleted")
                 return False
             
             now = datetime.utcnow()

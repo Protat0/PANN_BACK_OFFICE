@@ -258,12 +258,11 @@
     </div>
 
     <!-- Active Orders Modal -->
-    <ActiveOrdersModal
+     <ActiveOrdersModal
       :show="reportsComposable.showActiveOrdersModal.value"
       :orders="reportsComposable.activeOrders.value"
       :loading="reportsComposable.loading.value"
       @close="reportsComposable.closeActiveOrdersModal"
-      @view-all="handleViewAllOrders"
     />
 
     <!-- Top Performers Modal -->
@@ -545,20 +544,29 @@ export default {
       }
     }
 
-    const handleOrderSave = (orderData) => {
-      const result = createOrderComposable.handleOrderSave(
-        orderData, 
-        suppliersComposable.suppliers?.value || []
-      )
+    const handleOrderSave = async (orderData) => {
+      const result = await createOrderComposable.handleOrderSave(orderData)
       
       if (result.success) {
         suppliersComposable.successMessage.value = result.message
+        
+        // Refresh supplier data to update purchase order count
+        await suppliersComposable.fetchSuppliers()
+        
+        // Refresh reports
+        if (reportsComposable.refreshReports) {
+          await reportsComposable.refreshReports()
+        }
         
         setTimeout(() => {
           suppliersComposable.successMessage.value = null
         }, 3000)
       } else {
         suppliersComposable.error.value = result.error
+        
+        setTimeout(() => {
+          suppliersComposable.error.value = null
+        }, 5000)
       }
     }
 

@@ -2,10 +2,9 @@ import re
 from datetime import datetime
 from ..database import db_manager
 from ..models import Supplier
-from notifications.services import notification_service
+from notifications.services import NotificationService
 import logging
 from .audit_service import AuditLogService
-from notifications.services import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +72,7 @@ class SupplierService:
                 raise ValueError("Phone number must be at least 10 digits")
     
     def _send_supplier_notification(self, action_type, supplier_name, supplier_id=None):
-        """Centralized notification helper for supplier actions - UPDATED"""
+        """Centralized notification helper for supplier actions"""
         try:
             titles = {
                 'created': "New Supplier Added",
@@ -119,8 +118,25 @@ class SupplierService:
                 )
         except Exception as e:
             logger.error(f"Failed to send supplier notification: {e}")
+    
+    def _log_audit(self, action, supplier_id, supplier_name, user_id='system', details=None):
+        """Helper method to log audit trail"""
+        try:
+            self.audit_service.log_action(
+                action=action,
+                resource_type='supplier',
+                resource_id=supplier_id,
+                user_id=user_id,
+                changes=None,  # You can pass changes here if needed
+                metadata={
+                    'supplier_name': supplier_name,
+                    **(details or {})
+                }
+            )
+        except Exception as e:
+            logger.error(f"Failed to log audit action: {e}")
 
-    def create_supplier(self, supplier_data):
+    def create_supplier(self, supplier_data, user_id='system'):
         """Create a new supplier"""
         try:
             # Validate supplier data
@@ -144,6 +160,7 @@ class SupplierService:
                 'isDeleted': False,
                 'created_at': current_time,
                 'updated_at': current_time,
+                'created_by': user_id,
                 'purchase_orders': [],  # Initialize empty purchase orders array
                 'sync_logs': [
                     self.add_sync_log(source='cloud', status='pending', details={'action': 'created'})
@@ -153,7 +170,15 @@ class SupplierService:
             # Insert supplier
             result = self.supplier_collection.insert_one(supplier_data)
             
-            # Send notification using centralized method
+            # Log audit trail
+            self._log_audit(
+                action='supplier_created',
+                supplier_id=supplier_data['_id'],
+                supplier_name=supplier_data['supplier_name'],
+                user_id=user_id
+            )
+            
+            # Send notification
             self._send_supplier_notification('created', supplier_data['supplier_name'], supplier_data['_id'])
             
             # Return created supplier
@@ -162,7 +187,7 @@ class SupplierService:
         except Exception as e:
             raise Exception(f"Error creating supplier: {str(e)}")
         
-    def add_purchase_order(self, supplier_id, order_data):
+    def add_purchase_order(self, supplier_id, order_data, user_id='system'):
         """Add a purchase order to a supplier"""
         try:
             if not supplier_id or not isinstance(supplier_id, str):
@@ -203,7 +228,9 @@ class SupplierService:
                 'status': order_data.get('status', 'pending'),
                 'order_date': order_data.get('order_date', current_time),
                 'created_at': current_time,
-                'updated_at': current_time
+                'updated_at': current_time,
+                'created_by': user_id,
+                'isDeleted': False
             })
             
             # Add purchase order to supplier
@@ -216,6 +243,15 @@ class SupplierService:
             )
             
             if result.modified_count > 0:
+                # Log audit trail
+                self._log_audit(
+                    action='purchase_order_added',
+                    supplier_id=supplier_id,
+                    supplier_name=supplier['supplier_name'],
+                    user_id=user_id,
+                    details={'order_id': order_data['order_id']}
+                )
+                
                 # Send notification
                 self._send_supplier_notification('purchase_order_added', supplier['supplier_name'], supplier_id)
                 
@@ -227,7 +263,7 @@ class SupplierService:
         except Exception as e:
             raise Exception(f"Error adding purchase order: {str(e)}")
     
-    def update_purchase_order(self, supplier_id, order_id, update_data):
+    def update_purchase_order(self, supplier_id, order_id, update_data, user_id='system'):
         """Update a specific purchase order for a supplier"""
         try:
             if not supplier_id or not isinstance(supplier_id, str):
@@ -244,7 +280,7 @@ class SupplierService:
             # Find the order in the purchase_orders array
             order_found = False
             for order in supplier.get('purchase_orders', []):
-                if order.get('order_id') == order_id:
+                if order.get('order_id') == order_id and not order.get('isDeleted', False):
                     order_found = True
                     break
             
@@ -254,6 +290,7 @@ class SupplierService:
             # Prepare update data
             current_time = datetime.utcnow()
             update_data['updated_at'] = current_time
+            update_data['updated_by'] = user_id
             
             # Recalculate total if items are updated
             if 'items' in update_data:
@@ -281,6 +318,15 @@ class SupplierService:
             )
             
             if result.modified_count > 0:
+                # Log audit trail
+                self._log_audit(
+                    action='purchase_order_updated',
+                    supplier_id=supplier_id,
+                    supplier_name=supplier['supplier_name'],
+                    user_id=user_id,
+                    details={'order_id': order_id}
+                )
+                
                 # Send notification
                 self._send_supplier_notification('purchase_order_updated', supplier['supplier_name'], supplier_id)
                 
@@ -292,18 +338,31 @@ class SupplierService:
         except Exception as e:
             raise Exception(f"Error updating purchase order: {str(e)}")
     
-    def get_purchase_orders(self, supplier_id, status=None):
-        """Get purchase orders for a specific supplier"""
+    def get_purchase_orders(self, supplier_id, status=None, include_deleted=False):
+        """
+        Get purchase orders for a specific supplier
+        
+        Args:
+            supplier_id: Supplier's string ID
+            status: Filter by order status (optional)
+            include_deleted: Include soft-deleted orders (default: False)
+        
+        Returns:
+            List of purchase orders
+        """
         try:
             if not supplier_id or not isinstance(supplier_id, str):
                 raise ValueError("Invalid supplier ID")
             
-            # Get supplier
             supplier = self.get_supplier_by_id(supplier_id, include_deleted=False)
             if not supplier:
                 return []
             
             orders = supplier.get('purchase_orders', [])
+            
+            # Filter by deletion status
+            if not include_deleted:
+                orders = [order for order in orders if not order.get('isDeleted', False)]
             
             # Filter by status if provided
             if status:
@@ -320,7 +379,7 @@ class SupplierService:
     def get_purchase_order_by_id(self, supplier_id, order_id):
         """Get a specific purchase order by ID"""
         try:
-            orders = self.get_purchase_orders(supplier_id)
+            orders = self.get_purchase_orders(supplier_id, include_deleted=False)
             
             for order in orders:
                 if order.get('order_id') == order_id:
@@ -398,7 +457,7 @@ class SupplierService:
         except Exception as e:
             raise Exception(f"Error getting supplier: {str(e)}")
     
-    def update_supplier(self, supplier_id, supplier_data):
+    def update_supplier(self, supplier_id, supplier_data, user_id='system'):
         """Update supplier"""
         try:
             if not supplier_id or not isinstance(supplier_id, str):
@@ -422,8 +481,9 @@ class SupplierService:
                 if existing_name:
                     raise ValueError(f"Supplier with name '{supplier_data['supplier_name']}' already exists")
             
-            # Add updated timestamp
+            # Add updated timestamp and user
             supplier_data['updated_at'] = datetime.utcnow()
+            supplier_data['updated_by'] = user_id
             
             # Update supplier
             result = self.supplier_collection.update_one(
@@ -432,8 +492,17 @@ class SupplierService:
             )
             
             if result.modified_count > 0:
-                # Send notification using centralized method
                 updated_supplier = self.supplier_collection.find_one({'_id': supplier_id})
+                
+                # Log audit trail
+                self._log_audit(
+                    action='supplier_updated',
+                    supplier_id=supplier_id,
+                    supplier_name=updated_supplier['supplier_name'],
+                    user_id=user_id
+                )
+                
+                # Send notification
                 self._send_supplier_notification('updated', updated_supplier['supplier_name'], supplier_id)
                 
                 return updated_supplier
@@ -443,7 +512,7 @@ class SupplierService:
         except Exception as e:
             raise Exception(f"Error updating supplier: {str(e)}")
     
-    def delete_supplier(self, supplier_id, hard_delete=False):
+    def delete_supplier(self, supplier_id, hard_delete=False, user_id='system'):
         """Soft delete or hard delete a supplier"""
         try:
             if not supplier_id or not isinstance(supplier_id, str):
@@ -459,21 +528,16 @@ class SupplierService:
                 result = self.supplier_collection.delete_one({'_id': supplier_id})
                 
                 if result.deleted_count > 0:
-                    try:
-                        notification_service.create_notification(
-                            title="Supplier Permanently Deleted",
-                            message=f"Supplier '{supplier_to_delete['supplier_name']}' has been permanently removed",
-                            priority="high",
-                            notification_type="alert",
-                            metadata={
-                                "supplier_id": supplier_id,
-                                "supplier_name": supplier_to_delete['supplier_name'],
-                                "action_type": "supplier_hard_deleted",
-                                "deletion_type": "permanent"
-                            }
-                        )
-                    except Exception as notification_error:
-                        logger.warning(f"Failed to create notification for hard deleted supplier: {notification_error}")
+                    # Log audit trail
+                    self._log_audit(
+                        action='supplier_hard_deleted',
+                        supplier_id=supplier_id,
+                        supplier_name=supplier_to_delete['supplier_name'],
+                        user_id=user_id
+                    )
+                    
+                    # Send notification
+                    self._send_supplier_notification('hard_deleted', supplier_to_delete['supplier_name'], supplier_id)
                     
                     return True
                 return False
@@ -482,7 +546,7 @@ class SupplierService:
                 current_time = datetime.utcnow()
                 deletion_log = {
                     'deleted_at': current_time,
-                    'deleted_by': 'system',
+                    'deleted_by': user_id,
                     'reason': 'Manual deletion'
                 }
                 
@@ -498,22 +562,16 @@ class SupplierService:
                 )
                 
                 if result.modified_count > 0:
-                    try:
-                        notification_service.create_notification(
-                            title="Supplier Deleted",
-                            message=f"Supplier '{supplier_to_delete['supplier_name']}' has been moved to trash",
-                            priority="medium",
-                            notification_type="system",
-                            metadata={
-                                "supplier_id": supplier_id,
-                                "supplier_name": supplier_to_delete['supplier_name'],
-                                "action_type": "supplier_soft_deleted",
-                                "deletion_type": "soft",
-                                "can_be_restored": True
-                            }
-                        )
-                    except Exception as notification_error:
-                        logger.warning(f"Failed to create notification for deleted supplier: {notification_error}")
+                    # Log audit trail
+                    self._log_audit(
+                        action='supplier_soft_deleted',
+                        supplier_id=supplier_id,
+                        supplier_name=supplier_to_delete['supplier_name'],
+                        user_id=user_id
+                    )
+                    
+                    # Send notification
+                    self._send_supplier_notification('soft_deleted', supplier_to_delete['supplier_name'], supplier_id)
                     
                     return True
                 
@@ -522,7 +580,7 @@ class SupplierService:
         except Exception as e:
             raise Exception(f"Error deleting supplier: {str(e)}")
     
-    def restore_supplier(self, supplier_id):
+    def restore_supplier(self, supplier_id, user_id='system'):
         """Restore a soft-deleted supplier"""
         try:
             if not supplier_id or not isinstance(supplier_id, str):
@@ -531,7 +589,7 @@ class SupplierService:
             current_time = datetime.utcnow()
             restoration_log = {
                 'restored_at': current_time,
-                'restored_by': 'system',
+                'restored_by': user_id,
                 'reason': 'Manual restoration'
             }
             
@@ -550,21 +608,18 @@ class SupplierService:
             )
             
             if result.modified_count > 0:
-                try:
-                    restored_supplier = self.supplier_collection.find_one({'_id': supplier_id})
-                    notification_service.create_notification(
-                        title="Supplier Restored",
-                        message=f"Supplier '{restored_supplier['supplier_name']}' has been restored from trash",
-                        priority="low",
-                        notification_type="system",
-                        metadata={
-                            "supplier_id": supplier_id,
-                            "supplier_name": restored_supplier['supplier_name'],
-                            "action_type": "supplier_restored"
-                        }
-                    )
-                except Exception as notification_error:
-                    logger.warning(f"Failed to create notification for restored supplier: {notification_error}")
+                restored_supplier = self.supplier_collection.find_one({'_id': supplier_id})
+                
+                # Log audit trail
+                self._log_audit(
+                    action='supplier_restored',
+                    supplier_id=supplier_id,
+                    supplier_name=restored_supplier['supplier_name'],
+                    user_id=user_id
+                )
+                
+                # Send notification
+                self._send_supplier_notification('restored', restored_supplier['supplier_name'], supplier_id)
                 
                 return True
             
@@ -601,7 +656,7 @@ class SupplierService:
         except Exception as e:
             raise Exception(f"Error getting deleted suppliers: {str(e)}")
         
-    def delete_purchase_order(self, supplier_id, order_id, hard_delete=False):
+    def delete_purchase_order(self, supplier_id, order_id, hard_delete=False, user_id='system'):
         """Soft delete or hard delete a purchase order"""
         try:
             if not supplier_id or not isinstance(supplier_id, str):
@@ -638,6 +693,15 @@ class SupplierService:
                 )
                 
                 if result.modified_count > 0:
+                    # Log audit trail
+                    self._log_audit(
+                        action='purchase_order_hard_deleted',
+                        supplier_id=supplier_id,
+                        supplier_name=supplier['supplier_name'],
+                        user_id=user_id,
+                        details={'order_id': order_id}
+                    )
+                    
                     # Send notification
                     self._send_supplier_notification('purchase_order_hard_deleted', supplier['supplier_name'], supplier_id)
                     return True
@@ -647,7 +711,7 @@ class SupplierService:
                 # Soft delete - mark as deleted with timestamp
                 deletion_log = {
                     'deleted_at': current_time,
-                    'deleted_by': 'system',
+                    'deleted_by': user_id,
                     'reason': 'Manual deletion'
                 }
                 
@@ -668,6 +732,15 @@ class SupplierService:
                 )
                 
                 if result.modified_count > 0:
+                    # Log audit trail
+                    self._log_audit(
+                        action='purchase_order_soft_deleted',
+                        supplier_id=supplier_id,
+                        supplier_name=supplier['supplier_name'],
+                        user_id=user_id,
+                        details={'order_id': order_id}
+                    )
+                    
                     # Send notification
                     self._send_supplier_notification('purchase_order_soft_deleted', supplier['supplier_name'], supplier_id)
                     return True
@@ -676,7 +749,7 @@ class SupplierService:
         except Exception as e:
             raise Exception(f"Error deleting purchase order: {str(e)}")
 
-    def restore_purchase_order(self, supplier_id, order_id):
+    def restore_purchase_order(self, supplier_id, order_id, user_id='system'):
         """Restore a soft-deleted purchase order"""
         try:
             if not supplier_id or not isinstance(supplier_id, str):
@@ -703,7 +776,7 @@ class SupplierService:
             current_time = datetime.utcnow()
             restoration_log = {
                 'restored_at': current_time,
-                'restored_by': 'system',
+                'restored_by': user_id,
                 'reason': 'Manual restoration'
             }
             
@@ -728,6 +801,15 @@ class SupplierService:
             )
             
             if result.modified_count > 0:
+                # Log audit trail
+                self._log_audit(
+                    action='purchase_order_restored',
+                    supplier_id=supplier_id,
+                    supplier_name=supplier['supplier_name'],
+                    user_id=user_id,
+                    details={'order_id': order_id}
+                )
+                
                 # Send notification
                 self._send_supplier_notification('purchase_order_restored', supplier['supplier_name'], supplier_id)
                 return True
@@ -764,32 +846,3 @@ class SupplierService:
         
         except Exception as e:
             raise Exception(f"Error getting deleted purchase orders: {str(e)}")
-
-    def get_purchase_orders(self, supplier_id, status=None, include_deleted=False):
-        """Get purchase orders for a specific supplier - UPDATED"""
-        try:
-            if not supplier_id or not isinstance(supplier_id, str):
-                raise ValueError("Invalid supplier ID")
-            
-            # Get supplier
-            supplier = self.get_supplier_by_id(supplier_id, include_deleted=False)
-            if not supplier:
-                return []
-            
-            orders = supplier.get('purchase_orders', [])
-            
-            # Filter by deletion status
-            if not include_deleted:
-                orders = [order for order in orders if not order.get('isDeleted', False)]
-            
-            # Filter by status if provided
-            if status:
-                orders = [order for order in orders if order.get('status') == status]
-            
-            # Sort by order date (newest first)
-            orders.sort(key=lambda x: x.get('order_date', datetime.min), reverse=True)
-            
-            return orders
-        
-        except Exception as e:
-            raise Exception(f"Error getting purchase orders: {str(e)}")

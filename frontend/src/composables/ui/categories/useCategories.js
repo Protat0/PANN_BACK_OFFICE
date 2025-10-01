@@ -11,7 +11,7 @@ export function useCategories() {
   const error = ref(null)
   const successMessage = ref(null)
   const uncategorizedCount = ref(0)
-  const UNCATEGORIZED_CATEGORY_ID = '686a4de143821e2b21f725c6'
+  const UNCATEGORIZED_CATEGORY_ID = 'UNCTGRY-001'
   
   // UI State
   const showAddDropdown = ref(false)
@@ -32,6 +32,24 @@ export function useCategories() {
   const loadingProducts = ref({}) // Track loading state per category
   
   // Computed
+  const ensureUncategorizedExists = async () => {
+    try {
+      // Check if uncategorized category exists in our current categories
+      const uncategorized = categories.value.find(cat => cat._id === 'UNCTGRY-001')
+      
+      if (!uncategorized) {
+        console.log('Uncategorized category not found, will be created on next fetch')
+        // The backend will create it automatically when we fetch categories
+        await fetchCategories()
+      }
+      
+      return uncategorized || categories.value.find(cat => cat._id === 'UNCTGRY-001')
+    } catch (error) {
+      console.error('Error ensuring uncategorized category exists:', error)
+      return null
+    }
+  }
+
   const paginatedCategories = computed(() => {
     const start = (currentPage.value - 1) * itemsPerPage.value
     const end = start + itemsPerPage.value
@@ -74,6 +92,9 @@ export function useCategories() {
       
       categories.value = Array.isArray(data) ? data : []
       console.log(`Fetched ${categories.value.length} categories`)
+      
+      // Ensure uncategorized category exists
+      await ensureUncategorizedExists()
       
       applyFilters()
       
@@ -129,11 +150,25 @@ export function useCategories() {
   const fetchUncategorizedCount = async () => {
     try {
       console.log('Fetching uncategorized products count...')
-      const products = await categoryApiService.FindProdcategory({ 
-        id: UNCATEGORIZED_CATEGORY_ID 
-      })
       
-      uncategorizedCount.value = Array.isArray(products) ? products.length : 0
+      // First, make sure we have categories loaded
+      if (categories.value.length === 0) {
+        await fetchCategories()
+      }
+      
+      // Check if uncategorized category exists in our loaded categories
+      const uncategorizedCategory = categories.value.find(cat => cat._id === 'UNCTGRY-001')
+      
+      if (!uncategorizedCategory) {
+        console.log('Uncategorized category not found in loaded categories')
+        uncategorizedCount.value = 0
+        return
+      }
+      
+      // Get products count from the category data we already have
+      const productCount = getProductCount(uncategorizedCategory)
+      uncategorizedCount.value = productCount
+      
       console.log(`Found ${uncategorizedCount.value} uncategorized products`)
     } catch (error) {
       console.error('Error fetching uncategorized count:', error)
@@ -492,8 +527,12 @@ export function useCategories() {
   }
 
   // Filter and Search Methods
+  // In useCategories.js
   const applyFilters = () => {
     let filtered = [...categories.value]
+    
+    // Filter out uncategorized category from main display (but keep in exports)
+    filtered = filtered.filter(category => category._id !== 'UNCTGRY-001')
     
     // Status filter
     if (statusFilter.value !== 'all') {
@@ -505,7 +544,6 @@ export function useCategories() {
         )
       }
     } else if (!includeDeleted.value) {
-      // Default: exclude deleted categories unless explicitly including them
       filtered = filtered.filter(category => !category.isDeleted)
     }
     

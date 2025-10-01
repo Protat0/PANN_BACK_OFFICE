@@ -296,6 +296,9 @@ export default {
     const selectedProducts = ref([])
     const isExporting = ref(false)
     const categoryId = ref(null)
+    const editCategoryModal = ref(null)
+    const addSubcategoryModal = ref(null)
+
 
     // Computed
     const filteredProducts = computed(() => {
@@ -462,17 +465,27 @@ export default {
 
     // Modal handlers
     const handleEditCategory = () => {
-      if (this && this.$refs && this.$refs.editCategoryModal) {
-        this.$refs.editCategoryModal.openEditMode(currentCategory.value)
+      if (editCategoryModal.value) {
+        editCategoryModal.value.openEditMode(currentCategory.value)
+      } else {
+        console.error('Edit category modal ref not found')
       }
     }
 
+    // In CategoryDetails.vue
     const handleAddSubCategory = () => {
-      if (this && this.$refs && this.$refs.addSubcategoryModal) {
-        this.$refs.addSubcategoryModal.openModal(
+      console.log('Add subcategory button clicked')
+      console.log('Modal ref:', addSubcategoryModal.value)
+      console.log('Current category:', currentCategory.value)
+      
+      if (addSubcategoryModal.value) {
+        console.log('Opening modal...')
+        addSubcategoryModal.value.openModal(
           currentCategory.value._id,
           currentCategory.value.category_name || 'Unknown Category'
         )
+      } else {
+        console.error('Add subcategory modal ref not found')
       }
     }
 
@@ -560,6 +573,9 @@ export default {
       // Computed
       filteredProducts, paginatedProducts, isAllSelected, isIndeterminate,
       
+      editCategoryModal,
+      addSubcategoryModal,
+
       // Methods
       loadCategoryData, handleRetryLoad, applyFilter, handlePageChange, toggleSelectAll,
       handleUpdateProductSubcategory, removeProductFromCategory, removeSelectedFromCategory,

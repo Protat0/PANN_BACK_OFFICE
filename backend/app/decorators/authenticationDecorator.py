@@ -1,7 +1,6 @@
 from rest_framework.response import Response
 from rest_framework import status
 from ..services.auth_services import AuthService
-from bson import ObjectId
 import logging
 from functools import wraps
 

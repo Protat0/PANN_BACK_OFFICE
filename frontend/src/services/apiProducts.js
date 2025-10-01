@@ -17,6 +17,16 @@ class ProductsApiService {
     throw new Error(message);
   }
 
+  async getCategoryStats() {
+    try {
+      const response = await api.get('/category/stats/') 
+      return this.handleResponse(response)
+    } catch (error) {
+      console.error('Error fetching category stats:', error)
+      this.handleError(error)
+    }
+  }
+
   // PRODUCT CRUD OPERATIONS
   
   /**
@@ -24,14 +34,11 @@ class ProductsApiService {
    * @param {Object} params - Query parameters (page, limit, search, category, include_deleted, etc.)
    * @returns {Promise<Object>} Products list with pagination info
    */
-  async getProducts(params = {}) {
+  async getProducts(filters = {}) {
     try {
-      console.log('Making API call to get products...', params);
-      const response = await api.get('/products/', { params });
-      console.log('Products API response:', response);
-      return this.handleResponse(response);
+      const response = await api.get('/products/', { params: filters });
+      return this.handleResponse(response); // Make sure this returns the correct structure
     } catch (error) {
-      console.error('Error in getProducts:', error);
       this.handleError(error);
     }
   }
@@ -120,8 +127,8 @@ class ProductsApiService {
    */
   async deleteProduct(productId, hardDelete = false) {
     try {
-      const params = hardDelete ? { hard_delete: true } : {};
-      const response = await api.delete(`/products/${productId}/delete/`, { params });
+      const params = hardDelete ? { hard_delete: 'true' } : {};
+      const response = await api.delete(`/products/${productId}/`, { params });
       return this.handleResponse(response);
     } catch (error) {
       this.handleError(error);

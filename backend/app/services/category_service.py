@@ -17,9 +17,61 @@ class CategoryService:
         self.audit_service = AuditLogService()
         self._ensure_indexes()
 
+        self.ensure_uncategorized_category_exists()
+
     # ================================================================
     # UTILITY METHODS
     # ================================================================
+
+    def ensure_uncategorized_category_exists(self):
+        """Ensure an 'Uncategorized' category exists, create if not"""
+        try:
+            # Check if uncategorized category already exists
+            uncategorized = self.collection.find_one({
+                '_id': 'UNCTGRY-001',
+                'isDeleted': {'$ne': True}
+            })
+            
+            if uncategorized:
+                logger.info("Uncategorized category already exists")
+                return uncategorized
+            
+            # Create default uncategorized category
+            now = datetime.utcnow()
+            uncategorized_data = {
+                '_id': 'UNCTGRY-001',
+                'category_name': 'Uncategorized',
+                'description': 'Default category for products without specific categorization',
+                'status': 'active',
+                'sub_categories': [{
+                    'subcategory_id': 'SUBCAT-00001',
+                    'name': 'General',
+                    'description': 'General uncategorized products',
+                    'products': [],
+                    'created_at': now.isoformat(),
+                    'status': 'active'
+                }],
+                'isDeleted': False,
+                'date_created': now.isoformat(),
+                'last_updated': now.isoformat()
+            }
+            
+            # Insert the category
+            result = self.collection.insert_one(uncategorized_data)
+            
+            logger.info("Created default 'Uncategorized' category with ID: UNCTGRY-001")
+            
+            # Send notification about system initialization
+            self._send_category_notification('created', 'Uncategorized', 'UNCTGRY-001', {
+                'system_generated': True,
+                'action_type': 'system_initialization'
+            })
+            
+            return uncategorized_data
+            
+        except Exception as e:
+            logger.error(f"Error ensuring uncategorized category exists: {e}")
+            raise Exception(f"Error creating uncategorized category: {str(e)}")
 
     def generate_category_id(self):
         """Generate sequential CTGY-### ID"""
@@ -63,6 +115,47 @@ class CategoryService:
             fallback_number = int(time.time()) % 1000
             return f"CTGY-{fallback_number:03d}"
 
+    def generate_subcategory_id(self):
+        """Generate sequential SUBCAT-##### ID"""
+        try:
+            # Use aggregation to find highest existing number across all categories
+            pipeline = [
+                {"$unwind": "$sub_categories"},
+                {
+                    '$match': {
+                        'sub_categories.subcategory_id': {'$regex': '^SUBCAT-\\d{5}$'}
+                    }
+                },
+                {
+                    '$addFields': {
+                        'numeric_part': {
+                            '$toInt': {'$substr': ['$sub_categories.subcategory_id', 7, 5]}
+                        }
+                    }
+                },
+                {
+                    '$group': {
+                        '_id': None,
+                        'max_number': {'$max': '$numeric_part'}
+                    }
+                }
+            ]
+            
+            result = list(self.collection.aggregate(pipeline))
+            
+            if result and result[0]['max_number'] is not None:
+                next_number = result[0]['max_number'] + 1
+            else:
+                next_number = 1
+            
+            return f"SUBCAT-{next_number:05d}"
+            
+        except Exception as e:
+            logger.error(f"Error generating subcategory ID: {e}")
+            # Emergency fallback
+            import time
+            fallback_number = int(time.time()) % 100000
+            return f"SUBCAT-{fallback_number:05d}"
 
     def _ensure_indexes(self):
         """Create indexes for string-based operations"""
@@ -108,24 +201,45 @@ class CategoryService:
         return category_name
 
     def _prepare_subcategories(self, existing_sub_categories):
-        """Prepare subcategories with 'None' as default subcategory"""
+        """Prepare subcategories with string IDs"""
         subcategories_list = existing_sub_categories or []
         
-        # Check if "None" subcategory already exists (changed from "General")
+        # Check if "None" subcategory already exists
         none_exists = any(
             sub.get('name', '').lower() == 'none' 
             for sub in subcategories_list
         )
         
         if not none_exists:
-            default_none = Category.create_subcategory(
-                name="None",  # Changed from "General"
-                description="Default holding subcategory for products without specific subcategorization"
-            )
+            default_none = {
+                'subcategory_id': self.generate_subcategory_id(),  # String ID
+                'name': "None",
+                'description': "Default holding subcategory for products without specific subcategorization",
+                'products': [],
+                'created_at': datetime.utcnow(),
+                'status': 'active'
+            }
             subcategories_list.insert(0, default_none)
-            logger.debug("Auto-added 'None' subcategory")
+            logger.debug("Auto-added 'None' subcategory with string ID")
         
-        return subcategories_list
+        # Process existing subcategories and ensure they have string IDs
+        processed_subcategories = []
+        for sub in subcategories_list:
+            # If subcategory doesn't have an ID, generate one
+            if not sub.get('subcategory_id'):
+                sub['subcategory_id'] = self.generate_subcategory_id()
+            
+            clean_sub = {
+                'subcategory_id': sub['subcategory_id'],  # String ID
+                'name': sub.get('name', ''),
+                'description': sub.get('description', ''),
+                'products': sub.get('products', []),
+                'created_at': sub.get('created_at', datetime.utcnow()),
+                'status': sub.get('status', 'active')
+            }
+            processed_subcategories.append(clean_sub)
+        
+        return processed_subcategories
     
     def _send_category_notification(self, action_type, category_name, category_id=None, additional_metadata=None):
         """Centralized notification helper for category actions"""
@@ -209,9 +323,7 @@ class CategoryService:
             logger.error(f"Failed to send category notification: {e}")
     
     def create_category(self, category_data, current_user=None):
-        """Create a new category with CTGY-### ID"""
         try:
-            # Validate input data
             category_name = self._validate_category_data(category_data)
             logger.info(f"Creating category: {category_name}")
             
@@ -225,14 +337,14 @@ class CategoryService:
             # Add timestamps and default values
             now = datetime.utcnow()
             category_kwargs = {
-                'category_id': category_id,  # String ID
+                '_id': category_id,
                 'category_name': category_name,
                 'description': category_data.get("description", ''),
                 'status': category_data.get("status", 'active'),
                 'sub_categories': sub_categories,
                 'isDeleted': False,
-                'date_created': now,
-                'last_updated': now
+                'date_created': now.isoformat(),
+                'last_updated': now.isoformat()
             }
             
             # Add image fields if present
@@ -243,25 +355,24 @@ class CategoryService:
             
             # Create and insert category
             category = Category(**category_kwargs)
-            result = self.collection.insert_one(category.to_dict())
-            
-            # Get created category using string ID
-            created_category = self.collection.find_one({'category_id': category_id})
+            self.collection.insert_one(category.to_dict())
             
             # Send notification
             self._send_category_notification('created', category_name, category_id)
             
-            # Audit logging
+            # Audit logging - use the clean data we already have
             if current_user and self.audit_service:
                 try:
-                    audit_data = {**created_category, "category_id": category_id}
+                    audit_data = {**category_kwargs, "category_id": category_id}
                     self.audit_service.log_category_create(current_user, audit_data)
                     logger.debug("Audit log created for category creation")
                 except Exception as audit_error:
                     logger.error(f"Audit logging failed: {audit_error}")
             
             logger.info(f"Category '{category_name}' created successfully with ID {category_id}")
-            return created_category
+            
+            # Return the clean data instead of querying back
+            return category_kwargs
 
         except ValueError as ve:
             logger.error(f"Validation error: {ve}")
@@ -271,7 +382,7 @@ class CategoryService:
             raise Exception(f"Error creating category: {str(e)}")
     
     def get_all_categories(self, include_deleted=False, limit=None, skip=None):
-        """Get all categories with string ID operations"""
+        """Get all categories - no longer checks uncategorized every time"""
         try:
             query = {}
             if not include_deleted:
@@ -279,7 +390,6 @@ class CategoryService:
             
             cursor = self.collection.find(query)
             
-            # Add pagination if specified
             if skip:
                 cursor = cursor.skip(skip)
             if limit:
@@ -297,7 +407,7 @@ class CategoryService:
             if not category_id or not category_id.startswith('CTGY-'):
                 return None
             
-            query = {'category_id': category_id}
+            query = {'_id': category_id}  # Use _id instead of category_id
             if not include_deleted:
                 query['isDeleted'] = {'$ne': True}
 
@@ -306,7 +416,7 @@ class CategoryService:
         except Exception as e:
             logger.error(f"Error getting category by ID {category_id}: {e}")
             raise Exception(f"Error getting category: {str(e)}")
-
+        
     def update_category(self, category_id, category_data, current_user=None):
         """Update category with string ID operations"""
         try:
@@ -317,18 +427,19 @@ class CategoryService:
             if not category_id or not category_id.startswith('CTGY-'):
                 return None
             
-            # Get current category data for audit
+            # Get current category data for audit - USE _id instead of category_id
             old_category = self.collection.find_one({
-                'category_id': category_id,
+                '_id': category_id,  # Changed from 'category_id': category_id
                 'isDeleted': {'$ne': True}
             })
             
             if not old_category:
+                logger.error(f"Category {category_id} not found for update")
                 return None
             
             # Prepare update data
             update_data = category_data.copy()
-            update_data['last_updated'] = datetime.utcnow()
+            update_data['last_updated'] = datetime.utcnow().isoformat()  # Use ISO string
             
             # Validate category name if being updated
             if 'category_name' in update_data:
@@ -337,14 +448,15 @@ class CategoryService:
                     existing = self.collection.find_one({
                         'category_name': new_name,
                         'isDeleted': {'$ne': True},
-                        'category_id': {'$ne': category_id}
+                        '_id': {'$ne': category_id}  # Changed from 'category_id': {'$ne': category_id}
                     })
                     if existing:
                         raise ValueError(f"Category name '{new_name}' already exists")
 
+            # Update using _id instead of category_id
             result = self.collection.update_one(
                 {
-                    'category_id': category_id,
+                    '_id': category_id,  # Changed from 'category_id': category_id
                     'isDeleted': {'$ne': True}
                 },
                 {'$set': update_data}
@@ -353,7 +465,8 @@ class CategoryService:
             if result.modified_count == 0:
                 return None
 
-            updated_category = self.collection.find_one({'category_id': category_id})
+            # Get updated category using _id
+            updated_category = self.collection.find_one({'_id': category_id})
             
             # Send notification
             self._send_category_notification('updated', updated_category['category_name'], category_id)
@@ -361,7 +474,7 @@ class CategoryService:
             # Audit logging
             if current_user and self.audit_service:
                 try:
-                    self.audit_service.log_category_update(
+                    self.audit_service.log_action(
                         current_user, 
                         category_id, 
                         old_values=old_category, 
@@ -427,7 +540,7 @@ class CategoryService:
                         category_for_audit = category_to_delete.copy()
                         category_for_audit['deletion_type'] = 'soft_delete'
                         
-                        self.audit_service.log_category_delete(current_user, category_for_audit)
+                        self.audit_service.log_action(current_user, category_for_audit)
                         logger.info("Audit log created for category soft deletion")
                     except Exception as audit_error:
                         logger.error(f"Audit logging failed: {audit_error}")
@@ -540,7 +653,7 @@ class CategoryService:
                         category_for_audit = category_to_delete.copy()
                         category_for_audit['deletion_type'] = 'hard_delete'
                         
-                        self.audit_service.log_category_delete(current_user, category_for_audit)
+                        self.audit_service.log_action(current_user, category_for_audit)
                         logger.info("Audit log created for PERMANENT category deletion")
                     except Exception as audit_error:
                         logger.error(f"Audit logging failed: {audit_error}")
@@ -635,7 +748,7 @@ class CategoryService:
             
             # Resolve product - get both string ID and name
             product_data = self._resolve_product(product_identifier)
-            product_id = product_data['id']  # Now string ID
+            product_id = product_data['id']  # This should be PROD-##### 
             product_name = product_data['name']
             
             # Check if product already exists in this subcategory
@@ -656,12 +769,13 @@ class CategoryService:
             
             # Add to subcategory with combined format using string IDs
             result = self.collection.update_one(
-                {'category_id': category_id},
+                {'_id': category_id},
                 {
                     '$addToSet': {
                         'sub_categories.$[elem].products': {
-                            'product_id': product_id,  # String ID
-                            'product_name': product_name
+                            'product_id': product_id,        # String: PROD-#####
+                            'product_name': product_name,    # String: Product Name
+                            'added_at': datetime.utcnow()    # Datetime (serializable)
                         }
                     },
                     '$set': {
@@ -852,9 +966,9 @@ class CategoryService:
             if not subcategory_data or not subcategory_data.get('name', '').strip():
                 raise ValueError("Subcategory name is required")
             
-            # Check if category exists and is not deleted
+            # Check if category exists and is not deleted - USE _id instead of category_id
             category = self.collection.find_one({
-                'category_id': category_id,
+                '_id': category_id,  # Changed from 'category_id': category_id
                 'isDeleted': {'$ne': True}
             })
             
@@ -872,14 +986,14 @@ class CategoryService:
             if 'products' not in subcategory_data:
                 subcategory_data['products'] = []
             if 'created_at' not in subcategory_data:
-                subcategory_data['created_at'] = datetime.utcnow()
+                subcategory_data['created_at'] = datetime.utcnow().isoformat()  # Use ISO string
             
-            # Add subcategory
+            # Add subcategory - USE _id instead of category_id
             result = self.collection.update_one(
-                {'category_id': category_id},
+                {'_id': category_id},  # Changed from 'category_id': category_id
                 {
                     '$addToSet': {'sub_categories': subcategory_data},
-                    '$set': {'last_updated': datetime.utcnow()}
+                    '$set': {'last_updated': datetime.utcnow().isoformat()}  # Use ISO string
                 }
             )
             
@@ -1274,3 +1388,5 @@ class CategoryService:
         except Exception as e:
             logger.error(f"Error moving product to None subcategory: {e}")
             raise Exception(f"Error moving product to None subcategory: {str(e)}")
+    
+    

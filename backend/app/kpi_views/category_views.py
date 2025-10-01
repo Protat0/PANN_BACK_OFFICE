@@ -10,11 +10,23 @@ logger = logging.getLogger(__name__)
 
 class CategoryKPIView(APIView):
     
+    def _serialize_objectids(self, obj):
+        """Convert ObjectIds and datetime objects to strings recursively"""
+        from datetime import datetime
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        elif isinstance(obj, dict):
+            return {key: self._serialize_objectids(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [self._serialize_objectids(item) for item in obj]
+        else:
+            return obj
+
     @require_authentication
     def post(self, request):
         """Create a new category"""
         try:
-            category_service = CategoryService()  # Create instance
+            category_service = CategoryService()
             
             category_data = {
                 'category_name': request.data.get('category_name'),
@@ -22,6 +34,12 @@ class CategoryKPIView(APIView):
                 'status': request.data.get('status', 'active'),
                 'sub_categories': request.data.get('sub_categories', [])
             }
+            
+            # Add image fields if they exist
+            image_fields = ['image_url', 'image_filename', 'image_size', 'image_type', 'image_uploaded_at']
+            for field in image_fields:
+                if field in request.data and request.data[field] is not None:
+                    category_data[field] = request.data[field]
             
             result = category_service.create_category(category_data, request.current_user)
             
@@ -37,7 +55,7 @@ class CategoryKPIView(APIView):
     def get(self, request):
         """Get all categories or search categories"""
         try:
-            category_service = CategoryService()  # Create instance for this method
+            category_service = CategoryService()
             
             search_term = request.query_params.get('search')
             active_only = request.query_params.get('active_only', 'false').lower() == 'true'
@@ -52,10 +70,13 @@ class CategoryKPIView(APIView):
             else:
                 categories = category_service.get_all_categories(include_deleted=include_deleted, limit=limit, skip=skip)
             
+            # Serialize any remaining non-JSON-serializable objects
+            clean_categories = self._serialize_objectids(categories)
+            
             return Response({
                 "message": "Categories retrieved successfully",
-                "categories": categories,
-                "count": len(categories)
+                "categories": clean_categories,
+                "count": len(clean_categories)
             }, status=status.HTTP_200_OK)
         
         except Exception as e:
