@@ -55,14 +55,15 @@
     >
       <template #header>
         <tr>
-          <th style="width: 150px;" class="text-inverse">Customer ID</th>
-          <th class="text-inverse">Full Name</th>
-          <th class="text-inverse">Email</th>
-          <th class="text-inverse">Phone</th>
-          <th style="width: 120px;" class="text-inverse">Loyalty Points</th>
-          <th style="width: 100px;" class="text-inverse">Status</th>
-          <th style="width: 140px;" class="text-inverse">Date Created</th>
-          <th style="width: 120px;" class="text-center text-inverse">Actions</th>
+          <th style="width: 150px;">Customer ID</th>
+          <th style="width: 140px;">Username</th>  <!-- Add this line -->
+          <th>Full Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th style="width: 120px;">Loyalty Points</th>
+          <th style="width: 100px;">Status</th>
+          <th style="width: 140px;">Date Created</th>
+          <th style="width: 120px;" class="text-center">Actions</th>
         </tr>
       </template>
       
@@ -72,6 +73,12 @@
             <span class="badge surface-tertiary text-accent border-theme-subtle fw-medium" style="font-family: var(--font-mono, 'Courier New', monospace);">
               {{ customer.customer_id || customer._id }}
             </span>
+          </td>
+          <!-- Add this username column -->
+          <td>
+            <div class="fw-medium text-tertiary-dark">
+              {{ customer.username || 'N/A' }}
+            </div>
           </td>
           <td>
             <div class="fw-medium text-primary">
@@ -149,6 +156,48 @@
         Add First Customer
       </button>
     </div>
+
+    <!-- Add Delete Confirmation Modal -->
+    <div class="modal fade" ref="deleteModalElement" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header border-theme">
+            <h5 class="modal-title text-error">Confirm Delete</h5>
+            <button type="button" class="btn-close" @click="closeDeleteModal"></button>
+          </div>
+          <div class="modal-body">
+            <div v-if="customerToDelete" class="text-center">
+              <div class="text-5xl mb-3">⚠️</div>
+              <h6 class="text-primary mb-3">Delete Customer</h6>
+              <p class="text-secondary mb-3">
+                Are you sure you want to delete customer 
+                <strong>{{ customerToDelete.full_name }}</strong>?
+              </p>
+              <div class="alert alert-warning" role="alert">
+                <small>
+                  This will hide the customer from the active list, but they can be restored later if needed.
+                </small>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer border-theme">
+            <button type="button" class="btn btn-secondary" @click="closeDeleteModal">
+              Cancel
+            </button>
+            <button 
+              type="button" 
+              class="btn btn-danger" 
+              @click="confirmDelete"
+              :disabled="isLoading"
+            >
+              <span v-if="isLoading">Deleting...</span>
+              <span v-else>Delete Customer</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- Customer Modal -->
@@ -173,6 +222,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { Modal } from 'bootstrap'
 import { useCustomers } from '@/composables/api/useCustomers.js'
 import TableTemplate from '@/components/common/TableTemplate.vue'
 import ActionBar from '@/components/common/ActionBar.vue'
@@ -189,8 +239,7 @@ const {
   hasCustomers,
   fetchCustomers,
   fetchStatistics,
-  deleteCustomer: deleteCustomerApi,
-  searchCustomers,
+  deleteCustomer: deleteCustomerAPI,
   clearError
 } = useCustomers()
 
@@ -210,6 +259,11 @@ const customerToDelete = ref(null)
 const selectedCustomers = ref([])
 const searchValue = ref('')
 const exporting = ref(false)
+
+// Delete modal state
+const deleteModalElement = ref(null)
+const customerToDelete = ref(null)
+let deleteModalInstance = null
 
 const addOptions = ref([
   {
@@ -364,12 +418,21 @@ const handleModalClose = () => {
 
 const handleModalSuccess = async (customerData) => {
   console.log('Customer saved successfully:', customerData)
-  // Refresh the customers list to show updates
-  await fetchCustomers()
-}
-
-const handleModeChanged = (newMode) => {
-  modalMode.value = newMode
+  
+  // Refresh the customers list to show the new/updated customer
+  try {
+    await fetchCustomers()
+    console.log('Customer list refreshed successfully')
+    
+    // Optional: Reset to first page if adding new customer to show it at the top
+    if (modalMode.value === 'create') {
+      currentPage.value = 1
+    }
+    
+  } catch (error) {
+    console.error('Failed to refresh customer list:', error)
+    // You could add a toast notification here if you have one
+  }
 }
 
 // Table action handlers
@@ -381,49 +444,61 @@ const editCustomer = (customer) => {
   openEditCustomerModal(customer)
 }
 
-const deleteCustomer = (customer) => {
+// Delete modal methods
+const openDeleteModal = (customer) => {
   customerToDelete.value = customer
-  deleteModal.value?.openModal({
-    title: 'Delete Customer',
-    message: `Are you sure you want to delete "${customer.full_name}"? This action cannot be undone.`,
-    confirmText: 'Delete Customer',
-    confirmClass: 'btn-delete'
-  })
+  if (deleteModalInstance) {
+    deleteModalInstance.show()
+  }
+}
+
+const closeDeleteModal = () => {
+  customerToDelete.value = null
+  if (deleteModalInstance) {
+    deleteModalInstance.hide()
+  }
 }
 
 const confirmDelete = async () => {
   if (!customerToDelete.value) return
 
-  const customerId = customerToDelete.value._id || customerToDelete.value.customer_id
-  deletingCustomerId.value = customerId
-
   try {
-    await deleteCustomerApi(customerId)
+    await deleteCustomerAPI(customerToDelete.value._id || customerToDelete.value.customer_id)
+    
+    // Show success message
     console.log('Customer deleted successfully')
     
-    // Close the modal and reset state
-    deleteModal.value?.closeModal()
-    customerToDelete.value = null
-    
-  } catch (err) {
-    console.error('Failed to delete customer:', err)
-  } finally {
-    deletingCustomerId.value = null
+    closeDeleteModal()
+  } catch (error) {
+    console.error('Failed to delete customer:', error)
   }
 }
 
-const cancelDelete = () => {
-  customerToDelete.value = null
-  deleteModal.value?.closeModal()
+// Update the delete handler in your table
+const deleteCustomer = (customer) => {
+  openDeleteModal(customer)
 }
 
-// Initialize on mount
 onMounted(async () => {
   try {
+    // Initialize data
     await Promise.all([
       fetchCustomers(),
       fetchStatistics()
     ])
+    
+    // Initialize delete modal
+    if (deleteModalElement.value) {
+      deleteModalInstance = new Modal(deleteModalElement.value)
+      
+      deleteModalElement.value.addEventListener('hidden.bs.modal', () => {
+        customerToDelete.value = null
+      })
+      
+      console.log('Delete modal initialized successfully') // Add this for debugging
+    } else {
+      console.error('Delete modal element not found')
+    }
   } catch (err) {
     console.error('Failed to initialize customers page:', err)
   }

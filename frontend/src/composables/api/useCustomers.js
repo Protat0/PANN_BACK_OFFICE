@@ -185,9 +185,9 @@ export function useCustomers() {
     error.value = null
 
     try {
-      await customerApiService.deleteCustomer(customerId)
+      const response = await customerApiService.deleteCustomer(customerId)
 
-      // Remove from local array
+      // Remove from local array since it's now soft deleted
       customers.value = customers.value.filter(c => 
         c._id !== customerId && c.customer_id !== customerId
       )
@@ -196,11 +196,11 @@ export function useCustomers() {
       // Clear selected customer if it's the deleted one
       if (selectedCustomer.value && 
           (selectedCustomer.value._id === customerId || 
-           selectedCustomer.value.customer_id === customerId)) {
+          selectedCustomer.value.customer_id === customerId)) {
         selectedCustomer.value = null
       }
 
-      return true
+      return response
     } catch (err) {
       error.value = err.message || 'Failed to delete customer'
       throw err
@@ -228,6 +228,50 @@ export function useCustomers() {
       return response
     } catch (err) {
       error.value = err.message || 'Failed to delete customers'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
+   * Restore deleted customer
+   */
+  const restoreCustomer = async (customerId) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const response = await customerApiService.restoreCustomer(customerId)
+      const restoredCustomer = response.customer || response
+
+      // Add back to customers list if we're viewing all customers
+      if (!filtersApplied.value.include_deleted) {
+        customers.value.unshift(restoredCustomer)
+        totalCustomers.value += 1
+      }
+
+      return restoredCustomer
+    } catch (err) {
+      error.value = err.message || 'Failed to restore customer'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /**
+   * Get deleted customers
+   */
+  const getDeletedCustomers = async (params = {}) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const response = await customerApiService.getDeletedCustomers(params)
+      return response
+    } catch (err) {
+      error.value = err.message || 'Failed to fetch deleted customers'
       throw err
     } finally {
       isLoading.value = false
@@ -383,6 +427,8 @@ export function useCustomers() {
     updateCustomer,
     deleteCustomer,
     deleteMultipleCustomers,
+    restoreCustomer,
+    getDeletedCustomers,
 
     // Search and filter methods
     searchCustomers,

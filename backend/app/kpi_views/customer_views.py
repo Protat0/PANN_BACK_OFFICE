@@ -109,9 +109,9 @@ class CustomerDetailView(APIView):
     def delete(self, request, customer_id):
         """Delete customer - Admin only"""
         try:
-            deleted = self.customer_service.delete_customer(
+            deleted = self.customer_service.soft_delete_customer(
                 customer_id, 
-                request.current_user  # Set by decorator
+                request.current_user
             )
             
             if deleted:
