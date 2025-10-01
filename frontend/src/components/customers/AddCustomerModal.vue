@@ -13,16 +13,29 @@
       <!-- Modal Header -->
       <div class="modal-header">
         <h3 class="text-primary mb-0 fw-semibold">
-          {{ mode === 'edit' ? 'Edit Customer' : 'Add New Customer' }}
+          {{ getModalTitle() }}
         </h3>
-        <button 
-          class="btn-close"
-          @click="closeModal"
-          :disabled="isLoading"
-          aria-label="Close"
-        >
-          <X :size="20" />
-        </button>
+        <div class="d-flex align-items-center gap-2">
+          <!-- Edit button in view mode -->
+          <button 
+            v-if="mode === 'view'"
+            class="btn btn-edit btn-sm"
+            @click="switchToEditMode"
+            :disabled="isLoading"
+          >
+            <Edit :size="16" class="me-1" />
+            Edit
+          </button>
+          
+          <button 
+            class="btn-close"
+            @click="closeModal"
+            :disabled="isLoading"
+            aria-label="Close"
+          >
+            <X :size="20" />
+          </button>
+        </div>
       </div>
 
       <!-- Modal Body -->
@@ -35,7 +48,7 @@
           </div>
         </div>
 
-        <!-- Customer Form -->
+        <!-- Customer Information -->
         <form @submit.prevent="handleSubmit">
           <!-- Username -->
           <div class="mb-4">
@@ -58,9 +71,10 @@
           <!-- Full Name -->
           <div class="mb-4">
             <label class="form-label text-secondary fw-medium mb-2">
-              Full Name <span class="text-error">*</span>
+              Full Name <span v-if="mode !== 'view'" class="text-error">*</span>
             </label>
             <input
+              v-if="mode !== 'view'"
               v-model="form.full_name"
               type="text"
               class="form-control"
@@ -68,14 +82,18 @@
               required
               :disabled="isLoading"
             />
+            <div v-else class="form-control-plaintext text-primary fw-medium">
+              {{ form.full_name || 'Not provided' }}
+            </div>
           </div>
 
           <!-- Email -->
           <div class="mb-4">
             <label class="form-label text-secondary fw-medium mb-2">
-              Email Address <span class="text-error">*</span>
+              Email Address <span v-if="mode !== 'view'" class="text-error">*</span>
             </label>
             <input
+              v-if="mode !== 'view'"
               v-model="form.email"
               type="email"
               class="form-control"
@@ -83,6 +101,9 @@
               required
               :disabled="isLoading"
             />
+            <div v-else class="form-control-plaintext text-secondary">
+              {{ form.email || 'Not provided' }}
+            </div>
           </div>
 
           <!-- Phone -->
@@ -91,12 +112,16 @@
               Phone Number
             </label>
             <input
+              v-if="mode !== 'view'"
               v-model="form.phone"
               type="tel"
               class="form-control"
               placeholder="+1 (555) 123-4567"
               :disabled="isLoading"
             />
+            <div v-else class="form-control-plaintext text-secondary">
+              {{ form.phone || 'Not provided' }}
+            </div>
           </div>
 
           <!-- Password (only for new customers) -->
@@ -161,12 +186,13 @@
             </div>
           </div>
 
-          <!-- Loyalty Points (only for edit mode) -->
-          <div v-if="mode === 'edit'" class="mb-4">
+          <!-- Loyalty Points -->
+          <div v-if="mode !== 'create'" class="mb-4">
             <label class="form-label text-secondary fw-medium mb-2">
               Loyalty Points
             </label>
             <input
+              v-if="mode === 'edit'"
               v-model.number="form.loyalty_points"
               type="number"
               min="0"
@@ -174,14 +200,20 @@
               placeholder="0"
               :disabled="isLoading"
             />
+            <div v-else class="form-control-plaintext">
+              <span class="badge bg-success text-inverse fw-medium">
+                {{ form.loyalty_points || 0 }} points
+              </span>
+            </div>
           </div>
 
-          <!-- Status (only for edit mode) -->
-          <div v-if="mode === 'edit'" class="mb-4">
+          <!-- Status -->
+          <div v-if="mode !== 'create'" class="mb-4">
             <label class="form-label text-secondary fw-medium mb-2">
               Status
             </label>
             <select
+              v-if="mode === 'edit'"
               v-model="form.status"
               class="form-select"
               :disabled="isLoading"
@@ -189,6 +221,24 @@
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
+            <div v-else class="form-control-plaintext">
+              <span 
+                class="badge fw-medium"
+                :class="form.status === 'active' ? 'bg-success text-inverse' : 'surface-tertiary text-tertiary border-theme'"
+              >
+                {{ form.status || 'active' }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Date Created (view mode only) -->
+          <div v-if="mode === 'view'" class="mb-4">
+            <label class="form-label text-secondary fw-medium mb-2">
+              Date Created
+            </label>
+            <div class="form-control-plaintext text-tertiary small">
+              {{ formatDate(customer?.date_created) }}
+            </div>
           </div>
         </form>
       </div>
@@ -202,9 +252,10 @@
             @click="closeModal"
             :disabled="isLoading"
           >
-            Cancel
+            {{ mode === 'view' ? 'Close' : 'Cancel' }}
           </button>
           <button
+            v-if="mode !== 'view'"
             type="button"
             class="btn btn-submit btn-with-icon"
             @click="handleSubmit"
@@ -221,7 +272,6 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { X, AlertTriangle } from 'lucide-vue-next'
 import { useModal } from '@/composables/ui/useModal.js'
 import { useCustomers } from '@/composables/api/useCustomers.js'
 
@@ -230,7 +280,7 @@ const props = defineProps({
   mode: {
     type: String,
     default: 'create',
-    validator: (value) => ['create', 'edit'].includes(value)
+    validator: (value) => ['create', 'edit', 'view'].includes(value)
   },
   customer: {
     type: Object,
@@ -239,7 +289,7 @@ const props = defineProps({
 })
 
 // Emits
-const emit = defineEmits(['close', 'success'])
+const emit = defineEmits(['close', 'success', 'mode-changed'])
 
 // Composables
 const { isVisible, isLoading, error, show, hide, setLoading, setError, clearError } = useModal()
@@ -262,6 +312,9 @@ const form = ref({
   status: 'active'
 })
 
+// Local mode state for switching between view/edit
+const currentMode = ref(props.mode)
+
 // Computed
 const isFormValid = computed(() => {
   const hasRequiredFields = form.value.username.trim() && 
@@ -272,9 +325,23 @@ const isFormValid = computed(() => {
 })
 
 // Methods
+const getModalTitle = () => {
+  switch (currentMode.value) {
+    case 'view': return 'Customer Details'
+    case 'edit': return 'Edit Customer'
+    default: return 'Add New Customer'
+  }
+}
+
+const switchToEditMode = () => {
+  currentMode.value = 'edit'
+  emit('mode-changed', 'edit')
+}
+
 const openModal = () => {
   clearError()
-  if (props.mode === 'edit' && props.customer) {
+  currentMode.value = props.mode
+  if ((props.mode === 'edit' || props.mode === 'view') && props.customer) {
     populateForm()
   } else {
     resetForm()
@@ -284,6 +351,7 @@ const openModal = () => {
 
 const closeModal = () => {
   if (!isLoading.value) {
+    currentMode.value = props.mode // Reset to original mode
     hide()
     emit('close')
   }
@@ -333,8 +401,23 @@ const populateForm = () => {
   }
 }
 
+const formatDate = (dateString) => {
+  if (!dateString) return 'N/A'
+  try {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch {
+    return 'Invalid Date'
+  }
+}
+
 const handleSubmit = async () => {
-  if (!isFormValid.value || isLoading.value) return
+  if (!isFormValid.value || isLoading.value || currentMode.value === 'view') return
 
   setLoading(true)
   clearError()
@@ -348,7 +431,7 @@ const handleSubmit = async () => {
       delivery_address: form.value.delivery_address
     }
 
-    if (props.mode === 'create') {
+    if (currentMode.value === 'create') {
       customerData.password = form.value.password
     } else {
       if (form.value.password.trim()) {
@@ -356,13 +439,13 @@ const handleSubmit = async () => {
       }
     }
 
-    if (props.mode === 'edit') {
+    if (currentMode.value === 'edit') {
       customerData.loyalty_points = form.value.loyalty_points
       customerData.status = form.value.status
     }
 
     let result
-    if (props.mode === 'edit') {
+    if (currentMode.value === 'edit') {
       const customerId = props.customer._id || props.customer.customer_id
       result = await updateCustomer(customerId, customerData)
     } else {
@@ -377,7 +460,7 @@ const handleSubmit = async () => {
     closeModal()
     
   } catch (err) {
-    setError(err.message || `Failed to ${props.mode === 'edit' ? 'update' : 'create'} customer`)
+    setError(err.message || `Failed to ${currentMode.value === 'edit' ? 'update' : 'create'} customer`)
   } finally {
     setLoading(false)
   }
@@ -385,9 +468,14 @@ const handleSubmit = async () => {
 
 // Watch for customer prop changes
 watch(() => props.customer, () => {
-  if (props.mode === 'edit' && props.customer && isVisible.value) {
+  if ((props.mode === 'edit' || props.mode === 'view') && props.customer && isVisible.value) {
     populateForm()
   }
+})
+
+// Watch for mode prop changes
+watch(() => props.mode, (newMode) => {
+  currentMode.value = newMode
 })
 
 // Expose methods for parent component
@@ -396,7 +484,6 @@ defineExpose({
   closeModal
 })
 </script>
-
 <style scoped>
 /* All your existing styles remain the same */
 .modal-backdrop {
@@ -558,5 +645,43 @@ defineExpose({
   .modal-footer {
     padding: 1rem;
   }
+}
+
+.form-control-plaintext {
+  display: block;
+  width: 100%;
+  padding: 0.375rem 0;
+  margin-bottom: 0;
+  line-height: 1.5;
+  background-color: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+}
+
+.small {
+  font-size: 0.875rem;
+}
+
+.text-wrap {
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+/* Badge styles */
+.badge {
+  display: inline-block;
+  padding: 0.35em 0.65em;
+  font-size: 0.75em;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: baseline;
+  border-radius: 0.25rem;
+}
+
+.bg-success {
+  background-color: var(--status-success) !important;
+  color: white !important;
 }
 </style>

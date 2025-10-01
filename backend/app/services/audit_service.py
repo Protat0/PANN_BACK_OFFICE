@@ -367,6 +367,92 @@ class AuditLogService:
             metadata={"action": "create", "module": "users"}
         )
     
+    def log_user_restore(self, admin_user, restored_user_data):
+        return self._create_audit_log(
+            event_type="user_restore",
+            user_data=admin_user,
+            target_data={
+                "type": "user",
+                "id": restored_user_data.get("_id", "Unknown"),  # USER-####
+                "name": restored_user_data.get("username", restored_user_data.get("email", "Unknown"))
+            },
+            old_values={
+                "isDeleted": True,
+                "status": "deleted"
+            },
+            new_values={
+                "isDeleted": False,
+                "status": restored_user_data.get("status", "active"),
+                "restoredAt": str(datetime.utcnow()),
+                "restoredBy": admin_user.get("username", admin_user.get("user_id", "system"))
+            },
+            metadata={
+                "action": "restore",
+                "module": "users",
+                "user_id": restored_user_data.get("_id"),
+                "restored_by": admin_user.get("username", admin_user.get("user_id", "system"))
+            }
+        )
+    
+    def log_user_delete(self, admin_user, deleted_user_data, deletion_type="soft_delete"):
+        """Log user deletion (soft or hard) - USER-#### format"""
+        return self._create_audit_log(
+            event_type=f"user_{deletion_type}",
+            user_data=admin_user,
+            target_data={
+                "type": "user",
+                "id": deleted_user_data.get("_id", "Unknown"),  # USER-####
+                "name": deleted_user_data.get("username", deleted_user_data.get("email", "Unknown"))
+            },
+            old_values={
+                "isDeleted": False,
+                "status": deleted_user_data.get("status", "active")
+            },
+            new_values={
+                "isDeleted": True,
+                "deletedAt": str(datetime.utcnow()),
+                "deletedBy": admin_user.get("username", admin_user.get("user_id", "system"))
+            },
+            metadata={
+                "action": "delete",
+                "module": "users",
+                "deletion_type": deletion_type,
+                "user_id": deleted_user_data.get("_id")
+            }
+        )
+    
+    def log_user_hard_delete(self, admin_user, deleted_user_data):
+        """Log permanent user deletion - USER-#### format"""
+        return self._create_audit_log(
+            event_type="user_hard_delete",
+            user_data=admin_user,
+            target_data={
+                "type": "user",
+                "id": deleted_user_data.get("_id", "Unknown"),  # USER-####
+                "name": deleted_user_data.get("username", deleted_user_data.get("email", "Unknown"))
+            },
+            old_values={
+                "existed": True,
+                "user_data": {
+                    "username": deleted_user_data.get("username"),
+                    "email": deleted_user_data.get("email"),
+                    "role": deleted_user_data.get("role")
+                }
+            },
+            new_values={
+                "existed": False,
+                "permanently_deleted": True,
+                "deleted_at": str(datetime.utcnow())
+            },
+            metadata={
+                "action": "hard_delete",
+                "module": "users",
+                "warning": "PERMANENT_DELETION",
+                "user_id": deleted_user_data.get("_id"),
+                "deleted_by": admin_user.get("username", admin_user.get("user_id", "system"))
+            }
+        )
+
     # CUST-##### (5 digits - customer base)
     def log_customer_create(self, user_data, customer_data):
         """Log customer creation - CUST-##### format"""
