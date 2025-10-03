@@ -253,7 +253,6 @@ const deleteModal = ref(null)
 const modalMode = ref('create')
 const selectedCustomer = ref(null)
 const deletingCustomerId = ref(null)
-const customerToDelete = ref(null)
 
 // Action bar configuration
 const selectedCustomers = ref([])
