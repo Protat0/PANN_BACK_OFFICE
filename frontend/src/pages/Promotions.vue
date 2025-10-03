@@ -1,246 +1,160 @@
 <template>
   <div class="promotions-page">
-    <!-- Main Content -->
-    <div class="container-fluid py-4">
-      <!-- Action Bar and Filters -->
-      <div class="action-bar-container mb-3">
-        <div class="action-row">
-          <!-- Left Side: Main Actions -->
-          <div v-if="selectedPromotions.length === 0" class="d-flex gap-2">
-            <button 
-              class="btn btn-add btn-sm btn-with-icon"
-              @click="handleSinglePromo"
-            >
-              <Plus :size="14" />
-              ADD PROMO
-            </button>
+    <!-- Page Header -->
+    <div class="page-header">
+      <h1 class="page-title">Promotion Management</h1>
+      <p class="page-subtitle">Manage promotional campaigns and discounts</p>
+    </div>
 
-            <button 
-              class="btn btn-outline-secondary btn-sm"
-              @click="exportData"
-              :disabled="loading"
-            >
-              EXPORT
-            </button>
+    <!-- Action Bar -->
+    <ActionBar
+      entity-name="promotion"
+      add-button-text="ADD PROMO"
+      search-placeholder="Search promotions by name..."
+      :add-options="addOptions"
+      :selected-items="selectedPromotions"
+      :selection-actions="selectionActions"
+      :filters="filters"
+      :search-value="searchFilter"
+      :show-columns-button="false"
+      :show-export-button="true"
+      :exporting="exporting"
+      @add-action="handleAddAction"
+      @selection-action="handleSelectionAction"
+      @filter-change="handleFilterChange"
+      @search-input="handleSearchInput"
+      @search-clear="handleSearchClear"
+      @export="exportData"
+    />
 
-            <button 
-              class="btn btn-outline-info btn-sm"
-              @click="refreshPromotions"
-              :disabled="loading"
-            >
-              <RotateCcw :size="14" />
-              REFRESH
-            </button>
-          </div>
+    <!-- Loading State -->
+    <div v-if="loading && promotions.length === 0" class="loading-state">
+      <div class="spinner-border"></div>
+      <p>Loading promotions...</p>
+    </div>
 
-          <!-- Selection Actions -->
-          <div v-if="selectedPromotions.length > 0" class="d-flex gap-2">
-            <button 
-              class="btn btn-delete btn-sm btn-with-icon"
-              @click="deleteSelected"
-              :disabled="loading"
-            >
-              <Trash2 :size="14" />
-              DELETE ({{ selectedPromotions.length }})
-            </button>
-          </div>
-
-          <!-- Right Side: Search and Filters -->
-          <div class="filters-section d-flex align-items-center gap-2">
-            <!-- Search Toggle -->
-            <button 
-              class="btn btn-secondary btn-sm search-toggle-btn"
-              @click="toggleSearchMode"
-              :class="{ 'active': searchMode }"
-            >
-              <Search :size="16" />
-            </button>
-
-            <!-- Filter Dropdowns -->
-            <template v-if="!searchMode">
-              <div class="filter-group">
-                <label class="filter-label">Discount Type</label>
-                <select 
-                  class="form-select form-select-sm" 
-                  v-model="discountTypeFilter" 
-                  @change="applyFilters"
-                >
-                  <option value="all">All types</option>
-                  <option value="percentage">Percentage</option>
-                  <option value="fixed_amount">Fixed Amount</option>
-                  <option value="buy_x_get_y">BOGO</option>
-                </select>
-              </div>
-
-              <div class="filter-group">
-                <label class="filter-label">Status</label>
-                <select 
-                  class="form-select form-select-sm" 
-                  v-model="statusFilter" 
-                  @change="applyFilters"
-                >
-                  <option value="all">All status</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="expired">Expired</option>
-                  <option value="scheduled">Scheduled</option>
-                </select>
-              </div>
-            </template>
-
-            <!-- Search Bar -->
-            <div v-if="searchMode" class="search-container">
-              <div class="position-relative">
-                <input 
-                  ref="searchInput"
-                  v-model="searchFilter" 
-                  @input="debounceSearch"
-                  @keyup.enter="performSearch"
-                  type="text" 
-                  class="form-control form-control-sm search-input"
-                  placeholder="Search promotions..."
-                />
-                <button 
-                  class="btn btn-sm btn-link position-absolute end-0 top-50 translate-middle-y"
-                  @click="clearSearch"
-                  style="border: none; padding: 0.25rem;"
-                >
-                  <X :size="16" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Loading State -->
-      <div v-if="loading" class="text-center py-4">
-        <div class="spinner-border text-primary" role="status">
-          <span class="visually-hidden">Loading...</span>
-        </div>
-      </div>
-
-      <!-- Error State -->
-      <div v-if="error" class="alert alert-danger" role="alert">
-        <strong>Error:</strong> {{ error }}
-        <button class="btn btn-sm btn-outline-danger ms-2" @click="refreshPromotions">
+    <!-- Error State -->
+    <div v-if="error" class="error-state">
+      <div class="alert alert-danger">
+        <p>{{ error }}</p>
+        <button class="btn btn-primary" @click="refreshPromotions">
           Try Again
         </button>
       </div>
+    </div>
 
-      <div class="row" v-if="!loading">
-        <div class="col-12">
-          <!-- Promotions Table -->
-          <DataTable
-            :total-items="pagination.total_items"
-            :current-page="pagination.current_page"
-            :items-per-page="pagination.items_per_page"
-            @page-changed="handlePageChange"
-          >
-            <template #header>
-              <tr>
-                <th class="text-center" style="width: 50px;">
-                  <div class="form-check">
-                    <input 
-                      class="form-check-input" 
-                      type="checkbox" 
-                      :checked="isAllSelected"
-                      :indeterminate="isIndeterminate"
-                      @change="toggleSelectAll"
-                    >
-                  </div>
-                </th>
-                <th>Promotion Name</th>
-                <th>Discount Type</th>
-                <th>Discount Value</th>
-                <th>Start Date</th>
-                <th>End Date</th>
-                <th>Status</th>
-                <th>Last Updated</th>
-                <th class="text-center" style="width: 120px;">Actions</th>
-              </tr>
-            </template>
+    <!-- Data Table -->
+    <TableTemplate
+      v-if="!loading || promotions.length > 0"
+      :items-per-page="pagination.items_per_page"
+      :total-items="pagination.total_items"
+      :current-page="pagination.current_page"
+      :show-pagination="true"
+      @page-changed="handlePageChange"
+    >
+      <template #header>
+        <tr>
+          <th class="checkbox-column">
+            <input 
+              type="checkbox" 
+              class="form-check-input"
+              @change="toggleSelectAll" 
+              :checked="isAllSelected"
+              :indeterminate.prop="isIndeterminate"
+            />
+          </th>
+          <th>Promotion Name</th>
+          <th>Discount Type</th>
+          <th>Discount Value</th>
+          <th>Start Date</th>
+          <th>End Date</th>
+          <th>Status</th>
+          <th>Last Updated</th>
+          <th>Actions</th>
+        </tr>
+      </template>
 
-            <template #body>
-              <tr 
-                v-for="promotion in promotions" 
-                :key="promotion.promotion_id"
-                :class="{ 'table-primary': selectedPromotions.includes(promotion.promotion_id) }"
+      <template #body>
+        <tr 
+          v-for="promotion in promotions" 
+          :key="promotion.promotion_id"
+          :class="{ 'table-primary': selectedPromotions.includes(promotion.promotion_id) }"
+        >
+          <td class="checkbox-column">
+            <input 
+              type="checkbox" 
+              class="form-check-input"
+              :value="promotion.promotion_id"
+              v-model="selectedPromotions"
+            />
+          </td>
+          <td>{{ promotion.promotion_name }}</td>
+          <td>
+            <span 
+              class="badge"
+              :class="getDiscountTypeBadgeClass(promotion.discount_type)"
+            >
+              {{ formatDiscountType(promotion.discount_type) }}
+            </span>
+          </td>
+          <td class="text-tertiary-medium">
+            {{ formatDiscountValue(promotion.discount_value, promotion.discount_type) }}
+          </td>
+          <td class="text-tertiary-medium">
+            {{ formatDate(promotion.start_date) }}
+          </td>
+          <td class="text-tertiary-medium">
+            {{ formatDate(promotion.end_date) }}
+          </td>
+          <td>
+            <span 
+              class="badge"
+              :class="getStatusBadgeClass(promotion.status)"
+            >
+              {{ formatStatus(promotion.status) }}
+            </span>
+          </td>
+          <td class="text-tertiary-medium">
+            {{ formatDateTime(promotion.last_updated) }}
+          </td>
+          <td>
+            <div class="d-flex gap-1">
+              <button
+                class="btn btn-outline btn-sm action-btn action-btn-view"
+                @click="viewPromotion(promotion)"
+                title="View Details"
               >
-                <td class="text-center">
-                  <div class="form-check">
-                    <input 
-                      class="form-check-input" 
-                      type="checkbox" 
-                      :value="promotion.promotion_id"
-                      v-model="selectedPromotions"
-                    >
-                  </div>
-                </td>
-                <td>
-                  <div class="fw-medium text-tertiary-dark">{{ promotion.promotion_name }}</div>
-                </td>
-                <td>
-                  <span class="badge" :class="getDiscountTypeBadgeClass(promotion.discount_type)">
-                    {{ formatDiscountType(promotion.discount_type) }}
-                  </span>
-                </td>
-                <td class="text-tertiary-dark">
-                  {{ formatDiscountValue(promotion.discount_value, promotion.discount_type) }}
-                </td>
-                <td class="text-tertiary-medium">
-                  {{ formatDate(promotion.start_date) }}
-                </td>
-                <td class="text-tertiary-medium">
-                  {{ formatDate(promotion.end_date) }}
-                </td>
-                <td>
-                  <span class="badge" :class="getStatusBadgeClass(promotion.status)">
-                    {{ formatStatus(promotion.status) }}
-                  </span>
-                </td>
-                <td class="text-tertiary-medium">
-                  {{ formatDateTime(promotion.last_updated) }}
-                </td>
-                <td class="text-center">
-                  <div class="d-flex justify-content-center gap-1">
-                    <button 
-                      class="btn btn-outline-primary action-btn action-btn-view"
-                      @click="viewPromotion(promotion)"
-                      title="View Details"
-                    >
-                      <Eye :size="12" />
-                    </button>
-                    <button 
-                      class="btn btn-outline-secondary action-btn action-btn-edit"
-                      @click="editPromotion(promotion)"
-                      title="Edit"
-                    >
-                      <Edit :size="12" />
-                    </button>
-                    <button 
-                      class="btn btn-outline-danger action-btn action-btn-delete"
-                      @click="deletePromotion(promotion)"
-                      title="Delete"
-                    >
-                      <Trash2 :size="12" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
+                <Eye :size="14" />
+              </button>
+              <button
+                class="btn btn-outline btn-sm action-btn action-btn-edit"
+                @click="editPromotion(promotion)"
+                title="Edit Promotion"
+              >
+                <Edit :size="14" />
+              </button>
+              <button
+                class="btn btn-outline btn-sm action-btn action-btn-delete"
+                @click="deletePromotion(promotion)"
+                title="Delete Promotion"
+              >
+                <Trash2 :size="14" />
+              </button>
+            </div>
+          </td>
+        </tr>
+      </template>
+    </TableTemplate>
 
-              <!-- Empty State -->
-              <tr v-if="promotions.length === 0 && !loading">
-                <td colspan="9" class="text-center py-5">
-                  <div class="text-tertiary-medium">
-                    <Package :size="48" class="mb-3 opacity-50" />
-                    <div>No promotions found</div>
-                    <small>Start by creating your first promotional campaign</small>
-                  </div>
-                </td>
-              </tr>
-            </template>
-          </DataTable>
+    <!-- Empty State -->
+    <div v-if="!loading && promotions.length === 0 && !error" class="empty-state">
+      <div class="card">
+        <div class="card-body">
+          <p class="empty-message">No promotions found</p>
+          <p class="empty-submessage">Get started by creating your first promotional campaign</p>
+          <button class="btn btn-add" @click="handleSinglePromo">
+            Add First Promotion
+          </button>
         </div>
       </div>
     </div>
@@ -251,14 +165,16 @@
 </template>
 
 <script>
-import DataTable from '@/components/common/TableTemplate.vue'
+import ActionBar from '@/components/common/ActionBar.vue'
+import TableTemplate from '@/components/common/TableTemplate.vue'
 import AddPromoModal from '@/components/promotions/AddPromoModal.vue'
 import promotionApiService from '@/services/apiPromotions.js'
 
 export default {
   name: 'Promotions',
   components: {
-    DataTable,
+    ActionBar,
+    TableTemplate,
     AddPromoModal
   },
   data() {
@@ -275,27 +191,112 @@ export default {
       // UI State
       loading: false,
       error: null,
-      searchMode: false,
+      exporting: false,
       
       // Filters
       discountTypeFilter: 'all',
       statusFilter: 'all',
-      searchFilter: '',
-      searchTimeout: null
+      searchFilter: ''
     }
   },
   computed: {
     isAllSelected() {
-      return this.selectedPromotions.length === this.promotions.length && this.promotions.length > 0
+      return this.promotions.length > 0 && this.selectedPromotions.length === this.promotions.length
     },
     isIndeterminate() {
       return this.selectedPromotions.length > 0 && this.selectedPromotions.length < this.promotions.length
+    },
+    addOptions() {
+      return [
+        {
+          key: 'single',
+          icon: 'Plus',
+          title: 'Add Single Promotion',
+          description: 'Create a new promotional campaign'
+        }
+      ]
+    },
+    selectionActions() {
+      return [
+        {
+          key: 'delete',
+          icon: 'Trash2',
+          label: 'Delete',
+          buttonClass: 'btn-delete-dynamic has-items'
+        }
+      ]
+    },
+    filters() {
+      return [
+        {
+          key: 'discountType',
+          label: 'Discount Type',
+          value: this.discountTypeFilter,
+          options: [
+            { value: 'all', label: 'All Types' },
+            { value: 'percentage', label: 'Percentage' },
+            { value: 'fixed_amount', label: 'Fixed Amount' },
+            { value: 'buy_x_get_y', label: 'BOGO' }
+          ]
+        },
+        {
+          key: 'status',
+          label: 'Status',
+          value: this.statusFilter,
+          options: [
+            { value: 'all', label: 'All Status' },
+            { value: 'active', label: 'Active' },
+            { value: 'inactive', label: 'Inactive' },
+            { value: 'expired', label: 'Expired' },
+            { value: 'scheduled', label: 'Scheduled' }
+          ]
+        }
+      ]
     }
   },
   async mounted() {
     await this.loadPromotions()
   },
   methods: {
+    handleAddAction(actionKey) {
+      if (actionKey === 'single') {
+        this.handleSinglePromo()
+      }
+    },
+
+    handleSelectionAction(actionKey) {
+      if (actionKey === 'delete') {
+        this.deleteSelected()
+      }
+    },
+
+    handleFilterChange(filterKey, value) {
+      if (filterKey === 'discountType') {
+        this.discountTypeFilter = value
+      } else if (filterKey === 'status') {
+        this.statusFilter = value
+      }
+      this.applyFilters()
+    },
+
+    handleSearchInput(value) {
+      this.searchFilter = value
+      this.applyFilters()
+    },
+
+    handleSearchClear() {
+      this.searchFilter = ''
+      this.applyFilters()
+    },
+
+    toggleSelectAll(event) {
+      if (event.target.checked) {
+        this.selectedPromotions = this.promotions.map(p => p.promotion_id)
+      } else {
+        this.selectedPromotions = []
+      }
+    },
+
     async loadPromotions() {
       try {
         this.loading = true
@@ -306,7 +307,6 @@ export default {
           limit: this.pagination.items_per_page
         }
         
-        // Add filters
         if (this.discountTypeFilter !== 'all') {
           params.discount_type = this.discountTypeFilter
         }
@@ -339,6 +339,17 @@ export default {
       await this.loadPromotions()
     },
 
+    async applyFilters() {
+      this.pagination.current_page = 1
+      this.selectedPromotions = []
+      await this.loadPromotions()
+    },
+
+    async handlePageChange(page) {
+      this.pagination.current_page = page
+      await this.loadPromotions()
+    },
+
     handleSinglePromo() {
       if (this.$refs.addPromoModal && this.$refs.addPromoModal.openAdd) {
         this.$refs.addPromoModal.openAdd()
@@ -346,6 +357,8 @@ export default {
     },
 
     async exportData() {
+      this.exporting = true
+      
       try {
         const filters = {}
         if (this.discountTypeFilter !== 'all') {
@@ -357,7 +370,6 @@ export default {
         
         const exportData = await promotionApiService.exportPromotions(filters, 'json')
         
-        // Create and download file
         const blob = new Blob([exportData], { type: 'application/json' })
         const url = window.URL.createObjectURL(blob)
         const link = document.createElement('a')
@@ -368,14 +380,16 @@ export default {
         
       } catch (error) {
         console.error('Export error:', error)
-        alert('Export failed: ' + error.message)
+        this.error = 'Export failed: ' + error.message
+      } finally {
+        this.exporting = false
       }
     },
 
     async deleteSelected() {
       if (this.selectedPromotions.length === 0) return
       
-      const confirmed = confirm(`Are you sure you want to delete ${this.selectedPromotions.length} promotion(s)?`)
+      const confirmed = confirm(`Delete ${this.selectedPromotions.length} promotion(s)?`)
       if (!confirmed) return
 
       try {
@@ -390,66 +404,48 @@ export default {
         }
       } catch (error) {
         console.error('Bulk delete error:', error)
-        alert('Delete failed: ' + error.message)
+        this.error = 'Delete failed: ' + error.message
       } finally {
         this.loading = false
       }
     },
 
-    toggleSearchMode() {
-      this.searchMode = !this.searchMode
-      
-      if (this.searchMode) {
-        this.$nextTick(() => {
-          if (this.$refs.searchInput) {
-            this.$refs.searchInput.focus()
-          }
-        })
-      } else {
-        this.searchFilter = ''
-        this.applyFilters()
-      }
-    },
+    async deletePromotion(promotion) {
+      const confirmed = confirm(`Delete promotion "${promotion.promotion_name}"?`)
+      if (!confirmed) return
 
-    clearSearch() {
-      this.searchFilter = ''
-      this.searchMode = false
-      this.applyFilters()
-    },
-
-    debounceSearch() {
-      clearTimeout(this.searchTimeout)
-      this.searchTimeout = setTimeout(() => {
-        this.performSearch()
-      }, 500)
-    },
-
-    async performSearch() {
-      this.pagination.current_page = 1
-      await this.loadPromotions()
-    },
-
-    async applyFilters() {
-      this.pagination.current_page = 1
-      this.selectedPromotions = []
-      await this.loadPromotions()
-    },
-
-    async handlePageChange(page) {
-      this.pagination.current_page = page
-      await this.loadPromotions()
-    },
-
-    toggleSelectAll() {
-      if (this.isAllSelected) {
-        this.selectedPromotions = []
-      } else {
-        this.selectedPromotions = this.promotions.map(p => p.promotion_id)
+      try {
+        this.loading = true
+        const result = await promotionApiService.deletePromotion(promotion.promotion_id)
+        
+        if (result.success) {
+          alert('Promotion deleted successfully')
+          await this.loadPromotions()
+        } else {
+          this.error = 'Delete failed: ' + result.message
+        }
+      } catch (error) {
+        console.error('Delete error:', error)
+        this.error = 'Delete failed: ' + error.message
+      } finally {
+        this.loading = false
       }
     },
 
     async handlePromotionSaved() {
       await this.refreshPromotions()
+    },
+
+    viewPromotion(promotion) {
+      if (this.$refs.addPromoModal && this.$refs.addPromoModal.openView) {
+        this.$refs.addPromoModal.openView(promotion)
+      }
+    },
+
+    editPromotion(promotion) {
+      if (this.$refs.addPromoModal && this.$refs.addPromoModal.openEdit) {
+        this.$refs.addPromoModal.openEdit(promotion)
+      }
     },
 
     // Formatting methods
@@ -492,152 +488,162 @@ export default {
 
     formatDateTime(dateString) {
       if (!dateString) return '-'
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
+      return new Date(dateString).toLocaleString()
     },
 
     getDiscountTypeBadgeClass(type) {
       const classes = {
-        'percentage': 'bg-primary text-white',
-        'fixed_amount': 'bg-success text-white',
-        'buy_x_get_y': 'bg-info text-white'
+        'percentage': 'bg-primary',
+        'fixed_amount': 'bg-success',
+        'buy_x_get_y': 'bg-info'
       }
-      return classes[type] || 'bg-secondary text-white'
+      return classes[type] || 'bg-secondary'
     },
 
     getStatusBadgeClass(status) {
       const classes = {
-        'active': 'bg-success text-white',
-        'inactive': 'bg-secondary text-white',
-        'expired': 'bg-danger text-white',
-        'scheduled': 'bg-warning text-dark'
+        'active': 'bg-success',
+        'inactive': 'bg-secondary',
+        'expired': 'bg-danger',
+        'scheduled': 'bg-warning'
       }
-      return classes[status] || 'bg-secondary text-white'
-    },
-
-    viewPromotion(promotion) {
-      if (this.$refs.addPromoModal && this.$refs.addPromoModal.openView) {
-        this.$refs.addPromoModal.openView(promotion)
-      }
-    },
-
-    editPromotion(promotion) {
-      if (this.$refs.addPromoModal && this.$refs.addPromoModal.openEdit) {
-        this.$refs.addPromoModal.openEdit(promotion)
-      }
-    },
-
-    async deletePromotion(promotion) {
-      const confirmed = confirm(`Are you sure you want to delete "${promotion.promotion_name}"?`)
-      if (!confirmed) return
-
-      try {
-        this.loading = true
-        const result = await promotionApiService.deletePromotion(promotion.promotion_id)
-        
-        if (result.success) {
-          alert('Promotion deleted successfully')
-          await this.loadPromotions()
-        } else {
-          alert('Delete failed: ' + result.message)
-        }
-      } catch (error) {
-        console.error('Delete error:', error)
-        alert('Delete failed: ' + error.message)
-      } finally {
-        this.loading = false
-      }
+      return classes[status] || 'bg-secondary'
     }
   }
 }
 </script>
 
 <style scoped>
-/* Keep existing styles */
 .promotions-page {
-  min-height: 100vh;
-  background-color: var(--neutral-light);
+  padding: 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-.action-bar-container {
-  background: white;
+.page-header {
+  margin-bottom: 1.5rem;
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem 0;
+}
+
+.page-subtitle {
+  color: var(--text-tertiary);
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.loading-state,
+.error-state,
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  background: var(--surface-primary);
   border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  padding: 1rem;
+  box-shadow: var(--shadow-md);
+  margin-top: 1rem;
 }
 
-.action-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-}
-
-.filters-section {
-  flex-shrink: 0;
-}
-
-.search-toggle-btn {
-  width: 40px;
-  height: 40px;
+.spinner-border {
+  width: 2rem;
+  height: 2rem;
+  border: 0.25em solid currentColor;
+  border-right-color: transparent;
   border-radius: 50%;
+  animation: spinner-border 0.75s linear infinite;
+}
+
+@keyframes spinner-border {
+  to { transform: rotate(360deg); }
+}
+
+.alert {
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.alert-danger {
+  background-color: var(--status-error-bg);
+  color: var(--status-error);
+  border: 1px solid var(--status-error);
+}
+
+.empty-state .card {
+  background: var(--surface-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 0.75rem;
+}
+
+.empty-state .card-body {
+  padding: 3rem;
+}
+
+.empty-message {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.empty-submessage {
+  color: var(--text-tertiary);
+  margin-bottom: 1.5rem;
+}
+
+.checkbox-column {
+  width: 40px;
+  text-align: center;
+}
+
+.d-flex {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  flex-shrink: 0;
 }
 
-.filter-group {
-  min-width: 140px;
+.gap-1 {
+  gap: 0.25rem;
 }
 
-.filter-label {
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
   font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--tertiary-medium);
-  margin-bottom: 0.25rem;
-  display: block;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
-.search-container {
-  min-width: 300px;
+.badge.bg-primary {
+  background: var(--primary-light);
+  color: var(--primary-dark);
 }
 
-.search-input {
-  padding-right: 2.5rem;
-  height: calc(1.5em + 0.75rem + 2px);
+.badge.bg-warning {
+  background: var(--status-warning-bg);
+  color: var(--status-warning);
 }
 
-.btn.active {
-  background-color: var(--primary);
-  border-color: var(--primary);
-  color: white;
+.badge.bg-info {
+  background: var(--status-info-bg);
+  color: var(--status-info);
 }
 
-@media (max-width: 768px) {
-  .action-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 1rem;
-  }
-  
-  .filters-section {
-    justify-content: flex-start;
-  }
-  
-  .filter-group {
-    min-width: 120px;
-  }
-  
-  .search-container {
-    min-width: 100%;
-  }
+.badge.bg-success {
+  background: var(--status-success-bg);
+  color: var(--status-success);
+}
+
+.badge.bg-secondary {
+  background: var(--surface-tertiary);
+  color: var(--text-tertiary);
+}
+
+.badge.bg-danger {
+  background: var(--status-error-bg);
+  color: var(--status-error);
 }
 </style>
