@@ -1,12 +1,9 @@
-# ========================================
-# ENHANCED AUDIT SERVICE with String _id Format
-# audit_service.py - Using generated AUD-###### as MongoDB _id
-# ========================================
-
 from datetime import datetime
 from bson import ObjectId
 from ..database import db_manager
 import logging
+
+logger = logging.getLogger(__name__)
 
 class AuditLogService:
     def __init__(self):
@@ -701,3 +698,74 @@ class AuditLogService:
             }
         except Exception as e:
             return {'success': False, 'error': str(e)}
+
+    def get_resource_audit_history(self, resource_type, resource_id, limit=50):
+        """Get audit history for a specific resource"""
+        try:
+            query = {
+                'resource_type': resource_type,
+                'resource_id': resource_id
+            }
+            
+            # Query audit logs sorted by timestamp (most recent first)
+            audit_logs = list(self.collection.find(query)
+                            .sort('timestamp', -1)
+                            .limit(limit))
+            
+            # Serialize the audit logs to handle ObjectId and datetime
+            serialized_logs = []
+            for log in audit_logs:
+                serialized_log = self._serialize_audit_log(log)
+                serialized_logs.append(serialized_log)
+            
+            return {
+                'success': True,
+                'audit_logs': serialized_logs,
+                'count': len(serialized_logs)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting resource audit history: {e}")
+            return {
+                'success': False,
+                'message': f'Error retrieving audit history: {str(e)}',
+                'audit_logs': []
+            }
+
+    def _serialize_audit_log(self, log):
+        """Serialize audit log for JSON response"""
+        if not log:
+            return {}
+        
+        # Convert ObjectId to string
+        if '_id' in log:
+            log['_id'] = str(log['_id'])
+        
+        # Convert datetime objects to ISO strings
+        datetime_fields = ['timestamp', 'created_at', 'updated_at']
+        for field in datetime_fields:
+            if field in log and log[field]:
+                if hasattr(log[field], 'isoformat'):
+                    log[field] = log[field].isoformat()
+        
+        # Handle nested data
+        if 'changes' in log and isinstance(log['changes'], dict):
+            log['changes'] = self._serialize_nested_data(log['changes'])
+        
+        if 'metadata' in log and isinstance(log['metadata'], dict):
+            log['metadata'] = self._serialize_nested_data(log['metadata'])
+        
+        return log
+
+    def _serialize_nested_data(self, data):
+        """Recursively serialize nested data structures"""
+        if isinstance(data, dict):
+            return {key: self._serialize_nested_data(value) for key, value in data.items()}
+        elif isinstance(data, list):
+            return [self._serialize_nested_data(item) for item in data]
+        elif hasattr(data, 'isoformat'):  # datetime
+            return data.isoformat()
+        elif type(data).__name__ == 'ObjectId':
+            return str(data)
+        else:
+            return data
