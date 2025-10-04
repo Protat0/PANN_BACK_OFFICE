@@ -23,12 +23,12 @@
                 </div>
                 <div class="col-md-6 mb-3">
                   <label class="form-label">Discount Type <span class="text-danger">*</span></label>
-                 <select class="form-select" v-model="formData.discount_type" required>
-                  <option value="">Select discount type</option>
-                  <option value="percentage">Percentage</option>
-                  <option value="fixed_amount">Fixed Amount</option>  <!-- Changed from 'fixed' -->
-                  <option value="buy_x_get_y">Buy One Get One (BOGO)</option>  <!-- Changed from 'buy_one_get_one' -->
-                </select>
+                  <select class="form-select" v-model="formData.discount_type" required>
+                    <option value="">Select discount type</option>
+                    <option value="percentage">Percentage</option>
+                    <option value="fixed_amount">Fixed Amount</option>
+                    <option value="buy_x_get_y">Buy One Get One (BOGO)</option>
+                  </select>
                 </div>
                 <div class="col-md-6 mb-3">
                   <label class="form-label">Discount Value <span class="text-danger">*</span></label>
@@ -51,9 +51,9 @@
                 <div class="col-md-6 mb-3">
                   <label class="form-label">Status</label>
                   <select class="form-select" v-model="formData.status">
+                    <option value="scheduled">Scheduled</option>
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
-                    <option value="scheduled">Scheduled</option>
                   </select>
                 </div>
                 <div class="col-md-6 mb-3">
@@ -84,16 +84,38 @@
                     />
                   </div>
                 </div>
-                <div class="col-12 mb-3">
-                  <label class="form-label">Affected Products <span class="text-danger">*</span></label>
-                  <select class="form-select" v-model="formData.affected_products" required>
-                    <option value="">Select product category</option>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Usage Limit</label>
+                  <input 
+                    type="number" 
+                    class="form-control" 
+                    v-model="formData.usage_limit"
+                    placeholder="Leave empty for unlimited"
+                    min="1"
+                    step="1"
+                  >
+                  <small class="form-text text-muted">Maximum number of times this promotion can be used (optional)</small>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Apply to Category <span class="text-danger">*</span></label>
+                  <select class="form-select" v-model="formData.affected_category" required>
+                    <option value="">Select category</option>
                     <option value="all">All Products</option>
                     <option value="noodles">Noodles</option>
                     <option value="drinks">Drinks</option>
                     <option value="toppings">Toppings</option>
                   </select>
-                  <small class="form-text text-muted">Choose which category of products this promotion applies to</small>
+                  <small class="form-text text-muted">Choose which category this promotion applies to</small>
+                </div>
+                <div class="col-12 mb-3">
+                  <label class="form-label">Description</label>
+                  <textarea 
+                    class="form-control" 
+                    v-model="formData.description"
+                    placeholder="Enter promotion description (optional)"
+                    rows="3"
+                  ></textarea>
+                  <small class="form-text text-muted">Add details about this promotion (optional)</small>
                 </div>
               </div>
             </form>
@@ -117,8 +139,8 @@
                   <select class="form-select" v-model="formData.discount_type" required>
                     <option value="">Select discount type</option>
                     <option value="percentage">Percentage</option>
-                    <option value="fixed_amount">Fixed Amount</option>  <!-- Changed -->
-                    <option value="buy_x_get_y">Buy One Get One (BOGO)</option>  <!-- Changed -->
+                    <option value="fixed_amount">Fixed Amount</option>
+                    <option value="buy_x_get_y">Buy One Get One (BOGO)</option>
                   </select>
                 </div>
                 <div class="col-md-6 mb-3">
@@ -142,10 +164,10 @@
                 <div class="col-md-6 mb-3">
                   <label class="form-label">Status</label>
                   <select class="form-select" v-model="formData.status">
+                    <option value="scheduled">Scheduled</option>
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                     <option value="expired">Expired</option>
-                    <option value="scheduled">Scheduled</option>
                   </select>
                 </div>
                 <div class="col-md-6 mb-3">
@@ -176,6 +198,29 @@
                     />
                   </div>
                 </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Usage Limit</label>
+                  <input 
+                    type="number" 
+                    class="form-control" 
+                    v-model="formData.usage_limit"
+                    placeholder="Leave empty for unlimited"
+                    min="1"
+                    step="1"
+                  >
+                  <small class="form-text text-muted">Maximum number of times this promotion can be used (optional)</small>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Apply to Category <span class="text-danger">*</span></label>
+                  <select class="form-select" v-model="formData.affected_category" required>
+                    <option value="">Select category</option>
+                    <option value="all">All Products</option>
+                    <option value="noodles">Noodles</option>
+                    <option value="drinks">Drinks</option>
+                    <option value="toppings">Toppings</option>
+                  </select>
+                  <small class="form-text text-muted">Choose which category this promotion applies to</small>
+                </div>
                 <div class="col-12 mb-3">
                   <label class="form-label">Description</label>
                   <textarea 
@@ -184,24 +229,13 @@
                     placeholder="Enter promotion description (optional)"
                     rows="3"
                   ></textarea>
-                </div>
-                <div class="col-12 mb-3">
-                  <label class="form-label">Affected Products <span class="text-danger">*</span></label>
-                  <select class="form-select" v-model="formData.affected_products" required>
-                    <option value="">Select product category</option>
-                    <option value="all">All Products</option>
-                    <option value="noodles">Noodles</option>
-                    <option value="drinks">Drinks</option>
-                    <option value="toppings">Toppings</option>
-                  </select>
-                  <small class="form-text text-muted">Choose which category of products this promotion applies to</small>
+                  <small class="form-text text-muted">Add details about this promotion (optional)</small>
                 </div>
               </div>
             </form>
           </div>
 
           <div v-if="mode === 'view'" class="view-mode">
-            <p class="text-tertiary-medium">View promotion details...</p>
             <div class="promotion-details" v-if="selectedPromotion">
               <div class="row">
                 <div class="col-md-6 mb-3">
@@ -236,13 +270,33 @@
                   <label class="form-label text-tertiary-dark fw-semibold">End Date</label>
                   <div class="form-control-plaintext">{{ formatDate(selectedPromotion.end_date) }}</div>
                 </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label text-tertiary-dark fw-semibold">Usage Limit</label>
+                  <div class="form-control-plaintext">
+                    {{ selectedPromotion.usage_limit === null || selectedPromotion.usage_limit === undefined ? 'Unlimited' : selectedPromotion.usage_limit }}
+                  </div>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label text-tertiary-dark fw-semibold">Current Usage</label>
+                  <div class="form-control-plaintext">
+                    {{ selectedPromotion.current_usage || 0 }}
+                    <span v-if="selectedPromotion.usage_limit !== null && selectedPromotion.usage_limit !== undefined" class="text-muted">
+                      / {{ selectedPromotion.usage_limit }}
+                    </span>
+                    <span v-else class="text-muted">(Unlimited)</span>
+                  </div>
+                </div>
                 <div class="col-12 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">Affected Products</label>
+                  <label class="form-label text-tertiary-dark fw-semibold">Applied to Category</label>
                   <div class="form-control-plaintext">
                     <span class="badge bg-info text-white">
-                      {{ formatAffectedProducts(selectedPromotion.applicable_products) }}
+                      {{ formatCategory(selectedPromotion.affected_category) }}
                     </span>
                   </div>
+                </div>
+                <div class="col-12 mb-3" v-if="selectedPromotion.description">
+                  <label class="form-label text-tertiary-dark fw-semibold">Description</label>
+                  <div class="form-control-plaintext">{{ selectedPromotion.description }}</div>
                 </div>
                 <div class="col-12 mb-3">
                   <label class="form-label text-tertiary-dark fw-semibold">Last Updated</label>
@@ -281,20 +335,23 @@
 
 <script>
 import promotionApiService from '@/services/apiPromotions.js'
+
 export default {
   name: 'AddPromoModal',
   data() {
     return {
-      mode: 'add', // 'add', 'edit', 'view'
+      mode: 'add',
       selectedPromotion: null,
       formData: {
         promotion_name: '',
         discount_type: '',
         discount_value: '',
-        status: 'active',
+        status: 'scheduled',
         start_date: '',
         end_date: '',
-        affected_products: ''
+        affected_category: '',
+        usage_limit: null,
+        description: ''
       }
     }
   },
@@ -309,7 +366,6 @@ export default {
     }
   },
   methods: {
-    // Mode switching methods
     openAdd() {
       this.mode = 'add'
       this.selectedPromotion = null
@@ -332,31 +388,34 @@ export default {
       this.populateForm(this.selectedPromotion)
     },
 
-    // Form management methods
     resetForm() {
       this.formData = {
         promotion_name: '',
         discount_type: '',
         discount_value: '',
-        status: 'active',
+        status: 'scheduled',
         start_date: '',
         end_date: '',
-        affected_products: '',
-        description: ''  
+        affected_category: '',
+        usage_limit: null,
+        description: ''
       }
     },
+    
     populateForm(promotion) {
       this.formData = {
         promotion_name: promotion.promotion_name || '',
         discount_type: promotion.discount_type || '',
         discount_value: promotion.discount_value || '',
-        status: promotion.status || 'active',
+        status: promotion.status || 'scheduled',
         start_date: promotion.start_date || '',
         end_date: promotion.end_date || '',
-        affected_products: this.mapApplicableProductsToCategory(promotion.applicable_products) || '',
-        description: promotion.description || ''  // Add this
+        affected_category: promotion.affected_category || '',
+        usage_limit: promotion.usage_limit || null,
+        description: promotion.description || ''
       }
     },
+
     validateForm() {
       if (!this.formData.promotion_name.trim()) {
         alert('Please enter a promotion name')
@@ -374,8 +433,8 @@ export default {
         alert('Percentage discount cannot exceed 100%')
         return false
       }
-      if (!this.formData.affected_products) {
-        alert('Please select which products this promotion affects')
+      if (!this.formData.affected_category) {
+        alert('Please select which category this promotion affects')
         return false
       }
       if (!this.formData.start_date) {
@@ -390,10 +449,19 @@ export default {
         alert('End date must be after start date')
         return false
       }
+      if (this.formData.usage_limit !== null && 
+          this.formData.usage_limit !== undefined && 
+          this.formData.usage_limit !== '') {
+        const limit = parseInt(this.formData.usage_limit);
+        if (isNaN(limit) || limit <= 0) {
+          alert('Usage limit must be a positive number or leave empty for unlimited')
+          return false
+        }
+      }
+      
       return true
     },
 
-    // Modal control methods
     openModal() {
       const modalElement = document.getElementById('addPromoModal')
       if (modalElement) {
@@ -401,6 +469,7 @@ export default {
         modal.show()
       }
     },
+
     closeModal() {
       const modalElement = document.getElementById('addPromoModal')
       if (modalElement) {
@@ -411,86 +480,86 @@ export default {
       }
     },
 
-    // Action methods
     async savePromotion() {
       if (!this.validateForm()) return
       
       try {
-        console.log('Save new promotion:', this.formData)
+        console.log('Creating promotion with data:', this.formData);
         
-        // Call the API to create the promotion
-        const result = await promotionApiService.createPromotion(this.formData)
+        const result = await promotionApiService.createPromotion(this.formData);
+        
+        console.log('Create promotion result:', result);
         
         if (result.success) {
-          alert('Promotion created successfully!')
-          
-          // Emit success event to parent
+          alert('Promotion created successfully!');
           this.$emit('promotion-saved', {
             action: 'add',
             data: result.promotion
-          })
-          
-          this.closeModal()
+          });
+          this.closeModal();
         } else {
-          alert('Failed to create promotion: ' + result.message)
+          alert('Failed to create promotion:\n' + result.message);
+          console.error('Backend errors:', result.errors);
         }
       } catch (error) {
-        console.error('Error saving promotion:', error)
-        alert('Error creating promotion: ' + error.message)
+        console.error('Error saving promotion:', error);
+        alert('Error creating promotion: ' + error.message);
       }
     },
+
     async updatePromotion() {
       if (!this.validateForm()) return
       
       try {
-        console.log('Update promotion:', {
+        console.log('Updating promotion:', {
           id: this.selectedPromotion.promotion_id,
           data: this.formData
-        })
+        });
         
-        // Call the API to update the promotion
         const result = await promotionApiService.updatePromotion(
           this.selectedPromotion.promotion_id, 
           this.formData
-        )
+        );
+        
+        console.log('Update promotion result:', result);
         
         if (result.success) {
-          alert('Promotion updated successfully!')
-          
-          // Emit success event to parent
+          alert('Promotion updated successfully!');
           this.$emit('promotion-saved', {
             action: 'edit',
             id: this.selectedPromotion.promotion_id,
             data: result.promotion
-          })
-          
-          this.closeModal()
+          });
+          this.closeModal();
         } else {
-          alert('Failed to update promotion: ' + result.message)
+          alert('Failed to update promotion:\n' + result.message);
+          console.error('Backend errors:', result.errors);
         }
       } catch (error) {
-        console.error('Error updating promotion:', error)
-        alert('Error updating promotion: ' + error.message)
+        console.error('Error updating promotion:', error);
+        alert('Error updating promotion: ' + error.message);
       }
     },
 
-    // Formatting methods (same as Promotions page)
+    // Formatting methods
     formatDiscountType(type) {
       const types = {
         'percentage': 'Percentage',
-        'fixed': 'Fixed Amount',
-        'buy_one_get_one': 'BOGO'
+        'fixed_amount': 'Fixed Amount',
+        'buy_x_get_y': 'BOGO'
       }
       return types[type] || type
     },
+
     formatDiscountValue(value, type) {
       if (type === 'percentage') {
         return `${value}%`
-      } else if (type === 'fixed') {
+      } else if (type === 'fixed_amount') {
         return `₱${value}`
       }
       return value
     },
+
     formatStatus(status) {
       const statuses = {
         'active': 'Active',
@@ -500,6 +569,7 @@ export default {
       }
       return statuses[status] || status
     },
+
     formatDate(dateString) {
       if (!dateString) return '—'
       return new Date(dateString).toLocaleDateString('en-US', {
@@ -508,7 +578,9 @@ export default {
         day: 'numeric'
       })
     },
+
     formatDateTime(dateString) {
+      if (!dateString) return '—'
       return new Date(dateString).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
@@ -517,14 +589,26 @@ export default {
         minute: '2-digit'
       })
     },
+
+    formatCategory(category) {
+      const categories = {
+        'all': 'All Products',
+        'noodles': 'Noodles',
+        'drinks': 'Drinks',
+        'toppings': 'Toppings'
+      }
+      return categories[category] || category
+    },
+
     getDiscountTypeBadgeClass(type) {
       const classes = {
         'percentage': 'bg-primary text-white',
-        'fixed': 'bg-success text-white',
-        'buy_one_get_one': 'bg-info text-white'
+        'fixed_amount': 'bg-success text-white',
+        'buy_x_get_y': 'bg-info text-white'
       }
       return classes[type] || 'bg-secondary text-white'
     },
+
     getStatusBadgeClass(status) {
       const classes = {
         'active': 'bg-success text-white',
@@ -533,55 +617,6 @@ export default {
         'scheduled': 'bg-warning text-dark'
       }
       return classes[status] || 'bg-secondary text-white'
-    },
-    formatAffectedProducts(applicableProducts) {
-      if (!applicableProducts || applicableProducts.length === 0) {
-        return 'No products selected'
-      }
-      
-      // For demo purposes, map product IDs to categories
-      // This would typically come from your product data
-      const categoryMap = {
-        'prod1': 'Noodles',
-        'prod2': 'Noodles', 
-        'prod3': 'Drinks',
-        'prod4': 'Toppings'
-      }
-      
-      const categories = [...new Set(applicableProducts.map(id => categoryMap[id] || 'Unknown'))]
-      
-      if (categories.length === 1) {
-        return categories[0]
-      } else if (categories.length <= 3) {
-        return categories.join(', ')
-      } else {
-        return `${categories.length} Categories`
-      }
-    },
-    mapApplicableProductsToCategory(applicableProducts) {
-      if (!applicableProducts || applicableProducts.length === 0) {
-        return ''
-      }
-      
-      // For demo purposes - this would be more sophisticated in a real app
-      // Map the first product ID to determine category selection
-      const categoryMap = {
-        'prod1': 'noodles',
-        'prod2': 'noodles',
-        'prod3': 'drinks', 
-        'prod4': 'toppings'
-      }
-      
-      const firstProductCategory = categoryMap[applicableProducts[0]]
-      
-      // Check if all products are from the same category
-      const allSameCategory = applicableProducts.every(id => categoryMap[id] === firstProductCategory)
-      
-      if (allSameCategory) {
-        return firstProductCategory || 'all'
-      } else {
-        return 'all' // Mixed categories = all products
-      }
     }
   }
 }
@@ -623,7 +658,6 @@ export default {
   color: var(--tertiary-dark);
 }
 
-/* Form styling */
 .form-label {
   font-weight: 500;
   color: var(--tertiary-dark);
@@ -643,14 +677,6 @@ export default {
 .form-select:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
-}
-
-.form-control:disabled,
-.form-select:disabled {
-  background-color: var(--neutral-light);
-  border-color: var(--neutral-medium);
-  color: var(--tertiary-medium);
-  cursor: not-allowed;
 }
 
 .input-group-text {
@@ -673,7 +699,6 @@ export default {
   color: var(--tertiary-medium) !important;
 }
 
-/* Date picker styling - Override global styles for this modal */
 .date-picker-wrapper {
   position: relative;
 }
@@ -682,7 +707,6 @@ export default {
   width: 100%;
 }
 
-/* Override the global dp__input styles specifically for this modal */
 .modal-content .custom-datepicker .dp__input {
   border: 1px solid var(--neutral) !important;
   border-radius: 0.5rem !important;
@@ -700,94 +724,15 @@ export default {
   border-color: var(--primary) !important;
   box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25) !important;
   outline: none !important;
-  background-color: var(--bg-secondary) !important;
 }
 
-.modal-content .custom-datepicker .dp__input:hover {
-  border-color: var(--primary) !important;
-}
-
-/* Position the calendar icon properly within the modal */
-.modal-content .custom-datepicker .dp__input_wrap {
-  position: relative !important;
-  width: 100% !important;
-}
-
-.modal-content .custom-datepicker .dp__input_icon {
-  position: absolute !important;
-  right: 0.875rem !important;
-  top: 50% !important;
-  transform: translateY(-50%) !important;
-  color: var(--tertiary-medium) !important;
-  pointer-events: none !important;
-  z-index: 10 !important;
-  width: 1rem !important;
-  height: 1rem !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-.modal-content .custom-datepicker .dp__input_icon svg {
-  width: 14px !important;
-  height: 14px !important;
-  display: block !important;
-}
-
-/* Ensure the datepicker menu appears above modal */
 .modal-content .custom-datepicker .dp__menu {
   z-index: 1060 !important;
   border: 1px solid var(--neutral) !important;
   border-radius: 0.75rem !important;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
-  background-color: var(--bg-secondary) !important;
 }
 
-:deep(.dp__menu) {
-  border: 1px solid var(--neutral);
-  border-radius: 0.75rem;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-  margin-top: 0.25rem;
-}
-
-:deep(.dp__calendar_header) {
-  background-color: var(--primary-light);
-  color: var(--primary-dark);
-  font-weight: 600;
-}
-
-:deep(.dp__today) {
-  border: 2px solid var(--primary);
-}
-
-:deep(.dp__active_date) {
-  background-color: var(--primary);
-  color: white;
-}
-
-:deep(.dp__date_hover) {
-  background-color: var(--primary-light);
-  color: var(--primary-dark);
-}
-
-:deep(.dp__calendar_item) {
-  padding: 0.5rem;
-  text-align: center;
-  cursor: pointer;
-  border-radius: 0.375rem;
-  transition: all 0.2s ease;
-}
-
-:deep(.dp__calendar_item:hover) {
-  background-color: var(--primary-light);
-  color: var(--primary-dark);
-}
-
-:deep(.dp__overlay) {
-  z-index: 1050;
-}
-
-/* View mode styling */
 .form-control-plaintext {
   padding: 0.375rem 0;
   color: var(--tertiary-dark);
@@ -796,18 +741,12 @@ export default {
   font-weight: 500;
 }
 
-.promotion-details .form-label {
-  font-size: 0.875rem;
-  margin-bottom: 0.25rem;
-}
-
 .badge {
   font-size: 0.75rem;
   padding: 0.375rem 0.75rem;
   border-radius: 0.5rem;
 }
 
-/* Responsive adjustments */
 @media (max-width: 768px) {
   .modal-dialog {
     margin: 0.5rem;
@@ -817,10 +756,6 @@ export default {
   .modal-body,
   .modal-footer {
     padding: 1rem;
-  }
-  
-  .col-md-6 {
-    margin-bottom: 1rem;
   }
 }
 </style>
