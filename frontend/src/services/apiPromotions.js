@@ -60,6 +60,7 @@ class PromotionApiService {
       start_date: backendData.start_date,
       end_date: backendData.end_date,
       status: backendData.status,
+      is_deleted: backendData.isDeleted || false,
       last_updated: backendData.updated_at || backendData.last_updated,
       target_type: backendData.target_type,
       usage_limit: backendData.usage_limit,

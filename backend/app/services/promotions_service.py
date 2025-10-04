@@ -62,10 +62,10 @@ class PromotionService:
                     'errors': validation_result['errors']
                 }
                 
-            # Build promotion document
+            # Build promotion document - REMOVED is_active
             promotion = {
-                '_id': promotion_id,  # Use promotion_id as the MongoDB _id
-                'promotion_id': promotion_id,  # Keep this for consistency with your code
+                '_id': promotion_id,
+                'promotion_id': promotion_id,
                 'name': promotion_data['name'],
                 'description': promotion_data.get('description', ''),
                 'type': promotion_data['type'],
@@ -75,7 +75,7 @@ class PromotionService:
                 'target_ids': promotion_data.get('target_ids', []),
                 'start_date': promotion_data['start_date'],
                 'end_date': promotion_data['end_date'],
-                'is_active': False,
+                'isDeleted': False,
                 'usage_limit': promotion_data.get('usage_limit'),
                 'current_usage': 0,
                 'total_revenue_impact': 0.0,
@@ -244,7 +244,6 @@ class PromotionService:
         try:
             promotion = self.collection.find_one({'promotion_id': promotion_id})
             if not promotion:
-                # Log failed activation attempt
                 self.audit_service.log_action(
                     action='promotion_activation_failed',
                     resource_type='promotion',
@@ -255,13 +254,16 @@ class PromotionService:
                 )
                 return {'success': False, 'message': 'Promotion not found'}
             
+            # Check if deleted
+            if promotion.get('isDeleted'):
+                return {'success': False, 'message': 'Cannot activate deleted promotion'}
+            
             # Store pre-activation state
             pre_activation_status = promotion['status']
             
             # Validate promotion targets still exist
             validation_result = self._validate_promotion_targets(promotion)
             if not validation_result['is_valid']:
-                # Log validation failure
                 self.audit_service.log_action(
                     action='promotion_activation_failed',
                     resource_type='promotion',
@@ -303,12 +305,11 @@ class PromotionService:
                 )
                 return {'success': False, 'message': 'Promotion has expired'}
             
-            # Activate promotion
+            # Activate promotion - ONLY UPDATE STATUS
             self.collection.update_one(
                 {'promotion_id': promotion_id},
                 {
                     '$set': {
-                        'is_active': True,
                         'status': 'active',
                         'activated_at': now,
                         'activated_by': user_id,
@@ -598,7 +599,6 @@ class PromotionService:
             # Get existing promotion for audit
             existing_promotion = self.collection.find_one({'promotion_id': promotion_id})
             if not existing_promotion:
-                # Log attempt to delete non-existent promotion
                 self.audit_service.log_action(
                     action='promotion_delete_failed',
                     resource_type='promotion',
@@ -610,8 +610,7 @@ class PromotionService:
                 return {'success': False, 'message': 'Promotion not found'}
             
             # Check if promotion is currently active
-            if existing_promotion.get('is_active'):
-                # Log attempt to delete active promotion
+            if existing_promotion.get('status') == 'active':
                 self.audit_service.log_action(
                     action='promotion_delete_failed',
                     resource_type='promotion',
@@ -632,7 +631,7 @@ class PromotionService:
                     {
                         '$set': {
                             'status': 'deleted',
-                            'is_active': False,
+                            'isDeleted': True,
                             'deleted_at': datetime.utcnow(),
                             'deleted_by': user_id,
                             'updated_at': datetime.utcnow()
@@ -661,7 +660,7 @@ class PromotionService:
                 },
                 metadata={
                     'soft_delete': soft_delete,
-                    'promotion_was_active': existing_promotion.get('is_active', False),
+                    'promotion_was_active': existing_promotion.get('status') == 'active',
                     'promotion_type': existing_promotion.get('type')
                 }
             )
@@ -733,7 +732,7 @@ class PromotionService:
             if not existing_promotion:
                 return {'success': False, 'message': 'Promotion not found'}
             
-            if existing_promotion.get('status') != 'deleted':
+            if not existing_promotion.get('isDeleted'):
                 return {'success': False, 'message': 'Promotion is not deleted'}
             
             # Restore promotion
@@ -744,13 +743,14 @@ class PromotionService:
             if now > existing_promotion['end_date']:
                 restore_status = 'expired'
             elif now >= existing_promotion['start_date'] and now <= existing_promotion['end_date']:
-                restore_status = 'scheduled'  # Will need manual activation
+                restore_status = 'scheduled'
             
             self.collection.update_one(
                 {'promotion_id': promotion_id},
                 {
                     '$set': {
                         'status': restore_status,
+                        'isDeleted': False,
                         'restored_at': now,
                         'restored_by': user_id,
                         'updated_at': now
@@ -788,7 +788,7 @@ class PromotionService:
     def get_deleted_promotions(self, page=1, limit=20):
         """Get all soft-deleted promotions"""
         try:
-            query = {'status': 'deleted'}
+            query = {'isDeleted': True}
             
             skip = (page - 1) * limit
             
@@ -797,12 +797,17 @@ class PromotionService:
                                     .skip(skip)
                                     .limit(limit))
             
+            # Serialize promotions
+            serialized_promotions = []
+            for promotion in deleted_promotions:
+                serialized_promotions.append(self._serialize_promotion_data(promotion))
+            
             total_count = self.collection.count_documents(query)
             total_pages = (total_count + limit - 1) // limit
             
             return {
                 'success': True,
-                'promotions': deleted_promotions,
+                'promotions': serialized_promotions,
                 'pagination': {
                     'current_page': page,
                     'total_pages': total_pages,
@@ -889,7 +894,7 @@ class PromotionService:
             now = datetime.utcnow()
             
             active_promotions = list(self.collection.find({
-                'is_active': True,
+                'isDeleted': {'$ne': True},
                 'status': 'active',
                 'start_date': {'$lte': now},
                 'end_date': {'$gte': now}
@@ -935,12 +940,12 @@ class PromotionService:
             
             # Exclude deleted promotions by default
             if not filters or not filters.get('include_deleted'):
-                query['status'] = {'$ne': 'deleted'}
+                query['isDeleted'] = {'$ne': True}
             
             if filters:
                 # Add your existing filter logic here...
                 pass
-            
+                
             # Calculate pagination
             skip = (page - 1) * limit
             
@@ -1104,7 +1109,7 @@ class PromotionService:
             errors = []
             
             # Cannot update certain fields if promotion is active
-            if existing_promotion.get('is_active'):
+            if existing_promotion.get('status') == 'active':
                 restricted_fields = ['type', 'discount_value', 'target_type', 'target_ids']
                 for field in restricted_fields:
                     if field in update_data:
@@ -1356,12 +1361,11 @@ class PromotionService:
             if not promotion:
                 return {'success': False, 'message': 'Promotion not found'}
             
-            # Update promotion status
+            # Update promotion status - ONLY UPDATE STATUS
             self.collection.update_one(
                 {'promotion_id': promotion_id},
                 {
                     '$set': {
-                        'is_active': False,
                         'status': 'expired',
                         'expired_at': datetime.utcnow(),
                         'updated_at': datetime.utcnow()
@@ -1408,16 +1412,15 @@ class PromotionService:
             if not promotion:
                 return {'success': False, 'message': 'Promotion not found'}
             
-            if not promotion.get('is_active'):
+            if promotion.get('status') != 'active':
                 return {'success': False, 'message': 'Promotion is not active'}
             
-            # Deactivate promotion
+            # Deactivate promotion - ONLY UPDATE STATUS
             self.collection.update_one(
                 {'promotion_id': promotion_id},
                 {
                     '$set': {
-                        'is_active': False,
-                        'status': 'deactivated',
+                        'status': 'inactive',
                         'deactivated_at': datetime.utcnow(),
                         'deactivated_by': user_id,
                         'updated_at': datetime.utcnow()
@@ -1432,7 +1435,7 @@ class PromotionService:
                 resource_id=promotion_id,
                 user_id=user_id,
                 changes={
-                    'status_change': {'from': 'active', 'to': 'deactivated'},
+                    'status_change': {'from': 'active', 'to': 'inactive'},
                     'usage_at_deactivation': promotion.get('current_usage', 0)
                 },
                 metadata={'deactivation_reason': 'manual_deactivation'}
