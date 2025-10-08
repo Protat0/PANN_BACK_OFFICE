@@ -19,6 +19,8 @@ class ProductListView(APIView):
             filters = {}
             if request.GET.get('category_id'):
                 filters['category_id'] = request.GET.get('category_id')
+            if request.GET.get('subcategory_name'):  # ADDED subcategory filtering
+                filters['subcategory_name'] = request.GET.get('subcategory_name')
             if request.GET.get('status'):
                 filters['status'] = request.GET.get('status')
             if request.GET.get('stock_level'):
@@ -49,15 +51,8 @@ class ProductListView(APIView):
         try:
             product_service = ProductService()
             
-            # Debug the incoming data
-            print(f"=== DJANGO VIEW DEBUG ===")
-            print(f"request.data type: {type(request.data)}")
-            print(f"request.data: {request.data}")
-            
             # Convert to plain dict
             product_data = dict(request.data)
-            print(f"Converted to dict type: {type(product_data)}")
-            print(f"Converted dict: {product_data}")
             
             new_product = product_service.create_product(product_data)
             return Response({
@@ -65,35 +60,15 @@ class ProductListView(APIView):
                 'data': new_product
             }, status=status.HTTP_201_CREATED)
         except ValueError as ve:
-            print(f"ValueError: {ve}")
             return Response(
                 {"error": str(ve)}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         except Exception as e:
-            print(f"Exception: {e}")
             logger.error(f"Error in ProductListView.post: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-
-class ProductCreateView(APIView):
-    def post(self, request):
-        """Create a new product (dedicated endpoint)"""
-        try:
-            product_service = ProductService()
-            product_data = request.data
-            new_product = product_service.create_product(product_data)
-            return Response({
-                'message': 'Product created successfully', 
-                'data': new_product
-            }, status=status.HTTP_201_CREATED)
-        except Exception as e:
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_400_BAD_REQUEST
             )
 
 class ProductDetailView(APIView):
@@ -119,10 +94,11 @@ class ProductDetailView(APIView):
             )
     
     def put(self, request, product_id):
-        """Update product"""
+        """Update product - SIMPLIFIED (no complex category sync)"""
         try:
             product_service = ProductService()
             product_data = request.data
+            
             updated_product = product_service.update_product(product_id, product_data)
             if not updated_product:
                 return Response(
@@ -169,11 +145,13 @@ class ProductDetailView(APIView):
             )
         
     def patch(self, request, product_id):
-        """Partial update product"""
+        """Partial update product - SIMPLIFIED"""
         try:
             product_service = ProductService()
             product_data = request.data
-            updated_product = product_service.update_product(product_id, product_data, partial_update=True)
+            
+            # Note: Removed partial_update parameter since the refactored service doesn't need it
+            updated_product = product_service.update_product(product_id, product_data)
             if not updated_product:
                 return Response(
                     {"error": "Product not found"}, 
@@ -190,55 +168,6 @@ class ProductDetailView(APIView):
             )
         except Exception as e:
             logger.error(f"Error in ProductDetailView.patch: {e}")
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-class ProductUpdateView(APIView):
-    def put(self, request, product_id):
-        """Update product (dedicated endpoint)"""
-        try:
-            product_service = ProductService()
-            product_data = request.data
-            updated_product = product_service.update_product(product_id, product_data)
-            if not updated_product:
-                return Response(
-                    {"error": "Product not found"}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            return Response({
-                'message': 'Product updated successfully', 
-                'data': updated_product
-            }, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-    
-    def patch(self, request, product_id):
-        """Partial update product"""
-        return self.put(request, product_id)
-
-class ProductDeleteView(APIView):
-    def delete(self, request, product_id):
-        """Delete product (dedicated endpoint)"""
-        try:
-            product_service = ProductService()
-            hard_delete = request.GET.get('hard_delete', 'false').lower() == 'true'
-            deleted = product_service.delete_product(product_id, hard_delete)
-            if not deleted:
-                return Response(
-                    {"error": "Product not found"}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            delete_type = "permanently deleted" if hard_delete else "moved to trash"
-            return Response(
-                {"message": f"Product {delete_type} successfully"}, 
-                status=status.HTTP_200_OK
-            )
-        except Exception as e:
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -265,7 +194,6 @@ class ProductRestoreView(APIView):
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
 
 class ProductBySkuView(APIView):
     def get(self, request, sku):
@@ -525,12 +453,19 @@ class ExpiringProductsView(APIView):
 
 class ProductsByCategoryView(APIView):
     def get(self, request, category_id):
-        """Get products by category"""
+        """Get products by category with optional subcategory filter"""
         try:
             product_service = ProductService()
-            products = product_service.get_products_by_category(category_id)
+            subcategory_name = request.GET.get('subcategory_name')  # ADDED subcategory filtering
+            
+            products = product_service.get_products_by_category(category_id, subcategory_name)
+            
+            message = f'Found {len(products)} products in category'
+            if subcategory_name:
+                message += f' > {subcategory_name}'
+                
             return Response({
-                'message': f'Found {len(products)} products in category',
+                'message': message,
                 'data': products
             }, status=status.HTTP_200_OK)
         except Exception as e:
@@ -584,61 +519,6 @@ class ProductSyncView(APIView):
             
         except Exception as e:
             logger.error(f"Error in ProductSyncView.post: {e}")
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-class UnsyncedProductsView(APIView):
-    def get(self, request):
-        """Get products that need synchronization"""
-        try:
-            product_service = ProductService()
-            source = request.GET.get('source', 'local')
-            products = product_service.get_unsynced_products(source)
-            return Response({
-                'message': f'Found {len(products)} unsynced products',
-                'data': products
-            }, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-class SyncStatusView(APIView):
-    def get(self, request, product_id):
-        """Get sync status for a product"""
-        try:
-            product_service = ProductService()
-            product = product_service.get_product_by_id(product_id)
-            if not product:
-                return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
-            
-            return Response({
-                'product_id': product_id,
-                'sync_logs': product.get('sync_logs', [])
-            }, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-    def put(self, request, product_id):
-        """Update sync status for a product"""
-        try:
-            product_service = ProductService()
-            sync_status = request.data.get('status', 'pending')
-            source = request.data.get('source', 'cloud')
-            
-            success = product_service.update_sync_status(product_id, sync_status, source)
-            
-            if not success:
-                return Response(
-                    {"error": "Product not found or sync update failed"}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
-            return Response({
-                'message': 'Sync status updated successfully'
-            }, status=status.HTTP_200_OK)
-            
-        except Exception as e:
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -743,10 +623,12 @@ class ProductExportView(APIView):
             product_service = ProductService()
             file_type = request.GET.get('format', 'csv').lower()
             
-            # Get filters
+            # Get filters - UPDATED to include subcategory
             filters = {}
             if request.GET.get('category_id'):
                 filters['category_id'] = request.GET.get('category_id')
+            if request.GET.get('subcategory_name'):  # ADDED subcategory filter
+                filters['subcategory_name'] = request.GET.get('subcategory_name')
             if request.GET.get('status'):
                 filters['status'] = request.GET.get('status')
             
@@ -757,8 +639,9 @@ class ProductExportView(APIView):
                 from io import StringIO
                 
                 output = StringIO()
-                fieldnames = ['_id', 'product_name', 'SKU', 'category_id', 'supplier_id', 'stock', 
-                             'low_stock_threshold', 'cost_price', 'selling_price', 'unit', 'status']
+                # UPDATED fieldnames to include subcategory_name
+                fieldnames = ['_id', 'product_name', 'SKU', 'category_id', 'subcategory_name', 'supplier_id', 'stock', 
+                            'low_stock_threshold', 'cost_price', 'selling_price', 'unit', 'status']
                 writer = csv.DictWriter(output, fieldnames=fieldnames)
                 writer.writeheader()
                 
@@ -832,3 +715,4 @@ class ImportTemplateView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         
+print("ProductDetailView exists:", 'ProductDetailView' in locals())

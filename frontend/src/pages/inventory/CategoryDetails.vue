@@ -29,11 +29,6 @@
       </button>
     </div>
 
-    <!-- Success Message -->
-    <div v-if="successMessage" class="status-success mb-3">
-      {{ successMessage }}
-    </div>
-
     <!-- Main Content -->
     <div v-if="!loading && !error && currentCategory">
       <!-- Page Header -->
@@ -120,12 +115,12 @@
           <div class="action-row">
             <div class="d-flex align-items-end gap-2">
               <div class="filter-dropdown">
-                <label class="filter-label text-tertiary">Filter</label>
-                <select class="form-select form-select-sm input-theme" v-model="categoryFilter" @change="applyFilter">
-                  <option value="all">All Products ({{ currentProducts.length }})</option>
+                <label class="filter-label text-tertiary">Filter by Subcategory</label>
+                <select class="form-select form-select-sm input-theme" v-model="subcategoryFilter" @change="applyFilter">
+                  <option value="">All Products ({{ categoryProducts.length }})</option>
                   <option 
                     v-for="subCat in currentCategory.sub_categories" 
-                    :key="subCat.id || subCat.name" 
+                    :key="subCat.name" 
                     :value="subCat.name"
                   >
                     {{ subCat.name }} ({{ getSubcategoryProductCount(subCat.name) }})
@@ -146,9 +141,10 @@
                 v-if="selectedProducts.length > 0"
                 class="btn btn-delete btn-sm btn-with-icon-sm" 
                 @click="removeSelectedFromCategory"
+                :disabled="bulkMoveLoading"
               >
                 <Trash2 :size="14" />
-                Remove ({{ selectedProducts.length }})
+                {{ bulkMoveLoading ? 'Moving...' : `Remove (${selectedProducts.length})` }}
               </button>
             </div>
           </div>
@@ -176,9 +172,9 @@
             <th style="width: 120px;">Product ID</th>
             <th>Product Name</th>
             <th style="width: 140px;">Sub-Category</th>
-            <th style="width: 120px;">Remaining Stock</th>
+            <th style="width: 120px;">Stock</th>
             <th style="width: 120px;">Selling Price</th>
-            <th style="width: 120px;">Supplier</th>
+            <th style="width: 120px;">Cost Price</th>
             <th style="width: 100px;">Actions</th>
           </tr>
         </template>
@@ -204,8 +200,9 @@
             <td>
                <select 
                   class="form-select form-select-sm input-complete"
-                  :value="product.subcategory || 'None'"  
+                  :value="product.subcategory_name || 'None'"  
                   @change="handleUpdateProductSubcategory(product._id, $event.target.value)"
+                  :disabled="moveProductLoading"
                 >
                   <option 
                     v-for="subCat in currentCategory.sub_categories" 
@@ -224,12 +221,15 @@
             <td class="text-end fw-medium text-secondary">
               ₱{{ formatPrice(product.selling_price) }}
             </td>
-            <td class="text-secondary">{{ product.supplier || 'N/A' }}</td>
+            <td class="text-end fw-medium text-secondary">
+              ₱{{ formatPrice(product.cost_price) }}
+            </td>
             <td>
               <div class="d-flex gap-1 justify-content-center">
                 <button 
                   class="btn btn-outline-danger btn-icon-only btn-xs action-btn action-btn-delete"
                   @click="removeProductFromCategory(product)"
+                  :disabled="moveProductLoading"
                   data-bs-toggle="tooltip"
                   title="Remove from Category"
                 >
@@ -247,10 +247,9 @@
           <div class="card-body py-5">
             <Package :size="48" class="text-tertiary mb-3" />
             <p class="text-tertiary mb-3">
-              {{ categoryFilter === 'all' ? 'No products found in this category' : 
-                 `No products found in "${categoryFilter}" subcategory` }}
+              {{ subcategoryFilter ? `No products found in "${subcategoryFilter}" subcategory` : 'No products found in this category' }}
             </p>
-            <button class="btn btn-add btn-with-icon" v-if="categoryFilter === 'all'">
+            <button class="btn btn-add btn-with-icon" v-if="!subcategoryFilter">
               <Plus :size="16" />
               Add First Product
             </button>
@@ -266,12 +265,13 @@
 </template>
 
 <script>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import DataTable from '@/components/common/TableTemplate.vue'
 import AddSubcategoryModal from '@/components/categories/AddSubCategoryModal.vue'
 import AddCategoryModal from '@/components/categories/AddCategoryModal.vue'
-import categoryApiService from '@/services/apiCategory'
+import { useCategories } from '@/composables/api/useCategories'
+import { useProducts } from '@/composables/api/useProducts'
 
 export default {
   name: 'CategoryDetails',
@@ -284,30 +284,46 @@ export default {
   setup() {
     const route = useRoute()
     
-    // State
-    const loading = ref(false)
-    const error = ref(null)
-    const successMessage = ref(null)
-    const currentCategory = ref(null)
-    const currentProducts = ref([])
+    // Composables
+    const {
+      currentCategory,
+      loading: categoriesLoading,
+      error: categoriesError,
+      fetchCategoryById,
+      fetchProductsByCategory,
+      moveProductToCategory,
+      bulkMoveProductsToUncategorized,
+      moveProductLoading,
+      bulkMoveLoading
+    } = useCategories()
+
+    const {
+      exportProducts
+    } = useProducts()
+
+    // Local state
+    const categoryProducts = ref([])
+    const productsLoading = ref(false)
+    const productsError = ref(null)
     const currentPage = ref(1)
     const itemsPerPage = ref(10)
-    const categoryFilter = ref('all')
+    const subcategoryFilter = ref('')
     const selectedProducts = ref([])
     const isExporting = ref(false)
     const categoryId = ref(null)
     const editCategoryModal = ref(null)
     const addSubcategoryModal = ref(null)
 
+    // Computed properties
+    const loading = computed(() => categoriesLoading.value || productsLoading.value)
+    const error = computed(() => categoriesError.value || productsError.value)
 
-    // Computed
     const filteredProducts = computed(() => {
-      if (categoryFilter.value === 'all') {
-        return currentProducts.value
+      if (!subcategoryFilter.value) {
+        return categoryProducts.value
       }
-      return currentProducts.value.filter(product => {
-        const productSubcategory = product.subcategory || product.subcategory_id || product.subcategory_name
-        return productSubcategory === categoryFilter.value
+      return categoryProducts.value.filter(product => {
+        return product.subcategory_name === subcategoryFilter.value
       })
     })
     
@@ -332,30 +348,28 @@ export default {
     // Methods
     const loadCategoryData = async (id) => {
       if (!id) {
-        error.value = 'No category ID provided'
+        productsError.value = 'No category ID provided'
         return
       }
       
-      loading.value = true
-      error.value = null
-      
       try {
-        const categoryResponse = await categoryApiService.FindCategoryData({ id })
+        categoryId.value = id
         
-        if (categoryResponse) {
-          currentCategory.value = categoryResponse.category || categoryResponse
-          const products = await categoryApiService.FindProdcategory({ id })
-          currentProducts.value = Array.isArray(products) ? products : []
-        } else {
-          throw new Error('Category not found')
-        }
+        // Load category details
+        await fetchCategoryById(id)
+        
+        // Load products for this category
+        productsLoading.value = true
+        productsError.value = null
+        
+        const products = await fetchProductsByCategory(id)
+        categoryProducts.value = Array.isArray(products) ? products : []
         
       } catch (err) {
-        error.value = err.message || 'Failed to load category data'
-        currentCategory.value = null
-        currentProducts.value = []
+        productsError.value = err.message || 'Failed to load category data'
+        categoryProducts.value = []
       } finally {
-        loading.value = false
+        productsLoading.value = false
       }
     }
 
@@ -363,8 +377,6 @@ export default {
       const id = route.params.id
       if (id) {
         await loadCategoryData(id)
-      } else {
-        error.value = 'No category ID available for retry'
       }
     }
 
@@ -390,50 +402,40 @@ export default {
 
     const handleUpdateProductSubcategory = async (productId, newSubcategory) => {
       try {
-        await categoryApiService.SubCatChangeTab({
-          product_id: productId,
-          category_id: categoryId.value,
-          new_subcategory: newSubcategory || "None"
-        })
+        await moveProductToCategory(productId, categoryId.value, newSubcategory)
         
-        const product = currentProducts.value.find(p => p._id === productId)
+        // Update local state
+        const product = categoryProducts.value.find(p => p._id === productId)
         if (product) {
-          product.subcategory = newSubcategory || "None"
-          product.subcategory_name = newSubcategory || "None"
-          product.subcategory_id = newSubcategory || "None"
+          product.subcategory_name = newSubcategory
         }
         
-        showSuccess('Product subcategory updated successfully')
-        
       } catch (err) {
-        showError(`Failed to update subcategory: ${err.message}`)
+        console.error(`Failed to update subcategory: ${err.message}`)
       }
     }
 
     const removeProductFromCategory = async (product) => {
       try {
         const confirmed = confirm(
-          `Are you sure you want to remove "${product.name || product.product_name}" from the "${currentCategory.value.category_name}" category?\n\n` +
+          `Are you sure you want to remove "${product.product_name}" from the "${currentCategory.value.category_name}" category?\n\n` +
           `The product will be moved back to the "Uncategorized" category.`
         )
         
         if (!confirmed) return
         
-        await categoryApiService.MoveProductToUncategorized({
-          product_id: product._id,
-          current_category_id: categoryId.value
-        })
+        await bulkMoveProductsToUncategorized([product._id])
         
-        const productIndex = currentProducts.value.findIndex(p => p._id === product._id)
+        // Remove from local state
+        const productIndex = categoryProducts.value.findIndex(p => p._id === product._id)
         if (productIndex > -1) {
-          currentProducts.value.splice(productIndex, 1)
+          categoryProducts.value.splice(productIndex, 1)
         }
         
         selectedProducts.value = selectedProducts.value.filter(id => id !== product._id)
-        showSuccess(`"${product.product_name}" has been moved to the Uncategorized category.`)
         
       } catch (err) {
-        showError(`Failed to move product: ${err.message}`)
+        console.error(`Failed to move product: ${err.message}`)
       }
     }
 
@@ -444,26 +446,21 @@ export default {
       if (!confirmed) return
       
       try {
-        await categoryApiService.BulkMoveProductsToUncategorized({
-          product_ids: selectedProducts.value,
-          current_category_id: categoryId.value
-        })
+        await bulkMoveProductsToUncategorized(selectedProducts.value)
         
-        currentProducts.value = currentProducts.value.filter(product => 
+        // Remove from local state
+        categoryProducts.value = categoryProducts.value.filter(product => 
           !selectedProducts.value.includes(product._id)
         )
         
-        const removedCount = selectedProducts.value.length
         selectedProducts.value = []
         
-        showSuccess(`${removedCount} product(s) moved to Uncategorized category successfully!`)
-        
       } catch (err) {
-        showError(`Bulk move failed: ${err.message}`)
+        console.error(`Bulk move failed: ${err.message}`)
       }
     }
 
-    // Modal handlers
+    // Modal handlers - keeping these untouched as requested
     const handleEditCategory = () => {
       if (editCategoryModal.value) {
         editCategoryModal.value.openEditMode(currentCategory.value)
@@ -472,7 +469,6 @@ export default {
       }
     }
 
-    // In CategoryDetails.vue
     const handleAddSubCategory = () => {
       console.log('Add subcategory button clicked')
       console.log('Modal ref:', addSubcategoryModal.value)
@@ -497,23 +493,12 @@ export default {
     const onSubcategoryAdded = async () => {
       try {
         await loadCategoryData(categoryId.value)
-        showSuccess('Subcategory added successfully')
       } catch (err) {
-        showError('Subcategory added but failed to refresh data. Please refresh the page.')
+        console.error('Failed to refresh data after subcategory added')
       }
     }
 
     // Utility methods
-    const showSuccess = (message) => {
-      successMessage.value = message
-      setTimeout(() => { successMessage.value = null }, 3000)
-    }
-
-    const showError = (message) => {
-      error.value = message
-      setTimeout(() => { error.value = null }, 5000)
-    }
-
     const formatPrice = (price) => parseFloat(price || 0).toFixed(2)
 
     const formatDate = (dateString) => {
@@ -537,22 +522,28 @@ export default {
     }
 
     const getSubcategoryProductCount = (subcategoryName) => {
-      return currentProducts.value.filter(product => {
-        const productSubcategory = product.subcategory || product.subcategory_id || product.subcategory_name
-        return productSubcategory === subcategoryName
+      return categoryProducts.value.filter(product => {
+        return product.subcategory_name === subcategoryName
       }).length
     }
 
     const getProductCount = (category) => {
-      if (category.sub_categories) {
-        return category.sub_categories.reduce((total, sub) => total + (sub.products?.length || 0), 0)
-      }
-      return category.product_count || 0
+      return categoryProducts.value.length
     }
 
-    const exportFilteredProducts = () => {
-      // Placeholder - implement export logic
-      console.log('Export functionality to be implemented')
+    const exportFilteredProducts = async () => {
+      try {
+        isExporting.value = true
+        const filters = {
+          category_id: categoryId.value,
+          subcategory_name: subcategoryFilter.value || undefined
+        }
+        await exportProducts(filters)
+      } catch (error) {
+        console.error('Export failed:', error)
+      } finally {
+        isExporting.value = false
+      }
     }
 
     const getExportButtonText = () => `Export (${filteredProducts.value.length})`
@@ -560,24 +551,24 @@ export default {
     // Watch for route changes
     watch(() => route.params.id, (newId) => {
       if (newId) {
-        categoryId.value = newId
         loadCategoryData(newId)
       }
     }, { immediate: true })
 
     return {
       // State
-      loading, error, successMessage, currentCategory, currentProducts, currentPage, itemsPerPage,
-      categoryFilter, selectedProducts, isExporting, categoryId,
+      loading, error, currentCategory, categoryProducts, currentPage, itemsPerPage,
+      subcategoryFilter, selectedProducts, isExporting, categoryId,
+      moveProductLoading, bulkMoveLoading,
       
       // Computed
       filteredProducts, paginatedProducts, isAllSelected, isIndeterminate,
       
-      editCategoryModal,
-      addSubcategoryModal,
+      // Refs
+      editCategoryModal, addSubcategoryModal,
 
       // Methods
-      loadCategoryData, handleRetryLoad, applyFilter, handlePageChange, toggleSelectAll,
+      handleRetryLoad, applyFilter, handlePageChange, toggleSelectAll,
       handleUpdateProductSubcategory, removeProductFromCategory, removeSelectedFromCategory,
       handleEditCategory, handleAddSubCategory, onCategoryUpdated, onSubcategoryAdded,
       

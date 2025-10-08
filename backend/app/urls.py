@@ -102,9 +102,8 @@ from .kpi_views.category_views import (
     CategoryDeleteInfoView,               
     CategorySubcategoryView,              
     UncategorizedCategoryView,              
-    SubcategoryProductsView,                
-    ProductSubcategoryUpdateView,
-    ProductMoveToUncategorizedView,
+    SubcategoryProductsView,
+    CategoryProductManagementView,  
 )
 
 # POS Operations
@@ -304,6 +303,7 @@ urlpatterns = [
     path('category/display/', CategoryDataView.as_view(), name='category-display'),
     path('category/export/', CategoryExportView.as_view(), name='category-export'),
     path('category/bulk/', CategoryBulkOperationsView.as_view(), name='category-bulk-operations'),
+    path('category/product-management/', CategoryProductManagementView.as_view(), name='category-product-management'),
 
     # Admin-only Category Operations
     path('category/deleted/', CategoryDeletedListView.as_view(), name='category-deleted-list'),
@@ -326,10 +326,6 @@ urlpatterns = [
     path('pos/stock/check/', POSStockCheckView.as_view(), name='pos-stock-check'),
     path('pos/stock/low/', POSLowStockView.as_view(), name='pos-low-stock'),
     path('pos/category/<str:category_id>/subcategory/<str:subcategory_name>/products/', POSSubcategoryProductsView.as_view(), name='pos-subcategory-products'),
-
-    # ========== PRODUCT-CATEGORY RELATIONSHIPS ==========
-    path('product/subcategory/update/', ProductSubcategoryUpdateView.as_view(), name='product-subcategory-update'),
-    path('product/move-uncategorized/', ProductMoveToUncategorizedView.as_view(), name='product-move-uncategorized'),  
     
     # ========== SALES & INVOICES ==========
     # Sales log operations

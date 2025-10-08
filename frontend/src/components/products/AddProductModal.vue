@@ -1,23 +1,23 @@
 <template>
   <!-- Use Teleport to render modal at body level -->
   <Teleport to="body">
-    <div v-if="show" class="modal-overlay modal-overlay-theme" @click="handleOverlayClick">
+    <div v-if="isVisible" class="modal-overlay modal-overlay-theme" @click="handleOverlayClick">
       <div class="modal-content modal-theme large-modal" @click.stop>
         <div class="modal-header border-bottom-theme">
           <h2 class="text-primary">{{ isEditMode ? 'Edit Product' : 'Add New Product' }}</h2>
-          <button class="btn-close" @click="closeModal" :disabled="loading" aria-label="Close">
-            ✕
+          <button class="btn-close" @click="closeModal" :disabled="isLoading" aria-label="Close">
+            <X :size="20" />
           </button>
         </div>
         
         <form @submit.prevent="handleSubmit" class="product-form">
           <!-- Product Image Upload Section -->
           <div class="mb-3">
-  <label class="form-label text-primary fw-medium">Product Image:</label>
-  
+            <label class="form-label text-primary fw-medium">Product Image:</label>
+            
             <!-- Image Preview (if exists) -->
             <div v-if="imagePreview" class="mb-3">
-              <div class="image-preview-container bg-neutral-light rounded p-3 text-center">
+              <div class="image-preview-container surface-tertiary rounded p-3 text-center">
                 <img 
                   :src="imagePreview" 
                   alt="Product preview" 
@@ -29,7 +29,7 @@
                 <br>
                 <button 
                   type="button" 
-                  class="btn btn-outline-danger btn-xs mt-2"
+                  class="btn btn-cancel btn-xs mt-2"
                   @click="removeImage"
                 >
                   Remove Image
@@ -39,19 +39,21 @@
             
             <!-- File Input (always visible) -->
             <div class="product-image-upload">
-              <div class="image-upload-container bg-neutral-light rounded p-4 text-center">
-                <div class="upload-icon text-accent">📷</div>
+              <div class="image-upload-container surface-tertiary rounded p-4 text-center">
+                <div class="upload-icon text-accent">
+                  <Camera :size="32" />
+                </div>
                 <p class="text-primary mb-2">
                   {{ imagePreview ? 'Change image' : 'Upload product image' }}
                 </p>
                 <input 
                   type="file" 
-                  class="form-control" 
+                  class="form-control input-theme" 
                   accept="image/*"
                   @change="handleImageUpload"
-                  :key="'imageInput-' + (isEditMode ? 'edit' : 'new')"
+                  :key="imageInputKey"
                 />
-                <small class="text-muted mt-2 d-block">
+                <small class="text-tertiary-medium mt-2 d-block">
                   Maximum file size: 5MB. Supported formats: JPEG, PNG, GIF, WebP
                 </small>
               </div>
@@ -65,13 +67,20 @@
               </label>
               <input 
                 id="product_name"
-                v-model="form.product_name" 
+                v-model="productForm.product_name" 
                 type="text" 
                 required 
-                :disabled="loading"
+                :disabled="isLoading"
                 placeholder="Enter product name"
                 class="form-control input-theme"
+                :class="{ 
+                  'is-invalid': validationErrors.product_name, 
+                  'validation-error': validationErrors.product_name 
+                }"
               />
+              <div v-if="validationErrors.product_name" class="invalid-feedback">
+                {{ validationErrors.product_name }}
+              </div>
             </div>
 
             <div class="col-md-6">
@@ -81,13 +90,16 @@
               <div class="position-relative">
                 <input 
                   id="SKU"
-                  v-model="form.SKU" 
+                  v-model="productForm.SKU" 
                   type="text" 
                   required 
-                  :disabled="loading || isValidatingSku"
-                  placeholder="Enter SKU"
+                  :disabled="isLoading || isValidatingSku"
+                  placeholder="Enter any unique identifier (e.g., ABC123, NOODLE-001, etc.)"
                   class="form-control input-theme"
-                  :class="{ 'border-error': skuError }"
+                  :class="{ 
+                    'is-invalid': validationErrors.SKU || skuError,
+                    'validation-error': validationErrors.SKU || skuError
+                  }"
                   @blur="validateSKU"
                 />
                 <div v-if="isValidatingSku" class="validation-spinner position-absolute top-50 end-0 translate-middle-y me-3">
@@ -95,26 +107,30 @@
                     <span class="visually-hidden">Validating...</span>
                   </div>
                 </div>
-                <div v-if="skuError" class="invalid-feedback text-error">
-                  {{ skuError }}
+                <div v-if="validationErrors.SKU || skuError" class="invalid-feedback">
+                  {{ validationErrors.SKU || skuError }}
                 </div>
               </div>
+              <small class="text-tertiary-medium">
+                Can be any format you prefer - just needs to be unique for each product
+              </small>
             </div>
           </div>
 
           <div class="row g-3 mb-3">
             <div class="col-md-6">
               <label for="category_id" class="form-label text-primary fw-medium">
-                Category <span class="text-error">*</span>
+                Category
+                <small class="text-tertiary-medium">(Optional - defaults to Uncategorized)</small>
               </label>
               <select 
                 id="category_id"
-                v-model="form.category_id" 
+                v-model="productForm.category_id" 
                 class="form-select input-theme"
-                required
-                :disabled="loading"
+                :disabled="isLoading"
+                @change="onCategoryChange"
               >
-                <option value="">Select Category</option>
+                <option value="">Uncategorized</option>
                 <option 
                   v-for="category in categories" 
                   :key="category._id" 
@@ -126,24 +142,72 @@
             </div>
 
             <div class="col-md-6">
+              <label for="subcategory_name" class="form-label text-primary fw-medium">
+                Subcategory
+                <small class="text-tertiary-medium">(Optional)</small>
+              </label>
+              <select 
+                id="subcategory_name"
+                v-model="productForm.subcategory_name" 
+                class="form-select input-theme"
+                :disabled="isLoading || !productForm.category_id"
+              >
+                <option value="">{{ productForm.category_id ? 'Select Subcategory' : 'General' }}</option>
+                <option 
+                  v-for="subcategory in availableSubcategories" 
+                  :key="subcategory.name" 
+                  :value="subcategory.name"
+                >
+                  {{ subcategory.name }}
+                </option>
+              </select>
+              <small v-if="!productForm.category_id" class="text-tertiary-medium">
+                Will be placed in "General" subcategory of Uncategorized
+              </small>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
               <label for="unit" class="form-label text-primary fw-medium">
                 Unit <span class="text-error">*</span>
               </label>
               <select 
                 id="unit"
-                v-model="form.unit" 
+                v-model="productForm.unit" 
                 required 
-                :disabled="loading"
+                :disabled="isLoading"
                 class="form-select input-theme"
+                :class="{ 
+                  'is-invalid': validationErrors.unit,
+                  'validation-error': validationErrors.unit 
+                }"
               >
                 <option value="">Select Unit</option>
-                <option value="pcs">Pieces</option>
+                <option value="piece">Pieces</option>
                 <option value="pack">Pack</option>
                 <option value="bottle">Bottle</option>
                 <option value="can">Can</option>
                 <option value="kg">Kilogram</option>
                 <option value="liter">Liter</option>
               </select>
+              <div v-if="validationErrors.unit" class="invalid-feedback">
+                {{ validationErrors.unit }}
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <label for="supplier" class="form-label text-primary fw-medium">
+                Supplier:
+              </label>
+              <input 
+                id="supplier"
+                v-model="productForm.supplier" 
+                type="text" 
+                :disabled="isLoading"
+                placeholder="Enter supplier name"
+                class="form-control input-theme"
+              />
             </div>
           </div>
 
@@ -154,33 +218,50 @@
               </label>
               <input 
                 id="cost_price"
-                v-model.number="form.cost_price" 
+                v-model.number="productForm.cost_price" 
                 type="number" 
                 step="0.01"
                 min="0"
                 required 
-                :disabled="loading"
+                :disabled="isLoading"
                 placeholder="0.00"
                 class="form-control input-theme"
+                :class="{ 
+                  'is-invalid': validationErrors.cost_price,
+                  'validation-error': validationErrors.cost_price 
+                }"
               />
+              <div v-if="validationErrors.cost_price" class="invalid-feedback">
+                {{ validationErrors.cost_price }}
+              </div>
             </div>
 
             <div class="col-md-6">
-               <label for="selling_price" class="form-label text-primary fw-medium">
-                  Selling Price (₱) <span class="text-error">*</span>
-                </label>
-                <input 
-                  id="selling_price"
-                  v-model.number="form.selling_price" 
-                  type="number" 
-                  step="0.01"
-                  min="0"
-                  required 
-                  :disabled="loading"
-                  placeholder="0.00"
-                  class="form-control input-theme"
-                  @input="handleSellingPriceChange"
-                />
+              <label for="selling_price" class="form-label text-primary fw-medium">
+                Selling Price (₱) <span class="text-error">*</span>
+              </label>
+              <input 
+                id="selling_price"
+                v-model.number="productForm.selling_price" 
+                type="number" 
+                step="0.01"
+                min="0"
+                required 
+                :disabled="isLoading"
+                placeholder="0.00"
+                class="form-control input-theme"
+                :class="{ 
+                  'is-invalid': validationErrors.selling_price,
+                  'validation-error': validationErrors.selling_price 
+                }"
+                @input="calculateMargin"
+              />
+              <div v-if="validationErrors.selling_price" class="invalid-feedback">
+                {{ validationErrors.selling_price }}
+              </div>
+              <small v-if="marginPercentage" class="text-tertiary-medium">
+                Profit Margin: {{ marginPercentage }}%
+              </small>
             </div>
           </div>
 
@@ -191,14 +272,21 @@
               </label>
               <input 
                 id="stock"
-                v-model.number="form.stock" 
+                v-model.number="productForm.stock" 
                 type="number" 
                 min="0"
                 required 
-                :disabled="loading"
+                :disabled="isLoading"
                 placeholder="0"
                 class="form-control input-theme"
+                :class="{ 
+                  'is-invalid': validationErrors.stock,
+                  'validation-error': validationErrors.stock 
+                }"
               />
+              <div v-if="validationErrors.stock" class="invalid-feedback">
+                {{ validationErrors.stock }}
+              </div>
             </div>
 
             <div class="col-md-6">
@@ -207,14 +295,21 @@
               </label>
               <input 
                 id="low_stock_threshold"
-                v-model.number="form.low_stock_threshold" 
+                v-model.number="productForm.low_stock_threshold" 
                 type="number" 
                 min="0"
                 required 
-                :disabled="loading"
+                :disabled="isLoading"
                 placeholder="10"
                 class="form-control input-theme"
+                :class="{ 
+                  'is-invalid': validationErrors.low_stock_threshold,
+                  'validation-error': validationErrors.low_stock_threshold 
+                }"
               />
+              <div v-if="validationErrors.low_stock_threshold" class="invalid-feedback">
+                {{ validationErrors.low_stock_threshold }}
+              </div>
             </div>
           </div>
 
@@ -223,9 +318,9 @@
               <label for="expiry_date" class="form-label text-primary fw-medium">Expiry Date:</label>
               <input 
                 id="expiry_date"
-                v-model="form.expiry_date" 
+                v-model="productForm.expiry_date" 
                 type="date" 
-                :disabled="loading"
+                :disabled="isLoading"
                 class="form-control input-theme"
               />
             </div>
@@ -236,9 +331,9 @@
               </label>
               <select 
                 id="status"
-                v-model="form.status" 
+                v-model="productForm.status" 
                 required 
-                :disabled="loading"
+                :disabled="isLoading"
                 class="form-select input-theme"
               >
                 <option value="active">Active</option>
@@ -253,18 +348,19 @@
               <div class="input-group">
                 <input 
                   id="barcode"
-                  v-model="form.barcode" 
+                  v-model="productForm.barcode" 
                   type="text" 
-                  :disabled="loading"
+                  :disabled="isLoading"
                   placeholder="Enter barcode or generate automatically"
                   class="form-control input-theme"
                 />
                 <button 
                   type="button" 
                   @click="generateBarcode"
-                  :disabled="loading"
-                  class="btn btn-export btn-with-icon"
+                  :disabled="isLoading"
+                  class="btn btn-export btn-with-icon-sm"
                 >
+                  <BarChart3 :size="16" />
                   Generate
                 </button>
               </div>
@@ -274,10 +370,10 @@
               <div class="form-check">
                 <input 
                   id="is_taxable"
-                  v-model="form.is_taxable" 
+                  v-model="productForm.is_taxable" 
                   type="checkbox" 
-                  :disabled="loading"
-                  class="form-check-input focus-ring-theme"
+                  :disabled="isLoading"
+                  class="form-check-input"
                 />
                 <label for="is_taxable" class="form-check-label text-secondary">
                   Taxable Item
@@ -290,38 +386,51 @@
             <label for="description" class="form-label text-primary fw-medium">Description:</label>
             <textarea 
               id="description"
-              v-model="form.description" 
-              :disabled="loading"
+              v-model="productForm.description" 
+              :disabled="isLoading"
               placeholder="Enter product description (optional)"
               class="form-control input-theme"
               rows="3"
             ></textarea>
           </div>
 
-          <div v-if="error" class="alert alert-danger status-error d-flex align-items-center mb-3" role="alert">
-            <span class="me-2">⚠️</span>
-            {{ error }}
+          <!-- Validation Error Summary -->
+          <div v-if="showValidationSummary && Object.keys(validationErrors).length > 0" 
+               class="status-error mb-3" 
+               role="alert">
+            <strong>Please fix the following errors:</strong>
+            <ul class="mb-0 mt-2">
+              <li v-for="(error, field) in validationErrors" :key="field">
+                {{ error }}
+              </li>
+            </ul>
+          </div>
+
+          <!-- General Error -->
+          <div v-if="error" class="status-error mb-3" role="alert">
+            <strong>Error:</strong> {{ error }}
           </div>
 
           <div class="d-flex gap-2 justify-content-end pt-3 divider-theme">
             <button 
               type="button" 
               @click="closeModal" 
-              :disabled="loading"
+              :disabled="isLoading"
               class="btn btn-cancel"
             >
               Cancel
             </button>
             <button 
               type="submit" 
-              :disabled="loading || !isFormValid" 
-              class="btn btn-save btn-with-icon"
-              :class="{ 'btn-loading': loading }"
+              :disabled="isLoading" 
+              class="btn btn-save btn-with-icon-sm"
+              :class="{ 'btn-loading': isLoading }"
             >
-              <span v-if="loading" class="spinner-border spinner-border-sm me-2" role="status">
+              <span v-if="isLoading" class="spinner-border spinner-border-sm me-2" role="status">
                 <span class="visually-hidden">Loading...</span>
               </span>
-              {{ loading ? 'Saving...' : (isEditMode ? 'Update Product' : 'Create Product') }}
+              <Save :size="16" />
+              {{ isLoading ? 'Saving...' : (isEditMode ? 'Update Product' : 'Create Product') }}
             </button>
           </div>
         </form>
@@ -331,8 +440,9 @@
 </template>
 
 <script>
-import { useAddProduct } from '@/composables/ui/products/useAddProduct'
-import { onMounted, onBeforeUnmount, toRef } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { useModal } from '@/composables/ui/useModal'
+import { useProducts } from '@/composables/api/useProducts'
 
 export default {
   name: 'AddProductModal',
@@ -343,115 +453,422 @@ export default {
     }
   },
   emits: ['success'],
- 
+
   setup(props, { emit }) {
+    // Use modal composable
     const {
-      // State
-      show,
-      loading,
+      isVisible,
+      isLoading,
       error,
-      form,
-      imagePreview,
-      skuError,
-      isValidatingSku,
-     
-      // Computed
-      isEditMode,
-      isFormValid,
-     
-      // Actions
-      openAddModal,
-      openEditModal,
-      closeModal,
-      submitProduct,
-     
-      // Form methods
-      validateSKU,
-      generateBarcode,
-     
-      // Image methods
-      handleImageUpload,
-      removeImage,
-     
-      // Utility methods
-      setupKeyboardListeners,
-      cleanupKeyboardListeners
-    } = useAddProduct()
-   
-    // Setup keyboard listeners on mount
-    onMounted(() => {
-      setupKeyboardListeners()
+      show,
+      hide,
+      setLoading,
+      setError,
+      clearError
+    } = useModal()
+
+    // Use products composable
+    const {
+      createProduct,
+      updateProduct,
+      checkSkuExists
+    } = useProducts()
+
+    // Form state
+    const editingProduct = ref(null)
+    const imagePreview = ref(null)
+    const skuError = ref('')
+    const isValidatingSku = ref(false)
+    const imageInputKey = ref(0)
+    const validationErrors = ref({})
+    const showValidationSummary = ref(false)
+
+    const productForm = ref({
+      product_name: '',
+      SKU: '',
+      category_id: '',
+      subcategory_name: '',
+      unit: '',
+      supplier: '',
+      cost_price: 0,
+      selling_price: 0,
+      stock: 0,
+      low_stock_threshold: 10,
+      expiry_date: '',
+      status: 'active',
+      barcode: '',
+      is_taxable: true,
+      description: '',
+      image_url: '',
+      image_filename: '',
+      image_size: 0,
+      image_type: ''
     })
-   
-    // Cleanup on unmount
-    onBeforeUnmount(() => {
-      cleanupKeyboardListeners()
+
+    // Computed properties
+    const isEditMode = computed(() => editingProduct.value !== null)
+
+    const availableSubcategories = computed(() => {
+      if (!productForm.value.category_id) return []
+      const category = props.categories.find(c => c._id === productForm.value.category_id)
+      return category?.sub_categories || []
     })
-   
+
+    const marginPercentage = computed(() => {
+      const { cost_price, selling_price } = productForm.value
+      if (!cost_price || !selling_price || cost_price >= selling_price) return 0
+      return Math.round(((selling_price - cost_price) / selling_price) * 100)
+    })
+
+    const isFormValid = computed(() => {
+      return productForm.value.product_name.trim() &&
+             productForm.value.SKU.trim() &&
+             productForm.value.unit &&
+             productForm.value.cost_price > 0 &&
+             productForm.value.selling_price > 0 &&
+             productForm.value.stock >= 0 &&
+             productForm.value.low_stock_threshold >= 0 &&
+             !skuError.value
+    })
+
+    // Validation methods
+    const validateForm = () => {
+      const errors = {}
+
+      if (!productForm.value.product_name.trim()) {
+        errors.product_name = 'Product name is required'
+      }
+
+      if (!productForm.value.SKU.trim()) {
+        errors.SKU = 'SKU is required'
+      }
+
+      if (!productForm.value.unit) {
+        errors.unit = 'Unit is required'
+      }
+
+      if (!productForm.value.cost_price || productForm.value.cost_price <= 0) {
+        errors.cost_price = 'Cost price must be greater than 0'
+      }
+
+      if (!productForm.value.selling_price || productForm.value.selling_price <= 0) {
+        errors.selling_price = 'Selling price must be greater than 0'
+      }
+
+      if (productForm.value.stock < 0) {
+        errors.stock = 'Stock quantity cannot be negative'
+      }
+
+      if (productForm.value.low_stock_threshold < 0) {
+        errors.low_stock_threshold = 'Low stock threshold cannot be negative'
+      }
+
+      if (skuError.value) {
+        errors.SKU = skuError.value
+      }
+
+      validationErrors.value = errors
+      showValidationSummary.value = Object.keys(errors).length > 0
+
+      // Add highlight animation to error fields
+      if (Object.keys(errors).length > 0) {
+        setTimeout(() => {
+          Object.keys(errors).forEach(fieldName => {
+            const element = document.getElementById(fieldName)
+            if (element) {
+              element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }
+          })
+        }, 100)
+      }
+
+      return Object.keys(errors).length === 0
+    }
+
+    const clearValidationErrors = () => {
+      validationErrors.value = {}
+      showValidationSummary.value = false
+    }
+
     // Methods
-    const triggerFileInput = () => {
-      if (!loading.value) {
-        // Use the template ref instead of querySelector
-        const fileInput = document.querySelector('input[type="file"]')
-        if (fileInput) {
-          fileInput.click()
-        }
+    const resetForm = () => {
+      productForm.value = {
+        product_name: '',
+        SKU: '',
+        category_id: '',
+        subcategory_name: '',
+        unit: '',
+        supplier: '',
+        cost_price: 0,
+        selling_price: 0,
+        stock: 0,
+        low_stock_threshold: 10,
+        expiry_date: '',
+        status: 'active',
+        barcode: '',
+        is_taxable: true,
+        description: '',
+        image_url: '',
+        image_filename: '',
+        image_size: 0,
+        image_type: ''
+      }
+      editingProduct.value = null
+      imagePreview.value = null
+      skuError.value = ''
+      imageInputKey.value++
+      clearError()
+      clearValidationErrors()
+    }
+
+    const onCategoryChange = () => {
+      // Reset subcategory when category changes
+      productForm.value.subcategory_name = ''
+      // Clear subcategory validation error
+      if (validationErrors.value.subcategory_name) {
+        delete validationErrors.value.subcategory_name
       }
     }
-   
-    const handleSubmit = () => {
-      submitProduct((result, wasEdit) => {
-        const action = wasEdit ? 'updated' : 'created'
-        emit('success', {
-          message: `Product "${form.value.product_name}" ${action} successfully`,
-          product: result,
-          action
-        })
-      })
+
+    const calculateMargin = () => {
+      // Margin calculation is handled by computed property
     }
-   
+
+    const validateSKU = async () => {
+      if (!productForm.value.SKU.trim()) {
+        skuError.value = ''
+        return
+      }
+
+      // Skip validation if editing and SKU hasn't changed
+      if (isEditMode.value && productForm.value.SKU === editingProduct.value?.SKU) {
+        skuError.value = ''
+        return
+      }
+
+      isValidatingSku.value = true
+      skuError.value = ''
+
+      try {
+        const exists = await checkSkuExists(productForm.value.SKU)
+        if (exists) {
+          skuError.value = 'This SKU is already used by another product'
+        }
+      } catch (error) {
+        console.error('SKU validation error:', error)
+        skuError.value = 'Unable to validate SKU'
+      } finally {
+        isValidatingSku.value = false
+      }
+    }
+
+    const generateBarcode = () => {
+      const timestamp = Date.now().toString()
+      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+      productForm.value.barcode = `${timestamp}${random}`
+    }
+
+    const handleImageUpload = (event) => {
+      const file = event.target.files[0]
+      if (!file) return
+
+      // Validate file size (5MB)
+      const maxSize = 5 * 1024 * 1024
+      if (file.size > maxSize) {
+        setError('File size too large. Maximum 5MB allowed.')
+        return
+      }
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+      if (!allowedTypes.includes(file.type)) {
+        setError('Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.')
+        return
+      }
+
+      // Create preview
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        imagePreview.value = e.target.result
+        productForm.value.image_url = e.target.result
+      }
+      reader.readAsDataURL(file)
+
+      // Store file metadata
+      productForm.value.image_filename = file.name
+      productForm.value.image_size = file.size
+      productForm.value.image_type = file.type
+    }
+
+    const removeImage = () => {
+      imagePreview.value = null
+      productForm.value.image_url = ''
+      productForm.value.image_filename = ''
+      productForm.value.image_size = 0
+      productForm.value.image_type = ''
+      imageInputKey.value++
+    }
+
+  const handleSubmit = async () => {
+    // Always validate form on submit
+    if (!validateForm()) {
+      return
+    }
+
+    setLoading(true)
+    clearError()
+
+    try {
+      let result
+      const formData = { ...productForm.value }
+
+      // If no category is selected, set default values for uncategorized
+      if (!formData.category_id) {
+        formData.category_id = 'UNCTGRY-001' // Default uncategorized category ID
+        formData.subcategory_name = 'General' // Default subcategory
+      }
+
+      if (isEditMode.value) {
+        result = await updateProduct(editingProduct.value._id, formData)
+      } else {
+        result = await createProduct(formData)
+      }
+
+      // Emit success event to parent component
+      emit('success', {
+        message: `Product "${formData.product_name}" ${isEditMode.value ? 'updated' : 'created'} successfully`,
+        product: result,
+        action: isEditMode.value ? 'updated' : 'created'
+      })
+
+      // Close modal immediately on success
+      closeModal()
+      
+    } catch (error) {
+      console.error('Error saving product:', error)
+      setError(error.message || 'Failed to save product')
+      // Modal stays open on error so user can fix issues
+    } finally {
+      setLoading(false)
+    }
+  }
+
+    const openAddModal = () => {
+      resetForm()
+      show()
+    }
+
+    const openEditModal = (product) => {
+      resetForm()
+      editingProduct.value = { ...product }
+      
+      // Populate form with product data
+      Object.keys(productForm.value).forEach(key => {
+        if (product[key] !== undefined) {
+          productForm.value[key] = product[key]
+        }
+      })
+
+      // Handle existing image
+      if (product.image_url) {
+        imagePreview.value = product.image_url
+      }
+
+      // Format date for input
+      if (product.expiry_date) {
+        const date = new Date(product.expiry_date)
+        productForm.value.expiry_date = date.toISOString().split('T')[0]
+      }
+
+      show()
+    }
+
+    const closeModal = () => {
+      if (!isLoading.value) {
+        hide()
+        resetForm()
+      }
+    }
+
     const handleOverlayClick = () => {
-      if (!loading.value) {
+      if (!isLoading.value) {
         closeModal()
       }
     }
-   
-    // Expose methods for parent component
-    const openAdd = () => {
-      openAddModal()
+
+    // Keyboard listeners
+    const handleKeydown = (event) => {
+      if (event.key === 'Escape' && isVisible.value && !isLoading.value) {
+        closeModal()
+      }
     }
-   
-    const openEdit = (product) => {
-      openEditModal(product)
-    }
-   
-    return {
-      // Props - make categories reactive and available to template
-      categories: toRef(props, 'categories'),
+
+    onMounted(() => {
+      document.addEventListener('keydown', handleKeydown)
+    })
+
+    onBeforeUnmount(() => {
+      document.removeEventListener('keydown', handleKeydown)
+    })
+
+    // Watch for form changes to clear individual field errors
+    watch(productForm, (newForm, oldForm) => {
+      // Clear validation errors for fields that have been updated
+      Object.keys(newForm).forEach(key => {
+        if (newForm[key] !== oldForm[key] && validationErrors.value[key]) {
+          delete validationErrors.value[key]
+        }
+      })
       
-      // State
-      show,
-      loading,
+      // Hide validation summary if all errors are resolved
+      if (Object.keys(validationErrors.value).length === 0) {
+        showValidationSummary.value = false
+      }
+
+      // Clear general error when form changes
+      if (error.value) {
+        clearError()
+      }
+    }, { deep: true })
+
+    // Expose methods for parent component
+    const openAdd = openAddModal
+    const openEdit = openEditModal
+
+    return {
+      // Modal state
+      isVisible,
+      isLoading,
       error,
-      form,
+
+      // Form state
+      productForm,
       imagePreview,
       skuError,
       isValidatingSku,
-     
+      imageInputKey,
+      validationErrors,
+      showValidationSummary,
+
       // Computed
       isEditMode,
       isFormValid,
-     
+      availableSubcategories,
+      marginPercentage,
+
       // Methods
       closeModal,
-      triggerFileInput,
       handleSubmit,
       handleOverlayClick,
+      onCategoryChange,
+      calculateMargin,
       validateSKU,
       generateBarcode,
       handleImageUpload,
       removeImage,
-     
+      validateForm,
+      clearValidationErrors,
+
       // Exposed methods
       openAdd,
       openEdit
@@ -461,8 +878,7 @@ export default {
 </script>
 
 <style scoped>
-
-/* CRITICAL: Fixed positioning for modal overlay */
+/* All existing styles remain the same - no changes needed */
 .modal-overlay {
   position: fixed !important;
   top: 0 !important;
@@ -475,7 +891,7 @@ export default {
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
-  z-index: 9999 !important; /* Ensure it's above everything */
+  z-index: 9999 !important;
   animation: fadeIn 0.3s ease;
   backdrop-filter: blur(4px);
 }
@@ -492,7 +908,7 @@ export default {
   max-height: 90vh;
   overflow-y: auto;
   animation: slideIn 0.3s ease;
-  z-index: 10000 !important; /* Higher than overlay */
+  z-index: 10000 !important;
 }
 
 @keyframes slideIn {
@@ -519,12 +935,14 @@ export default {
 .btn-close {
   background: none;
   border: none;
-  font-size: 1.5rem;
   cursor: pointer;
   color: var(--text-tertiary);
   padding: 0.25rem;
   border-radius: 0.375rem;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-close:hover:not(:disabled) {
@@ -541,87 +959,62 @@ export default {
   padding: 1.5rem 2rem 2rem 2rem;
 }
 
-/* Image Upload Styles using semantic classes */
 .image-upload-container {
   width: 100%;
+  border: 2px dashed var(--border-secondary);
+  transition: border-color 0.2s ease;
 }
 
-.image-preview-area {
-  width: 200px;
-  height: 200px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  background-color: var(--surface-secondary);
-}
-
-.image-preview-area:hover:not(.has-image) {
-  background-color: var(--state-hover);
-}
-
-.upload-placeholder {
-  text-align: center;
-  padding: 1rem;
+.image-upload-container:hover {
+  border-color: var(--border-accent);
 }
 
 .upload-icon {
-  font-size: 2rem;
   margin-bottom: 0.5rem;
-}
-
-.upload-text {
-  font-weight: 500;
-  margin: 0 0 0.25rem 0;
-  font-size: 0.875rem;
-}
-
-.upload-subtext {
-  font-size: 0.75rem;
-  margin: 0;
-}
-
-.image-preview {
-  width: 100%;
-  height: 100%;
-  position: relative;
-}
-
-.preview-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 10px;
-}
-
-.image-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  border-radius: 10px;
 }
 
-.image-preview:hover .image-overlay {
-  opacity: 1;
-}
-
-/* Override for divider-theme in this context */
 .divider-theme {
   border-top: 1px solid var(--border-secondary) !important;
   margin: 0;
   padding-top: 1rem;
+}
+
+.validation-spinner {
+  z-index: 10;
+}
+
+/* Enhanced validation error styling */
+.validation-error {
+  border-color: var(--status-error) !important;
+  animation: errorPulse 0.6s ease-in-out;
+}
+
+@keyframes errorPulse {
+  0% { 
+    border-color: var(--status-error);
+    box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.4);
+  }
+  50% { 
+    border-color: var(--status-error);
+    box-shadow: 0 0 0 4px rgba(229, 57, 53, 0.2);
+  }
+  100% { 
+    border-color: var(--status-error);
+    box-shadow: 0 0 0 0 rgba(229, 57, 53, 0);
+  }
+}
+
+.is-invalid {
+  border-color: var(--status-error) !important;
+}
+
+.invalid-feedback {
+  display: block !important;
+  color: var(--status-error) !important;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
 }
 
 /* Responsive Design */
@@ -642,12 +1035,6 @@ export default {
   .product-form {
     padding: 1rem 1.5rem 1.5rem 1.5rem;
   }
-
-  .image-preview-area {
-    width: 100%;
-    max-width: 200px;
-    margin: 0 auto;
-  }
 }
 
 @media (max-width: 480px) {
@@ -666,7 +1053,6 @@ export default {
   }
 }
 
-/* Custom scrollbar using semantic colors */
 .modal-content::-webkit-scrollbar {
   width: 6px;
 }
@@ -685,7 +1071,6 @@ export default {
   background: var(--border-accent);
 }
 
-/* Prevent body scroll when modal is open */
 body:has(.modal-overlay) {
   overflow: hidden !important;
 }

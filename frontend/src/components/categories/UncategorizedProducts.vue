@@ -1,5 +1,5 @@
 <template>
-  <div class="container-fluid pt-2 pb-4 uncategorized-page">
+  <div class="container-fluid pt-2 pb-4 uncategorized-page surface-secondary">
     <!-- Breadcrumb Navigation -->
     <nav aria-label="breadcrumb" class="mb-3">
       <ol class="breadcrumb">
@@ -15,16 +15,16 @@
 
     <!-- Loading State -->
     <div v-if="loading" class="text-center py-4">
-      <div class="spinner-border text-primary" role="status">
+      <div class="spinner-border text-accent" role="status">
         <span class="visually-hidden">Loading uncategorized products...</span>
       </div>
-      <p class="mt-2 text-muted">Loading uncategorized products...</p>
+      <p class="mt-2 text-tertiary-medium">Loading uncategorized products...</p>
     </div>
 
     <!-- Error State -->
-    <div v-if="error" class="alert alert-danger" role="alert">
+    <div v-if="error" class="status-error" role="alert">
       <strong>Error:</strong> {{ error }}
-      <button @click="retryLoad" class="btn btn-sm btn-outline-danger ms-2">
+      <button @click="retryLoad" class="btn btn-sm btn-export ms-2">
         Retry
       </button>
     </div>
@@ -35,19 +35,19 @@
       <div class="d-flex justify-content-between align-items-start mb-4">
         <div>
           <h1 class="h2 fw-bold text-primary mb-1">Uncategorized Products</h1>
-          <p class="text-muted mb-0">Manage products that need to be categorized</p>
+          <p class="text-tertiary-medium mb-0">Manage products that need to be categorized</p>
         </div>
         <div class="d-flex gap-2">
           <!-- Export button -->
           <button 
             class="btn btn-export btn-sm btn-with-icon-sm" 
             type="button" 
-            :disabled="isExporting || products.length === 0"
+            :disabled="isExporting || uncategorizedProducts.length === 0"
             @click="exportUncategorizedProducts()"
             title="Export uncategorized products as CSV"
           >
             <Download :size="14" />
-            {{ isExporting ? 'Exporting...' : `Export (${products.length})` }}
+            {{ isExporting ? 'Exporting...' : `Export (${uncategorizedProducts.length})` }}
           </button>
         </div>
       </div>
@@ -55,31 +55,31 @@
       <!-- Summary Card -->
       <div class="row mb-4">
         <div class="col-12">
-          <div class="card shadow-sm">
+          <div class="card-theme">
             <div class="card-body">
               <div class="row">
                 <div class="col-md-3">
                   <div class="text-center">
-                    <div class="h2 fw-bold text-warning mb-1">{{ products.length }}</div>
-                    <small class="text-muted">Total Uncategorized</small>
+                    <div class="h2 fw-bold text-warning mb-1">{{ uncategorizedProducts.length }}</div>
+                    <small class="text-tertiary-medium">Total Uncategorized</small>
                   </div>
                 </div>
                 <div class="col-md-3">
                   <div class="text-center">
                     <div class="h2 fw-bold text-info mb-1">{{ selectedProducts.length }}</div>
-                    <small class="text-muted">Selected</small>
+                    <small class="text-tertiary-medium">Selected</small>
                   </div>
                 </div>
                 <div class="col-md-3">
                   <div class="text-center">
-                    <div class="h2 fw-bold text-success mb-1">{{ availableCategories.length }}</div>
-                    <small class="text-muted">Available Categories</small>
+                    <div class="h2 fw-bold text-success mb-1">{{ activeCategories.length }}</div>
+                    <small class="text-tertiary-medium">Available Categories</small>
                   </div>
                 </div>
                 <div class="col-md-3">
                   <div class="text-center">
-                    <div class="h2 fw-bold text-primary mb-1">{{ totalValue.toFixed(2) }}</div>
-                    <small class="text-muted">Total Value (₱)</small>
+                    <div class="h2 fw-bold text-primary mb-1">₱{{ totalValue.toFixed(2) }}</div>
+                    <small class="text-tertiary-medium">Total Value</small>
                   </div>
                 </div>
               </div>
@@ -90,38 +90,53 @@
 
       <!-- Action Bar -->
       <div class="action-bar-container mb-3">
-        <div class="action-bar-controls">
+        <div class="action-bar-controls surface-card border-theme">
           <div class="action-row">
             <div class="d-flex align-items-center gap-3 flex-wrap">
               <!-- Bulk Categorization -->
               <div v-if="selectedProducts.length > 0" class="d-flex align-items-center gap-2">
-                <span class="text-muted">Move {{ selectedProducts.length }} product(s) to:</span>
+                <span class="text-tertiary-medium">Move {{ selectedProducts.length }} product(s) to:</span>
                 <select 
-                  class="form-select form-select-sm" 
+                  class="form-select form-select-sm input-theme" 
                   v-model="bulkTargetCategory"
                   style="min-width: 200px;"
                 >
                   <option value="">Choose Category</option>
                   <option 
-                    v-for="category in availableCategories" 
+                    v-for="category in activeCategories" 
                     :key="category._id" 
                     :value="category._id"
                   >
                     {{ category.category_name }}
                   </option>
                 </select>
+                <select 
+                  class="form-select form-select-sm input-theme" 
+                  v-model="bulkTargetSubcategory"
+                  :disabled="!bulkTargetCategory"
+                  style="min-width: 150px;"
+                >
+                  <option value="">Choose Subcategory</option>
+                  <option 
+                    v-for="subcategory in getSubcategoriesForCategory(bulkTargetCategory)" 
+                    :key="subcategory.name" 
+                    :value="subcategory.name"
+                  >
+                    {{ subcategory.name }}
+                  </option>
+                </select>
                 <button 
                   class="btn btn-success btn-sm"
                   @click="moveSelectedToCategory"
-                  :disabled="!bulkTargetCategory || isMoving"
+                  :disabled="!bulkTargetCategory || !bulkTargetSubcategory || bulkMoveLoading"
                 >
-                  <div v-if="isMoving" class="spinner-border spinner-border-sm me-2" role="status">
+                  <div v-if="bulkMoveLoading" class="spinner-border spinner-border-sm me-2" role="status">
                     <span class="visually-hidden">Moving...</span>
                   </div>
-                  {{ isMoving ? 'Moving...' : 'Move' }}
+                  {{ bulkMoveLoading ? 'Moving...' : 'Move' }}
                 </button>
                 <button 
-                  class="btn btn-outline-secondary btn-sm"
+                  class="btn btn-cancel btn-sm"
                   @click="clearSelection"
                 >
                   Clear
@@ -134,13 +149,13 @@
                   <input 
                     v-model="searchFilter" 
                     type="text" 
-                    class="form-control form-control-sm search-input"
+                    class="form-control form-control-sm search-input input-theme"
                     placeholder="Search products..."
                     style="min-width: 250px;"
                   />
                   <button 
                     v-if="searchFilter"
-                    class="btn btn-sm btn-link position-absolute end-0 top-50 translate-middle-y"
+                    class="btn btn-sm btn-link position-absolute end-0 top-50 translate-middle-y text-tertiary-medium"
                     @click="searchFilter = ''"
                     style="border: none; padding: 0.25rem;"
                   >
@@ -173,10 +188,11 @@
             </th>
             <th style="width: 120px;">Product ID</th>
             <th>Product Name</th>
-            <th style="width: 200px;">Move to Category</th>
+            <th style="width: 180px;">Move to Category</th>
+            <th style="width: 140px;">Subcategory</th>
             <th style="width: 120px;">Stock</th>
             <th style="width: 120px;">Selling Price</th>
-            <th style="width: 120px;">Supplier</th>
+            <th style="width: 120px;">Cost Price</th>
             <th style="width: 100px;">Date Added</th>
           </tr>
         </template>
@@ -192,26 +208,44 @@
               />
             </td>
             <td>
-              <code class="text-tertiary-dark bg-neutral-light px-2 py-1 rounded">
+              <code class="text-tertiary surface-tertiary px-2 py-1 rounded">
                 {{ product._id }}
               </code>
             </td>
             <td>
-              <div class="fw-medium text-tertiary-dark">{{ product.product_name }}</div>
+              <div class="fw-medium text-primary">{{ product.product_name }}</div>
             </td>
             <td>
               <select 
-                class="form-select form-select-sm"
-                @change="moveProductToCategory(product._id, $event.target.value)"
-                :disabled="isMoving"
+                class="form-select form-select-sm input-theme"
+                v-model="product.selectedCategory"
+                @change="onCategorySelect(product)"
+                :disabled="moveProductLoading"
               >
                 <option value="">Select Category</option>
                 <option 
-                  v-for="category in availableCategories" 
+                  v-for="category in activeCategories" 
                   :key="category._id" 
                   :value="category._id"
                 >
                   {{ category.category_name }}
+                </option>
+              </select>
+            </td>
+            <td>
+              <select 
+                class="form-select form-select-sm input-theme"
+                v-model="product.selectedSubcategory"
+                @change="moveProductToCategory(product._id, product.selectedCategory, product.selectedSubcategory)"
+                :disabled="!product.selectedCategory || moveProductLoading"
+              >
+                <option value="">Select Subcategory</option>
+                <option 
+                  v-for="subcategory in getSubcategoriesForCategory(product.selectedCategory)" 
+                  :key="subcategory.name" 
+                  :value="subcategory.name"
+                >
+                  {{ subcategory.name }}
                 </option>
               </select>
             </td>
@@ -220,11 +254,13 @@
                 {{ product.stock || 0 }}
               </span>
             </td>
-            <td class="text-end fw-medium text-tertiary-dark">
+            <td class="text-end fw-medium text-secondary">
               ₱{{ formatPrice(product.selling_price) }}
             </td>
-            <td class="text-tertiary-dark">{{ product.supplier || 'N/A' }}</td>
-            <td class="text-tertiary-dark">
+            <td class="text-end fw-medium text-secondary">
+              ₱{{ formatPrice(product.cost_price) }}
+            </td>
+            <td class="text-secondary">
               {{ formatDate(product.date_created || product.created_at) }}
             </td>
           </tr>
@@ -233,17 +269,17 @@
 
       <!-- Empty State -->
       <div v-if="filteredProducts.length === 0" class="text-center py-5">
-        <div class="card">
+        <div class="card-theme">
           <div class="card-body py-5">
             <Package :size="64" class="text-success mb-3" />
             <h5 class="text-success">All Products Categorized!</h5>
-            <p class="text-muted mb-3">
-              {{ products.length === 0 ? 
+            <p class="text-tertiary-medium mb-3">
+              {{ uncategorizedProducts.length === 0 ? 
                 'No uncategorized products found. All products have been properly categorized.' :
                 'No products match your search criteria.' }}
             </p>
-            <router-link to="/categories" class="btn btn-primary">
-              <ArrowLeft :size="16" class="me-1" />
+            <router-link to="/categories" class="btn btn-primary btn-with-icon">
+              <ArrowLeft :size="16" />
               Back to Categories
             </router-link>
           </div>
@@ -254,325 +290,218 @@
 </template>
 
 <script>
+import { ref, computed, onMounted } from 'vue'
 import DataTable from '@/components/common/TableTemplate.vue'
-import categoryApiService from '@/services/apiCategory'
-import { 
-  Download,
-  Package,
-  X,
-  ArrowLeft
-} from 'lucide-vue-next'
+import { useProducts } from '@/composables/api/useProducts'
+import { useCategories } from '@/composables/api/useCategories'
 
 export default {
   name: 'UncategorizedProducts',
   components: {
-    DataTable,
-    Download,
-    Package,
-    X,
-    ArrowLeft
+    DataTable
   },
-  data() {
-    return {
-      currentPage: 1,
-      itemsPerPage: 10,
-      selectedProducts: [],
-      loading: false,
-      error: null,
-      isExporting: false,
-      isMoving: false,
-      
-      // Data
-      products: [],
-      availableCategories: [],
-      
-      // Filters
-      searchFilter: '',
-      
-      // Bulk operations
-      bulkTargetCategory: '',
-      
-      // Constants
-      UNCATEGORIZED_CATEGORY_ID: '686a4de143821e2b21f725c6'
-    }
-  },
-  computed: {
-    filteredProducts() {
-      if (!this.searchFilter.trim()) {
-        return this.products
+
+  setup() {
+    // Composables
+    const { 
+      products: allProducts,
+      loading: productsLoading,
+      error: productsError,
+      fetchProducts,
+      exportProducts,
+      moveProductToCategory: moveProduct,
+      bulkMoveProductsToCategory,
+      moveProductLoading,
+      bulkMoveLoading
+    } = useProducts()
+
+    const { 
+      activeCategories,
+      loading: categoriesLoading,
+      fetchCategories
+    } = useCategories()
+
+    // Local state
+    const searchFilter = ref('')
+    const selectedProducts = ref([])
+    const bulkTargetCategory = ref('')
+    const bulkTargetSubcategory = ref('')
+    const currentPage = ref(1)
+    const itemsPerPage = ref(10)
+    const isExporting = ref(false)
+
+    // Computed properties
+    const loading = computed(() => productsLoading.value || categoriesLoading.value)
+    const error = computed(() => productsError.value)
+
+    const uncategorizedProducts = computed(() => {
+      return allProducts.value.filter(product => {
+        // Product is uncategorized if it has no category_id or if it's in the uncategorized category
+        return !product.category_id || 
+               product.category_id === 'UNCTGRY-001' ||
+               product.subcategory_name === 'General' ||
+               product.category_id?.startsWith?.('UNCTGRY-')
+      }).map(product => ({
+        ...product,
+        selectedCategory: '',
+        selectedSubcategory: ''
+      }))
+    })
+
+    const filteredProducts = computed(() => {
+      if (!searchFilter.value.trim()) {
+        return uncategorizedProducts.value
       }
       
-      const searchTerm = this.searchFilter.toLowerCase().trim()
-      return this.products.filter(product => 
+      const searchTerm = searchFilter.value.toLowerCase().trim()
+      return uncategorizedProducts.value.filter(product => 
         (product.product_name || '').toLowerCase().includes(searchTerm) ||
         (product.supplier || '').toLowerCase().includes(searchTerm) ||
-        (product._id || '').toLowerCase().includes(searchTerm)
+        (product._id || '').toLowerCase().includes(searchTerm) ||
+        (product.SKU || '').toLowerCase().includes(searchTerm)
       )
-    },
-    
-    paginatedProducts() {
-      const start = (this.currentPage - 1) * this.itemsPerPage
-      const end = start + this.itemsPerPage
-      return this.filteredProducts.slice(start, end)
-    },
+    })
 
-    isAllSelected() {
-      const currentPageProductIds = this.paginatedProducts.map(p => p._id)
+    const paginatedProducts = computed(() => {
+      const start = (currentPage.value - 1) * itemsPerPage.value
+      const end = start + itemsPerPage.value
+      return filteredProducts.value.slice(start, end)
+    })
+
+    const isAllSelected = computed(() => {
+      const currentPageProductIds = paginatedProducts.value.map(p => p._id)
       return currentPageProductIds.length > 0 && 
-            currentPageProductIds.every(id => this.selectedProducts.includes(id))
-    },
+            currentPageProductIds.every(id => selectedProducts.value.includes(id))
+    })
 
-    isIndeterminate() {
-      const currentPageProductIds = this.paginatedProducts.map(p => p._id)
-      const selectedOnPage = currentPageProductIds.filter(id => this.selectedProducts.includes(id))
+    const isIndeterminate = computed(() => {
+      const currentPageProductIds = paginatedProducts.value.map(p => p._id)
+      const selectedOnPage = currentPageProductIds.filter(id => selectedProducts.value.includes(id))
       return selectedOnPage.length > 0 && selectedOnPage.length < currentPageProductIds.length
-    },
+    })
 
-    totalValue() {
-      return this.products.reduce((total, product) => {
+    const totalValue = computed(() => {
+      return uncategorizedProducts.value.reduce((total, product) => {
         return total + (parseFloat(product.selling_price) || 0) * (parseInt(product.stock) || 0)
       }, 0)
+    })
+
+    // Methods
+    const getSubcategoriesForCategory = (categoryId) => {
+      if (!categoryId) return []
+      const category = activeCategories.value.find(c => c._id === categoryId)
+      return category?.sub_categories || []
     }
-  },
-  methods: {
-    // DATA LOADING METHODS
-    async loadUncategorizedProducts() {
-      this.loading = true
-      this.error = null
+
+    const onCategorySelect = (product) => {
+      // Reset subcategory when category changes
+      product.selectedSubcategory = ''
+    }
+
+    const moveProductToCategory = async (productId, categoryId, subcategoryName) => {
+      if (!categoryId || !subcategoryName) return
       
       try {
-        console.log('Loading uncategorized products...')
-        
-        // Load uncategorized products from the Uncategorized category
-        const products = await categoryApiService.FindProdcategory({ 
-          id: this.UNCATEGORIZED_CATEGORY_ID 
-        })
-        
-        this.products = Array.isArray(products) ? products : []
-        console.log(`Loaded ${this.products.length} uncategorized products`)
-        
-      } catch (error) {
-        console.error('Error loading uncategorized products:', error)
-        this.error = error.message || 'Failed to load uncategorized products'
-        this.products = []
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async loadAvailableCategories() {
-      try {
-        console.log('🔄 Starting to load available categories...')
-        
-        let categories = []
-        const response = await categoryApiService.CategoryData()
-        for (const X of response.categories)
-          if (X.category_name != "Uncategorized"){
-              categories.push(X)
-          }
-
-        this.availableCategories = categories
-
-      } catch (error) {
-        console.error('❌ Error loading categories:', error)
-        console.error('❌ Error details:', error.message)
-        console.error('❌ Full error:', error)
-        this.availableCategories = []
-      }
-    },
-
-    // PRODUCT MOVEMENT METHODS
-    async moveProductToCategory(productId, categoryId) {
-      if (!categoryId) return
-      
-      try {
-        this.isMoving = true
-        
-        const product = this.products.find(p => p._id === productId)
-        const category = this.availableCategories.find(c => c._id === categoryId)
+        const product = uncategorizedProducts.value.find(p => p._id === productId)
+        const category = activeCategories.value.find(c => c._id === categoryId)
         
         if (!product || !category) {
           throw new Error('Product or category not found')
         }
         
-        console.log(`Moving product ${product.product_name} to category ${category.category_name}`)
+        console.log(`Moving product ${product.product_name} to category ${category.category_name} > ${subcategoryName}`)
         
-        // FIXED: Explicitly set subcategory to "None" instead of null
-        await categoryApiService.SubCatChangeTab({
-          product_id: productId,
-          new_subcategory: "None", // ← Changed from null to "None"
-          category_id: categoryId // The target category
-        })
+        await moveProduct(productId, categoryId, subcategoryName)
         
-        // Remove from local uncategorized array since it's now categorized
-        this.products = this.products.filter(p => p._id !== productId)
+        // Remove from selections if selected
+        selectedProducts.value = selectedProducts.value.filter(id => id !== productId)
         
-        // Clear from selection if selected
-        this.selectedProducts = this.selectedProducts.filter(id => id !== productId)
-        
-        this.showSuccessMessage(
-          `"${product.product_name}" moved to "${category.category_name}" category (subcategory: None)`
-        )
+        console.log(`"${product.product_name}" moved to "${category.category_name}" > "${subcategoryName}"`)
         
       } catch (error) {
         console.error('Error moving product:', error)
-        this.showErrorMessage(`Failed to move product: ${error.message}`)
-      } finally {
-        this.isMoving = false
+        alert(`Failed to move product: ${error.message}`)
       }
-    },
+    }
 
-    async moveSelectedToCategory() {
-      if (this.selectedProducts.length === 0 || !this.bulkTargetCategory) return
+    const moveSelectedToCategory = async () => {
+      if (selectedProducts.value.length === 0 || !bulkTargetCategory.value || !bulkTargetSubcategory.value) return
       
       try {
-        this.isMoving = true
-        
-        const category = this.availableCategories.find(c => c._id === this.bulkTargetCategory)
+        const category = activeCategories.value.find(c => c._id === bulkTargetCategory.value)
         if (!category) {
           throw new Error('Target category not found')
         }
         
-        console.log(`Bulk moving ${this.selectedProducts.length} products to ${category.category_name}`)
+        console.log(`Bulk moving ${selectedProducts.value.length} products to ${category.category_name} > ${bulkTargetSubcategory.value}`)
         
-        // FIXED: Explicitly set subcategory to "None" for all products
-        const movePromises = this.selectedProducts.map(productId => 
-          categoryApiService.SubCatChangeTab({
-            product_id: productId,
-            new_subcategory: "None", // ← Changed from null to "None"
-            category_id: this.bulkTargetCategory
-          })
-        )
-        
-        const results = await Promise.allSettled(movePromises)
-        
-        // Count successes
-        const successful = results.filter(r => r.status === 'fulfilled').length
-        const failed = results.filter(r => r.status === 'rejected').length
-        
-        // Remove successfully moved products
-        const failedProductIds = results
-          .map((result, index) => result.status === 'rejected' ? this.selectedProducts[index] : null)
-          .filter(Boolean)
-        
-        this.products = this.products.filter(product => 
-          !this.selectedProducts.includes(product._id) || failedProductIds.includes(product._id)
-        )
+        await bulkMoveProductsToCategory(selectedProducts.value, bulkTargetCategory.value, bulkTargetSubcategory.value)
         
         // Clear selections and reset form
-        this.selectedProducts = []
-        this.bulkTargetCategory = ''
+        selectedProducts.value = []
+        bulkTargetCategory.value = ''
+        bulkTargetSubcategory.value = ''
         
-        // Show results
-        if (successful > 0) {
-          this.showSuccessMessage(
-            `${successful} product(s) moved to "${category.category_name}" (subcategory: None) successfully!` +
-            (failed > 0 ? ` ${failed} failed.` : '')
-          )
-        }
-        
-        if (failed > 0 && successful === 0) {
-          this.showErrorMessage(`Failed to move ${failed} product(s)`)
-        }
+        console.log(`Products moved to "${category.category_name}" > "${bulkTargetSubcategory.value}" successfully!`)
         
       } catch (error) {
         console.error('Error in bulk move:', error)
-        this.showErrorMessage(`Bulk move failed: ${error.message}`)
-      } finally {
-        this.isMoving = false
+        alert(`Bulk move failed: ${error.message}`)
       }
-    },
+    }
 
-    // SELECTION METHODS
-    toggleSelectAll() {
-      const currentPageProductIds = this.paginatedProducts.map(p => p._id)
+    const toggleSelectAll = () => {
+      const currentPageProductIds = paginatedProducts.value.map(p => p._id)
       
-      if (this.isAllSelected) {
-        this.selectedProducts = this.selectedProducts.filter(id => !currentPageProductIds.includes(id))
+      if (isAllSelected.value) {
+        selectedProducts.value = selectedProducts.value.filter(id => !currentPageProductIds.includes(id))
       } else {
-        const newSelections = currentPageProductIds.filter(id => !this.selectedProducts.includes(id))
-        this.selectedProducts = [...this.selectedProducts, ...newSelections]
+        const newSelections = currentPageProductIds.filter(id => !selectedProducts.value.includes(id))
+        selectedProducts.value = [...selectedProducts.value, ...newSelections]
       }
-    },
+    }
 
-    clearSelection() {
-      this.selectedProducts = []
-      this.bulkTargetCategory = ''
-    },
+    const clearSelection = () => {
+      selectedProducts.value = []
+      bulkTargetCategory.value = ''
+      bulkTargetSubcategory.value = ''
+    }
 
-    handlePageChange(page) {
-      this.currentPage = page
-    },
+    const handlePageChange = (page) => {
+      currentPage.value = page
+    }
 
-    // EXPORT METHODS
-    async exportUncategorizedProducts() {
+    const exportUncategorizedProducts = async () => {
       try {
-        this.isExporting = true
+        isExporting.value = true
         
-        const csvContent = this.convertProductsToCSV()
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
+        // Export products with no category filter to get uncategorized ones
+        await exportProducts({ 
+          category_id: null,
+          uncategorized_only: true 
+        })
         
-        const timestamp = new Date().toISOString().split('T')[0]
-        link.download = `uncategorized_products_${timestamp}.csv`
-        
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        window.URL.revokeObjectURL(url)
-        
-        this.showSuccessMessage(`${this.products.length} uncategorized products exported successfully`)
+        console.log('Uncategorized products exported successfully')
         
       } catch (error) {
         console.error('Export failed:', error)
-        this.showErrorMessage(`Export failed: ${error.message}`)
+        alert(`Export failed: ${error.message}`)
       } finally {
-        this.isExporting = false
+        isExporting.value = false
       }
-    },
+    }
 
-    convertProductsToCSV() {
-      const headers = [
-        'Product ID',
-        'Product Name',
-        'Stock',
-        'Selling Price (₱)',
-        'Supplier',
-        'Date Added'
-      ]
-      
-      const csvComments = [
-        '# Uncategorized Products Report',
-        `# Generated: ${new Date().toISOString()}`,
-        `# Total Products: ${this.products.length}`,
-        `# Total Value: ₱${this.totalValue.toFixed(2)}`,
-        ''
-      ]
-      
-      const rows = this.products.map(product => [
-        product._id,
-        `"${product.product_name || 'Unknown'}"`,
-        product.stock || 0,
-        product.selling_price || 0,
-        `"${product.supplier || 'N/A'}"`,
-        this.formatDate(product.date_created || product.created_at) || 'N/A'
+    const retryLoad = async () => {
+      await Promise.all([
+        fetchProducts(),
+        fetchCategories()
       ])
-      
-      return [
-        ...csvComments,
-        headers.join(','),
-        ...rows.map(row => row.join(','))
-      ].join('\n')
-    },
+    }
 
-    // UTILITY METHODS
-    formatPrice(price) {
-      return parseFloat(price || 0).toFixed(2)
-    },
+    // Utility methods
+    const formatPrice = (price) => parseFloat(price || 0).toFixed(2)
 
-    formatDate(dateString) {
+    const formatDate = (dateString) => {
       if (!dateString) return 'N/A'
       const date = new Date(dateString)
       return date.toLocaleDateString('en-US', {
@@ -580,83 +509,69 @@ export default {
         month: 'short',
         day: 'numeric'
       })
-    },
+    }
 
-    getStockClass(stock) {
-      if (stock === 0) return 'text-danger fw-bold'
+    const getStockClass = (stock) => {
+      if (stock === 0) return 'text-error fw-bold'
       if (stock <= 15) return 'text-warning fw-semibold'
       return 'text-success fw-medium'
-    },
-
-    showSuccessMessage(message) {
-      console.log('✅ Success:', message)
-      // Replace with your notification system
-    },
-
-    showErrorMessage(message) {
-      console.error('❌ Error:', message)
-      alert(message)
     }
-  },
-  
-  async mounted() {
-    await Promise.all([
-      this.loadUncategorizedProducts(),
-      this.loadAvailableCategories()
-    ])
+
+    // Initialize data
+    onMounted(async () => {
+      await Promise.all([
+        fetchProducts(),
+        fetchCategories()
+      ])
+    })
+
+    return {
+      // State
+      loading,
+      error,
+      uncategorizedProducts,
+      activeCategories,
+      searchFilter,
+      selectedProducts,
+      bulkTargetCategory,
+      bulkTargetSubcategory,
+      currentPage,
+      itemsPerPage,
+      isExporting,
+      moveProductLoading,
+      bulkMoveLoading,
+
+      // Computed
+      filteredProducts,
+      paginatedProducts,
+      isAllSelected,
+      isIndeterminate,
+      totalValue,
+
+      // Methods
+      getSubcategoriesForCategory,
+      onCategorySelect,
+      moveProductToCategory,
+      moveSelectedToCategory,
+      toggleSelectAll,
+      clearSelection,
+      handlePageChange,
+      exportUncategorizedProducts,
+      retryLoad,
+      formatPrice,
+      formatDate,
+      getStockClass
+    }
   }
 }
 </script>
 
 <style scoped>
 .uncategorized-page {
-  background-color: var(--neutral-light);
   min-height: 100vh;
 }
 
-.text-primary {
-  color: var(--primary) !important;
-}
-
-.text-tertiary-dark {
-  color: var(--tertiary-dark) !important;
-}
-
-.text-tertiary-medium {
-  color: var(--tertiary-medium) !important;
-}
-
-.bg-neutral-light {
-  background-color: var(--neutral-light) !important;
-}
-
-.spinner-border {
-  width: 2rem;
-  height: 2rem;
-}
-
-.breadcrumb {
-  background: none;
-  padding: 0;
-  margin: 0;
-}
-
-.breadcrumb-item + .breadcrumb-item::before {
-  content: ">";
-  color: var(--tertiary-medium);
-}
-
-.breadcrumb-item a {
-  text-decoration: none;
-}
-
-.breadcrumb-item a:hover {
-  text-decoration: underline;
-}
-
 .action-bar-controls {
-  border-bottom: 1px solid var(--neutral);
-  background-color: white;
   border-radius: 0.75rem;
 }
 
@@ -673,23 +588,28 @@ export default {
   padding-right: 2.5rem;
 }
 
-.card {
-  border: 1px solid var(--neutral);
-  border-radius: 0.75rem;
+.breadcrumb {
+  background: none;
+  padding: 0;
+  margin: 0;
 }
 
-.card-body {
-  padding: 1.5rem;
+.breadcrumb-item + .breadcrumb-item::before {
+  content: ">";
+  color: var(--text-tertiary);
 }
 
-.form-select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
+.breadcrumb-item a {
+  text-decoration: none;
 }
 
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.breadcrumb-item a:hover {
+  text-decoration: underline;
+}
+
+.spinner-border-sm {
+  width: 0.875rem;
+  height: 0.875rem;
 }
 
 @media (max-width: 768px) {

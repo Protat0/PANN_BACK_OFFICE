@@ -201,45 +201,81 @@ class CategoryService:
         return category_name
 
     def _prepare_subcategories(self, existing_sub_categories):
-        """Prepare subcategories with string IDs"""
+        """Prepare subcategories with proper sequential IDs"""
         subcategories_list = existing_sub_categories or []
         
         # Check if "None" subcategory already exists
         none_exists = any(
-            sub.get('name', '').lower() == 'none' 
+            sub.get('name', '').lower() == 'none'
             for sub in subcategories_list
         )
         
+        # Add default "None" subcategory if it doesn't exist
         if not none_exists:
-            default_none = {
-                'subcategory_id': self.generate_subcategory_id(),  # String ID
-                'name': "None",
-                'description': "Default holding subcategory for products without specific subcategorization",
+            none_subcategory = {
+                'name': 'None',
+                'description': 'Default holding subcategory for products without specific subcategorization'
+            }
+            subcategories_list.insert(0, none_subcategory)
+        
+        if not subcategories_list:
+            return []
+        
+        # Get the starting ID number once
+        start_id_number = self._get_next_subcategory_number()
+        
+        prepared_subcategories = []
+        for i, subcategory in enumerate(subcategories_list):
+            # Generate sequential ID for each subcategory
+            subcategory_id = f"SUBCAT-{(start_id_number + i):05d}"
+            
+            prepared_subcategory = {
+                'subcategory_id': subcategory_id,
+                'name': subcategory.get('name', ''),
+                'description': subcategory.get('description', ''),
                 'products': [],
-                'created_at': datetime.utcnow(),
+                'created_at': datetime.utcnow().isoformat(),
                 'status': 'active'
             }
-            subcategories_list.insert(0, default_none)
-            logger.debug("Auto-added 'None' subcategory with string ID")
+            prepared_subcategories.append(prepared_subcategory)
         
-        # Process existing subcategories and ensure they have string IDs
-        processed_subcategories = []
-        for sub in subcategories_list:
-            # If subcategory doesn't have an ID, generate one
-            if not sub.get('subcategory_id'):
-                sub['subcategory_id'] = self.generate_subcategory_id()
+        return prepared_subcategories
+    
+    def _get_next_subcategory_number(self):
+        """Get the next available subcategory number"""
+        try:
+            pipeline = [
+                {"$unwind": "$sub_categories"},
+                {
+                    '$match': {
+                        'sub_categories.subcategory_id': {'$regex': '^SUBCAT-\\d{5}$'}
+                    }
+                },
+                {
+                    '$addFields': {
+                        'numeric_part': {
+                            '$toInt': {'$substr': ['$sub_categories.subcategory_id', 7, 5]}
+                        }
+                    }
+                },
+                {
+                    '$group': {
+                        '_id': None,
+                        'max_number': {'$max': '$numeric_part'}
+                    }
+                }
+            ]
             
-            clean_sub = {
-                'subcategory_id': sub['subcategory_id'],  # String ID
-                'name': sub.get('name', ''),
-                'description': sub.get('description', ''),
-                'products': sub.get('products', []),
-                'created_at': sub.get('created_at', datetime.utcnow()),
-                'status': sub.get('status', 'active')
-            }
-            processed_subcategories.append(clean_sub)
-        
-        return processed_subcategories
+            result = list(self.collection.aggregate(pipeline))
+            
+            if result and result[0]['max_number'] is not None:
+                return result[0]['max_number'] + 1
+            else:
+                return 1
+                
+        except Exception as e:
+            logger.error(f"Error getting next subcategory number: {e}")
+            return 1
     
     def _send_category_notification(self, action_type, category_name, category_id=None, additional_metadata=None):
         """Centralized notification helper for category actions"""
@@ -504,13 +540,14 @@ class CategoryService:
             if not category_id or not category_id.startswith('CTGY-'):
                 return False
             
-            # Get category data before deletion (only active categories)
+            # Get category data before deletion (only active categories) - USE _id
             category_to_delete = self.collection.find_one({
-                'category_id': category_id,
+                '_id': category_id,  # ✅ Changed to use _id
                 'isDeleted': {'$ne': True}
             })
             
             if not category_to_delete:
+                logger.error(f"Category {category_id} not found for soft delete")
                 return False
             
             now = datetime.utcnow()
@@ -518,15 +555,15 @@ class CategoryService:
             # Soft delete data
             update_data = {
                 'isDeleted': True,
-                'deleted_at': now,
+                'deleted_at': now.isoformat(),  # Use ISO string for consistency
                 'deletedBy': current_user.get('username') if current_user else 'system',
-                'last_updated': now,
+                'last_updated': now.isoformat(),  # Use ISO string for consistency
                 'deletionContext': deletion_context or "category_deletion"
             }
             
-            # Update category using string ID
+            # Update category using _id - FIXED
             result = self.collection.update_one(
-                {'category_id': category_id},
+                {'_id': category_id},  # ✅ Changed to use _id
                 {'$set': update_data}
             )
             
@@ -566,7 +603,7 @@ class CategoryService:
             
             # Find deleted category using string ID
             deleted_category = self.collection.find_one({
-                'category_id': category_id,
+                '_id': category_id,
                 'isDeleted': True
             })
             
@@ -593,7 +630,7 @@ class CategoryService:
             
             # Restore category using string ID
             result = self.collection.update_one(
-                {'category_id': category_id},
+                {'_id': category_id},
                 {'$set': restore_data, '$unset': unset_data}
             )
             
@@ -631,14 +668,14 @@ class CategoryService:
                 return False
             
             # Get category data before permanent deletion
-            category_to_delete = self.collection.find_one({'category_id': category_id})
+            category_to_delete = self.collection.find_one({'_id': category_id})
             if not category_to_delete:
                 return False
             
             category_name = category_to_delete.get('category_name', 'Unknown Category')
             
             # Permanently delete from collection using string ID
-            result = self.collection.delete_one({'category_id': category_id})
+            result = self.collection.delete_one({'_id': category_id})
             
             if result.deleted_count > 0:
                 # Send critical notification with enhanced metadata
@@ -1082,7 +1119,7 @@ class CategoryService:
             
             category = self.collection.find_one(
                 {
-                    'category_id': category_id,
+                    '_id': category_id,
                     'isDeleted': {'$ne': True}
                 },
                 {'sub_categories': 1}
@@ -1388,5 +1425,71 @@ class CategoryService:
         except Exception as e:
             logger.error(f"Error moving product to None subcategory: {e}")
             raise Exception(f"Error moving product to None subcategory: {str(e)}")
-    
+        
+    def get_products_in_subcategory(self, category_id, subcategory_name, include_deleted=False):
+        """Get all products in a specific subcategory"""
+        try:
+            from ..services.product_service import ProductService
+            product_service = ProductService()
+            
+            # Get products by category and subcategory
+            filters = {
+                'category_id': category_id,
+                'subcategory_name': subcategory_name
+            }
+            
+            products = product_service.get_all_products(
+                filters=filters,
+                include_deleted=include_deleted
+            )
+            
+            return products
+            
+        except Exception as e:
+            logger.error(f"Error getting products in subcategory: {e}")
+            raise Exception(f"Error getting products in subcategory: {str(e)}")
+        
+    def move_product_to_category(self, product_id, new_category_id, new_subcategory_name=None, current_user=None):
+        """Move a product to a different category/subcategory using ProductService"""
+        try:
+            from ..services.product_service import ProductService
+            product_service = ProductService()
+            
+            # Validate the target category exists
+            target_category = self.get_category_by_id(new_category_id)
+            if not target_category:
+                raise ValueError(f"Target category {new_category_id} not found")
+            
+            # If no subcategory specified, use "None" as default
+            if not new_subcategory_name:
+                new_subcategory_name = "None"
+            
+            # Validate subcategory exists in target category
+            subcategories = target_category.get('sub_categories', [])
+            subcategory_exists = any(
+                sub.get('name') == new_subcategory_name 
+                for sub in subcategories
+            )
+            
+            if not subcategory_exists:
+                raise ValueError(f"Subcategory '{new_subcategory_name}' not found in category {new_category_id}")
+            
+            # Update the product using ProductService
+            update_data = {
+                'category_id': new_category_id,
+                'subcategory_name': new_subcategory_name
+            }
+            
+            updated_product = product_service.update_product(product_id, update_data)
+            
+            if not updated_product:
+                raise ValueError(f"Product {product_id} not found or update failed")
+            
+            logger.info(f"Product {product_id} moved to category {new_category_id} > {new_subcategory_name}")
+            return updated_product
+            
+        except Exception as e:
+            logger.error(f"Error moving product to category: {e}")
+            raise Exception(f"Error moving product to category: {str(e)}")
+            
     
