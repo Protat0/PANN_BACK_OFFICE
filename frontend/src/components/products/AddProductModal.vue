@@ -167,6 +167,174 @@
             </div>
           </div>
 
+          <!-- BATCH STOCK MANAGEMENT SECTION -->
+          <div class="mb-4">
+            <div class="surface-elevated p-3 rounded border-theme-subtle">
+              <h5 class="text-primary mb-3">
+                <Package :size="20" />
+                Stock & Batch Information
+              </h5>
+              
+              <!-- Stock Mode Toggle -->
+              <div class="mb-3">
+                <div class="form-check form-switch">
+                  <input 
+                    id="createWithStock"
+                    v-model="createWithStock" 
+                    type="checkbox" 
+                    class="form-check-input"
+                    @change="onStockModeChange"
+                  />
+                  <label for="createWithStock" class="form-check-label text-secondary">
+                    Add initial stock (creates first batch)
+                  </label>
+                </div>
+                <small class="text-tertiary-medium">
+                  {{ createWithStock 
+                    ? 'This will create the first batch for this product with the stock details below' 
+                    : 'Product will be created without stock. Add batches later when receiving inventory' 
+                  }}
+                </small>
+              </div>
+
+              <!-- Initial Stock Fields (only shown when createWithStock is true) -->
+              <div v-if="createWithStock" class="batch-fields">
+                <div class="row g-3 mb-3">
+                  <div class="col-md-6">
+                    <label for="initial_stock" class="form-label text-primary fw-medium">
+                      Initial Stock Quantity <span class="text-error">*</span>
+                    </label>
+                    <input 
+                      id="initial_stock"
+                      v-model.number="batchForm.quantity_received" 
+                      type="number" 
+                      min="1"
+                      :required="createWithStock"
+                      :disabled="isLoading"
+                      placeholder="0"
+                      class="form-control input-theme"
+                      :class="{ 
+                        'is-invalid': validationErrors.initial_stock,
+                        'validation-error': validationErrors.initial_stock 
+                      }"
+                    />
+                    <div v-if="validationErrors.initial_stock" class="invalid-feedback">
+                      {{ validationErrors.initial_stock }}
+                    </div>
+                  </div>
+
+                  <div class="col-md-6">
+                    <label for="batch_cost_price" class="form-label text-primary fw-medium">
+                      Cost Price per Unit (₱) <span class="text-error">*</span>
+                    </label>
+                    <input 
+                      id="batch_cost_price"
+                      v-model.number="batchForm.cost_price" 
+                      type="number" 
+                      step="0.01"
+                      min="0"
+                      :required="createWithStock"
+                      :disabled="isLoading"
+                      placeholder="0.00"
+                      class="form-control input-theme"
+                      :class="{ 
+                        'is-invalid': validationErrors.batch_cost_price,
+                        'validation-error': validationErrors.batch_cost_price 
+                      }"
+                    />
+                    <div v-if="validationErrors.batch_cost_price" class="invalid-feedback">
+                      {{ validationErrors.batch_cost_price }}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                  <div class="col-md-6">
+                    <label for="batch_expiry_date" class="form-label text-primary fw-medium">
+                      Expiry Date <span class="text-error">*</span>
+                    </label>
+                    <input 
+                      id="batch_expiry_date"
+                      v-model="batchForm.expiry_date" 
+                      type="date" 
+                      :required="createWithStock"
+                      :disabled="isLoading"
+                      :min="tomorrow"
+                      class="form-control input-theme"
+                      :class="{ 
+                        'is-invalid': validationErrors.batch_expiry_date,
+                        'validation-error': validationErrors.batch_expiry_date 
+                      }"
+                    />
+                    <div v-if="validationErrors.batch_expiry_date" class="invalid-feedback">
+                      {{ validationErrors.batch_expiry_date }}
+                    </div>
+                    <small class="text-tertiary-medium">
+                      Expiry date for this batch
+                    </small>
+                  </div>
+
+                  <div class="col-md-6">
+                    <label for="batch_number" class="form-label text-primary fw-medium">
+                      Batch Number
+                    </label>
+                    <input 
+                      id="batch_number"
+                      v-model="batchForm.batch_number" 
+                      type="text" 
+                      :disabled="isLoading"
+                      placeholder="Auto-generated if empty"
+                      class="form-control input-theme"
+                    />
+                    <small class="text-tertiary-medium">
+                      Leave empty to auto-generate
+                    </small>
+                  </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                  <div class="col-md-6">
+                    <label for="supplier_id" class="form-label text-primary fw-medium">
+                      Supplier
+                    </label>
+                    <select 
+                      id="supplier_id"
+                      v-model="batchForm.supplier_id" 
+                      class="form-select input-theme"
+                      :disabled="isLoading"
+                    >
+                      <option value="">Select Supplier</option>
+                      <option 
+                        v-for="supplier in suppliers" 
+                        :key="supplier._id" 
+                        :value="supplier._id"
+                      >
+                        {{ supplier.name }}
+                      </option>
+                    </select>
+                  </div>
+
+                  <div class="col-md-6">
+                    <label for="date_received" class="form-label text-primary fw-medium">
+                      Date Received
+                    </label>
+                    <input 
+                      id="date_received"
+                      v-model="batchForm.date_received" 
+                      type="date" 
+                      :disabled="isLoading"
+                      :max="today"
+                      class="form-control input-theme"
+                    />
+                    <small class="text-tertiary-medium">
+                      Defaults to today if empty
+                    </small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="row g-3 mb-3">
             <div class="col-md-6">
               <label for="unit" class="form-label text-primary fw-medium">
@@ -197,46 +365,6 @@
             </div>
 
             <div class="col-md-6">
-              <label for="supplier" class="form-label text-primary fw-medium">
-                Supplier:
-              </label>
-              <input 
-                id="supplier"
-                v-model="productForm.supplier" 
-                type="text" 
-                :disabled="isLoading"
-                placeholder="Enter supplier name"
-                class="form-control input-theme"
-              />
-            </div>
-          </div>
-
-          <div class="row g-3 mb-3">
-            <div class="col-md-6">
-              <label for="cost_price" class="form-label text-primary fw-medium">
-                Cost Price (₱) <span class="text-error">*</span>
-              </label>
-              <input 
-                id="cost_price"
-                v-model.number="productForm.cost_price" 
-                type="number" 
-                step="0.01"
-                min="0"
-                required 
-                :disabled="isLoading"
-                placeholder="0.00"
-                class="form-control input-theme"
-                :class="{ 
-                  'is-invalid': validationErrors.cost_price,
-                  'validation-error': validationErrors.cost_price 
-                }"
-              />
-              <div v-if="validationErrors.cost_price" class="invalid-feedback">
-                {{ validationErrors.cost_price }}
-              </div>
-            </div>
-
-            <div class="col-md-6">
               <label for="selling_price" class="form-label text-primary fw-medium">
                 Selling Price (₱) <span class="text-error">*</span>
               </label>
@@ -259,36 +387,13 @@
               <div v-if="validationErrors.selling_price" class="invalid-feedback">
                 {{ validationErrors.selling_price }}
               </div>
-              <small v-if="marginPercentage" class="text-tertiary-medium">
+              <small v-if="marginPercentage && createWithStock" class="text-tertiary-medium">
                 Profit Margin: {{ marginPercentage }}%
               </small>
             </div>
           </div>
 
           <div class="row g-3 mb-3">
-            <div class="col-md-6">
-              <label for="stock" class="form-label text-primary fw-medium">
-                Stock Quantity <span class="text-error">*</span>
-              </label>
-              <input 
-                id="stock"
-                v-model.number="productForm.stock" 
-                type="number" 
-                min="0"
-                required 
-                :disabled="isLoading"
-                placeholder="0"
-                class="form-control input-theme"
-                :class="{ 
-                  'is-invalid': validationErrors.stock,
-                  'validation-error': validationErrors.stock 
-                }"
-              />
-              <div v-if="validationErrors.stock" class="invalid-feedback">
-                {{ validationErrors.stock }}
-              </div>
-            </div>
-
             <div class="col-md-6">
               <label for="low_stock_threshold" class="form-label text-primary fw-medium">
                 Low Stock Threshold <span class="text-error">*</span>
@@ -310,19 +415,6 @@
               <div v-if="validationErrors.low_stock_threshold" class="invalid-feedback">
                 {{ validationErrors.low_stock_threshold }}
               </div>
-            </div>
-          </div>
-
-          <div class="row g-3 mb-3">
-            <div class="col-md-6">
-              <label for="expiry_date" class="form-label text-primary fw-medium">Expiry Date:</label>
-              <input 
-                id="expiry_date"
-                v-model="productForm.expiry_date" 
-                type="date" 
-                :disabled="isLoading"
-                class="form-control input-theme"
-              />
             </div>
 
             <div class="col-md-6">
@@ -441,13 +533,26 @@
 
 <script>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { X, Camera, Save, BarChart3, Package } from 'lucide-vue-next'
 import { useModal } from '@/composables/ui/useModal'
 import { useProducts } from '@/composables/api/useProducts'
+import { useBatches } from '@/composables/api/useBatches'
 
 export default {
   name: 'AddProductModal',
+  components: {
+    X,
+    Camera,
+    Save,
+    BarChart3,
+    Package
+  },
   props: {
     categories: {
+      type: Array,
+      default: () => []
+    },
+    suppliers: {
       type: Array,
       default: () => []
     }
@@ -455,7 +560,7 @@ export default {
   emits: ['success'],
 
   setup(props, { emit }) {
-    // Use modal composable
+    // Use composables
     const {
       isVisible,
       isLoading,
@@ -467,12 +572,13 @@ export default {
       clearError
     } = useModal()
 
-    // Use products composable
     const {
       createProduct,
       updateProduct,
       checkSkuExists
     } = useProducts()
+
+    const { restockWithBatch } = useBatches()
 
     // Form state
     const editingProduct = ref(null)
@@ -482,6 +588,15 @@ export default {
     const imageInputKey = ref(0)
     const validationErrors = ref({})
     const showValidationSummary = ref(false)
+    const createWithStock = ref(false)
+
+    // Date helpers
+    const today = computed(() => new Date().toISOString().split('T')[0])
+    const tomorrow = computed(() => {
+      const date = new Date()
+      date.setDate(date.getDate() + 1)
+      return date.toISOString().split('T')[0]
+    })
 
     const productForm = ref({
       product_name: '',
@@ -489,12 +604,8 @@ export default {
       category_id: '',
       subcategory_name: '',
       unit: '',
-      supplier: '',
-      cost_price: 0,
       selling_price: 0,
-      stock: 0,
       low_stock_threshold: 10,
-      expiry_date: '',
       status: 'active',
       barcode: '',
       is_taxable: true,
@@ -503,6 +614,15 @@ export default {
       image_filename: '',
       image_size: 0,
       image_type: ''
+    })
+
+    const batchForm = ref({
+      quantity_received: 0,
+      cost_price: 0,
+      expiry_date: '',
+      batch_number: '',
+      supplier_id: '',
+      date_received: today.value
     })
 
     // Computed properties
@@ -515,26 +635,18 @@ export default {
     })
 
     const marginPercentage = computed(() => {
-      const { cost_price, selling_price } = productForm.value
+      if (!createWithStock.value) return 0
+      const { cost_price } = batchForm.value
+      const { selling_price } = productForm.value
       if (!cost_price || !selling_price || cost_price >= selling_price) return 0
       return Math.round(((selling_price - cost_price) / selling_price) * 100)
-    })
-
-    const isFormValid = computed(() => {
-      return productForm.value.product_name.trim() &&
-             productForm.value.SKU.trim() &&
-             productForm.value.unit &&
-             productForm.value.cost_price > 0 &&
-             productForm.value.selling_price > 0 &&
-             productForm.value.stock >= 0 &&
-             productForm.value.low_stock_threshold >= 0 &&
-             !skuError.value
     })
 
     // Validation methods
     const validateForm = () => {
       const errors = {}
 
+      // Product validation
       if (!productForm.value.product_name.trim()) {
         errors.product_name = 'Product name is required'
       }
@@ -547,20 +659,35 @@ export default {
         errors.unit = 'Unit is required'
       }
 
-      if (!productForm.value.cost_price || productForm.value.cost_price <= 0) {
-        errors.cost_price = 'Cost price must be greater than 0'
-      }
-
       if (!productForm.value.selling_price || productForm.value.selling_price <= 0) {
         errors.selling_price = 'Selling price must be greater than 0'
       }
 
-      if (productForm.value.stock < 0) {
-        errors.stock = 'Stock quantity cannot be negative'
-      }
-
       if (productForm.value.low_stock_threshold < 0) {
         errors.low_stock_threshold = 'Low stock threshold cannot be negative'
+      }
+
+      // Batch validation (only when creating with stock)
+      if (createWithStock.value) {
+        if (!batchForm.value.quantity_received || batchForm.value.quantity_received <= 0) {
+          errors.initial_stock = 'Initial stock quantity must be greater than 0'
+        }
+
+        if (!batchForm.value.cost_price || batchForm.value.cost_price <= 0) {
+          errors.batch_cost_price = 'Cost price is required when adding initial stock'
+        }
+
+        if (!batchForm.value.expiry_date) {
+          errors.batch_expiry_date = 'Expiry date is required when adding initial stock'
+        } else {
+          const expiryDate = new Date(batchForm.value.expiry_date)
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          
+          if (expiryDate <= today) {
+            errors.batch_expiry_date = 'Expiry date must be in the future'
+          }
+        }
       }
 
       if (skuError.value) {
@@ -570,24 +697,7 @@ export default {
       validationErrors.value = errors
       showValidationSummary.value = Object.keys(errors).length > 0
 
-      // Add highlight animation to error fields
-      if (Object.keys(errors).length > 0) {
-        setTimeout(() => {
-          Object.keys(errors).forEach(fieldName => {
-            const element = document.getElementById(fieldName)
-            if (element) {
-              element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-            }
-          })
-        }, 100)
-      }
-
       return Object.keys(errors).length === 0
-    }
-
-    const clearValidationErrors = () => {
-      validationErrors.value = {}
-      showValidationSummary.value = false
     }
 
     // Methods
@@ -598,12 +708,8 @@ export default {
         category_id: '',
         subcategory_name: '',
         unit: '',
-        supplier: '',
-        cost_price: 0,
         selling_price: 0,
-        stock: 0,
         low_stock_threshold: 10,
-        expiry_date: '',
         status: 'active',
         barcode: '',
         is_taxable: true,
@@ -613,6 +719,17 @@ export default {
         image_size: 0,
         image_type: ''
       }
+
+      batchForm.value = {
+        quantity_received: 0,
+        cost_price: 0,
+        expiry_date: '',
+        batch_number: '',
+        supplier_id: '',
+        date_received: today.value
+      }
+
+      createWithStock.value = false
       editingProduct.value = null
       imagePreview.value = null
       skuError.value = ''
@@ -621,17 +738,25 @@ export default {
       clearValidationErrors()
     }
 
+    const onStockModeChange = () => {
+      // Clear batch-related validation errors when toggling
+      const batchFields = ['initial_stock', 'batch_cost_price', 'batch_expiry_date']
+      batchFields.forEach(field => {
+        if (validationErrors.value[field]) {
+          delete validationErrors.value[field]
+        }
+      })
+    }
+
     const onCategoryChange = () => {
-      // Reset subcategory when category changes
       productForm.value.subcategory_name = ''
-      // Clear subcategory validation error
       if (validationErrors.value.subcategory_name) {
         delete validationErrors.value.subcategory_name
       }
     }
 
     const calculateMargin = () => {
-      // Margin calculation is handled by computed property
+      // Handled by computed property
     }
 
     const validateSKU = async () => {
@@ -640,7 +765,6 @@ export default {
         return
       }
 
-      // Skip validation if editing and SKU hasn't changed
       if (isEditMode.value && productForm.value.SKU === editingProduct.value?.SKU) {
         skuError.value = ''
         return
@@ -672,21 +796,18 @@ export default {
       const file = event.target.files[0]
       if (!file) return
 
-      // Validate file size (5MB)
       const maxSize = 5 * 1024 * 1024
       if (file.size > maxSize) {
         setError('File size too large. Maximum 5MB allowed.')
         return
       }
 
-      // Validate file type
       const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
       if (!allowedTypes.includes(file.type)) {
         setError('Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.')
         return
       }
 
-      // Create preview
       const reader = new FileReader()
       reader.onload = (e) => {
         imagePreview.value = e.target.result
@@ -694,7 +815,6 @@ export default {
       }
       reader.readAsDataURL(file)
 
-      // Store file metadata
       productForm.value.image_filename = file.name
       productForm.value.image_size = file.size
       productForm.value.image_type = file.type
@@ -709,49 +829,78 @@ export default {
       imageInputKey.value++
     }
 
-  const handleSubmit = async () => {
-    // Always validate form on submit
-    if (!validateForm()) {
-      return
-    }
-
-    setLoading(true)
-    clearError()
-
-    try {
-      let result
-      const formData = { ...productForm.value }
-
-      // If no category is selected, set default values for uncategorized
-      if (!formData.category_id) {
-        formData.category_id = 'UNCTGRY-001' // Default uncategorized category ID
-        formData.subcategory_name = 'General' // Default subcategory
+    const handleSubmit = async () => {
+      if (!validateForm()) {
+        return
       }
 
-      if (isEditMode.value) {
-        result = await updateProduct(editingProduct.value._id, formData)
-      } else {
-        result = await createProduct(formData)
+      setLoading(true)
+      clearError()
+
+      try {
+        let result
+        const formData = { ...productForm.value }
+
+        // Set stock to 0 initially if not creating with stock
+        formData.stock = createWithStock.value ? batchForm.value.quantity_received : 0
+
+        // Handle uncategorized products
+        if (!formData.category_id) {
+          formData.category_id = 'UNCTGRY-001'
+          formData.subcategory_name = 'General'
+        }
+
+        if (isEditMode.value) {
+          result = await updateProduct(editingProduct.value._id, formData)
+        } else {
+          result = await createProduct(formData)
+        }
+
+        // Create initial batch if stock was provided and this is a new product
+        if (!isEditMode.value && createWithStock.value && result.data) {
+          try {
+            const batchData = {
+              quantity_received: batchForm.value.quantity_received,
+              supplier_info: batchForm.value.supplier_id ? {
+                supplier_id: batchForm.value.supplier_id
+              } : {},
+              batch_info: {
+                cost_price: batchForm.value.cost_price,
+                expiry_date: batchForm.value.expiry_date,
+                batch_number: batchForm.value.batch_number || undefined,
+                date_received: batchForm.value.date_received || undefined
+              }
+            }
+
+            await restockWithBatch(result.data._id, batchData)
+          } catch (batchError) {
+            console.error('Error creating initial batch:', batchError)
+            // Don't fail the whole operation if batch creation fails
+            // Product was already created successfully
+          }
+        }
+
+        emit('success', {
+          message: `Product "${formData.product_name}" ${isEditMode.value ? 'updated' : 'created'} successfully`,
+          product: result.data,
+          action: isEditMode.value ? 'updated' : 'created',
+          withBatch: !isEditMode.value && createWithStock.value
+        })
+
+        closeModal()
+        
+      } catch (error) {
+        console.error('Error saving product:', error)
+        setError(error.message || 'Failed to save product')
+      } finally {
+        setLoading(false)
       }
-
-      // Emit success event to parent component
-      emit('success', {
-        message: `Product "${formData.product_name}" ${isEditMode.value ? 'updated' : 'created'} successfully`,
-        product: result,
-        action: isEditMode.value ? 'updated' : 'created'
-      })
-
-      // Close modal immediately on success
-      closeModal()
-      
-    } catch (error) {
-      console.error('Error saving product:', error)
-      setError(error.message || 'Failed to save product')
-      // Modal stays open on error so user can fix issues
-    } finally {
-      setLoading(false)
     }
-  }
+
+    const clearValidationErrors = () => {
+      validationErrors.value = {}
+      showValidationSummary.value = false
+    }
 
     const openAddModal = () => {
       resetForm()
@@ -762,22 +911,14 @@ export default {
       resetForm()
       editingProduct.value = { ...product }
       
-      // Populate form with product data
       Object.keys(productForm.value).forEach(key => {
         if (product[key] !== undefined) {
           productForm.value[key] = product[key]
         }
       })
 
-      // Handle existing image
       if (product.image_url) {
         imagePreview.value = product.image_url
-      }
-
-      // Format date for input
-      if (product.expiry_date) {
-        const date = new Date(product.expiry_date)
-        productForm.value.expiry_date = date.toISOString().split('T')[0]
       }
 
       show()
@@ -796,7 +937,6 @@ export default {
       }
     }
 
-    // Keyboard listeners
     const handleKeydown = (event) => {
       if (event.key === 'Escape' && isVisible.value && !isLoading.value) {
         closeModal()
@@ -811,29 +951,21 @@ export default {
       document.removeEventListener('keydown', handleKeydown)
     })
 
-    // Watch for form changes to clear individual field errors
-    watch(productForm, (newForm, oldForm) => {
-      // Clear validation errors for fields that have been updated
-      Object.keys(newForm).forEach(key => {
-        if (newForm[key] !== oldForm[key] && validationErrors.value[key]) {
-          delete validationErrors.value[key]
-        }
-      })
-      
-      // Hide validation summary if all errors are resolved
-      if (Object.keys(validationErrors.value).length === 0) {
-        showValidationSummary.value = false
+    // Watch for form changes to clear validation errors
+    watch([productForm, batchForm], () => {
+      if (Object.keys(validationErrors.value).length > 0) {
+        // Clear validation errors after a delay to avoid constant clearing
+        setTimeout(() => {
+          if (Object.keys(validationErrors.value).length === 0) {
+            showValidationSummary.value = false
+          }
+        }, 100)
       }
 
-      // Clear general error when form changes
       if (error.value) {
         clearError()
       }
     }, { deep: true })
-
-    // Expose methods for parent component
-    const openAdd = openAddModal
-    const openEdit = openEditModal
 
     return {
       // Modal state
@@ -843,24 +975,28 @@ export default {
 
       // Form state
       productForm,
+      batchForm,
       imagePreview,
       skuError,
       isValidatingSku,
       imageInputKey,
       validationErrors,
       showValidationSummary,
+      createWithStock,
 
       // Computed
       isEditMode,
-      isFormValid,
       availableSubcategories,
       marginPercentage,
+      today,
+      tomorrow,
 
       // Methods
       closeModal,
       handleSubmit,
       handleOverlayClick,
       onCategoryChange,
+      onStockModeChange,
       calculateMargin,
       validateSKU,
       generateBarcode,
@@ -870,15 +1006,39 @@ export default {
       clearValidationErrors,
 
       // Exposed methods
-      openAdd,
-      openEdit
+      openAdd: openAddModal,
+      openEdit: openEditModal
     }
   }
 }
 </script>
 
 <style scoped>
-/* All existing styles remain the same - no changes needed */
+/* Existing styles plus new batch-specific styles */
+.batch-fields {
+  background-color: var(--surface-secondary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-top: 0.5rem;
+}
+
+.surface-elevated {
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-secondary);
+}
+
+.batch-fields .form-label {
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.form-check-input:checked {
+  background-color: var(--text-accent);
+  border-color: var(--text-accent);
+}
+
+/* All other existing styles remain the same */
 .modal-overlay {
   position: fixed !important;
   top: 0 !important;
@@ -985,7 +1145,6 @@ export default {
   z-index: 10;
 }
 
-/* Enhanced validation error styling */
 .validation-error {
   border-color: var(--status-error) !important;
   animation: errorPulse 0.6s ease-in-out;
@@ -1017,7 +1176,6 @@ export default {
   margin-top: 0.25rem;
 }
 
-/* Responsive Design */
 @media (max-width: 768px) {
   .modal-content {
     margin: 1rem;

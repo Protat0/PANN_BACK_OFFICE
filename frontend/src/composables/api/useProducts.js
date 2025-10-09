@@ -2,7 +2,6 @@ import { ref, computed, watch } from 'vue'
 import apiProductsService from '../../services/apiProducts.js'
 import { useToast } from '../ui/useToast.js'
 
-// Create toast instance
 const toast = useToast()
 
 // Global state for products
@@ -12,14 +11,16 @@ const deletedProducts = ref([])
 const lowStockProducts = ref([])
 const expiringProducts = ref([])
 
-// Loading states
+// Loading states - Fixed naming conflicts
 const loading = ref(false)
-const bulkLoading = ref(false)
+const deleteLoading = ref(false)
+const bulkDeleteLoading = ref(false)
+const exportLoading = ref(false)
 const stockLoading = ref(false)
 const importLoading = ref(false)
 const categoryMoveLoading = ref(false)
 
-// Filters and pagination - Updated for subcategory support
+// Filters and pagination
 const filters = ref({
   category_id: '',
   subcategory_name: '',
@@ -63,11 +64,12 @@ export function useProducts() {
     
     if (filters.value.stock_level) {
       if (filters.value.stock_level === 'out_of_stock') {
-        result = result.filter(product => product.stock === 0)
+        result = result.filter(product => (product.total_stock || product.stock) === 0)
       } else if (filters.value.stock_level === 'low_stock') {
-        result = result.filter(product => 
-          product.stock > 0 && product.stock <= product.low_stock_threshold
-        )
+        result = result.filter(product => {
+          const currentStock = product.total_stock || product.stock
+          return currentStock > 0 && currentStock <= product.low_stock_threshold
+        })
       }
     }
     
@@ -78,10 +80,11 @@ export function useProducts() {
     total: products.value.length,
     active: products.value.filter(p => p.status === 'active').length,
     inactive: products.value.filter(p => p.status === 'inactive').length,
-    outOfStock: products.value.filter(p => p.stock === 0).length,
-    lowStock: products.value.filter(p => 
-      p.stock > 0 && p.stock <= p.low_stock_threshold
-    ).length
+    outOfStock: products.value.filter(p => (p.total_stock || p.stock) === 0).length,
+    lowStock: products.value.filter(p => {
+      const currentStock = p.total_stock || p.stock
+      return currentStock > 0 && currentStock <= p.low_stock_threshold
+    }).length
   }))
 
   const productsByCategory = computed(() => {
@@ -110,14 +113,11 @@ export function useProducts() {
   const checkSkuExists = async (sku) => {
     try {
       const response = await apiProductsService.getProductBySku(sku)
-      // If we get a response, the SKU exists
       return true
     } catch (err) {
-      // If we get a 404, the SKU doesn't exist
       if (err.message.includes('404') || err.message.includes('not found')) {
         return false
       }
-      // For other errors, throw to let the caller handle
       throw err
     }
   }
@@ -133,7 +133,6 @@ export function useProducts() {
       const response = await apiProductsService.getAllProducts(mergedFilters)
       products.value = response.data || []
       
-      // Only show success toast on manual refresh, not on initial load
       if (Object.keys(customFilters).length > 0 || products.value.length > 0) {
         toast.success(`Loaded ${products.value.length} products`)
       }
@@ -190,7 +189,6 @@ export function useProducts() {
     try {
       const response = await apiProductsService.createProduct(productData)
       
-      // Add to local state
       products.value.unshift(response.data)
       currentProduct.value = response.data
       
@@ -213,7 +211,6 @@ export function useProducts() {
     try {
       const response = await apiProductsService.createProductWithCategory(productData, categoryId, subcategoryName)
       
-      // Add to local state
       products.value.unshift(response.data)
       currentProduct.value = response.data
       
@@ -236,7 +233,6 @@ export function useProducts() {
     try {
       const response = await apiProductsService.updateProduct(productId, productData, partial)
       
-      // Update local state
       const index = products.value.findIndex(p => p._id === productId)
       if (index !== -1) {
         products.value[index] = response.data
@@ -258,18 +254,16 @@ export function useProducts() {
   }
 
   const deleteProduct = async (productId, hardDelete = false) => {
-    loading.value = true
+    deleteLoading.value = true
     error.value = null
     
     try {
       const response = await apiProductsService.deleteProduct(productId, hardDelete)
       
       if (hardDelete) {
-        // Remove from local state completely
         products.value = products.value.filter(p => p._id !== productId)
         deletedProducts.value = deletedProducts.value.filter(p => p._id !== productId)
       } else {
-        // Move to deleted products
         const deletedProduct = products.value.find(p => p._id === productId)
         if (deletedProduct) {
           deletedProduct.isDeleted = true
@@ -289,7 +283,7 @@ export function useProducts() {
       toast.error(`Failed to delete product: ${err.message}`)
       throw err
     } finally {
-      loading.value = false
+      deleteLoading.value = false
     }
   }
 
@@ -300,7 +294,6 @@ export function useProducts() {
     try {
       const response = await apiProductsService.restoreProduct(productId)
       
-      // Move back to active products
       const restoredProduct = deletedProducts.value.find(p => p._id === productId)
       if (restoredProduct) {
         restoredProduct.isDeleted = false
@@ -321,31 +314,40 @@ export function useProducts() {
 
   // ================ BULK OPERATIONS ================
 
-  const bulkDeleteProducts = async (productIds) => {
-    bulkLoading.value = true
-    error.value = null
+const bulkDeleteProducts = async (productIds, hardDelete = false) => {
+  bulkDeleteLoading.value = true
+  error.value = null
+  
+  try {
+    const response = await apiProductsService.bulkDeleteProducts(productIds, hardDelete)
     
-    try {
-      const response = await apiProductsService.bulkDeleteProducts(productIds)
-      
-      // Remove deleted products from local state
-      products.value = products.value.filter(p => !productIds.includes(p._id))
-      
-      toast.success(`${productIds.length} products deleted successfully`)
-      return response
-    } catch (err) {
-      error.value = err.message
-      toast.error(`Failed to delete products: ${err.message}`)
-      throw err
-    } finally {
-      bulkLoading.value = false
+    // Update local state - remove deleted products
+    products.value = products.value.filter(p => !productIds.includes(p._id))
+    
+    // Handle the response structure from your backend
+    const deletedCount = response.details?.deleted_count || productIds.length
+    const failedCount = response.details?.failed_count || 0
+    
+    if (failedCount > 0) {
+      toast.success(`${deletedCount} products deleted successfully. ${failedCount} failed.`)
+    } else {
+      toast.success(`${deletedCount} products deleted successfully`)
     }
+    
+    return response
+  } catch (err) {
+    error.value = err.message
+    toast.error(`Failed to delete products: ${err.message}`)
+    throw err
+  } finally {
+    bulkDeleteLoading.value = false
   }
+}
 
   // ================ EXPORT OPERATIONS ================
 
   const exportProducts = async (customFilters = {}, format = 'csv') => {
-    const exportLoading = ref(true)
+    exportLoading.value = true
     error.value = null
     
     try {
@@ -370,7 +372,6 @@ export function useProducts() {
     try {
       const response = await apiProductsService.moveProductToCategory(productId, newCategoryId, newSubcategoryName)
       
-      // Update local state
       const index = products.value.findIndex(p => p._id === productId)
       if (index !== -1) {
         products.value[index] = response.data
@@ -392,13 +393,12 @@ export function useProducts() {
   }
 
   const bulkMoveProductsToCategory = async (productIds, newCategoryId, newSubcategoryName = null) => {
-    bulkLoading.value = true
+    bulkDeleteLoading.value = true
     error.value = null
     
     try {
       const response = await apiProductsService.bulkMoveProductsToCategory(productIds, newCategoryId, newSubcategoryName)
       
-      // Refresh products to get updated categories
       await fetchProducts()
       
       toast.success(`${response.moved_count} products moved successfully`)
@@ -408,11 +408,11 @@ export function useProducts() {
       toast.error(`Failed to move products: ${err.message}`)
       throw err
     } finally {
-      bulkLoading.value = false
+      bulkDeleteLoading.value = false
     }
   }
 
-  // ================ STOCK MANAGEMENT ================
+  // ================ BATCH-AWARE STOCK MANAGEMENT ================
 
   const updateStock = async (productId, stockData) => {
     stockLoading.value = true
@@ -421,7 +421,6 @@ export function useProducts() {
     try {
       const response = await apiProductsService.updateStock(productId, stockData)
       
-      // Update local state
       const index = products.value.findIndex(p => p._id === productId)
       if (index !== -1) {
         products.value[index] = response.data
@@ -449,7 +448,6 @@ export function useProducts() {
     try {
       const response = await apiProductsService.adjustStockForSale(productId, quantitySold)
       
-      // Update local state
       const index = products.value.findIndex(p => p._id === productId)
       if (index !== -1) {
         products.value[index] = response.data
@@ -471,7 +469,6 @@ export function useProducts() {
     try {
       const response = await apiProductsService.restockProduct(productId, quantityReceived, supplierInfo)
       
-      // Update local state
       const index = products.value.findIndex(p => p._id === productId)
       if (index !== -1) {
         products.value[index] = response.data
@@ -492,14 +489,41 @@ export function useProducts() {
     }
   }
 
+  // NEW: Batch-aware restock
+  const restockWithBatch = async (productId, restockData) => {
+    stockLoading.value = true
+    error.value = null
+    
+    try {
+      const response = await apiProductsService.restockWithBatch(productId, restockData)
+      
+      const index = products.value.findIndex(p => p._id === productId)
+      if (index !== -1) {
+        products.value[index] = response.data
+      }
+      
+      if (currentProduct.value?._id === productId) {
+        currentProduct.value = response.data
+      }
+      
+      toast.success(`Product restocked with batch successfully`)
+      return response
+    } catch (err) {
+      error.value = err.message
+      toast.error(`Failed to restock product: ${err.message}`)
+      throw err
+    } finally {
+      stockLoading.value = false
+    }
+  }
+
   const bulkUpdateStock = async (stockUpdates) => {
-    bulkLoading.value = true
+    bulkDeleteLoading.value = true
     error.value = null
     
     try {
       const response = await apiProductsService.bulkUpdateStock(stockUpdates)
       
-      // Refresh products to get updated stock levels
       await fetchProducts()
       
       toast.success(`Bulk stock update completed`)
@@ -509,7 +533,7 @@ export function useProducts() {
       toast.error(`Failed to update stock: ${err.message}`)
       throw err
     } finally {
-      bulkLoading.value = false
+      bulkDeleteLoading.value = false
     }
   }
 
@@ -528,16 +552,47 @@ export function useProducts() {
     }
   }
 
+  // NEW: Get product with batch information
+  const getProductWithBatches = async (productId) => {
+    loading.value = true
+    error.value = null
+    
+    try {
+      const response = await apiProductsService.getProductWithBatches(productId)
+      return response
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // NEW: Get products with expiry summary
+  const getProductsWithExpirySummary = async () => {
+    loading.value = true
+    error.value = null
+    
+    try {
+      const response = await apiProductsService.getProductsWithExpirySummary()
+      return response
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   // ================ BULK OPERATIONS (CONTINUED) ================
 
   const bulkCreateProducts = async (productsData) => {
-    bulkLoading.value = true
+    bulkDeleteLoading.value = true
     error.value = null
     
     try {
       const response = await apiProductsService.bulkCreateProducts(productsData)
       
-      // Add successful products to local state
       if (response.results?.successful) {
         products.value.unshift(...response.results.successful)
       }
@@ -549,18 +604,17 @@ export function useProducts() {
       toast.error(`Failed to create products: ${err.message}`)
       throw err
     } finally {
-      bulkLoading.value = false
+      bulkDeleteLoading.value = false
     }
   }
 
   const bulkCreateProductsWithCategory = async (productsData, defaultCategoryId, defaultSubcategoryName = 'None') => {
-    bulkLoading.value = true
+    bulkDeleteLoading.value = true
     error.value = null
     
     try {
       const response = await apiProductsService.bulkCreateProductsWithCategory(productsData, defaultCategoryId, defaultSubcategoryName)
       
-      // Add successful products to local state
       if (response.results?.successful) {
         products.value.unshift(...response.results.successful)
       }
@@ -572,7 +626,7 @@ export function useProducts() {
       toast.error(`Failed to create products: ${err.message}`)
       throw err
     } finally {
-      bulkLoading.value = false
+      bulkDeleteLoading.value = false
     }
   }
 
@@ -666,7 +720,6 @@ export function useProducts() {
       const response = await apiProductsService.importProducts(file, validateOnly)
       
       if (!validateOnly) {
-        // Refresh products after successful import
         await fetchProducts()
         toast.success('Products imported successfully')
       } else {
@@ -767,7 +820,6 @@ export function useProducts() {
   // ================ INITIALIZATION ================
 
   const initializeProducts = async () => {
-    // Don't show toast on initial load
     loading.value = true
     error.value = null
     
@@ -795,7 +847,9 @@ export function useProducts() {
     error,
     validationErrors,
     loading,
-    bulkLoading,
+    deleteLoading,
+    bulkDeleteLoading,
+    exportLoading,
     stockLoading,
     importLoading,
     categoryMoveLoading,
@@ -832,12 +886,15 @@ export function useProducts() {
     moveProductToCategory,
     bulkMoveProductsToCategory,
 
-    // Stock Management
+    // Stock Management (Batch-aware)
     updateStock,
     adjustStockForSale,
     restockProduct,
+    restockWithBatch,
     bulkUpdateStock,
     getStockHistory,
+    getProductWithBatches,
+    getProductsWithExpirySummary,
 
     // Reports
     fetchLowStockProducts,

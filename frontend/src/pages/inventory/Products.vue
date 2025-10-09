@@ -282,16 +282,16 @@
               ₱{{ formatPrice(product.selling_price) }}
             </td>
             <td v-if="isColumnVisible('costPrice')" class="text-end fw-medium text-secondary">
-              ₱{{ formatPrice(product.cost_price) }}
+              ₱{{ formatPrice(getProductCostPrice(product)) }}
             </td>
             <td class="text-center fw-medium">
-              <span :class="getMarginClass(product.cost_price, product.selling_price)">
-                {{ calculateMargin(product.cost_price, product.selling_price) }}%
+              <span :class="getMarginClass(getProductCostPrice(product), product.selling_price)">
+                {{ calculateMargin(getProductCostPrice(product), product.selling_price) }}%
               </span>
             </td>
             <td v-if="isColumnVisible('stock')" class="text-end">
               <span :class="getStockDisplayClass(product)">
-                {{ product.stock || '—' }}
+                {{ getProductStock(product) || '—' }}
               </span>
             </td>
             <td v-if="isColumnVisible('status')" class="text-center">
@@ -300,8 +300,8 @@
               </span>
             </td>
             <td v-if="isColumnVisible('expiryDate')" class="text-center">
-              <small :class="getExpiryDateClass(product.expiry_date)">
-                {{ formatExpiryDate(product.expiry_date) }}
+              <small :class="getExpiryDateClass(getProductExpiryDate(product))">
+                {{ formatExpiryDate(getProductExpiryDate(product)) }}
               </small>
             </td>
             <td>
@@ -512,16 +512,30 @@ export default {
       return products.value.filter(p => selectedProductIds.value.includes(p._id))
     })
 
-    // Calculate expiring products
+    // Calculate expiring products (updated for batch system)
     const calculateExpiringCount = () => {
       const now = new Date()
       const thirtyDaysFromNow = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000))
       
       expiringCount.value = products.value.filter(product => {
-        if (!product.expiry_date) return false
-        const expiryDate = new Date(product.expiry_date)
-        return expiryDate <= thirtyDaysFromNow && expiryDate >= now
+        const expiryDate = getProductExpiryDate(product)
+        if (!expiryDate) return false
+        const expiry = new Date(expiryDate)
+        return expiry <= thirtyDaysFromNow && expiry >= now
       }).length
+    }
+
+    // Helper functions for batch-aware data
+    const getProductStock = (product) => {
+      return product.total_stock ?? product.stock ?? 0
+    }
+
+    const getProductCostPrice = (product) => {
+      return product.average_cost_price ?? product.cost_price ?? 0
+    }
+
+    const getProductExpiryDate = (product) => {
+      return product.oldest_batch_expiry ?? product.expiry_date
     }
 
     // Event handlers
@@ -641,8 +655,9 @@ export default {
     }
 
     const getRowClass = (product) => {
-      if (product.stock === 0) return 'table-danger'
-      if (product.stock <= (product.low_stock_threshold || 15)) return 'table-warning'
+      const stock = getProductStock(product)
+      if (stock === 0) return 'table-danger'
+      if (stock <= (product.low_stock_threshold || 15)) return 'table-warning'
       return ''
     }
 
@@ -655,7 +670,6 @@ export default {
       const category = activeCategories.value.find(c => c._id === categoryId)
       if (!category) return 'bg-secondary'
       
-      // Simple hash to color mapping
       const colors = ['bg-primary', 'bg-info', 'bg-success', 'bg-warning', 'bg-danger']
       const index = categoryId ? categoryId.length % colors.length : 0
       return colors[index]
@@ -668,8 +682,9 @@ export default {
     }
 
     const getStockDisplayClass = (product) => {
-      if (product.stock === 0) return 'text-error fw-bold'
-      if (product.stock <= (product.low_stock_threshold || 15)) return 'text-warning fw-bold'
+      const stock = getProductStock(product)
+      if (stock === 0) return 'text-error fw-bold'
+      if (stock <= (product.low_stock_threshold || 15)) return 'text-warning fw-bold'
       return 'text-success'
     }
 
@@ -791,6 +806,11 @@ export default {
       allSelected,
       someSelected,
       
+      // Helper functions
+      getProductStock,
+      getProductCostPrice,
+      getProductExpiryDate,
+      
       // Event handlers
       handleRefresh,
       handleCategoryFilter,
@@ -829,7 +849,7 @@ export default {
   },
 
   methods: {
-    // Modal methods - kept untouched
+    // Modal methods
     showAddProductModal() {
       this.$refs.addProductModal?.openAdd?.()
     },

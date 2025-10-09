@@ -3,6 +3,7 @@ from datetime import datetime
 from ..database import db_manager
 from ..models import Product
 from notifications.services import notification_service
+from .batch_service import BatchService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -14,6 +15,7 @@ class ProductService:
         self.category_collection = self.db.category
         self.supplier_collection = self.db.suppliers
         self.branch_collection = self.db.branches
+        self.batch_service = BatchService()
         
     def validate_foreign_keys(self, product_data):
         """Validate that foreign key references exist - using string IDs"""
@@ -315,7 +317,12 @@ class ProductService:
                 'date_received': product_data.get('date_received', current_time),
                 'isDeleted': False,
                 'created_at': current_time,
-                'updated_at': current_time
+                'updated_at': current_time,
+                # Batch-related fields for simplified expiry tracking
+                'total_stock': int(product_data.get('stock', 0)),
+                'oldest_batch_expiry': None,
+                'newest_batch_expiry': None,
+                'expiry_alert': False
             }
             
             # Add optional fields if present
@@ -629,7 +636,7 @@ class ProductService:
             raise Exception(f"Error restoring product: {str(e)}")
 
     # ================================================================
-    # STOCK MANAGEMENT
+    # STOCK MANAGEMENT WITH BATCH INTEGRATION
     # ================================================================
     
     def update_stock(self, product_id, stock_data):
@@ -679,6 +686,7 @@ class ProductService:
             # Update the product
             update_data = {
                 'stock': new_stock,
+                'total_stock': new_stock,  # Keep both fields in sync
                 'updated_at': current_time
             }
             
@@ -794,21 +802,44 @@ class ProductService:
             raise Exception(f"Error in bulk stock update: {str(e)}")
         
     def adjust_stock_for_sale(self, product_id, quantity_sold):
-        """Reduce stock when a sale is made"""
+        """Reduce stock when a sale is made - now uses FIFO from batches"""
         try:
+            # Process sale using FIFO from batch service
+            batches_used = self.batch_service.process_sale_fifo(product_id, quantity_sold)
+            
+            # Update product stock using existing method
             stock_data = {
                 'operation_type': 'remove',
                 'quantity': quantity_sold,
                 'reason': 'Sale transaction'    
             }
-            return self.update_stock(product_id, stock_data)
-    
+            updated_product = self.update_stock(product_id, stock_data)
+            
+            return {
+                'product': updated_product,
+                'batches_used': batches_used
+            }
+
         except Exception as e:
             raise Exception(f"Error adjusting stock for sale: {str(e)}")
     
-    def restock_product(self, product_id, quantity_received, supplier_info=None):
-        """Add stock when receiving new inventory"""
+    def restock_product(self, product_id, quantity_received, supplier_info=None, batch_info=None):
+        """Add stock when receiving new inventory - now creates batches"""
         try:
+            # Create batch first
+            batch_data = {
+                'product_id': product_id,
+                'quantity_received': quantity_received,
+                'cost_price': batch_info.get('cost_price') if batch_info else 0,
+                'expiry_date': batch_info.get('expiry_date') if batch_info else None,
+                'supplier_id': supplier_info.get('supplier_id') if supplier_info else None,
+                'batch_number': batch_info.get('batch_number') if batch_info else None
+            }
+            
+            # Create the batch (this will automatically update product expiry summary)
+            batch = self.batch_service.create_batch(batch_data)
+            
+            # Update product stock using the existing method
             reason = f"Restock from supplier"
             if supplier_info:
                 reason += f" - {supplier_info.get('name', 'Unknown')}"
@@ -818,10 +849,42 @@ class ProductService:
                 'quantity': quantity_received,
                 'reason': reason
             }
-            return self.update_stock(product_id, stock_data)
-        
+            
+            updated_product = self.update_stock(product_id, stock_data)
+            
+            return {
+                'product': updated_product,
+                'batch': batch
+            }
+            
         except Exception as e:
             raise Exception(f"Error restocking product: {str(e)}")
+
+    def get_product_with_batch_summary(self, product_id):
+        """Get product with batch and expiry summary information"""
+        try:
+            product = self.get_product_by_id(product_id)
+            if not product:
+                return None
+            
+            # Get active batches for this product
+            batches = self.batch_service.get_batches_by_product(product_id, status='active')
+            
+            product['active_batches'] = batches
+            product['batch_count'] = len(batches)
+            
+            return product
+        
+        except Exception as e:
+            raise Exception(f"Error getting product with batch summary: {str(e)}")
+
+    def check_expiry_alerts(self, days_ahead=7):
+        """Check for products with expiring batches and return alert summary"""
+        try:
+            return self.batch_service.check_and_alert_expiring_batches(days_ahead)
+        
+        except Exception as e:
+            raise Exception(f"Error checking expiry alerts: {str(e)}")
 
     # ================================================================
     # PRODUCT QUERIES AND FILTERING
@@ -871,21 +934,21 @@ class ProductService:
             raise Exception(f"Error getting products by category: {str(e)}")
     
     def get_expiring_products(self, days_ahead=30):
-        """Get products expiring within specified days (excluding deleted)"""
+        """Get products with expiring batches within specified days"""
         try:
             from datetime import timedelta
             
             future_date = datetime.utcnow() + timedelta(days=days_ahead)
             
             query = {
-                'expiry_date': {
+                'oldest_batch_expiry': {
                     '$lte': future_date,
                     '$gte': datetime.utcnow()
                 },
                 'isDeleted': {'$ne': True}
             }
             
-            products = list(self.product_collection.find(query).sort('expiry_date', 1))
+            products = list(self.product_collection.find(query).sort('oldest_batch_expiry', 1))
             return products
         
         except Exception as e:
@@ -961,7 +1024,12 @@ class ProductService:
                         'isDeleted': False,
                         'created_at': current_time,
                         'updated_at': current_time,
-                        'sync_logs': [self.add_sync_log(source='cloud', status='pending', details={'action': 'bulk_created'})]
+                        'sync_logs': [self.add_sync_log(source='cloud', status='pending', details={'action': 'bulk_created'})],
+                        # Batch-related fields for simplified expiry tracking
+                        'total_stock': int(product_data.get('stock', 0)),
+                        'oldest_batch_expiry': None,
+                        'newest_batch_expiry': None,
+                        'expiry_alert': False
                     })
                     
                     # Handle numeric fields
@@ -1297,3 +1365,36 @@ class ProductService:
             
         except Exception as e:
             raise Exception(f"Error generating import template: {str(e)}")
+        
+    @staticmethod
+    def bulk_delete_products(product_ids, hard_delete=False):
+        deleted_count = 0
+        failed_deletions = []
+        
+        # Create service instance to use existing methods
+        service = ProductService()
+        
+        for product_id in product_ids:
+            try:
+                # Use your existing delete method that already works
+                success = service.delete_product(product_id, hard_delete)
+                if success:
+                    deleted_count += 1
+                else:
+                    failed_deletions.append({
+                        'product_id': product_id,
+                        'error': 'Product not found or delete failed'
+                    })
+            except Exception as e:
+                failed_deletions.append({
+                    'product_id': product_id,
+                    'error': str(e)
+                })
+        
+        return {
+            'deleted_count': deleted_count,
+            'failed_count': len(failed_deletions),
+            'total_requested': len(product_ids),
+            'failed_deletions': failed_deletions,
+            'success': deleted_count > 0
+        }

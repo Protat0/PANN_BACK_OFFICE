@@ -104,7 +104,7 @@ class ApiProductsService {
     }
   }
 
-  // ================ STOCK MANAGEMENT OPERATIONS ================
+  // ================ BATCH-INTEGRATED STOCK MANAGEMENT ================
 
   async updateStock(productId, stockData) {
     try {
@@ -138,6 +138,16 @@ class ApiProductsService {
     }
   }
 
+  // NEW: Batch-aware restock
+  async restockWithBatch(productId, restockData) {
+    try {
+      const response = await api.post(`${this.basePath}/${productId}/restock-batch/`, restockData)
+      return this.handleResponse(response)
+    } catch (error) {
+      this.handleError(error)
+    }
+  }
+
   async bulkUpdateStock(stockUpdates) {
     try {
       const response = await api.post(`${this.basePath}/stock/bulk-update/`, {
@@ -152,6 +162,26 @@ class ApiProductsService {
   async getStockHistory(productId) {
     try {
       const response = await api.get(`${this.basePath}/${productId}/stock/history/`)
+      return this.handleResponse(response)
+    } catch (error) {
+      this.handleError(error)
+    }
+  }
+
+  // NEW: Get product with batch information
+  async getProductWithBatches(productId) {
+    try {
+      const response = await api.get(`${this.basePath}/${productId}/with-batches/`)
+      return this.handleResponse(response)
+    } catch (error) {
+      this.handleError(error)
+    }
+  }
+
+  // NEW: Get products with expiry summary
+  async getProductsWithExpirySummary() {
+    try {
+      const response = await api.get(`${this.basePath}/expiry-summary/`)
       return this.handleResponse(response)
     } catch (error) {
       this.handleError(error)
@@ -173,7 +203,6 @@ class ApiProductsService {
 
   async bulkCreateProductsWithCategory(productsData, defaultCategoryId, defaultSubcategoryName = 'None') {
     try {
-      // Ensure all products have category information
       const productsWithCategories = productsData.map(product => ({
         ...product,
         category_id: product.category_id || defaultCategoryId,
@@ -181,6 +210,18 @@ class ApiProductsService {
       }))
       
       return await this.bulkCreateProducts(productsWithCategories)
+    } catch (error) {
+      this.handleError(error)
+    }
+  }
+
+  async bulkDeleteProducts(productIds, hardDelete = false) {
+    try {
+      const response = await api.post(`${this.basePath}/bulk-delete/`, {
+        product_ids: productIds,
+        hard_delete: hardDelete
+      })
+      return this.handleResponse(response)
     } catch (error) {
       this.handleError(error)
     }
@@ -282,37 +323,6 @@ class ApiProductsService {
     }
   }
 
-  async getUnsyncedProducts(source = 'local') {
-    try {
-      const params = { source }
-      const response = await api.get(`${this.basePath}/sync/unsynced/`, { params })
-      return this.handleResponse(response)
-    } catch (error) {
-      this.handleError(error)
-    }
-  }
-
-  async getSyncStatus(productId) {
-    try {
-      const response = await api.get(`${this.basePath}/sync/status/${productId}/`)
-      return this.handleResponse(response)
-    } catch (error) {
-      this.handleError(error)
-    }
-  }
-
-  async updateSyncStatus(productId, status, source = 'cloud') {
-    try {
-      const response = await api.put(`${this.basePath}/sync/status/${productId}/`, {
-        status,
-        source
-      })
-      return this.handleResponse(response)
-    } catch (error) {
-      this.handleError(error)
-    }
-  }
-
   // ================ IMPORT/EXPORT ================
 
   async importProducts(file, validateOnly = false) {
@@ -336,7 +346,6 @@ class ApiProductsService {
     try {
       const params = { format }
       
-      // Add all supported filters including subcategory_name
       if (filters.category_id) params.category_id = filters.category_id
       if (filters.subcategory_name) params.subcategory_name = filters.subcategory_name
       if (filters.status) params.status = filters.status
@@ -346,7 +355,6 @@ class ApiProductsService {
         responseType: 'blob'
       })
       
-      // Handle file download
       const blob = new Blob([response.data])
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -371,7 +379,6 @@ class ApiProductsService {
         responseType: 'blob'
       })
       
-      // Handle file download
       const blob = new Blob([response.data])
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
@@ -402,7 +409,6 @@ class ApiProductsService {
   async searchProductsAdvanced(query, filters = {}) {
     try {
       const searchFilters = { ...filters, search: query }
-      // Now supports subcategory_name filter
       if (filters.subcategory_name) {
         searchFilters.subcategory_name = filters.subcategory_name
       }
@@ -419,9 +425,13 @@ class ApiProductsService {
         productId: product.data._id,
         productName: product.data.product_name,
         currentStock: product.data.stock,
+        totalStock: product.data.total_stock || product.data.stock,
         lowStockThreshold: product.data.low_stock_threshold,
         isLowStock: product.data.stock <= product.data.low_stock_threshold,
-        isOutOfStock: product.data.stock === 0
+        isOutOfStock: product.data.stock === 0,
+        oldestBatchExpiry: product.data.oldest_batch_expiry,
+        newestBatchExpiry: product.data.newest_batch_expiry,
+        expiryAlert: product.data.expiry_alert
       }
     } catch (error) {
       this.handleError(error)
@@ -430,14 +440,12 @@ class ApiProductsService {
 
   async createProductWithCategory(productData, categoryId, subcategoryName = 'None') {
     try {
-      // Ensure category fields are set for the refactored structure
       const productWithCategory = {
         ...productData,
         category_id: categoryId,
         subcategory_name: subcategoryName
       }
       
-      // Validate before sending
       const validation = await this.validateProductData(productWithCategory)
       if (!validation.isValid) {
         throw new Error(`Validation failed: ${validation.errors.join(', ')}`)
@@ -450,7 +458,6 @@ class ApiProductsService {
   }
 
   async validateProductData(productData) {
-    // Client-side validation helper - updated for refactored structure
     const errors = []
     
     if (!productData.product_name?.trim()) {
@@ -461,10 +468,6 @@ class ApiProductsService {
       errors.push('Selling price must be greater than 0')
     }
     
-    if (!productData.cost_price || productData.cost_price <= 0) {
-      errors.push('Cost price must be greater than 0')
-    }
-    
     if (productData.stock < 0) {
       errors.push('Stock cannot be negative')
     }
@@ -473,12 +476,10 @@ class ApiProductsService {
       errors.push('Low stock threshold cannot be negative')
     }
 
-    // Updated: Category validation for refactored structure
     if (!productData.category_id?.trim()) {
       errors.push('Category is required')
     }
 
-    // New: Subcategory validation
     if (!productData.subcategory_name?.trim()) {
       errors.push('Subcategory is required')
     }
@@ -490,7 +491,5 @@ class ApiProductsService {
   }
 }
 
-// Create and export singleton instance
 const apiProductsService = new ApiProductsService()
-
 export default apiProductsService

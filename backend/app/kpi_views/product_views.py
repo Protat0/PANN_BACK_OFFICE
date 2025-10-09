@@ -715,4 +715,32 @@ class ImportTemplateView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
         
-print("ProductDetailView exists:", 'ProductDetailView' in locals())
+class BulkDeleteProductsView(APIView):
+    def post(self, request):
+        try:
+            product_ids = request.data.get('product_ids', [])
+            hard_delete = request.data.get('hard_delete', False)
+           
+            if not product_ids:
+                return Response({'error': 'No product IDs provided'}, status=400)
+           
+            # Call static method directly on the class
+            result = ProductService.bulk_delete_products(product_ids, hard_delete)
+           
+            if result['success']:
+                return Response({
+                    'message': f"{result['deleted_count']} products deleted successfully",
+                    'details': result
+                }, status=200)
+            else:
+                return Response({
+                    'error': 'Bulk deletion failed',
+                    'details': result
+                }, status=400)
+               
+        except Exception as e:
+            logger.error(f"Error in BulkDeleteProductsView.post: {e}")
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
