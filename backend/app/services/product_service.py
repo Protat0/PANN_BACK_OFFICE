@@ -4,6 +4,7 @@ from ..database import db_manager
 from ..models import Product
 from notifications.services import notification_service
 from .batch_service import BatchService
+import pandas as pd
 import logging
 
 logger = logging.getLogger(__name__)
@@ -269,6 +270,13 @@ class ProductService:
         try:
             logger.info(f"Creating single product: {product_data.get('product_name', 'Unknown')}")
             
+            # VALIDATION: If stock is provided, cost_price must also be provided
+            initial_stock = int(product_data.get('stock', 0))
+            if initial_stock > 0:
+                cost_price = product_data.get('cost_price')
+                if cost_price is None or float(cost_price) == 0:
+                    raise ValueError("Cost price is required when initial stock is provided")
+            
             # Generate sequential product ID
             product_id = self.generate_product_id()
             
@@ -308,7 +316,7 @@ class ProductService:
                 'subcategory_name': product_data.get('subcategory_name', ''),
                 'SKU': product_data['SKU'],
                 'unit': product_data.get('unit', ''),
-                'stock': int(product_data.get('stock', 0)),
+                'stock': initial_stock,  # Use validated initial_stock
                 'low_stock_threshold': int(product_data.get('low_stock_threshold', 10)),
                 'cost_price': float(product_data.get('cost_price', 0)),
                 'selling_price': float(product_data.get('selling_price', 0)),
@@ -319,7 +327,7 @@ class ProductService:
                 'created_at': current_time,
                 'updated_at': current_time,
                 # Batch-related fields for simplified expiry tracking
-                'total_stock': int(product_data.get('stock', 0)),
+                'total_stock': initial_stock,
                 'oldest_batch_expiry': None,
                 'newest_batch_expiry': None,
                 'expiry_alert': False
@@ -347,19 +355,38 @@ class ProductService:
             # Insert product directly as dict
             self.product_collection.insert_one(product_document)
             
+            # CREATE INITIAL BATCH IF STOCK WAS PROVIDED
+            initial_batch = None
+            if initial_stock > 0:
+                try:
+                    initial_batch = self._create_initial_batch_if_needed(product_id, product_data)
+                except Exception as batch_error:
+                    # If batch creation fails, log error but don't fail product creation
+                    logger.error(f"Failed to create initial batch for product {product_id}: {str(batch_error)}")
+                    # Optionally: rollback product creation if batch is critical
+                    # self.product_collection.delete_one({'_id': product_id})
+                    # raise batch_error
+            
             # Get created product
             created_product = self.product_collection.find_one({'_id': product_id})
             
             # Send notification
+            notification_metadata = {
+                "SKU": product_document["SKU"],
+                "category_id": created_product.get('category_id'),
+                "subcategory_name": created_product.get('subcategory_name'),
+                "initial_stock": initial_stock
+            }
+            
+            if initial_batch:
+                notification_metadata["initial_batch_id"] = initial_batch['_id']
+                notification_metadata["initial_batch_created"] = True
+            
             self._send_product_notification(
                 'created',
                 product_document.get("product_name", product_document.get("SKU", "Unknown Product")),
                 product_id,
-                {
-                    "SKU": product_document["SKU"],
-                    "category_id": created_product.get('category_id'),
-                    "subcategory_name": created_product.get('subcategory_name')
-                }
+                notification_metadata
             )
 
             return created_product
@@ -972,6 +999,13 @@ class ProductService:
                 try:
                     logger.debug(f"Processing product {i+1}: {product_data.get('product_name', 'Unknown')}")
                     
+                    # VALIDATION: If stock is provided, cost_price must also be provided
+                    initial_stock = int(product_data.get('stock', 0))
+                    if initial_stock > 0:
+                        cost_price = product_data.get('cost_price')
+                        if cost_price is None or float(cost_price) == 0:
+                            raise ValueError("Cost price is required when initial stock is provided")
+                    
                     # Generate sequential product ID for each product
                     product_id = self.generate_product_id()
                     product_data['_id'] = product_id
@@ -1026,7 +1060,7 @@ class ProductService:
                         'updated_at': current_time,
                         'sync_logs': [self.add_sync_log(source='cloud', status='pending', details={'action': 'bulk_created'})],
                         # Batch-related fields for simplified expiry tracking
-                        'total_stock': int(product_data.get('stock', 0)),
+                        'total_stock': initial_stock,
                         'oldest_batch_expiry': None,
                         'newest_batch_expiry': None,
                         'expiry_alert': False
@@ -1063,7 +1097,9 @@ class ProductService:
                 'failed': errors,
                 'total_processed': len(products_data),
                 'total_successful': 0,
-                'total_failed': len(errors)
+                'total_failed': len(errors),
+                'batches_created': 0,
+                'batch_creation_errors': []
             }
             
             if validated_products:
@@ -1079,17 +1115,44 @@ class ProductService:
                 results['successful'] = inserted_products
                 results['total_successful'] = len(inserted_products)
                 
+                # CREATE INITIAL BATCHES FOR PRODUCTS WITH STOCK
+                logger.info(f"Creating initial batches for products with stock...")
+                for product in inserted_products:
+                    try:
+                        initial_stock = product.get('stock', 0)
+                        if initial_stock > 0:
+                            # Find corresponding product_data to get full details
+                            product_data = next(
+                                (p for p in validated_products if p['_id'] == product['_id']), 
+                                None
+                            )
+                            if product_data:
+                                batch = self._create_initial_batch_if_needed(
+                                    product['_id'], 
+                                    product_data
+                                )
+                                if batch:
+                                    results['batches_created'] += 1
+                                    logger.debug(f"Created batch {batch['_id']} for product {product['_id']}")
+                    except Exception as batch_error:
+                        logger.error(f"Failed to create batch for product {product['_id']}: {str(batch_error)}")
+                        results['batch_creation_errors'].append({
+                            'product_id': product['_id'],
+                            'error': str(batch_error)
+                        })
+                
                 # Send notification for bulk creation
                 total_processed = len(products_data)
                 successful_count = len(inserted_products)
                 failed_count = len(errors)
+                batches_created = results['batches_created']
                 
-                if failed_count == 0:
+                if failed_count == 0 and len(results['batch_creation_errors']) == 0:
                     action_type = 'bulk_created'
-                    message = f"Bulk product creation completed successfully: {successful_count} products created"
+                    message = f"Bulk product creation completed successfully: {successful_count} products created, {batches_created} initial batches created"
                 else:
                     action_type = 'bulk_created'
-                    message = f"Bulk product creation completed: {successful_count} successful, {failed_count} failed out of {total_processed} total"
+                    message = f"Bulk product creation completed: {successful_count} products created ({batches_created} batches), {failed_count} failed, {len(results['batch_creation_errors'])} batch errors"
                 
                 self._send_product_notification(
                     action_type,
@@ -1099,12 +1162,14 @@ class ProductService:
                         "total_products": total_processed,
                         "successful_creations": successful_count,
                         "failed_creations": failed_count,
+                        "batches_created": batches_created,
+                        "batch_creation_errors": len(results['batch_creation_errors']),
                         "success_rate": round((successful_count / total_processed) * 100, 2) if total_processed > 0 else 0,
                         "custom_message": message
                     }
                 )
             
-            logger.info(f"Bulk creation completed: {results['total_successful']} successful, {results['total_failed']} failed")
+            logger.info(f"Bulk creation completed: {results['total_successful']} successful, {results['total_failed']} failed, {results['batches_created']} batches created")
             return results
             
         except Exception as e:
@@ -1167,179 +1232,298 @@ class ProductService:
         
         except Exception as e:
             raise Exception(f"Error preparing sync to local: {str(e)}")
-
-    # ================================================================
-    # IMPORT/EXPORT FUNCTIONALITY
-    # ================================================================
         
-    def parse_import_file(self, file_path, file_type='csv'):
-        """Parse CSV or Excel file for product import"""
+    def import_products_from_file(self, file_path, file_type='csv', validate_only=False):
+        """
+        Import products from CSV or Excel file with detailed validation
+        Now uses category_name instead of category_id
+        """
         try:
-            import pandas as pd
-            
             # Read file based on type
-            if file_type.lower() == 'csv':
+            if file_type == 'csv':
                 df = pd.read_csv(file_path)
-            elif file_type.lower() in ['xlsx', 'xls']:
+            elif file_type in ['xlsx', 'xls']:
                 df = pd.read_excel(file_path)
             else:
                 raise ValueError(f"Unsupported file type: {file_type}")
             
-            # Define expected columns and their mappings
-            column_mapping = {
-                'product_name': ['product_name', 'name', 'product', 'item_name'],
-                'SKU': ['sku', 'SKU', 'product_code', 'code'],
-                'category_id': ['category_id', 'category', 'category_name'],
-                'subcategory_name': ['subcategory_name', 'subcategory', 'sub_category'],
-                'supplier_id': ['supplier_id', 'supplier', 'supplier_name'],
-                'stock': ['stock', 'quantity', 'qty', 'current_stock'],
-                'low_stock_threshold': ['low_stock_threshold', 'min_stock', 'reorder_level'],
-                'cost_price': ['cost_price', 'cost', 'purchase_price'],
-                'selling_price': ['selling_price', 'price', 'sale_price'],
-                'unit': ['unit', 'unit_of_measure', 'uom'],
-                'expiry_date': ['expiry_date', 'expiration_date', 'exp_date'],
-                'status': ['status', 'active', 'enabled']
-            }
+            # Define required columns
+            required_columns = ['product_name', 'selling_price', 'category_name', 'subcategory_name']
+            optional_columns = ['SKU', 'supplier_id', 'stock', 'cost_price', 'low_stock_threshold', 
+                            'unit', 'status', 'barcode', 'description', 'expiry_date']
             
-            # Normalize column names and map to expected fields
-            products_data = []
-            for _, row in df.iterrows():
-                product_data = {}
+            # Check for missing required columns
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            if missing_columns:
+                raise ValueError(
+                    f"Missing required columns: {', '.join(missing_columns)}. "
+                    f"Required columns are: {', '.join(required_columns)}"
+                )
+            
+            # Validate each row
+            validation_errors = []
+            valid_products = []
+            skipped_products = []
+            missing_categories = {}
+            
+            for index, row in df.iterrows():
+                row_num = index + 2
+                errors = []
                 
-                for expected_field, possible_columns in column_mapping.items():
-                    value = None
-                    for col in possible_columns:
-                        if col in df.columns:
-                            value = row[col]
-                            if pd.notna(value):  # Check if not NaN
-                                break
+                # Validate required fields
+                if pd.isna(row.get('product_name')) or not str(row.get('product_name')).strip():
+                    errors.append(f"Row {row_num}: Product name is required")
+                
+                if pd.isna(row.get('selling_price')) or row.get('selling_price') <= 0:
+                    errors.append(f"Row {row_num}: Selling price must be greater than 0")
+                
+                # Validate category_name
+                category_name_raw = row.get('category_name', '')
+                category_name = str(category_name_raw).strip() if not pd.isna(category_name_raw) else ''
+                
+                if not category_name:
+                    errors.append(f"Row {row_num}: Category name is required")
+                
+                subcategory_name_raw = row.get('subcategory_name', '')
+                subcategory_name = str(subcategory_name_raw).strip() if not pd.isna(subcategory_name_raw) else ''
+                
+                if not subcategory_name:
+                    errors.append(f"Row {row_num}: Subcategory name is required")
+                
+                # DEBUG: Print what we're looking for
+                print(f"🔍 Row {row_num}: Looking for category='{category_name}' (len={len(category_name)})")
+                
+                # ✅ FIXED: Look up category using correct collection name
+                category = None
+                category_id = None
+                if category_name:
+                    category = self.db.category.find_one({  # ✅ FIXED: self.db.category (singular)
+                        'category_name': category_name,
+                        'isDeleted': False
+                    })
                     
-                    if value is not None and pd.notna(value):
-                        # Handle category name to ID conversion
-                        if expected_field == 'category_id' and not str(value).startswith('CTGY-'):
-                            # Look up category by name
-                            category = self.category_collection.find_one({'category_name': {'$regex': f'^{value}$', '$options': 'i'}})
-                            product_data[expected_field] = category['_id'] if category else None
-                        elif expected_field == 'supplier_id' and not str(value).startswith('SUPP-'):
-                            # Look up supplier by name
-                            supplier = self.supplier_collection.find_one({'name': {'$regex': f'^{value}$', '$options': 'i'}})
-                            product_data[expected_field] = supplier['_id'] if supplier else None
-                        else:
-                            product_data[expected_field] = value
+                    # DEBUG: Print result
+                    if category:
+                        print(f"✅ Row {row_num}: Found category '{category['category_name']}'")
+                    else:
+                        print(f"❌ Row {row_num}: Category '{category_name}' NOT FOUND")
+                        # DEBUG: Show what categories exist
+                        all_categories = list(self.db.category.find(  # ✅ FIXED: self.db.category
+                            {'isDeleted': False},
+                            {'category_name': 1}
+                        ))
+                        print(f"   Available categories: {[c['category_name'] for c in all_categories]}")
+                    
+                    if not category:
+                        # Track missing category
+                        if category_name not in missing_categories:
+                            missing_categories[category_name] = set()
+                        if subcategory_name:
+                            missing_categories[category_name].add(subcategory_name)
+                        errors.append(f"Row {row_num}: Category '{category_name}' not found")
+                    else:
+                        category_id = str(category['_id'])
+                        
+                        # ✅ FIXED: Validate subcategory using 'sub_categories' (with underscore)
+                        if subcategory_name and category:
+                            subcategories = category.get('sub_categories', [])  # ✅ FIXED: sub_categories
+                            
+                            # Handle both list of strings and list of dicts
+                            subcategory_names = []
+                            for subcat in subcategories:
+                                if isinstance(subcat, dict) and 'name' in subcat:
+                                    subcategory_names.append(subcat['name'])
+                                elif isinstance(subcat, str):
+                                    subcategory_names.append(subcat)
+                            
+                            print(f"🔍 Row {row_num}: Looking for subcategory='{subcategory_name}' in {subcategory_names}")
+                            
+                            if subcategory_name not in subcategory_names:
+                                if category_name not in missing_categories:
+                                    missing_categories[category_name] = set()
+                                missing_categories[category_name].add(subcategory_name)
+                                errors.append(f"Row {row_num}: Subcategory '{subcategory_name}' not found under category '{category_name}'")
+                            else:
+                                print(f"✅ Row {row_num}: Found subcategory '{subcategory_name}'")
                 
-                # Only add if required fields are present
-                if product_data.get('product_name'):
-                    products_data.append(product_data)
+                # Validate stock and cost_price relationship
+                stock = row.get('stock', 0)
+                cost_price = row.get('cost_price', 0)
+                expiry_date = row.get('expiry_date')
+                
+                if not pd.isna(stock) and stock > 0:
+                    if pd.isna(cost_price) or cost_price <= 0:
+                        errors.append(f"Row {row_num}: Cost price is required when stock is provided")
+                    
+                    if pd.isna(expiry_date) or not str(expiry_date).strip():
+                        errors.append(f"Row {row_num}: Expiry date is required when stock is provided")
+                
+                # Validate numeric fields
+                try:
+                    if not pd.isna(row.get('selling_price')):
+                        float(row['selling_price'])
+                except (ValueError, TypeError):
+                    errors.append(f"Row {row_num}: Selling price must be a valid number")
+                
+                try:
+                    if not pd.isna(row.get('cost_price')):
+                        float(row['cost_price'])
+                except (ValueError, TypeError):
+                    errors.append(f"Row {row_num}: Cost price must be a valid number")
+                
+                try:
+                    if not pd.isna(row.get('stock')):
+                        int(row['stock'])
+                except (ValueError, TypeError):
+                    errors.append(f"Row {row_num}: Stock must be a valid integer")
+                
+                try:
+                    if not pd.isna(row.get('low_stock_threshold')):
+                        int(row['low_stock_threshold'])
+                except (ValueError, TypeError):
+                    errors.append(f"Row {row_num}: Low stock threshold must be a valid integer")
+                
+                if errors:
+                    validation_errors.extend(errors)
+                else:
+                    # Build product data with category_id from lookup
+                    product_data = {
+                        'product_name': str(row['product_name']).strip(),
+                        'selling_price': float(row['selling_price']),
+                        'category_id': category_id,
+                        'subcategory_name': subcategory_name,
+                    }
+                    
+                    # Add optional fields
+                    if not pd.isna(row.get('SKU')):
+                        product_data['SKU'] = str(row['SKU']).strip()
+                    
+                    if not pd.isna(row.get('supplier_id')):
+                        product_data['supplier_id'] = str(row['supplier_id']).strip()
+                    
+                    if not pd.isna(row.get('stock')):
+                        product_data['stock'] = int(row['stock'])
+                    
+                    if not pd.isna(row.get('cost_price')):
+                        product_data['cost_price'] = float(row['cost_price'])
+                    
+                    if not pd.isna(row.get('low_stock_threshold')):
+                        product_data['low_stock_threshold'] = int(row['low_stock_threshold'])
+                    
+                    if not pd.isna(row.get('unit')):
+                        product_data['unit'] = str(row['unit']).strip()
+                    
+                    if not pd.isna(row.get('status')):
+                        product_data['status'] = str(row['status']).strip()
+                    
+                    if not pd.isna(row.get('barcode')):
+                        product_data['barcode'] = str(row['barcode']).strip()
+                    
+                    if not pd.isna(row.get('description')):
+                        product_data['description'] = str(row['description']).strip()
+                    
+                    if not pd.isna(row.get('expiry_date')):
+                        product_data['expiry_date'] = str(row['expiry_date']).strip()
+                    
+                    valid_products.append(product_data)
             
-            return {
-                'products_data': products_data,
-                'total_rows': len(df),
-                'valid_products': len(products_data),
-                'columns_found': list(df.columns)
-            }
+            # Convert missing_categories set to list for JSON serialization
+            missing_categories_list = [
+                {'category_name': cat, 'subcategories': list(subcats)}
+                for cat, subcats in missing_categories.items()
+            ]
             
-        except Exception as e:
-            raise Exception(f"Error parsing import file: {str(e)}")
-        
-    def import_products_from_file(self, file_path, file_type='csv', validate_only=False):
-        """Import products from CSV or Excel file"""
-        try:
-            # Parse the file
-            parse_result = self.parse_import_file(file_path, file_type)
-            
+            # If validation only, return results with missing categories
             if validate_only:
-                # Only validate, don't create products
-                validation_errors = []
-                for i, product_data in enumerate(parse_result['products_data']):
-                    try:
-                        self.validate_foreign_keys(product_data)
-                    except Exception as e:
-                        validation_errors.append({
-                            'row': i + 2,  # +2 for header and 0-based index
-                            'error': str(e),
-                            'data': product_data
-                        })
-                
                 return {
-                    'validation_only': True,
-                    'total_rows': parse_result['total_rows'],
-                    'valid_products': parse_result['valid_products'],
-                    'validation_errors': validation_errors,
-                    'columns_found': parse_result['columns_found']
+                    'valid': len(validation_errors) == 0 and len(missing_categories) == 0,
+                    'total_rows': len(df),
+                    'valid_products': len(valid_products),
+                    'errors': validation_errors,
+                    'missing_categories': missing_categories_list,
+                    'message': 'Validation completed' if not validation_errors else 'Validation failed'
                 }
             
-            # Create products in bulk
-            bulk_result = self.bulk_create_products(parse_result['products_data'])
+            # If there are validation errors, don't proceed with import
+            if validation_errors:
+                return {
+                    'success': False,
+                    'total_rows': len(df),
+                    'valid_products': len(valid_products),
+                    'errors': validation_errors,
+                    'missing_categories': missing_categories_list,
+                    'message': f'Import failed: {len(validation_errors)} validation error(s) found'
+                }
             
-            # Create import completion notification
-            try:
-                total_rows = parse_result['total_rows']
-                valid_products = parse_result['valid_products']
-                successful_imports = bulk_result['total_successful']
-                failed_imports = bulk_result['total_failed']
-                
-                # Determine priority based on success rate
-                if failed_imports == 0 and valid_products > 0:
-                    priority = "low"
-                    notification_type = "system"
-                elif failed_imports < successful_imports:
-                    priority = "medium"
-                    notification_type = "alert"
-                else:
-                    priority = "high"
-                    notification_type = "alert"
-                
-                # Create summary message
-                if failed_imports == 0 and valid_products > 0:
-                    message = f"Product import completed successfully: {successful_imports} products imported from {total_rows} rows"
-                elif valid_products == 0:
-                    message = f"Product import failed: No valid products found in {total_rows} rows"
-                else:
-                    message = f"Product import completed: {successful_imports} successful, {failed_imports} failed from {valid_products} valid products"
-                
-                notification_service.create_notification(
-                    title="Product Import Completed",
-                    message=message,
-                    priority=priority,
-                    notification_type=notification_type,
-                    metadata={
-                        "import_source": "file_import",
-                        "action_type": "products_imported",
-                        "file_type": file_type,
-                        "total_rows": total_rows,
-                        "valid_products": valid_products,
-                        "successful_imports": successful_imports,
-                        "failed_imports": failed_imports,
-                        "import_success_rate": round((successful_imports / valid_products) * 100, 2) if valid_products > 0 else 0
-                    }
-                )
-            except Exception as notification_error:
-                logger.error(f"Failed to create notification for product import: {notification_error}")
+            # Proceed with import
+            successful = []
+            failed = []
+            
+            for product_data in valid_products:
+                try:
+                    # Check if SKU exists (if SKU is provided)
+                    if 'SKU' in product_data:
+                        existing = self.db.products.find_one({
+                            'SKU': product_data['SKU'],
+                            'isDeleted': False
+                        })
+                        if existing:
+                            skipped_products.append({
+                                'product': product_data['product_name'],
+                                'reason': f"SKU {product_data['SKU']} already exists"
+                            })
+                            continue
+                    
+                    # ✅ NEW: Log what we're about to create
+                    logger.info(f"Creating product: {product_data['product_name']}")
+                    logger.debug(f"Product data: {product_data}")
+                    
+                    # Create product
+                    new_product = self.create_product(product_data)
+                    successful.append(new_product)
+                    
+                    logger.info(f"✅ Successfully created: {product_data['product_name']}")
+                    
+                except Exception as e:
+                    error_msg = str(e)
+                    logger.error(f"❌ FAILED to create '{product_data.get('product_name', 'Unknown')}': {error_msg}")
+                    logger.error(f"   Product data was: {product_data}")
+                    import traceback
+                    logger.error(f"   Full traceback: {traceback.format_exc()}")
+                    
+                    failed.append({
+                        'product': product_data.get('product_name', 'Unknown'),
+                        'error': error_msg
+                    })
             
             return {
-                'import_completed': True,
-                'file_info': {
-                    'total_rows': parse_result['total_rows'],
-                    'valid_products': parse_result['valid_products'],
-                    'columns_found': parse_result['columns_found']
-                },
-                'bulk_result': bulk_result
+                'success': True,
+                'total_rows': len(df),
+                'successful': len(successful),
+                'failed': len(failed),
+                'skipped': len(skipped_products),
+                'failed_details': failed,
+                'skipped_details': skipped_products,
+                'missing_categories': missing_categories_list,
+                'message': f'Import completed: {len(successful)} created, {len(failed)} failed, {len(skipped_products)} skipped'
             }
             
         except Exception as e:
-            raise Exception(f"Error importing products from file: {str(e)}")
-            
+            raise Exception(f"Import failed: {str(e)}")
+                
     def generate_import_template(self, file_type='csv'):
-        """Generate a template file for product import"""
+        """Generate a template file for product import with dropdowns for Excel"""
         try:
             import pandas as pd
+            from openpyxl import load_workbook
+            from openpyxl.worksheet.datavalidation import DataValidation
             
-            # Define template columns
+            # Define template columns - UPDATED: category_id → category_name
             template_data = {
                 'product_name': ['Sample Noodle 1', 'Sample Drink 1'],
                 'SKU': ['NOOD-SAMP-001', 'DRIN-SAMP-001'],
-                'category_id': ['category_name_or_id', 'category_name_or_id'],
-                'subcategory_name': ['Noodles', 'Drinks'],
+                'category_name': ['Noodles', 'Drinks'],
+                'subcategory_name': ['Instant', 'Beverages'],
                 'supplier_id': ['supplier_name_or_id', 'supplier_name_or_id'],
                 'stock': [100, 50],
                 'low_stock_threshold': [10, 5],
@@ -1353,11 +1537,70 @@ class ProductService:
             df = pd.DataFrame(template_data)
             
             if file_type.lower() == 'csv':
+                # CSV: Simple template without dropdowns
                 template_path = 'product_import_template.csv'
                 df.to_csv(template_path, index=False)
+                
             elif file_type.lower() == 'xlsx':
+                # Excel: Template with dropdowns
                 template_path = 'product_import_template.xlsx'
-                df.to_excel(template_path, index=False)
+                df.to_excel(template_path, index=False, engine='openpyxl')
+                
+                # Add dropdowns for category_name and subcategory_name
+                wb = load_workbook(template_path)
+                ws = wb.active
+                
+                # ✅ FIXED: Use correct collection name 'category' (singular)
+                categories = list(self.db.category.find(
+                    {'isDeleted': False},
+                    {'category_name': 1, 'sub_categories': 1}  # ✅ FIXED: sub_categories (with underscore)
+                ))
+                
+                # Extract category names for dropdown
+                category_names = [cat['category_name'] for cat in categories]
+                
+                # ✅ FIXED: Extract subcategories from 'sub_categories' field (with underscore)
+                all_subcategories = set()
+                for cat in categories:
+                    subcats = cat.get('sub_categories', [])  # ✅ FIXED: sub_categories
+                    if isinstance(subcats, list):
+                        for subcat in subcats:
+                            if isinstance(subcat, dict) and 'name' in subcat:
+                                all_subcategories.add(subcat['name'])
+                            elif isinstance(subcat, str):
+                                all_subcategories.add(subcat)
+                
+                subcategory_names = sorted(list(all_subcategories))
+                
+                # Create dropdown validation for category_name (Column C)
+                if category_names:
+                    category_dropdown = DataValidation(
+                        type="list",
+                        formula1=f'"{",".join(category_names)}"',
+                        allow_blank=False,
+                        showErrorMessage=True,
+                        errorTitle='Invalid Category',
+                        error='Please select a valid category from the list'
+                    )
+                    ws.add_data_validation(category_dropdown)
+                    category_dropdown.add('C2:C1000')
+                
+                # Create dropdown validation for subcategory_name (Column D)
+                if subcategory_names:
+                    subcategory_dropdown = DataValidation(
+                        type="list",
+                        formula1=f'"{",".join(subcategory_names)}"',
+                        allow_blank=False,
+                        showErrorMessage=True,
+                        errorTitle='Invalid Subcategory',
+                        error='Please select a valid subcategory from the list'
+                    )
+                    ws.add_data_validation(subcategory_dropdown)
+                    subcategory_dropdown.add('D2:D1000')
+                
+                # Save the workbook with dropdowns
+                wb.save(template_path)
+                
             else:
                 raise ValueError(f"Unsupported template type: {file_type}")
             
@@ -1398,3 +1641,40 @@ class ProductService:
             'failed_deletions': failed_deletions,
             'success': deleted_count > 0
         }
+    
+# Add this new method to ProductService class
+
+    def _create_initial_batch_if_needed(self, product_id, product_data):
+        """Create initial batch if stock is provided during product creation"""
+        try:
+            initial_stock = int(product_data.get('stock', 0))
+            
+            # Only create batch if stock is provided and > 0
+            if initial_stock > 0:
+                # Validate cost_price is provided when stock is given
+                cost_price = product_data.get('cost_price')
+                if cost_price is None or cost_price == 0:
+                    raise ValueError("Cost price is required when initial stock is provided")
+                
+                # Prepare batch data
+                batch_data = {
+                    'product_id': product_id,
+                    'quantity_received': initial_stock,
+                    'cost_price': float(cost_price),
+                    'expiry_date': product_data.get('expiry_date'),
+                    'supplier_id': product_data.get('supplier_id'),
+                    'date_received': product_data.get('date_received', datetime.utcnow()),
+                    'batch_number': f"INITIAL-{datetime.utcnow().strftime('%Y%m%d')}"
+                }
+                
+                # Create the batch using batch service
+                batch = self.batch_service.create_batch(batch_data)
+                logger.info(f"Created initial batch {batch['_id']} for product {product_id}")
+                
+                return batch
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error creating initial batch: {str(e)}")
+            raise Exception(f"Error creating initial batch: {str(e)}")

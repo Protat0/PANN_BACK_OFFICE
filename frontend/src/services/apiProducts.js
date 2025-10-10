@@ -1,4 +1,5 @@
 import { api } from './api.js'
+import axios from 'axios'
 
 class ApiProductsService {
   constructor() {
@@ -373,25 +374,37 @@ class ApiProductsService {
 
   async downloadImportTemplate(format = 'csv') {
     try {
-      const params = { format }
-      const response = await api.get(`${this.basePath}/import/template/`, { 
-        params,
-        responseType: 'blob'
+      console.log('🔍 Starting template download...')
+      console.log('Format requested:', format)
+      
+      // Use raw axios WITHOUT interceptors
+      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+      const url = `${baseURL}/products/import/template/`
+      
+      console.log('Direct URL:', url)
+      
+      const response = await axios.get(url, {
+        params: { format },
+        responseType: 'blob',
+        // NO Authorization header
       })
       
+      console.log('✅ Template download successful')
+      
       const blob = new Blob([response.data])
-      const url = window.URL.createObjectURL(blob)
+      const downloadUrl = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
-      link.href = url
+      link.href = downloadUrl
       link.download = `product_import_template.${format}`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
+      window.URL.revokeObjectURL(downloadUrl)
       
       return { message: 'Template downloaded successfully' }
     } catch (error) {
-      this.handleError(error)
+      console.error('❌ Download template error:', error)
+      throw error
     }
   }
 
@@ -468,11 +481,19 @@ class ApiProductsService {
       errors.push('Selling price must be greater than 0')
     }
     
-    if (productData.stock < 0) {
+    // UPDATED: Stock is now optional, but cannot be negative if provided
+    if (productData.stock !== undefined && productData.stock < 0) {
       errors.push('Stock cannot be negative')
     }
     
-    if (productData.low_stock_threshold < 0) {
+    // NEW: If stock is provided and > 0, cost_price is required
+    if (productData.stock && productData.stock > 0) {
+      if (!productData.cost_price || productData.cost_price <= 0) {
+        errors.push('Cost price is required when stock is provided')
+      }
+    }
+    
+    if (productData.low_stock_threshold !== undefined && productData.low_stock_threshold < 0) {
       errors.push('Low stock threshold cannot be negative')
     }
 

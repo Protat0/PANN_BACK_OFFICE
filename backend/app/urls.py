@@ -90,6 +90,7 @@ from .kpi_views.product_views import (
     ProductExportView,
     BulkCreateProductsView,
     ImportTemplateView,
+    TestTemplateView,
 )
 
 # BATCH VIEWS - ADD THIS IMPORT
@@ -300,6 +301,7 @@ urlpatterns = [
     
     # Product import/export
     path('products/import/', ProductImportView.as_view(), name='product-import'),  # POST
+    path('products/test-template/', TestTemplateView.as_view(), name='test-template'),
     path('products/import/template/', ImportTemplateView.as_view(), name='import-template'),  # GET
     path('products/export/', ProductExportView.as_view(), name='product-export'),  # GET
     path('products/bulk-create/', BulkCreateProductsView.as_view(), name='bulk-create-products'),  # POST

@@ -536,7 +536,6 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { X, Camera, Save, BarChart3, Package } from 'lucide-vue-next'
 import { useModal } from '@/composables/ui/useModal'
 import { useProducts } from '@/composables/api/useProducts'
-import { useBatches } from '@/composables/api/useBatches'
 
 export default {
   name: 'AddProductModal',
@@ -577,8 +576,6 @@ export default {
       updateProduct,
       checkSkuExists
     } = useProducts()
-
-    const { restockWithBatch } = useBatches()
 
     // Form state
     const editingProduct = ref(null)
@@ -673,6 +670,7 @@ export default {
           errors.initial_stock = 'Initial stock quantity must be greater than 0'
         }
 
+        // ✅ UPDATED: This matches backend validation
         if (!batchForm.value.cost_price || batchForm.value.cost_price <= 0) {
           errors.batch_cost_price = 'Cost price is required when adding initial stock'
         }
@@ -841,8 +839,17 @@ export default {
         let result
         const formData = { ...productForm.value }
 
-        // Set stock to 0 initially if not creating with stock
-        formData.stock = createWithStock.value ? batchForm.value.quantity_received : 0
+        // ✅ NEW: Set stock and cost_price based on createWithStock toggle
+        if (createWithStock.value) {
+          formData.stock = batchForm.value.quantity_received
+          formData.cost_price = batchForm.value.cost_price  // ← ADDED
+          formData.expiry_date = batchForm.value.expiry_date // ← ADDED
+          formData.supplier_id = batchForm.value.supplier_id || undefined // ← ADDED
+          formData.date_received = batchForm.value.date_received || undefined // ← ADDED
+        } else {
+          formData.stock = 0  // No stock when toggle is off
+          // Don't include cost_price, expiry_date, etc. when stock is 0
+        }
 
         // Handle uncategorized products
         if (!formData.category_id) {
@@ -853,32 +860,12 @@ export default {
         if (isEditMode.value) {
           result = await updateProduct(editingProduct.value._id, formData)
         } else {
+          // ✅ Backend automatically creates initial batch when stock > 0
           result = await createProduct(formData)
         }
 
-        // Create initial batch if stock was provided and this is a new product
-        if (!isEditMode.value && createWithStock.value && result.data) {
-          try {
-            const batchData = {
-              quantity_received: batchForm.value.quantity_received,
-              supplier_info: batchForm.value.supplier_id ? {
-                supplier_id: batchForm.value.supplier_id
-              } : {},
-              batch_info: {
-                cost_price: batchForm.value.cost_price,
-                expiry_date: batchForm.value.expiry_date,
-                batch_number: batchForm.value.batch_number || undefined,
-                date_received: batchForm.value.date_received || undefined
-              }
-            }
-
-            await restockWithBatch(result.data._id, batchData)
-          } catch (batchError) {
-            console.error('Error creating initial batch:', batchError)
-            // Don't fail the whole operation if batch creation fails
-            // Product was already created successfully
-          }
-        }
+        // ❌ REMOVED: Manual batch creation - backend does this now!
+        // The backend will automatically create the initial batch if stock > 0
 
         emit('success', {
           message: `Product "${formData.product_name}" ${isEditMode.value ? 'updated' : 'created'} successfully`,

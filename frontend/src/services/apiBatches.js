@@ -5,6 +5,23 @@ class BatchService {
     this.baseEndpoint = '/batches';
   }
 
+
+  // ================================================================
+  // IMPORTANT USAGE NOTE:
+  // ================================================================
+  // 
+  // When creating products with initial stock, DO NOT manually create batches.
+  // The backend automatically creates initial batches when:
+  // 1. Creating a single product with stock > 0 (via createProduct)
+  // 2. Bulk creating products with stock > 0 (via bulkCreateProducts)
+  // 3. Importing products with stock > 0 (via importProducts)
+  //
+  // Use createBatch() ONLY for:
+  // - Adding new batches to existing products (restocking)
+  // - Manual batch creation for special cases
+  //
+  // ================================================================
+
   // Helper method to handle responses
   handleResponse(response) {
     return response.data;

@@ -1,13 +1,23 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 from django.http import HttpResponse
+from django.views import View  # ← ADD THIS LINE
 from ..services.product_service import ProductService
 import logging
+import json  # ← ADD THIS LINE
 
 logger = logging.getLogger(__name__)
 
 # ================ PRODUCT VIEWS ================
+
+class TestTemplateView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        return Response({"message": "TEST ENDPOINT WORKS!"}, status=200)
 
 class ProductListView(APIView):
     def get(self, request):
@@ -682,15 +692,22 @@ class ProductExportView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-class ImportTemplateView(APIView):
+
+class ImportTemplateView(View):  # ← Inherit from View, not APIView!
+    """Generate import template file - Using Django View instead of DRF APIView"""
+   
     def get(self, request):
         """Generate import template file"""
+        print("=" * 100)
+        print("🔥 GET METHOD CALLED IN DJANGO VIEW!")
+        print("=" * 100)
+        
         try:
             product_service = ProductService()
             file_type = request.GET.get('format', 'csv').lower()
-            
+       
             template_path = product_service.generate_import_template(file_type)
-            
+       
             if file_type == 'csv':
                 with open(template_path, 'r') as f:
                     response = HttpResponse(f.read(), content_type='text/csv')
@@ -698,21 +715,27 @@ class ImportTemplateView(APIView):
             else:
                 with open(template_path, 'rb') as f:
                     response = HttpResponse(
-                        f.read(), 
+                        f.read(),
                         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
                     response['Content-Disposition'] = 'attachment; filename="product_import_template.xlsx"'
-            
+       
             import os
             os.unlink(template_path)
-            
+       
             return response
-            
+       
         except Exception as e:
+            print(f"❌ ERROR: {e}")
+            import traceback
+            traceback.print_exc()
             logger.error(f"Error in ImportTemplateView.get: {e}")
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            
+            # Return plain Django response
+            return HttpResponse(
+                json.dumps({"error": str(e)}),
+                content_type='application/json',
+                status=500
             )
         
 class BulkDeleteProductsView(APIView):
@@ -720,13 +743,13 @@ class BulkDeleteProductsView(APIView):
         try:
             product_ids = request.data.get('product_ids', [])
             hard_delete = request.data.get('hard_delete', False)
-           
+        
             if not product_ids:
                 return Response({'error': 'No product IDs provided'}, status=400)
-           
+        
             # Call static method directly on the class
             result = ProductService.bulk_delete_products(product_ids, hard_delete)
-           
+        
             if result['success']:
                 return Response({
                     'message': f"{result['deleted_count']} products deleted successfully",
@@ -737,7 +760,7 @@ class BulkDeleteProductsView(APIView):
                     'error': 'Bulk deletion failed',
                     'details': result
                 }, status=400)
-               
+            
         except Exception as e:
             logger.error(f"Error in BulkDeleteProductsView.post: {e}")
             return Response(

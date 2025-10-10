@@ -74,42 +74,61 @@ class CategoryService:
             raise Exception(f"Error creating uncategorized category: {str(e)}")
 
     def generate_category_id(self):
-        """Generate sequential CTGY-### ID"""
+        """Generate sequential CTGY-### ID with conflict checking"""
         try:
-            # Use aggregation to find highest existing number
-            pipeline = [
-                {
-                    '$match': {
-                        'category_id': {'$regex': '^CTGY-\\d{3}$'}
-                    }
-                },
-                {
-                    '$addFields': {
-                        'numeric_part': {
-                            '$toInt': {'$substr': ['$category_id', 5, 3]}
+            max_attempts = 100  # Safety limit
+            
+            for attempt in range(max_attempts):
+                # Find the highest existing CTGY number
+                pipeline = [
+                    {
+                        '$match': {
+                            '_id': {'$regex': '^CTGY-\\d{3}$'}
                         }
+                    },
+                    {
+                        '$addFields': {
+                            'numeric_part': {
+                                '$toInt': {'$substr': ['$_id', 5, 3]}
+                            }
+                        }
+                    },
+                    {
+                        '$sort': {'numeric_part': -1}
+                    },
+                    {
+                        '$limit': 1
                     }
-                },
-                {
-                    '$group': {
-                        '_id': None,
-                        'max_number': {'$max': '$numeric_part'}
-                    }
-                }
-            ]
+                ]
+                
+                result = list(self.collection.aggregate(pipeline))
+                
+                if result:
+                    next_number = result[0]['numeric_part'] + 1 + attempt
+                else:
+                    # No CTGY categories exist, start from 1
+                    next_number = 1 + attempt
+                
+                # Generate candidate ID
+                candidate_id = f"CTGY-{next_number:03d}"
+                
+                # Check if this ID already exists
+                existing = self.collection.find_one({'_id': candidate_id})
+                
+                if not existing:
+                    logger.info(f"Generated unique category ID: {candidate_id}")
+                    return candidate_id
+                
+                logger.warning(f"ID {candidate_id} already exists, trying next number...")
             
-            result = list(self.collection.aggregate(pipeline))
-            
-            if result and result[0]['max_number'] is not None:
-                next_number = result[0]['max_number'] + 1
-            else:
-                # Fallback to count-based approach
-                next_number = self.collection.count_documents({}) + 1
-            
-            return f"CTGY-{next_number:03d}"
+            # If we exhausted all attempts, use timestamp-based fallback
+            logger.error("Could not generate unique ID after 100 attempts, using fallback")
+            import time
+            fallback_number = int(time.time()) % 1000
+            return f"CTGY-{fallback_number:03d}"
             
         except Exception as e:
-            logger.error(f"Error generating category ID: {e}")
+            logger.error(f"Error generating category ID: {e}", exc_info=True)
             # Emergency fallback
             import time
             fallback_number = int(time.time()) % 1000
@@ -389,14 +408,13 @@ class CategoryService:
                 if field in category_data and category_data[field] is not None:
                     category_kwargs[field] = category_data[field]
             
-            # Create and insert category
-            category = Category(**category_kwargs)
-            self.collection.insert_one(category.to_dict())
+            # ✅ FIXED: Insert dict directly instead of using Category model
+            self.collection.insert_one(category_kwargs)
             
             # Send notification
             self._send_category_notification('created', category_name, category_id)
             
-            # Audit logging - use the clean data we already have
+            # Audit logging
             if current_user and self.audit_service:
                 try:
                     audit_data = {**category_kwargs, "category_id": category_id}
@@ -407,7 +425,7 @@ class CategoryService:
             
             logger.info(f"Category '{category_name}' created successfully with ID {category_id}")
             
-            # Return the clean data instead of querying back
+            # Return the created data
             return category_kwargs
 
         except ValueError as ve:
@@ -416,7 +434,7 @@ class CategoryService:
         except Exception as e:
             logger.error(f"Error creating category: {e}", exc_info=True)
             raise Exception(f"Error creating category: {str(e)}")
-    
+        
     def get_all_categories(self, include_deleted=False, limit=None, skip=None):
         """Get all categories - no longer checks uncategorized every time"""
         try:
