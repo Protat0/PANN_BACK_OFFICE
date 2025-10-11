@@ -204,23 +204,48 @@ class CategoryApiService {
    * @returns {Promise<Array>} List of products
    */
   async FindProdcategory(params = {}) {
-      try {
-          console.log(`This API call will fetch the products under the category ${params.id}`);
-          
-          if (params.subcategory_name) {
-              // Get products for specific subcategory
-              const response = await api.get(`/category/${params.id}/subcategories/${encodeURIComponent(params.subcategory_name)}/products/`);
-              return response.data.products || [];
-          } else {
-              // Get all products for category using products API
-              const response = await api.get(`/products/reports/by-category/${params.id}/`);
-              return response.data.products || [];
-          }
-          
-      } catch (error) {
-          console.error(`Error fetching Product List for category ${params.id}:`, error);
-          return [];
+    try {
+      console.log(`🔍 FindProdcategory: Fetching products for category ${params.id}`);
+      
+      if (!params.id) {
+        throw new Error('Category ID is required');
       }
+      
+      let response;
+      
+      if (params.subcategory_name) {
+        // Get products for specific subcategory
+        console.log(`   Filtering by subcategory: ${params.subcategory_name}`);
+        response = await api.get(`/category/${params.id}/subcategories/${encodeURIComponent(params.subcategory_name)}/products/`);
+      } else {
+        // Get all products for category using products API
+        console.log(`   Getting all products for category`);
+        response = await api.get(`/products/reports/by-category/${params.id}/`);
+      }
+      
+      console.log(`✅ FindProdcategory: Response:`, response.data);
+      
+      // ✅ FIXED: Handle different response formats
+      if (response.data) {
+        if (Array.isArray(response.data)) {
+          console.log(`   Returning ${response.data.length} products (direct array)`);
+          return response.data;
+        } else if (response.data.products && Array.isArray(response.data.products)) {
+          console.log(`   Returning ${response.data.products.length} products (from .products)`);
+          return response.data.products;
+        } else if (response.data.data && Array.isArray(response.data.data)) {
+          console.log(`   Returning ${response.data.data.length} products (from .data)`);
+          return response.data.data;
+        }
+      }
+      
+      console.log(`⚠️ FindProdcategory: Unexpected response format, returning empty array`);
+      return [];
+      
+    } catch (error) {
+      console.error(`❌ FindProdcategory: Error fetching products for category ${params.id}:`, error);
+      this.handleError(error);
+    }
   }
 
   // ================ SUBCATEGORY MANAGEMENT ================

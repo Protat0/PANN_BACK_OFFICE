@@ -36,8 +36,8 @@
               <div>
                 <strong>Important Guidelines:</strong>
                 <ul class="mb-0 mt-2" style="font-size: 0.875rem;">
-                  <li><strong>Required columns:</strong> product_name, selling_price, category_id, subcategory_name</li>
-                  <li><strong>Optional columns:</strong> SKU, supplier_id, stock, cost_price, low_stock_threshold, unit, status, barcode, description</li>
+                  <li><strong>Required columns:</strong> product_name, selling_price, category_id</li>
+                  <li><strong>Optional columns:</strong> subcategory_name, SKU, supplier_id, stock, cost_price, low_stock_threshold, unit, status, barcode, description, </li>
                   <li><strong>Stock is optional</strong> - Leave blank or set to 0 if not adding initial inventory</li>
                   <li><strong>When adding stock (stock > 0):</strong>
                     <ul>

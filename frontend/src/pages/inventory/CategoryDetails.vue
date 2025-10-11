@@ -355,17 +355,31 @@ export default {
       try {
         categoryId.value = id
         
+        console.log('🔄 Loading category data for ID:', id)
+        
         // Load category details
         await fetchCategoryById(id)
+        console.log('✅ Category loaded:', currentCategory.value)
         
         // Load products for this category
         productsLoading.value = true
         productsError.value = null
         
+        console.log('🔄 Fetching products for category:', id)
         const products = await fetchProductsByCategory(id)
-        categoryProducts.value = Array.isArray(products) ? products : []
+        console.log('✅ Products received:', products)
+        
+        // ✅ FIXED: Ensure we're getting an array
+        if (Array.isArray(products)) {
+          categoryProducts.value = products
+          console.log(`✅ Set ${products.length} products to categoryProducts`)
+        } else {
+          console.warn('⚠️ Products is not an array:', products)
+          categoryProducts.value = []
+        }
         
       } catch (err) {
+        console.error('❌ Error loading category data:', err)
         productsError.value = err.message || 'Failed to load category data'
         categoryProducts.value = []
       } finally {

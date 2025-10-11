@@ -473,7 +473,9 @@ export function useCategories() {
         id: categoryId,
         subcategory_name: subcategoryName
       })
-      return response
+      
+      // ✅ FIXED: Return the products array directly
+      return response.products || response || []
     } catch (err) {
       error.value = err.message
       throw err

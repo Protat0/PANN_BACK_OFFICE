@@ -1237,6 +1237,7 @@ class ProductService:
         """
         Import products from CSV or Excel file with detailed validation
         Now uses category_name instead of category_id
+        Subcategory is OPTIONAL - products can be imported without subcategory
         """
         try:
             # Read file based on type
@@ -1247,9 +1248,9 @@ class ProductService:
             else:
                 raise ValueError(f"Unsupported file type: {file_type}")
             
-            # Define required columns
-            required_columns = ['product_name', 'selling_price', 'category_name', 'subcategory_name']
-            optional_columns = ['SKU', 'supplier_id', 'stock', 'cost_price', 'low_stock_threshold', 
+            # ✅ FIXED: subcategory_name is now optional
+            required_columns = ['product_name', 'selling_price', 'category_name']
+            optional_columns = ['subcategory_name', 'SKU', 'supplier_id', 'stock', 'cost_price', 'low_stock_threshold', 
                             'unit', 'status', 'barcode', 'description', 'expiry_date']
             
             # Check for missing required columns
@@ -1277,42 +1278,25 @@ class ProductService:
                 if pd.isna(row.get('selling_price')) or row.get('selling_price') <= 0:
                     errors.append(f"Row {row_num}: Selling price must be greater than 0")
                 
-                # Validate category_name
+                # Validate category_name (REQUIRED)
                 category_name_raw = row.get('category_name', '')
                 category_name = str(category_name_raw).strip() if not pd.isna(category_name_raw) else ''
                 
                 if not category_name:
                     errors.append(f"Row {row_num}: Category name is required")
                 
+                # ✅ FIXED: Subcategory is now OPTIONAL - default to None if blank
                 subcategory_name_raw = row.get('subcategory_name', '')
-                subcategory_name = str(subcategory_name_raw).strip() if not pd.isna(subcategory_name_raw) else ''
+                subcategory_name = str(subcategory_name_raw).strip() if not pd.isna(subcategory_name_raw) and str(subcategory_name_raw).strip() else None
                 
-                if not subcategory_name:
-                    errors.append(f"Row {row_num}: Subcategory name is required")
-                
-                # DEBUG: Print what we're looking for
-                print(f"🔍 Row {row_num}: Looking for category='{category_name}' (len={len(category_name)})")
-                
-                # ✅ FIXED: Look up category using correct collection name
+                # Look up category using correct collection name
                 category = None
                 category_id = None
                 if category_name:
-                    category = self.db.category.find_one({  # ✅ FIXED: self.db.category (singular)
+                    category = self.db.category.find_one({
                         'category_name': category_name,
                         'isDeleted': False
                     })
-                    
-                    # DEBUG: Print result
-                    if category:
-                        print(f"✅ Row {row_num}: Found category '{category['category_name']}'")
-                    else:
-                        print(f"❌ Row {row_num}: Category '{category_name}' NOT FOUND")
-                        # DEBUG: Show what categories exist
-                        all_categories = list(self.db.category.find(  # ✅ FIXED: self.db.category
-                            {'isDeleted': False},
-                            {'category_name': 1}
-                        ))
-                        print(f"   Available categories: {[c['category_name'] for c in all_categories]}")
                     
                     if not category:
                         # Track missing category
@@ -1324,9 +1308,9 @@ class ProductService:
                     else:
                         category_id = str(category['_id'])
                         
-                        # ✅ FIXED: Validate subcategory using 'sub_categories' (with underscore)
+                        # ✅ FIXED: Only validate subcategory if one was provided
                         if subcategory_name and category:
-                            subcategories = category.get('sub_categories', [])  # ✅ FIXED: sub_categories
+                            subcategories = category.get('sub_categories', [])
                             
                             # Handle both list of strings and list of dicts
                             subcategory_names = []
@@ -1336,15 +1320,11 @@ class ProductService:
                                 elif isinstance(subcat, str):
                                     subcategory_names.append(subcat)
                             
-                            print(f"🔍 Row {row_num}: Looking for subcategory='{subcategory_name}' in {subcategory_names}")
-                            
                             if subcategory_name not in subcategory_names:
                                 if category_name not in missing_categories:
                                     missing_categories[category_name] = set()
                                 missing_categories[category_name].add(subcategory_name)
                                 errors.append(f"Row {row_num}: Subcategory '{subcategory_name}' not found under category '{category_name}'")
-                            else:
-                                print(f"✅ Row {row_num}: Found subcategory '{subcategory_name}'")
                 
                 # Validate stock and cost_price relationship
                 stock = row.get('stock', 0)
@@ -1386,15 +1366,18 @@ class ProductService:
                 if errors:
                     validation_errors.extend(errors)
                 else:
-                    # Build product data with category_id from lookup
+                    # ✅ FIXED: Build product data - subcategory is optional
                     product_data = {
                         'product_name': str(row['product_name']).strip(),
                         'selling_price': float(row['selling_price']),
                         'category_id': category_id,
-                        'subcategory_name': subcategory_name,
                     }
                     
-                    # Add optional fields
+                    # ✅ FIXED: Only add subcategory if provided
+                    if subcategory_name:
+                        product_data['subcategory_name'] = subcategory_name
+                    
+                    # Add other optional fields
                     if not pd.isna(row.get('SKU')):
                         product_data['SKU'] = str(row['SKU']).strip()
                     
@@ -1474,10 +1457,6 @@ class ProductService:
                             })
                             continue
                     
-                    # ✅ NEW: Log what we're about to create
-                    logger.info(f"Creating product: {product_data['product_name']}")
-                    logger.debug(f"Product data: {product_data}")
-                    
                     # Create product
                     new_product = self.create_product(product_data)
                     successful.append(new_product)
@@ -1487,9 +1466,6 @@ class ProductService:
                 except Exception as e:
                     error_msg = str(e)
                     logger.error(f"❌ FAILED to create '{product_data.get('product_name', 'Unknown')}': {error_msg}")
-                    logger.error(f"   Product data was: {product_data}")
-                    import traceback
-                    logger.error(f"   Full traceback: {traceback.format_exc()}")
                     
                     failed.append({
                         'product': product_data.get('product_name', 'Unknown'),

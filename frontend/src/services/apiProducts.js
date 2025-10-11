@@ -500,10 +500,6 @@ class ApiProductsService {
     if (!productData.category_id?.trim()) {
       errors.push('Category is required')
     }
-
-    if (!productData.subcategory_name?.trim()) {
-      errors.push('Subcategory is required')
-    }
     
     return {
       isValid: errors.length === 0,
