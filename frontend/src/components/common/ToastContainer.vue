@@ -66,7 +66,7 @@
 </template>
 
 <script>
-import { useToast } from '@/composables/useToast.js'
+import { useToast } from '@/composables/ui/useToast.js'
 import { CheckCircle, AlertCircle, AlertTriangle, Info, X } from 'lucide-vue-next'
 
 export default {

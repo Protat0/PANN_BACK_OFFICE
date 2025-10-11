@@ -2,7 +2,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from ..services.category_service import CategoryService
-from ..services.product_subcategory_service import ProductSubcategoryService
 from ..decorators.authenticationDecorator import require_authentication, require_admin
 import logging
 
@@ -89,7 +88,7 @@ class CategoryDetailView(APIView):
     def get(self, request, category_id):
         """Get a specific category by ID"""
         try:
-            category_service = CategoryService()  # Create instance
+            category_service = CategoryService()
             include_deleted = request.query_params.get('include_deleted', 'false').lower() == 'true'
             category = category_service.get_category_by_id(category_id, include_deleted=include_deleted)
             
@@ -106,7 +105,7 @@ class CategoryDetailView(APIView):
     def put(self, request, category_id):
         """Update a category"""
         try:
-            category_service = CategoryService()  # Create instance
+            category_service = CategoryService()
             
             logger.info(f"Updating category {category_id} by user: {request.current_user['username']}")
             
@@ -140,7 +139,7 @@ class CategorySoftDeleteView(APIView):
     def delete(self, request, category_id):
         """Soft delete a category"""
         try:
-            category_service = CategoryService()  # Create instance
+            category_service = CategoryService()
             result = category_service.soft_delete_category(category_id, request.current_user)
             
             if not result:
@@ -163,7 +162,7 @@ class CategoryHardDeleteView(APIView):
     def delete(self, request, category_id):
         """Hard delete a category (Admin only)"""
         try:
-            category_service = CategoryService()  # Create instance
+            category_service = CategoryService()
             result = category_service.hard_delete_category(category_id, request.current_user)
             
             if not result:
@@ -179,128 +178,6 @@ class CategoryHardDeleteView(APIView):
             logger.error(f"Error hard deleting category {category_id}: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-class ProductSubcategoryUpdateView(APIView):
-    
-    @require_authentication
-    def put(self, request):
-        """Update product subcategory"""
-        try:
-            subcategory_service = ProductSubcategoryService()  # Create correct service instance
-            
-            product_id = request.data.get('product_id')
-            new_subcategory = request.data.get('new_subcategory')
-            category_id = request.data.get('category_id')
-            
-            if not product_id or not category_id:
-                return Response({"error": "product_id and category_id are required"}, status=status.HTTP_400_BAD_REQUEST)
-            
-            validation = subcategory_service.validate_subcategory_update(product_id, new_subcategory, category_id)
-            
-            if not validation.get('is_valid'):
-                return Response({"error": validation.get('error')}, status=status.HTTP_400_BAD_REQUEST)
-            
-            result = subcategory_service.update_product_subcategory(
-                product_id, new_subcategory, category_id, current_user=request.current_user
-            )
-            
-            if result.get('success'):
-                return Response({
-                    "message": result.get('message'),
-                    "result": result,
-                    "updated_by": request.current_user['username']
-                }, status=status.HTTP_200_OK)
-            else:
-                return Response({"error": result.get('message', 'Update failed')}, status=status.HTTP_400_BAD_REQUEST)
-        
-        except Exception as e:
-            logger.error(f"Error updating product subcategory: {e}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-class ProductMoveToUncategorizedView(APIView):
-    
-    @require_authentication
-    def put(self, request):
-        """Move a product to Uncategorized category"""
-        try:
-            subcategory_service = ProductSubcategoryService()  # Create correct service instance
-            
-            product_id = request.data.get('product_id')
-            
-            if not product_id:
-                return Response({"error": "product_id is required"}, status=status.HTTP_400_BAD_REQUEST)
-            
-            result = subcategory_service.move_product_to_uncategorized_category(product_id)
-            
-            if result.get('success'):
-                return Response({
-                    "message": "Product moved to Uncategorized category successfully",
-                    "result": result,
-                    "moved_by": request.current_user['username']
-                }, status=status.HTTP_200_OK)
-            else:
-                return Response({"error": result.get('error', 'Move failed')}, status=status.HTTP_400_BAD_REQUEST)
-        
-        except Exception as e:
-            logger.error(f"Error moving product to uncategorized: {e}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-class CategoryRestoreView(APIView):
-    @require_admin
-    def post(self, request, category_id):
-        """Restore a soft-deleted category"""
-        try:
-            category_service = CategoryService()
-            result = category_service.restore_category(category_id, request.current_user)
-            
-            if not result:
-                return Response({"error": "Category not found or not deleted"}, status=status.HTTP_404_NOT_FOUND)
-            
-            return Response({
-                "message": "Category restored successfully",
-                "category_id": category_id,
-                "restored_by": request.current_user['username']
-            }, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-class CategoryDeletedListView(APIView):
-    @require_admin
-    def get(self, request):
-        """Get list of soft-deleted categories"""
-        try:
-            category_service = CategoryService()
-            deleted_categories = category_service.get_deleted_categories()
-            
-            return Response({
-                "message": "Deleted categories retrieved successfully",
-                "categories": deleted_categories,
-                "count": len(deleted_categories)
-            }, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-class CategoryBulkOperationsView(APIView):
-    @require_authentication
-    def post(self, request):
-        """Bulk operations on categories"""
-        try:
-            category_service = CategoryService()
-            operation = request.data.get('operation')
-            category_ids = request.data.get('category_ids', [])
-            
-            if operation == 'soft_delete':
-                result = category_service.bulk_soft_delete_categories(category_ids, request.current_user)
-            elif operation == 'update_status':
-                new_status = request.data.get('new_status')
-                result = category_service.bulk_update_categories_status(category_ids, new_status, request.current_user)
-            else:
-                return Response({"error": f"Unknown operation: {operation}"}, status=status.HTTP_400_BAD_REQUEST)
-            
-            return Response({"message": f"Bulk {operation} completed", "result": result}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class CategoryRestoreView(APIView):
     
@@ -458,8 +335,8 @@ class UncategorizedCategoryView(APIView):
     def get(self, request):
         """Get information about the Uncategorized category"""
         try:
-            subcategory_service = ProductSubcategoryService()
-            uncategorized_category = subcategory_service._ensure_uncategorized_category_exists()
+            category_service = CategoryService()
+            uncategorized_category = category_service.ensure_uncategorized_category_exists()
             
             return Response({
                 "message": "Uncategorized category information retrieved successfully",
@@ -472,8 +349,8 @@ class UncategorizedCategoryView(APIView):
     def post(self, request):
         """Create/ensure the Uncategorized category exists (Admin only)"""
         try:
-            subcategory_service = ProductSubcategoryService()
-            category = subcategory_service._ensure_uncategorized_category_exists()
+            category_service = CategoryService()
+            category = category_service.ensure_uncategorized_category_exists()
             
             return Response({
                 "message": "Uncategorized category ensured successfully",
@@ -487,10 +364,16 @@ class UncategorizedCategoryView(APIView):
 class SubcategoryProductsView(APIView):
     
     def get(self, request, category_id, subcategory_name):
-        """Get all products in a subcategory with full details"""
+        """Get all products in a subcategory"""
         try:
             category_service = CategoryService()
-            products = category_service.get_subcategory_products_with_details(category_id, subcategory_name)
+            
+            # Use the refactored method to get products in subcategory
+            products = category_service.get_products_in_subcategory(
+                category_id, 
+                subcategory_name, 
+                include_deleted=False
+            )
             
             return Response({
                 "message": "Subcategory products retrieved successfully",
@@ -500,4 +383,80 @@ class SubcategoryProductsView(APIView):
                 "count": len(products)
             }, status=status.HTTP_200_OK)
         except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class CategoryProductManagementView(APIView):
+    """New view for managing products within categories using proxy methods"""
+    
+    @require_authentication
+    def put(self, request):
+        """Move product to different category or subcategory"""
+        try:
+            category_service = CategoryService()
+            
+            product_id = request.data.get('product_id')
+            new_category_id = request.data.get('new_category_id')
+            new_subcategory_name = request.data.get('new_subcategory_name')
+            
+            if not product_id:
+                return Response({"error": "product_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not new_category_id:
+                return Response({"error": "new_category_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Use the proxy method to move product
+            result = category_service.move_product_to_category(
+                product_id, 
+                new_category_id, 
+                new_subcategory_name, 
+                request.current_user
+            )
+            
+            if not result:
+                return Response({"error": "Failed to move product"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            return Response({
+                "message": "Product moved successfully",
+                "product": result,
+                "moved_by": request.current_user['username']
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error moving product: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @require_authentication  
+    def post(self, request):
+        """Bulk move products to category/subcategory"""
+        try:
+            category_service = CategoryService()
+            
+            product_ids = request.data.get('product_ids', [])
+            new_category_id = request.data.get('new_category_id')
+            new_subcategory_name = request.data.get('new_subcategory_name')
+            
+            if not product_ids:
+                return Response({"error": "product_ids is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not new_category_id:
+                return Response({"error": "new_category_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Use the bulk proxy method
+            moved_count = category_service.bulk_move_products_to_category(
+                product_ids, 
+                new_category_id, 
+                new_subcategory_name, 
+                request.current_user
+            )
+            
+            return Response({
+                "message": f"Bulk move completed: {moved_count} products moved",
+                "moved_count": moved_count,
+                "total_requested": len(product_ids),
+                "moved_by": request.current_user['username']
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error bulk moving products: {e}")
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

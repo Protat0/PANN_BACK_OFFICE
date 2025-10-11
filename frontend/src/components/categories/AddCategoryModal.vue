@@ -94,12 +94,20 @@
                 >
                   <div class="card-body py-2">
                     <div class="row g-2 align-items-center">
-                      <div class="col-10">
+                      <div class="col-8">
                         <input 
                           type="text" 
                           class="form-control form-control-sm" 
                           v-model="subCategory.name"
                           placeholder="Sub-category name"
+                        />
+                      </div>
+                      <div class="col-2">
+                        <input 
+                          type="text" 
+                          class="form-control form-control-sm" 
+                          v-model="subCategory.description"
+                          placeholder="Description (optional)"
                         />
                       </div>
                       <div class="col-2 text-end">
@@ -121,6 +129,9 @@
                 <Package :size="24" class="text-tertiary-medium mb-2" />
                 <p class="text-tertiary-medium mb-0 small">
                   No sub-categories added yet. Click "Add Sub-Category" to create one.
+                </p>
+                <p class="text-tertiary-medium mb-0 small">
+                  Note: A default "None" subcategory will be automatically created.
                 </p>
               </div>
             </div>
@@ -188,9 +199,10 @@
             type="button" 
             class="btn btn-save btn-sm btn-with-icon-sm"
             @click="handleSubmit"
-            :disabled="!isFormValid"
+            :disabled="!isFormValid || isLoading"
           >
-            <Save :size="14" />
+            <div v-if="isLoading" class="spinner-border spinner-border-sm me-2" role="status"></div>
+            <Save v-else :size="14" />
             {{ isEditMode ? 'Update Category' : 'Create Category' }}
           </button>
         </div>
@@ -200,27 +212,31 @@
 </template>
 
 <script>
-import categoryApiService from '@/services/apiCategory' // Import your API service
-import { 
-  Package,
-  Plus,
-  Trash2,
-  Save
-} from 'lucide-vue-next'
+import { useCategories } from '@/composables/api/useCategories'
 
 export default {
   name: 'AddCategoryModal',
-  components: {
-    Package,
-    Plus,
-    Trash2,
-    Save
+  setup() {
+    const {
+      createCategory,
+      updateCategory,
+      loading,
+      validateCategoryData
+    } = useCategories()
+
+    return {
+      createCategory,
+      updateCategory,
+      loading,
+      validateCategoryData
+    }
   },
+  
   data() {
     return {
       isEditMode: false,
       editingCategoryId: null,
-      isLoading: false, // Add loading state
+      isLoading: false,
       formData: {
         category_name: '',
         description: '',
@@ -232,16 +248,19 @@ export default {
       hasExistingImage: false
     }
   },
+  
   computed: {
     isFormValid() {
-      return this.formData.category_name.trim() !== '' && this.formData.status !== ''
+      const validation = this.validateCategoryData(this.formData)
+      return validation.isValid && !this.isLoading
     }
   },
+  
   methods: {
     addSubCategory() {
       this.formData.sub_categories.push({
         name: '',
-        products: []
+        description: ''
       })
     },
     
@@ -254,11 +273,11 @@ export default {
       
       const file = event.target.files[0]
       if (!file) {
-        console.log('❌ No file selected')
+        console.log('No file selected')
         return
       }
       
-      console.log('📁 File selected:', {
+      console.log('File selected:', {
         name: file.name,
         size: file.size,
         type: file.type
@@ -269,7 +288,7 @@ export default {
       
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        console.error('❌ File too large:', file.size)
+        console.error('File too large:', file.size)
         alert('Image size should be less than 5MB')
         this.clearImageData()
         return
@@ -278,25 +297,25 @@ export default {
       // Validate file type
       const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
       if (!validTypes.includes(file.type)) {
-        console.error('❌ Invalid file type:', file.type)
+        console.error('Invalid file type:', file.type)
         alert('Please select a valid image file (JPEG, PNG, GIF, WebP)')
         this.clearImageData()
         return
       }
       
-      console.log('✅ File validation passed')
+      console.log('File validation passed')
       
       const reader = new FileReader()
       
       reader.onload = (e) => {
-        console.log('✅ FileReader onload triggered')
+        console.log('FileReader onload triggered')
         this.imagePreview = e.target.result
         this.hasExistingImage = false // This is a new upload
-        console.log('✅ Image preview set, length:', this.imagePreview.length)
+        console.log('Image preview set, length:', this.imagePreview.length)
       }
       
       reader.onerror = (e) => {
-        console.error('❌ FileReader error:', e)
+        console.error('FileReader error:', e)
         alert('Error reading the image file')
         this.clearImageData()
       }
@@ -305,7 +324,7 @@ export default {
     },
 
     removeImage() {
-      console.log('🗑️ Removing image')
+      console.log('Removing image')
       this.clearImageData()
     },
     
@@ -321,7 +340,14 @@ export default {
       this.isLoading = true
       
       try {
-        // Prepare the basic category data
+        // Validate form data using composable
+        const validation = this.validateCategoryData(this.formData)
+        if (!validation.isValid) {
+          alert('Please fix the following errors:\n' + validation.errors.join('\n'))
+          return
+        }
+
+        // Prepare the category data for the refactored structure
         const categoryData = {
           category_name: this.formData.category_name.trim(),
           description: this.formData.description.trim(),
@@ -330,77 +356,53 @@ export default {
             .filter(sub => sub.name.trim() !== '')
             .map(sub => ({
               name: sub.name.trim(),
-              products: sub.products || []
+              description: sub.description?.trim() || ''
             }))
         }
-        
-        // Debug info
-        console.log('=== IMAGE DEBUG INFO ===')
-        console.log('imagePreview exists:', !!this.imagePreview)
-        console.log('selectedImageFile exists:', !!this.selectedImageFile)
-        console.log('hasExistingImage:', this.hasExistingImage)
         
         // Handle image data
         if (this.selectedImageFile && this.imagePreview) {
           // New image uploaded
-          console.log('✅ Adding NEW image data')
+          console.log('Adding NEW image data')
           categoryData.image_filename = this.selectedImageFile.name
           categoryData.image_size = this.selectedImageFile.size
           categoryData.image_type = this.selectedImageFile.type
           categoryData.image_url = this.imagePreview
           categoryData.image_uploaded_at = new Date().toISOString()
-          
-          console.log('✅ Image data added:', {
-            image_filename: categoryData.image_filename,
-            image_size: categoryData.image_size,
-            image_type: categoryData.image_type,
-            image_url_length: categoryData.image_url.length
-          })
         } 
         else if (this.hasExistingImage && this.imagePreview) {
-          // Existing image kept (in edit mode)
-          console.log('✅ Keeping existing image')
+          // Existing image kept (in edit mode) - don't modify image fields
+          console.log('Keeping existing image')
         }
         else if (this.isEditMode && !this.imagePreview) {
           // Image was removed in edit mode
-          console.log('🗑️ Removing image in edit mode')
+          console.log('Removing image in edit mode')
           categoryData.image_url = null
           categoryData.image_filename = null
           categoryData.image_size = null
           categoryData.image_type = null
           categoryData.image_uploaded_at = null
         }
-        else {
-          console.log('ℹ️ No image data to process')
-        }
         
-        console.log('=== COMPLETE CATEGORY DATA TO SEND ===')
-        console.log(JSON.stringify(categoryData, null, 2))
+        console.log('Category data to send:', categoryData)
         
-        // Call API
+        // Call the appropriate composable method
         if (this.isEditMode) {
-          const updatedCategory = await categoryApiService.UpdateCategoryData({
-            id: this.editingCategoryId,
-            ...categoryData
+          await this.updateCategory(this.editingCategoryId, categoryData)
+          this.$emit('category-updated', { 
+            _id: this.editingCategoryId, 
+            ...categoryData 
           })
-          
-          console.log('✅ Category updated successfully:', updatedCategory)
-          this.$emit('category-updated', updatedCategory)
-          alert(`Category "${categoryData.category_name}" updated successfully!`)
-          
         } else {
-          const newCategory = await categoryApiService.AddCategoryData(categoryData)
-          
-          console.log('✅ Category created successfully:', newCategory)
-          this.$emit('category-added', newCategory)
-          alert(`Category "${categoryData.category_name}" created successfully!`)
+          const newCategory = await this.createCategory(categoryData)
+          this.$emit('category-added', newCategory.category)
         }
         
         this.resetForm()
         this.closeModal()
         
       } catch (error) {
-        console.error('❌ Error in handleSubmit:', error)
+        console.error('Error in handleSubmit:', error)
         const action = this.isEditMode ? 'update' : 'create'
         alert(`Failed to ${action} category. Please try again.\n\nError: ${error.message || 'Unknown error'}`)
       } finally {
@@ -438,10 +440,10 @@ export default {
         this.imagePreview = categoryData.image_url
         this.hasExistingImage = true
         this.selectedImageFile = null
-        console.log('✅ Loaded existing image for edit')
+        console.log('Loaded existing image for edit')
       } else {
         this.clearImageData()
-        console.log('ℹ️ No existing image to load')
+        console.log('No existing image to load')
       }
       
       this.showModal()
@@ -450,17 +452,19 @@ export default {
     processSubCategories(subCategories) {
       if (!Array.isArray(subCategories)) return []
       
-      return subCategories.map(sub => {
-        if (typeof sub === 'string') {
-          return { name: sub, products: [] }
-        } else if (sub && typeof sub === 'object') {
-          return {
-            name: sub.name || '',
-            products: sub.products || []
+      return subCategories
+        .filter(sub => sub.name !== 'None') // Filter out the default "None" subcategory
+        .map(sub => {
+          if (typeof sub === 'string') {
+            return { name: sub, description: '' }
+          } else if (sub && typeof sub === 'object') {
+            return {
+              name: sub.name || '',
+              description: sub.description || ''
+            }
           }
-        }
-        return { name: '', products: [] }
-      })
+          return { name: '', description: '' }
+        })
     },
 
     showModal() {
@@ -576,5 +580,11 @@ export default {
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Loading spinner */
+.spinner-border-sm {
+  width: 0.875rem;
+  height: 0.875rem;
 }
 </style>

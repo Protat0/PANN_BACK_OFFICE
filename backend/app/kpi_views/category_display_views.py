@@ -4,27 +4,34 @@ from rest_framework import status
 from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from ..services.category_display_service import category_display_service
+from ..services.category_service import CategoryService
 import logging
+import csv
+import json
+from io import StringIO
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 # ================ DISPLAY AND EXPORT VIEWS ================
 
 class CategoryDataView(APIView):
-    """Get categories with sales data"""
+    """Get categories with product data"""
     
     def get(self, request):
-        """Get all categories with sales data"""
+        """Get all categories with product counts and data"""
         try:
+            category_service = CategoryService()
             include_deleted = request.query_params.get('include_deleted', 'false').lower() == 'true'
-            result = category_display_service.get_categories_display(include_deleted=include_deleted)
+            
+            # Use the refactored method that includes product counts
+            categories = category_service.get_all_categories(include_deleted=include_deleted)
             
             return Response({
                 "success": True,
                 "message": "Categories retrieved successfully",
-                "categories": result,
-                "count": len(result),
+                "categories": categories,
+                "count": len(categories),
                 "include_deleted": include_deleted
             }, status=status.HTTP_200_OK)
             
@@ -48,8 +55,9 @@ class CategoryExportView(APIView):
     def get(self, request):
         """Export categories with optional filters"""
         try:
+            category_service = CategoryService()
+            
             format_type = request.GET.get('format', 'csv').lower()
-            include_sales_data = request.GET.get('include_sales_data', 'true').lower() == 'true'
             include_deleted = request.GET.get('include_deleted', 'false').lower() == 'true'
             
             if format_type not in ['csv', 'json']:
@@ -58,33 +66,70 @@ class CategoryExportView(APIView):
                     'error': 'Invalid format. Use csv or json.'
                 }, status=400)
             
-            # Parse date filter
-            date_filter = None
-            start_date = request.GET.get('start_date')
-            end_date = request.GET.get('end_date')
-            if start_date or end_date:
-                date_filter = {'start_date': start_date, 'end_date': end_date}
-            
-            # Validate and export
-            category_display_service.validate_export_params(format_type, include_sales_data, date_filter, include_deleted)
+            # Get categories with product counts
+            categories = category_service.get_all_categories(include_deleted=include_deleted)
             
             if format_type == 'csv':
-                export_result = category_display_service.export_categories_csv(
-                    include_sales_data=include_sales_data, 
-                    date_filter=date_filter, 
-                    include_deleted=include_deleted
+                # Generate CSV
+                output = StringIO()
+                fieldnames = [
+                    'category_id', 'category_name', 'description', 'status', 
+                    'subcategories_count', 'total_products', 'date_created', 'last_updated'
+                ]
+                writer = csv.DictWriter(output, fieldnames=fieldnames)
+                writer.writeheader()
+                
+                for category in categories:
+                    row = {
+                        'category_id': category.get('_id', ''),
+                        'category_name': category.get('category_name', ''),
+                        'description': category.get('description', ''),
+                        'status': category.get('status', ''),
+                        'subcategories_count': len(category.get('sub_categories', [])),
+                        'total_products': category.get('product_count', 0),
+                        'date_created': category.get('date_created', ''),
+                        'last_updated': category.get('last_updated', '')
+                    }
+                    writer.writerow(row)
+                
+                response = HttpResponse(output.getvalue(), content_type='text/csv')
+                filename = f"categories_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                
+                return response
+                
+            else:  # JSON format
+                # Prepare data for JSON export
+                export_data = {
+                    'export_timestamp': datetime.now().isoformat(),
+                    'total_categories': len(categories),
+                    'include_deleted': include_deleted,
+                    'categories': []
+                }
+                
+                for category in categories:
+                    export_category = {
+                        'category_id': category.get('_id'),
+                        'category_name': category.get('category_name'),
+                        'description': category.get('description'),
+                        'status': category.get('status'),
+                        'subcategories_count': len(category.get('sub_categories', [])),
+                        'total_products': category.get('product_count', 0),
+                        'subcategories': category.get('sub_categories', []),
+                        'date_created': category.get('date_created'),
+                        'last_updated': category.get('last_updated'),
+                        'is_deleted': category.get('isDeleted', False)
+                    }
+                    export_data['categories'].append(export_category)
+                
+                response = HttpResponse(
+                    json.dumps(export_data, indent=2, default=str),
+                    content_type='application/json'
                 )
-            else:
-                export_result = category_display_service.export_categories_json(
-                    include_sales_data=include_sales_data, 
-                    date_filter=date_filter, 
-                    include_deleted=include_deleted
-                )
-            
-            response = HttpResponse(export_result['content'], content_type=export_result['content_type'])
-            response['Content-Disposition'] = f'attachment; filename="{export_result["filename"]}"'
-            
-            return response
+                filename = f"categories_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                response['Content-Disposition'] = f'attachment; filename="{filename}"'
+                
+                return response
             
         except ValueError as e:
             logger.error(f"Invalid parameter in CategoryExportView: {e}")
@@ -106,7 +151,10 @@ class CategoryStatsView(APIView):
     def get(self, request):
         """Get comprehensive category statistics"""
         try:
-            stats = category_display_service.get_category_stats()
+            category_service = CategoryService()
+            
+            # Use the refactored stats method
+            stats = category_service.get_category_stats()
             
             return Response({
                 'success': True,
@@ -122,39 +170,84 @@ class CategoryStatsView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class CategoryDateFilterView(APIView):
-    """Get categories with date-filtered sales data"""
+class CategoryWithProductsView(APIView):
+    """Get specific category with all its products organized by subcategory"""
     
-    def get(self, request):
-        """Get categories with sales data filtered by date range"""
+    def get(self, request, category_id):
+        """Get category with products organized by subcategory"""
         try:
-            start_date = request.query_params.get('start_date')
-            end_date = request.query_params.get('end_date')
-            frequency = request.query_params.get('frequency', 'monthly')
+            category_service = CategoryService()
             include_deleted = request.query_params.get('include_deleted', 'false').lower() == 'true'
             
-            result = category_display_service.get_categories_display_with_date_filter(
-                start_date=start_date,
-                end_date=end_date,
-                frequency=frequency,
+            # Use the new method that organizes products by subcategory
+            category_with_products = category_service.get_category_with_products(
+                category_id, 
                 include_deleted=include_deleted
             )
             
+            if not category_with_products:
+                return Response({
+                    'success': False,
+                    'error': 'Category not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
             return Response({
                 'success': True,
-                'message': 'Categories with date filter retrieved successfully',
-                'data': result
+                'message': 'Category with products retrieved successfully',
+                'data': category_with_products
             }, status=status.HTTP_200_OK)
             
-        except ValueError as e:
-            logger.error(f"Invalid parameter in CategoryDateFilterView: {e}")
-            return Response({
-                "success": False,
-                "error": f"Invalid parameter: {str(e)}"
-            }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            logger.error(f"Error in CategoryDateFilterView: {e}")
+            logger.error(f"Error in CategoryWithProductsView: {e}")
             return Response({
                 "success": False,
-                "error": "Failed to retrieve categories with date filter"
+                "error": "Failed to retrieve category with products"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class CategoryProductCountsView(APIView):
+    """Get product counts for all categories and subcategories"""
+    
+    def get(self, request):
+        """Get detailed product counts for categories and subcategories"""
+        try:
+            category_service = CategoryService()
+            include_deleted = request.query_params.get('include_deleted', 'false').lower() == 'true'
+            
+            categories = category_service.get_all_categories(include_deleted=include_deleted)
+            
+            # Build detailed count structure
+            count_data = {
+                'total_categories': len(categories),
+                'categories': []
+            }
+            
+            for category in categories:
+                category_data = {
+                    'category_id': category.get('_id'),
+                    'category_name': category.get('category_name'),
+                    'total_products': category.get('product_count', 0),
+                    'subcategories': []
+                }
+                
+                for subcategory in category.get('sub_categories', []):
+                    subcategory_data = {
+                        'subcategory_name': subcategory.get('name'),
+                        'product_count': subcategory.get('product_count', 0)
+                    }
+                    category_data['subcategories'].append(subcategory_data)
+                
+                count_data['categories'].append(category_data)
+            
+            return Response({
+                'success': True,
+                'message': 'Product counts retrieved successfully',
+                'data': count_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error in CategoryProductCountsView: {e}")
+            return Response({
+                "success": False,
+                "error": "Failed to retrieve product counts"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

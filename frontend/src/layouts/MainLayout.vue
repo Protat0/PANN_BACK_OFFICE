@@ -72,7 +72,7 @@
 </template>
 
 <script>
-import { useToast } from '../composables/useToast.js'
+import { useToast } from '../composables/ui/useToast.js'
 import { useAuth } from '@/composables/auth/useAuth.js'
 import Sidebar from './Sidebar.vue'
 import NotificationBell from '@/components/NotificationBell.vue'

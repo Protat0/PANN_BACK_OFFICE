@@ -80,6 +80,7 @@ from .kpi_views.product_views import (
     ExpiringProductsView,
     ProductsByCategoryView,
     DeletedProductsView,
+    BulkDeleteProductsView, 
     
     # Product sync views
     ProductSyncView,
@@ -89,6 +90,33 @@ from .kpi_views.product_views import (
     ProductExportView,
     BulkCreateProductsView,
     ImportTemplateView,
+    TestTemplateView,
+)
+
+# BATCH VIEWS - ADD THIS IMPORT
+from .kpi_views.batch_views import (
+    # Batch CRUD
+    BatchListView,
+    CreateBatchView,
+    BatchDetailView,
+    UpdateBatchQuantityView,
+    
+    # Batch queries
+    ProductBatchesView,
+    ExpiringBatchesView,
+    ProductsWithExpirySummaryView,
+    
+    # Batch operations
+    ProcessSaleFIFOView,
+    CheckExpiryAlertsView,
+    MarkExpiredBatchesView,
+    
+    # Integration
+    ProductWithBatchSummaryView,
+    RestockWithBatchView,
+    
+    # Analytics
+    BatchStatisticsView,
 )
 
 from .kpi_views.category_views import (
@@ -102,9 +130,8 @@ from .kpi_views.category_views import (
     CategoryDeleteInfoView,               
     CategorySubcategoryView,              
     UncategorizedCategoryView,              
-    SubcategoryProductsView,                
-    ProductSubcategoryUpdateView,
-    ProductMoveToUncategorizedView,
+    SubcategoryProductsView,
+    CategoryProductManagementView,  
 )
 
 # POS Operations
@@ -270,9 +297,11 @@ urlpatterns = [
     path('products/', ProductListView.as_view(), name='product-list'),  # GET (list), POST (create)
     path('products/sku/<str:sku>/', ProductBySkuView.as_view(), name='product-by-sku'),  # GET by SKU
     path('products/deleted/', DeletedProductsView.as_view(), name='deleted-products'),  # GET deleted products
+    path('products/bulk-delete/', BulkDeleteProductsView.as_view(), name='bulk-delete-products'),  # POST
     
     # Product import/export
     path('products/import/', ProductImportView.as_view(), name='product-import'),  # POST
+    path('products/test-template/', TestTemplateView.as_view(), name='test-template'),
     path('products/import/template/', ImportTemplateView.as_view(), name='import-template'),  # GET
     path('products/export/', ProductExportView.as_view(), name='product-export'),  # GET
     path('products/bulk-create/', BulkCreateProductsView.as_view(), name='bulk-create-products'),  # POST
@@ -296,6 +325,27 @@ urlpatterns = [
     path('products/<str:product_id>/stock/history/', StockHistoryView.as_view(), name='stock-history'),  # GET
     path('products/<str:product_id>/restock/', RestockProductView.as_view(), name='restock-product'),  # POST
 
+    # ========== BATCH MANAGEMENT ==========
+    # Batch CRUD (static paths first)
+    path('batches/', BatchListView.as_view(), name='batch-list'),  # GET (list with filters)
+    path('batches/create/', CreateBatchView.as_view(), name='batch-create'),  # POST
+    path('batches/expiring/', ExpiringBatchesView.as_view(), name='expiring-batches'),  # GET
+    path('batches/statistics/', BatchStatisticsView.as_view(), name='batch-statistics'),  # GET
+    
+    # Batch operations
+    path('batches/process-sale/', ProcessSaleFIFOView.as_view(), name='process-sale-fifo'),  # POST
+    path('batches/check-expiry-alerts/', CheckExpiryAlertsView.as_view(), name='check-expiry-alerts'),  # POST
+    path('batches/mark-expired/', MarkExpiredBatchesView.as_view(), name='mark-expired-batches'),  # POST
+    
+    # Batch detail operations (parameterized paths last)
+    path('batches/<str:batch_id>/', BatchDetailView.as_view(), name='batch-detail'),  # GET
+    path('batches/<str:batch_id>/update-quantity/', UpdateBatchQuantityView.as_view(), name='batch-update-quantity'),  # PUT
+    
+    # Product-batch integration
+    path('products/<str:product_id>/batches/', ProductBatchesView.as_view(), name='product-batches'),  # GET
+    path('products/<str:product_id>/with-batches/', ProductWithBatchSummaryView.as_view(), name='product-with-batches'),  # GET
+    path('products/<str:product_id>/restock-batch/', RestockWithBatchView.as_view(), name='restock-with-batch'),  # POST
+    path('products/expiry-summary/', ProductsWithExpirySummaryView.as_view(), name='products-expiry-summary'),  # GET
     
     # ========== CATEGORY MANAGEMENT ==========
     # Core Category Operations
@@ -304,6 +354,7 @@ urlpatterns = [
     path('category/display/', CategoryDataView.as_view(), name='category-display'),
     path('category/export/', CategoryExportView.as_view(), name='category-export'),
     path('category/bulk/', CategoryBulkOperationsView.as_view(), name='category-bulk-operations'),
+    path('category/product-management/', CategoryProductManagementView.as_view(), name='category-product-management'),
 
     # Admin-only Category Operations
     path('category/deleted/', CategoryDeletedListView.as_view(), name='category-deleted-list'),
@@ -326,10 +377,6 @@ urlpatterns = [
     path('pos/stock/check/', POSStockCheckView.as_view(), name='pos-stock-check'),
     path('pos/stock/low/', POSLowStockView.as_view(), name='pos-low-stock'),
     path('pos/category/<str:category_id>/subcategory/<str:subcategory_name>/products/', POSSubcategoryProductsView.as_view(), name='pos-subcategory-products'),
-
-    # ========== PRODUCT-CATEGORY RELATIONSHIPS ==========
-    path('product/subcategory/update/', ProductSubcategoryUpdateView.as_view(), name='product-subcategory-update'),
-    path('product/move-uncategorized/', ProductMoveToUncategorizedView.as_view(), name='product-move-uncategorized'),  
     
     # ========== SALES & INVOICES ==========
     # Sales log operations
