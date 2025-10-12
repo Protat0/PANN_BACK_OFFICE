@@ -15,6 +15,35 @@ class SupplierService:
         self.audit_service = AuditLogService()
         self.notification_service = NotificationService()
     
+    def _get_user_info(self, user_id):
+        """Get user display information for history logging"""
+        try:
+            if user_id == 'system':
+                return {
+                    'display_name': 'System',
+                    'email': 'system@pann.com'
+                }
+            
+            # Query the users collection
+            user = self.db.users.find_one({'_id': user_id})
+            if user:
+                display_name = user.get('full_name') or user.get('username') or user.get('email', 'Unknown User')
+                return {
+                    'display_name': display_name,
+                    'email': user.get('email', '')
+                }
+            else:
+                return {
+                    'display_name': 'Unknown User',
+                    'email': ''
+                }
+        except Exception as e:
+            logger.error(f"Error getting user info for {user_id}: {e}")
+            return {
+                'display_name': 'Unknown User',
+                'email': ''
+            }
+    
     def generate_supplier_id(self):
         """Generate sequential SUPP-### ID"""
         try:
@@ -258,6 +287,37 @@ class SupplierService:
                 # Return updated supplier
                 return self.supplier_collection.find_one({'_id': supplier_id})
             
+            # Get user information for history
+            user_info = self._get_user_info(user_id)
+            
+            # Set default order values
+            current_time = datetime.utcnow()
+            order_data.update({
+                'status': order_data.get('status', 'pending'),
+                'order_date': order_data.get('order_date', current_time),
+                'created_at': current_time,
+                'updated_at': current_time,
+                'created_by': user_id,
+                'isDeleted': False,
+                # Add initial order history
+                'order_history': [
+                    {
+                        'timestamp': current_time.isoformat(),
+                        'action': 'created',
+                        'title': 'Order Created',
+                        'description': f'Purchase order {order_data["order_id"]} was created with {len(order_data["items"])} item(s)',
+                        'user': user_info['display_name'],
+                        'user_id': user_id,
+                        'previous_data': None,
+                        'new_data': {
+                            'status': order_data.get('status', 'pending'),
+                            'total_cost': order_data.get('total_cost', 0),
+                            'items_count': len(order_data.get('items', []))
+                        }
+                    }
+                ]
+            })
+
             return None
         
         except Exception as e:
@@ -332,6 +392,76 @@ class SupplierService:
                 
                 # Return updated supplier
                 return self.supplier_collection.find_one({'_id': supplier_id})
+            
+            # Get user information
+            user_info = self._get_user_info(user_id)
+            
+            # Get current order data for comparison
+            current_supplier = self.get_supplier_by_id(supplier_id, include_deleted=False)
+            current_order = None
+            for order in current_supplier.get('purchase_orders', []):
+                if order.get('order_id') == order_id and not order.get('isDeleted', False):
+                    current_order = order
+                    break
+            
+            # Prepare update data
+            current_time = datetime.utcnow()
+            update_data['updated_at'] = current_time
+            update_data['updated_by'] = user_id
+            
+            # Create history entry
+            history_entry = {
+                'timestamp': current_time.isoformat(),
+                'action': 'updated',
+                'title': 'Order Updated',
+                'description': f'Purchase order {order_id} was updated',
+                'user': user_info['display_name'],
+                'user_id': user_id,
+                'previous_data': {
+                    'status': current_order.get('status') if current_order else None,
+                    'total_cost': current_order.get('total_cost') if current_order else None
+                },
+                'new_data': {
+                    'status': update_data.get('status'),
+                    'total_cost': update_data.get('total_cost')
+                }
+            }
+            
+            # If status is being changed, create more specific history
+            if current_order and update_data.get('status') and update_data['status'] != current_order.get('status'):
+                history_entry.update({
+                    'action': 'status_changed',
+                    'title': 'Status Updated',
+                    'description': f'Order status changed from {current_order.get("status", "unknown")} to {update_data["status"]}'
+                })
+            
+            # Recalculate total if items are updated
+            if 'items' in update_data:
+                if isinstance(update_data['items'], list):
+                    total_cost = sum(item.get('quantity', 0) * item.get('unit_price', 0) for item in update_data['items'])
+                    update_data['total_cost'] = total_cost
+            
+            # Update the specific purchase order and add history
+            update_fields = {}
+            for key, value in update_data.items():
+                update_fields[f'purchase_orders.$.{key}'] = value
+            
+            result = self.supplier_collection.update_one(
+                {
+                    '_id': supplier_id, 
+                    'purchase_orders.order_id': order_id,
+                    'isDeleted': {'$ne': True}
+                },
+                {
+                    '$set': {
+                        **update_fields,
+                        'updated_at': current_time
+                    },
+                    '$push': {
+                        'purchase_orders.$.order_history': history_entry
+                    }
+                }
+            )
             
             return None
         

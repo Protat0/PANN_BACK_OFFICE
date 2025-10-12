@@ -188,35 +188,47 @@ class SupplierRestoreView(APIView):
 
     @require_authentication
     def post(self, request, supplier_id):
-        """Restore a soft-deleted supplier - Requires admin authentication"""
+        """Add purchase order to supplier"""
         try:
-            current_user = request.current_user
-            if not current_user or current_user.get('role', '').lower() != 'admin':
+            # Basic validation
+            if not request.data.get('order_id'):
                 return Response(
-                    {"error": "Admin permissions required"}, 
-                    status=status.HTTP_403_FORBIDDEN
+                    {"error": "Order ID is required"}, 
+                    status=status.HTTP_400_BAD_REQUEST
                 )
             
-            user_id = current_user.get('_id', 'system')
-            
-            restored = self.supplier_service.restore_supplier(supplier_id, user_id=user_id)
-            
-            if not restored:
+            if not request.data.get('items') or not isinstance(request.data.get('items'), list):
                 return Response(
-                    {"error": "Supplier not found or not deleted"},
-                    status=status.HTTP_404_NOT_FOUND
+                    {"error": "Items array is required"}, 
+                    status=status.HTTP_400_BAD_REQUEST
                 )
-
-            return Response(
-                {"message": "Supplier restored successfully"},
-                status=status.HTTP_200_OK
+            
+            # Get authenticated user ID - this should work with your decorator
+            user_id = request.current_user.get('_id', 'system')
+            print(f"Creating order with user_id: {user_id}")  # Debug log
+            
+            updated_supplier = self.supplier_service.add_purchase_order(
+                supplier_id, 
+                request.data,
+                user_id=user_id
             )
-
+            
+            if not updated_supplier:
+                return Response(
+                    {"error": "Failed to add purchase order"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            return Response({
+                "message": "Purchase order added successfully",
+                "supplier": updated_supplier
+            }, status=status.HTTP_201_CREATED)
+            
         except Exception as e:
-            logger.error(f"Error restoring supplier {supplier_id}: {e}")
+            logger.error(f"Error adding purchase order to supplier {supplier_id}: {e}")
             return Response(
                 {"error": str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_400_BAD_REQUEST
             )
 
 class SupplierHardDeleteView(APIView):

@@ -87,41 +87,176 @@
                   Financial Summary
                 </h6>
                 <div class="info-item">
-                  <label>Quantity:</label>
-                  <div v-if="!isEditMode">
-                    <span>{{ order.quantity }} items</span>
-                  </div>
-                  <input 
-                    v-else
-                    type="number" 
-                    class="form-control form-control-sm"
-                    v-model.number="editForm.quantity"
-                    min="1"
-                  >
+                  <label>Total Items:</label>
+                  <span>{{ displayItemCount }} item(s)</span>
                 </div>
                 <div class="info-item">
-                  <label>Total Cost:</label>
+                  <label>Total Quantity:</label>
+                  <span>{{ displayTotalQuantity }}</span>
+                </div>
+                <div class="info-item">
+                  <label>Subtotal:</label>
+                  <span class="text-muted">₱{{ formatCurrency(order.subtotal || 0) }}</span>
+                </div>
+                <div class="info-item">
+                  <label>Tax ({{ order.taxRate || 12 }}%):</label>
+                  <span class="text-muted">₱{{ formatCurrency(order.tax || 0) }}</span>
+                </div>
+                <div class="info-item">
+                  <label>Shipping:</label>
                   <div v-if="!isEditMode">
-                    <span class="amount-text">₱{{ formatCurrency(order.total) }}</span>
+                    <span class="text-muted">₱{{ formatCurrency(order.shippingCost || 0) }}</span>
                   </div>
                   <div v-else class="input-group input-group-sm">
                     <span class="input-group-text">₱</span>
                     <input 
                       type="number" 
                       class="form-control"
-                      v-model.number="editForm.total"
+                      v-model.number="editForm.shippingCost"
                       min="0"
                       step="0.01"
                     >
                   </div>
                 </div>
                 <div class="info-item mb-0">
-                  <label>Cost per Item:</label>
-                  <span class="text-muted">
-                    ₱{{ formatCurrency(getCostPerItem()) }}
-                  </span>
+                  <label>Total Cost:</label>
+                  <span class="amount-text">₱{{ formatCurrency(order.total) }}</span>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- Order Items (if available) -->
+          <div v-if="orderItems && orderItems.length > 0" class="info-card mb-4">
+            <h6 class="info-card-title">
+              <List :size="16" class="me-2" />
+              Order Items
+              <span class="badge bg-secondary ms-2">{{ orderItems.length }}</span>
+            </h6>
+            <div class="table-responsive">
+              <table class="table table-sm items-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Item Name / Description</th>
+                    <th>Quantity</th>
+                    <th>Unit</th>
+                    <th>Unit Price</th>
+                    <th>Total Price</th>
+                    <th v-if="!isEditMode">Notes</th>
+                    <th v-if="isEditMode">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(item, index) in orderItems" :key="`item-${index}`">
+                    <td>{{ index + 1 }}</td>
+                    <td>
+                      <input 
+                        v-if="isEditMode"
+                        type="text" 
+                        class="form-control form-control-sm"
+                        v-model="item.name"
+                        placeholder="Enter item name or description"
+                      >
+                      <span v-else class="fw-medium">{{ item.name }}</span>
+                    </td>
+                    <td>
+                      <input 
+                        v-if="isEditMode"
+                        type="number" 
+                        class="form-control form-control-sm"
+                        v-model.number="item.quantity"
+                        min="1"
+                        @input="calculateItemTotal(item)"
+                        style="width: 80px;"
+                      >
+                      <span v-else class="fw-bold">{{ item.quantity }}</span>
+                    </td>
+                    <td>
+                      <select 
+                        v-if="isEditMode"
+                        class="form-select form-select-sm"
+                        v-model="item.unit"
+                        style="width: 80px;"
+                      >
+                        <option value="pcs">pcs</option>
+                        <option value="kg">kg</option>
+                        <option value="lbs">lbs</option>
+                        <option value="box">box</option>
+                        <option value="pack">pack</option>
+                        <option value="bottle">bottle</option>
+                        <option value="can">can</option>
+                      </select>
+                      <span v-else class="text-muted">{{ item.unit || 'pcs' }}</span>
+                    </td>
+                    <td>
+                      <div v-if="isEditMode" class="input-group input-group-sm" style="width: 120px;">
+                        <span class="input-group-text">₱</span>
+                        <input 
+                          type="number" 
+                          class="form-control"
+                          v-model.number="item.unitPrice"
+                          min="0"
+                          step="0.01"
+                          @input="calculateItemTotal(item)"
+                        >
+                      </div>
+                      <span v-else>₱{{ formatCurrency(item.unitPrice) }}</span>
+                    </td>
+                    <td>
+                      <span class="fw-bold text-success">₱{{ formatCurrency(item.totalPrice) }}</span>
+                    </td>
+                    <td v-if="!isEditMode">
+                      <small class="text-muted">{{ item.notes || '-' }}</small>
+                    </td>
+                    <td v-if="isEditMode">
+                      <div class="d-flex gap-1">
+                        <input 
+                          type="text" 
+                          class="form-control form-control-sm"
+                          v-model="item.notes"
+                          placeholder="Notes"
+                          style="width: 100px;"
+                        >
+                        <button 
+                          type="button" 
+                          class="btn btn-outline-danger btn-sm"
+                          @click="removeItem(index)"
+                          :disabled="orderItems.length <= 1"
+                          title="Remove Item"
+                        >
+                          <Trash2 :size="12" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot v-if="orderItems.length > 1">
+                  <tr class="table-light">
+                    <td colspan="2" class="fw-bold">Total</td>
+                    <td class="fw-bold">{{ displayTotalQuantity }}</td>
+                    <td></td>
+                    <td></td>
+                    <td class="fw-bold text-success">₱{{ formatCurrency(displayTotalAmount) }}</td>
+                    <td v-if="!isEditMode"></td>
+                    <td v-if="isEditMode"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          <!-- Show message if no items -->
+          <div v-else class="info-card mb-4">
+            <h6 class="info-card-title">
+              <List :size="16" class="me-2" />
+              Order Items
+            </h6>
+            <div class="text-center py-4 text-muted">
+              <Package :size="48" class="mb-2 opacity-50" />
+              <p class="mb-0">
+                {{ itemsReady ? 'No items found for this order' : 'Loading items...' }}
+              </p>
             </div>
           </div>
 
@@ -141,87 +276,6 @@
               rows="3"
               placeholder="Enter order description..."
             ></textarea>
-          </div>
-
-          <!-- Order Items (if available) -->
-          <div v-if="orderItems && orderItems.length > 0" class="info-card mb-4">
-            <h6 class="info-card-title">
-              <List :size="16" class="me-2" />
-              Order Items
-              <span class="badge bg-secondary ms-2">{{ orderItems.length }}</span>
-            </h6>
-            <div class="table-responsive">
-              <table class="table table-sm items-table">
-                <thead>
-                  <tr>
-                    <th>Item Name</th>
-                    <th>Quantity</th>
-                    <th>Unit Price</th>
-                    <th>Total</th>
-                    <th v-if="isEditMode">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(item, index) in editableItems" :key="index">
-                    <td>
-                      <input 
-                        v-if="isEditMode"
-                        type="text" 
-                        class="form-control form-control-sm"
-                        v-model="item.name"
-                        placeholder="Item name"
-                      >
-                      <span v-else>{{ item.name }}</span>
-                    </td>
-                    <td>
-                      <input 
-                        v-if="isEditMode"
-                        type="number" 
-                        class="form-control form-control-sm"
-                        v-model.number="item.quantity"
-                        min="1"
-                        @input="calculateItemTotal(item)"
-                      >
-                      <span v-else>{{ item.quantity }}</span>
-                    </td>
-                    <td>
-                      <div v-if="isEditMode" class="input-group input-group-sm">
-                        <span class="input-group-text">₱</span>
-                        <input 
-                          type="number" 
-                          class="form-control"
-                          v-model.number="item.unitPrice"
-                          min="0"
-                          step="0.01"
-                          @input="calculateItemTotal(item)"
-                        >
-                      </div>
-                      <span v-else>₱{{ formatCurrency(item.unitPrice) }}</span>
-                    </td>
-                    <td>
-                      <span class="fw-bold">₱{{ formatCurrency(item.total) }}</span>
-                    </td>
-                    <td v-if="isEditMode">
-                      <button 
-                        type="button" 
-                        class="btn btn-outline-danger btn-sm"
-                        @click="removeItem(index)"
-                        :disabled="editableItems.length <= 1"
-                      >
-                        <Trash2 :size="14" />
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            
-            <div v-if="isEditMode" class="mt-3">
-              <button type="button" class="btn btn-outline-primary btn-sm" @click="addNewItem">
-                <Plus :size="16" class="me-1" />
-                Add Item
-              </button>
-            </div>
           </div>
 
           <!-- Order Notes -->
@@ -341,22 +395,21 @@ export default {
   },
   props: {
     show: {
-        type: Boolean,
-        default: false
+      type: Boolean,
+      default: false
     },
     order: {
-        type: Object,
-        required: true
+      type: Object,
+      required: true
     },
     canEdit: {
-        type: Boolean,
-        default: true
+      type: Boolean,
+      default: true
     },
-    // Add this new prop
     initialMode: {
-        type: String,
-        default: 'view', // 'view' or 'edit'
-        validator: value => ['view', 'edit'].includes(value)
+      type: String,
+      default: 'view',
+      validator: value => ['view', 'edit'].includes(value)
     }
   },
   emits: ['close', 'save', 'edit-mode-changed'],
@@ -364,6 +417,8 @@ export default {
     return {
       isEditMode: false,
       saving: false,
+      Edit,
+      Eye,
       editForm: {
         expectedDate: '',
         status: '',
@@ -374,94 +429,194 @@ export default {
       },
       editableItems: [],
       orderItems: [],
-      orderHistory: []
+      orderHistory: [],
+      // Force reactive updates
+      itemsReady: false
     }
   },
   computed: {
+    displayItemCount() {
+      // Direct access without itemsReady check
+      return this.orderItems?.length || 0
+    },
+    
+    displayTotalQuantity() {
+      if (!this.orderItems || this.orderItems.length === 0) return 0
+      return this.orderItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
+    },
+    
+    displayTotalAmount() {
+      if (!this.orderItems || this.orderItems.length === 0) return 0
+      return this.orderItems.reduce((sum, item) => sum + (Number(item.totalPrice) || 0), 0)
+    },
+    
     isFormValid() {
       return this.editForm.quantity > 0 && 
-             this.editForm.total > 0 && 
-             this.editForm.expectedDate && 
-             this.editForm.status
+            this.editForm.total > 0 && 
+            this.editForm.expectedDate && 
+            this.editForm.status
     }
   },
   watch: {
-    show(newVal) {
-      if (newVal) {
-        this.initializeModal()
-      }
-    },
-    order: {
-      handler() {
-        if (this.show) {
-          this.initializeModal()
+    show: {
+      handler(newVal) {
+        try {
+          if (newVal) {
+            this.initializeModal()
+          }
+        } catch (error) {
+          console.error('Error in show watcher:', error)
         }
       },
-      deep: true
+      immediate: true
+    },
+    
+    order: {
+      handler(newOrder, oldOrder) {
+        try {
+          if (this.show && newOrder) {
+            console.log('Order watcher triggered, calling initializeModal')
+            this.initializeModal()
+          }
+        } catch (error) {
+          console.error('Error in order watcher:', error)
+        }
+      },
+      deep: true,
+      immediate: false  // Changed to false to prevent double initialization
+    },
+    
+    initialMode: {
+      handler(newMode) {
+        try {
+          if (this.show) {
+            this.isEditMode = newMode === 'edit'
+            this.$emit('edit-mode-changed', this.isEditMode)
+          }
+        } catch (error) {
+          console.error('Error in initialMode watcher:', error)
+        }
+      },
+      immediate: true
     }
   },
   methods: {
     initializeModal() {
-        this.isEditMode = this.initialMode === 'edit'
-        this.resetEditForm()
-        this.loadOrderData()
+      console.log('=== INITIALIZE MODAL ===')
+      this.isEditMode = this.initialMode === 'edit'
+      this.resetEditForm()
+      this.loadOrderData()
+      this.$emit('edit-mode-changed', this.isEditMode)
     },
 
     resetEditForm() {
+      const formatDateForInput = (dateString) => {
+        if (!dateString) return ''
+        const date = new Date(dateString)
+        return date.toISOString().split('T')[0]
+      }
+
       this.editForm = {
-        expectedDate: this.order.expectedDate || '',
+        expectedDate: formatDateForInput(this.order.expectedDate),
         status: this.order.status || 'Pending',
         quantity: this.order.quantity || 0,
         total: this.order.total || 0,
         description: this.order.description || '',
-        notes: this.order.notes || ''
+        notes: this.order.notes || '',
+        priority: this.order.priority || 'normal',
+        subtotal: this.order.subtotal || 0,
+        tax: this.order.tax || 0,
+        shippingCost: this.order.shippingCost || 0
       }
     },
 
+    safeNumber(value, defaultValue = 0) {
+      const num = Number(value)
+      return isNaN(num) ? defaultValue : num
+    },
+
     loadOrderData() {
-      // Mock order items data
-      this.orderItems = [
-        {
-          name: 'Rice (Premium)',
-          quantity: 5,
-          unitPrice: 150.00,
-          total: 750.00
-        },
-        {
-          name: 'Cooking Oil (1L)',
-          quantity: 10,
-          unitPrice: 85.00,
-          total: 850.00
-        },
-        {
-          name: 'Sugar (1kg)',
-          quantity: 8,
-          unitPrice: 75.00,
-          total: 600.00
+      try {
+        console.log('=== LOAD ORDER DATA START ===')
+        console.log('Order received:', this.order)
+        console.log('Order items:', this.order?.items)
+        
+        // Reset state
+        this.itemsReady = false
+        
+        // Validate order object
+        if (!this.order) {
+          console.warn('No order object provided')
+          this.orderItems = []
+          this.editableItems = []
+          this.itemsReady = true
+          return
         }
-      ]
-
-      // Mock order history
-      this.orderHistory = [
-        {
-          id: 1,
-          type: 'created',
-          title: 'Order Created',
-          description: 'Purchase order was created',
-          user: 'Admin User',
-          date: this.order.date
-        },
-        {
-          id: 2,
-          type: 'updated',
-          title: 'Order Updated',
-          description: 'Order details were modified',
-          user: 'Admin User',
-          date: '2024-12-11T10:00:00Z'
+        
+        // Process items with better error handling
+        if (this.order.items && Array.isArray(this.order.items) && this.order.items.length > 0) {
+          console.log('Processing', this.order.items.length, 'items...')
+          
+          // Create new arrays with proper reactivity
+          const processedItems = this.order.items.map((item, index) => {
+            console.log(`Processing item ${index}:`, item)
+            
+            const processedItem = {
+              name: item?.name || item?.product_name || `Item ${index + 1}`,
+              quantity: Number(item?.quantity) || 0,
+              unit: item?.unit || 'pcs',
+              unitPrice: Number(item?.unitPrice || item?.unit_price) || 0,
+              notes: item?.notes || '',
+              productId: item?.productId || item?.product_id || `temp-${index}`,
+              totalPrice: 0
+            }
+            
+            // Calculate total price
+            processedItem.totalPrice = processedItem.quantity * processedItem.unitPrice
+            
+            return processedItem
+          })
+          
+          // Assign new arrays directly (Vue 3 handles reactivity automatically)
+          this.orderItems = [...processedItems]
+          this.editableItems = JSON.parse(JSON.stringify(processedItems))
+          
+          console.log('Successfully processed orderItems:', this.orderItems)
+          console.log('Items count:', this.orderItems.length)
+        } else {
+          console.log('No valid items array found')
+          this.orderItems = []
+          this.editableItems = []
         }
-      ]
-
-      this.editableItems = [...this.orderItems]
+        
+        // Load order history safely
+        try {
+          this.orderHistory = this.order?.orderHistory || []
+        } catch (historyError) {
+          console.error('Error loading order history:', historyError)
+          this.orderHistory = []
+        }
+        
+        // Signal that items are ready
+        this.itemsReady = true
+        
+        console.log('=== LOAD ORDER DATA COMPLETE ===')
+        console.log('Final orderItems:', this.orderItems)
+        console.log('Items ready:', this.itemsReady)
+        
+        // Force update in Vue 3
+        this.$nextTick(() => {
+          // Force re-render if needed
+          this.$forceUpdate()
+        })
+        
+      } catch (error) {
+        console.error('Critical error in loadOrderData:', error)
+        this.itemsReady = true
+        this.orderItems = []
+        this.editableItems = []
+        this.orderHistory = []
+      }
     },
 
     toggleEditMode() {
@@ -492,19 +647,26 @@ export default {
       this.saving = true
       
       try {
-        // Calculate total from items if available
-        if (this.editableItems.length > 0) {
-          this.editForm.total = this.editableItems.reduce((sum, item) => sum + item.total, 0)
-          this.editForm.quantity = this.editableItems.reduce((sum, item) => sum + item.quantity, 0)
-        }
-
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        const subtotal = this.getTotalAmount()
+        const tax = subtotal * 0.12
+        const shipping = this.editForm.shippingCost || 0
+        const total = subtotal + tax + shipping
 
         const updatedOrder = {
           ...this.order,
           ...this.editForm,
-          items: [...this.editableItems]
+          quantity: this.getTotalQuantity(),
+          subtotal: subtotal,
+          tax: tax,
+          total: total,
+          items: this.editableItems.map(item => ({
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+            notes: item.notes
+          }))
         }
 
         this.$emit('save', updatedOrder)
@@ -522,19 +684,36 @@ export default {
       this.editableItems.push({
         name: '',
         quantity: 1,
+        unit: 'pcs',
         unitPrice: 0,
-        total: 0
+        totalPrice: 0,
+        notes: ''
       })
     },
 
     removeItem(index) {
       if (this.editableItems.length > 1) {
         this.editableItems.splice(index, 1)
+        this.updateFormTotals()
       }
     },
 
     calculateItemTotal(item) {
-      item.total = (item.quantity || 0) * (item.unitPrice || 0)
+      item.totalPrice = (item.quantity || 0) * (item.unitPrice || 0)
+      this.updateFormTotals()
+    },
+
+    updateFormTotals() {
+      this.editForm.quantity = this.getTotalQuantity()
+      this.editForm.total = this.getTotalAmount()
+    },
+
+    getTotalQuantity() {
+      return this.displayTotalQuantity
+    },
+
+    getTotalAmount() {
+      return this.displayTotalAmount
     },
 
     printOrder() {
@@ -666,15 +845,14 @@ export default {
 }
 
 .modal-header .d-flex.align-items-center.flex-grow-1 {
-  min-width: 0; /* Prevents flex item from overflowing */
+  min-width: 0;
 }
 
 .modal-header .d-flex.align-items-center.gap-2 {
-  flex-shrink: 0; /* Prevents buttons from shrinking */
-  margin-left: auto; /* Pushes buttons to the right */
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
-/* Ensure proper button spacing and alignment */
 .modal-header .btn {
   white-space: nowrap;
 }
@@ -762,6 +940,7 @@ export default {
   background: white;
   border-radius: 8px;
   overflow: hidden;
+  font-size: 0.875rem;
 }
 
 .items-table th {
@@ -769,13 +948,40 @@ export default {
   color: var(--primary-dark);
   font-weight: 600;
   border: none;
-  padding: 0.75rem;
+  padding: 0.75rem 0.5rem;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .items-table td {
-  padding: 0.75rem;
+  padding: 0.75rem 0.5rem;
   border-top: 1px solid var(--neutral);
   vertical-align: middle;
+}
+
+.items-table tbody tr:hover {
+  background-color: var(--neutral-light);
+}
+
+.items-table tfoot tr {
+  border-top: 2px solid var(--primary);
+}
+
+.items-table tfoot td {
+  font-weight: 600;
+  background-color: var(--neutral-light);
+}
+
+/* Form controls in table */
+.items-table .form-control-sm,
+.items-table .form-select-sm {
+  font-size: 0.75rem;
+}
+
+.items-table .input-group-sm .input-group-text {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
 }
 
 .timeline {

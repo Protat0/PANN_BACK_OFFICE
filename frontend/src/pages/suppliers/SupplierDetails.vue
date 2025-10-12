@@ -361,7 +361,9 @@
                     <td>{{ formatDate(order.date) }}</td>
                     <td>
                       <div>
-                        {{ order.quantity }} items
+                        {{ order.items?.length || 0 }} item(s)
+                        <br>
+                        <small class="text-muted">{{ order.quantity }} total quantity</small>
                         <br>
                         <small class="text-muted">{{ order.description || 'Various items' }}</small>
                       </div>
@@ -676,6 +678,7 @@ import {
 import CreateOrderModal from '@/components/suppliers/CreateOrderModal.vue'
 import OrderDetailsModal from '@/components/suppliers/OrderDetailsModal.vue'
 import { useToast } from '@/composables/ui/useToast'
+import { useAuth } from '@/composables/auth/useAuth'
 import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
@@ -722,10 +725,11 @@ export default {
     }
   },
   setup() {
-    // Initialize toast composable
+    const { user } = useAuth()
     const { success, error: showError } = useToast()
     
     return {
+      user,
       success,
       showError
     }
@@ -823,11 +827,39 @@ export default {
           .map(order => ({
             id: order.order_id,
             date: order.order_date,
-            quantity: order.items?.length || 0,
+            quantity: order.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0,
             total: order.total_cost || 0,
             expectedDate: order.expected_delivery_date,
             status: order.status.charAt(0).toUpperCase() + order.status.slice(1),
-            description: order.description || ''
+            description: order.description || '',
+            notes: order.notes || '',
+            priority: order.priority || 'normal',
+            subtotal: order.subtotal || 0,
+            tax: order.tax_amount || 0,
+            shippingCost: order.shipping_cost || 0,
+            taxRate: order.tax_rate || 12,
+            // Map your actual items structure
+            items: (order.items || []).map(item => ({
+              name: item.product_name || 'Unknown Product',
+              quantity: item.quantity || 0,
+              unit: item.unit || 'pcs',
+              unitPrice: item.unit_price || 0,
+              totalPrice: (item.quantity || 0) * (item.unit_price || 0),
+              notes: item.notes || '',
+              productId: item.product_id
+            })),
+            // Map order history with real user data
+            orderHistory: (order.order_history || []).map(historyItem => ({
+              id: historyItem.timestamp,
+              type: historyItem.action,
+              title: historyItem.title,
+              description: historyItem.description,
+              user: historyItem.user,
+              date: historyItem.timestamp,
+              userId: historyItem.user_id,
+              previousData: historyItem.previous_data,
+              newData: historyItem.new_data
+            }))
           }))
         
         this.filteredOrders = [...this.orders]
@@ -876,7 +908,10 @@ export default {
       this.saving = true
       
       try {
-        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+        const token = localStorage.getItem('access_token')
+        
+        const currentUserId = this.user?._id || 'system'
+        console.log('Current user ID from useAuth:', currentUserId)
         
         const backendData = {
           order_id: orderData.id,
@@ -899,7 +934,10 @@ export default {
             unit_price: item.unitPrice || 0,
             notes: item.notes || ''
           }))
+          // Remove created_by - let backend handle it via authentication
         }
+        
+        console.log('Sending order data:', backendData)
         
         const response = await axios.post(
           `${API_BASE_URL}/suppliers/${this.supplier.id}/orders/`,
@@ -1230,6 +1268,13 @@ export default {
     },
 
     viewOrder(order) {
+      console.log('=== VIEWING ORDER ===')
+      console.log('Order being passed to modal:', order)
+      console.log('Order items:', order.items)
+      console.log('Items length:', order.items?.length)
+      console.log('Items structure:', order.items?.[0])
+      console.log('===================')
+      
       this.selectedOrderForView = order
       this.orderModalMode = 'view'
       this.showOrderDetailsModal = true
