@@ -357,8 +357,14 @@ export function useSuppliers() {
   }
 
   const refreshData = async () => {
-    successMessage.value = null
-    await fetchSuppliers(pagination.value.current_page)
+    try {
+      successMessage.value = null
+      error.value = null
+      await fetchSuppliers(pagination.value?.current_page || 1)
+    } catch (err) {
+      console.error('Error refreshing data:', err)
+      error.value = err.message || 'Failed to refresh data'
+    }
   }
 
   // Utility functions

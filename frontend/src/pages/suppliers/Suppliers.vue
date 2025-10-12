@@ -13,7 +13,7 @@
           border-color="warning"
           border-position="start"
           title="Active Orders"
-          :value="reportsComposable.activeOrdersCount"
+          :value="reportsComposable.activeOrdersCount.value"
           value-color="warning"
           subtitle="Pending Purchase Orders"
           clickable
@@ -26,7 +26,7 @@
           border-color="success"
           border-position="start"
           title="Top Performers"
-          :value="reportsComposable.topPerformersCount"
+          :value="reportsComposable.topPerformersCount.value"
           value-color="success"
           subtitle="High Volume Suppliers"
           clickable
@@ -533,14 +533,20 @@ export default {
     }
 
     const handleSaveSupplier = async () => {
-      const result = await formComposable.saveSupplier(suppliersComposable.suppliers?.value || [])
-      
-      if (result.success) {
-        suppliersComposable.successMessage.value = result.message
+      try {
+        const result = await formComposable.saveSupplier(suppliersComposable)
         
-        setTimeout(() => {
-          suppliersComposable.successMessage.value = null
-        }, 3000)
+        if (result.success) {
+          // Refresh the suppliers list to ensure the new supplier is visible
+          await suppliersComposable.refreshData()
+          
+          // Update reports if available
+          if (reportsComposable && reportsComposable.refreshReports) {
+            await reportsComposable.refreshReports()
+          }
+        }
+      } catch (error) {
+        console.error('Error in handleSaveSupplier:', error)
       }
     }
 
