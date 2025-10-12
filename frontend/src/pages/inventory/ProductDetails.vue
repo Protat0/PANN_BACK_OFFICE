@@ -231,19 +231,12 @@
           </div>
 
           <!-- Other Tabs -->
-          <div v-else-if="activeTab === 'Purchases'" class="card-theme p-6">
-            <h2 class="text-xl font-bold mb-6 text-primary">Purchase History</h2>
-            <p class="text-tertiary-medium">Purchase history content will be implemented here.</p>
+          <div v-else-if="activeTab === 'Purchases'">
+            <ProductPurchases :product-id="id" />
           </div>
 
-          <div v-else-if="activeTab === 'Adjustments'" class="card-theme p-6">
-            <h2 class="text-xl font-bold mb-6 text-primary">Stock Adjustments</h2>
-            <p class="text-tertiary-medium">Stock adjustments content will be implemented here.</p>
-          </div>
-
-          <div v-else-if="activeTab === 'History'" class="card-theme p-6">
-            <h2 class="text-xl font-bold mb-6 text-primary">Product History</h2>
-            <p class="text-tertiary-medium">Product history content will be implemented here.</p>
+          <div v-else-if="activeTab === 'Adjustments'">
+            <ProductAdjustments :product-id="id" />
           </div>
         </div>
       </div>
@@ -270,12 +263,16 @@ import { useProducts } from '@/composables/api/useProducts'
 import { useCategories } from '@/composables/api/useCategories'
 import AddProductModal from '@/components/products/AddProductModal.vue'
 import StockUpdateModal from '@/components/products/StockUpdateModal.vue'
+import ProductPurchases from '@/components/products/ProductPurchases.vue'
+import ProductAdjustments from '@/components/products/ProductAdjustments.vue'
 
 export default {
   name: 'ProductDetails',
   components: {
     AddProductModal,
-    StockUpdateModal
+    StockUpdateModal,
+    ProductPurchases,
+    ProductAdjustments 
   },
   props: {
     id: {
@@ -308,7 +305,7 @@ export default {
 
     // Local state
     const activeTab = ref('Overview')
-    const tabs = ['Overview', 'Purchases', 'Adjustments', 'History']
+    const tabs = ['Overview', 'Purchases', 'Adjustments']
     const successMessage = ref('')
 
     // Utility functions

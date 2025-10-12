@@ -193,67 +193,6 @@ class BatchService:
         
         except Exception as e:
             raise Exception(f"Error getting batches: {str(e)}")
-
-    def update_batch_quantity(self, batch_id, quantity_used, reason="Stock adjustment"):
-        """Update batch quantity when stock is sold/used"""
-        try:
-            batch = self.batch_collection.find_one({'_id': batch_id})
-            if not batch:
-                raise Exception(f"Batch with ID {batch_id} not found")
-            
-            new_quantity = max(0, batch['quantity_remaining'] - quantity_used)
-            new_status = 'depleted' if new_quantity == 0 else 'active'
-            
-            current_time = datetime.utcnow()
-            
-            # Update batch
-            result = self.batch_collection.update_one(
-                {'_id': batch_id},
-                {
-                    '$set': {
-                        'quantity_remaining': new_quantity,
-                        'status': new_status,
-                        'updated_at': current_time
-                    },
-                    '$push': {
-                        'usage_history': {
-                            'timestamp': current_time,
-                            'quantity_used': quantity_used,
-                            'reason': reason,
-                            'remaining_after': new_quantity
-                        }
-                    }
-                }
-            )
-            
-            if result.modified_count > 0:
-                # Update product's expiry summary
-                self.update_product_expiry_summary(batch['product_id'])
-                
-                # Send notification if batch is depleted
-                if new_status == 'depleted':
-                    product = self.product_collection.find_one({'_id': batch['product_id']})
-                    product_name = product.get('product_name', 'Unknown Product') if product else 'Unknown Product'
-                    
-                    self._send_batch_notification(
-                        'batch_depleted',
-                        product_name,
-                        {
-                            'batch_id': batch_id,
-                            'batch_number': batch['batch_number']
-                        }
-                    )
-                
-                return self.batch_collection.find_one({'_id': batch_id})
-            
-            return None
-        
-        except Exception as e:
-            raise Exception(f"Error updating batch quantity: {str(e)}")
-
-    # ================================================================
-    # SIMPLIFIED EXPIRY TRACKING (Option 1)
-    # ================================================================
     
     def update_product_expiry_summary(self, product_id):
         """Update product's simplified expiry tracking fields"""
@@ -487,6 +426,69 @@ class BatchService:
         
         except Exception as e:
             raise Exception(f"Error getting products with expiry summary: {str(e)}")
+        
+    def update_batch_quantity(self, batch_id, quantity_used, adjustment_type="correction", adjusted_by=None, notes=None):
+        """Update batch quantity when stock is sold/used - ENHANCED VERSION"""
+        try:
+            batch = self.batch_collection.find_one({'_id': batch_id})
+            if not batch:
+                raise Exception(f"Batch with ID {batch_id} not found")
+            
+            new_quantity = max(0, batch['quantity_remaining'] - quantity_used)
+            new_status = 'depleted' if new_quantity == 0 else 'active'
+            
+            current_time = datetime.utcnow()
+            
+            # Enhanced usage history entry (NO reason field)
+            usage_entry = {
+                'timestamp': current_time,
+                'quantity_used': quantity_used,
+                'remaining_after': new_quantity,
+                'adjustment_type': adjustment_type,  # sale, damage, theft, correction, spoilage, return, shrinkage
+                'adjusted_by': adjusted_by,
+                'approved_by': None,
+                'notes': notes,
+                'source': 'manual_adjustment'
+            }
+            
+            # Update batch
+            result = self.batch_collection.update_one(
+                {'_id': batch_id},
+                {
+                    '$set': {
+                        'quantity_remaining': new_quantity,
+                        'status': new_status,
+                        'updated_at': current_time
+                    },
+                    '$push': {
+                        'usage_history': usage_entry
+                    }
+                }
+            )
+            
+            if result.modified_count > 0:
+                self.update_product_expiry_summary(batch['product_id'])
+                
+                # Send notification if batch is depleted
+                if new_status == 'depleted':
+                    product = self.product_collection.find_one({'_id': batch['product_id']})
+                    product_name = product.get('product_name', 'Unknown Product') if product else 'Unknown Product'
+                    
+                    self._send_batch_notification(
+                        'batch_depleted',
+                        product_name,
+                        {
+                            'batch_id': batch_id,
+                            'batch_number': batch['batch_number']
+                        }
+                    )
+                
+                return self.batch_collection.find_one({'_id': batch_id})
+            
+            return None
+
+        except Exception as e:
+            raise Exception(f"Error updating batch quantity: {str(e)}")
 
     # ================================================================
     # INTEGRATION WITH SALES
@@ -514,11 +516,13 @@ class BatchService:
                 
                 quantity_from_batch = min(remaining_to_sell, batch['quantity_remaining'])
                 
-                # Update batch quantity
+                # Update batch quantity with SALE type (NO reason parameter)
                 self.update_batch_quantity(
                     batch['_id'], 
-                    quantity_from_batch, 
-                    f"Sale transaction"
+                    quantity_from_batch,
+                    adjustment_type="sale",
+                    adjusted_by=None,
+                    notes="POS sale transaction"
                 )
                 
                 batches_used.append({
@@ -539,6 +543,67 @@ class BatchService:
         except Exception as e:
             raise Exception(f"Error processing FIFO sale: {str(e)}")
 
+    def process_batch_adjustment(self, product_id, quantity_used, adjustment_type, adjusted_by=None, notes=None):
+        """Process a batch adjustment using FIFO logic"""
+        try:
+            logger.info(f"Processing batch adjustment for product {product_id}: {quantity_used} units, type: {adjustment_type}")
+            
+            # Get active batches sorted by expiry date (FIFO)
+            active_batches = list(self.batch_collection.find({
+                'product_id': product_id,
+                'status': 'active',
+                'quantity_remaining': {'$gt': 0}
+            }).sort('expiry_date', 1))
+            
+            if not active_batches:
+                raise Exception(f"No active batches available for product {product_id}")
+            
+            remaining_to_adjust = quantity_used
+            batches_adjusted = []
+            
+            for batch in active_batches:
+                if remaining_to_adjust <= 0:
+                    break
+                
+                quantity_from_batch = min(remaining_to_adjust, batch['quantity_remaining'])
+                
+                logger.info(f"Adjusting batch {batch['_id']}: {quantity_from_batch} units")
+                
+                # Update batch quantity with the specified adjustment type
+                self.update_batch_quantity(
+                    batch['_id'], 
+                    quantity_from_batch,
+                    adjustment_type=adjustment_type,
+                    adjusted_by=adjusted_by,
+                    notes=notes
+                )
+                
+                batches_adjusted.append({
+                    'batch_id': batch['_id'],
+                    'batch_number': batch['batch_number'],
+                    'quantity_adjusted': quantity_from_batch,
+                    'adjustment_type': adjustment_type,
+                    'remaining_in_batch': batch['quantity_remaining'] - quantity_from_batch
+                })
+                
+                remaining_to_adjust -= quantity_from_batch
+            
+            if remaining_to_adjust > 0:
+                raise Exception(f"Insufficient stock: {remaining_to_adjust} units could not be adjusted")
+            
+            logger.info(f"Successfully adjusted {quantity_used} units across {len(batches_adjusted)} batches")
+            
+            return {
+                'product_id': product_id,
+                'total_adjusted': quantity_used,
+                'adjustment_type': adjustment_type,
+                'batches_affected': batches_adjusted,
+                'adjusted_by': adjusted_by
+            }
+        
+        except Exception as e:
+            logger.error(f"Error processing batch adjustment: {str(e)}")
+            raise Exception(f"Error processing batch adjustment: {str(e)}")
     # ================================================================
     # MAINTENANCE AND CLEANUP
     # ================================================================

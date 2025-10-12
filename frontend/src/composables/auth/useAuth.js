@@ -15,8 +15,8 @@ export function useAuth() {
   const isAdmin = computed(() => user.value?.role === 'admin')
 
   const isAuthenticated = computed(() => {
-  const token = localStorage.getItem('access_token')
-  return !!token
+    const token = localStorage.getItem('access_token')
+    return !!token
   })
 
   // Sync token function
@@ -34,13 +34,35 @@ export function useAuth() {
     error.value = null
   }
 
+  // ✅ NEW: Fetch current user from /auth/me/
+  const fetchCurrentUser = async () => {
+    console.log('👤 useAuth: Fetching current user...')
+    
+    if (!token.value) {
+      console.log('👤 useAuth: No token available, cannot fetch user')
+      return false
+    }
+
+    try {
+      const userData = await apiService.getCurrentUser()
+      user.value = userData
+      console.log('👤 useAuth: User data loaded:', userData)
+      return true
+    } catch (err) {
+      console.error('❌ useAuth: Failed to fetch user:', err.message)
+      error.value = err.message
+      clearAuth()
+      return false
+    }
+  }
+
   // Initialize user from token on composable creation
   const initializeAuth = async () => {
     console.log('🚀 useAuth: Initializing auth...')
     
     if (token.value && !user.value) {
-      console.log('👤 useAuth: Token exists but no user data, login required')
-
+      console.log('👤 useAuth: Token exists but no user data, fetching user...')
+      await fetchCurrentUser() // ✅ Fetch user data
     } else if (token.value && user.value) {
       console.log('👤 useAuth: Token and user both exist, already authenticated')
     }
@@ -56,19 +78,17 @@ export function useAuth() {
       const response = await apiService.login(email, password)
       console.log('🔐 useAuth: Login API response:', response)
     
-      // Extract user data from login response
-      if (response.user) {
-        user.value = response.user
-        console.log('👤 useAuth: User data set from login response:', user.value)
-      }
-      
       // Sync token
       syncToken()
       await nextTick()
+
+      // ✅ Fetch full user data after login
+      await fetchCurrentUser()
       
       console.log('🎫 useAuth: Auth complete:', {
         tokenExists: !!token.value,
         userExists: !!user.value,
+        userId: user.value?._id,
         isAuthenticated: isAuthenticated.value
       })
       
@@ -184,6 +204,7 @@ export function useAuth() {
     logout,
     refresh,
     validateToken,
-    clearAuth
+    clearAuth,
+    fetchCurrentUser // ✅ Export this in case you need it elsewhere
   }
 }

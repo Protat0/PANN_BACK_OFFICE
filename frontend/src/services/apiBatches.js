@@ -78,12 +78,30 @@ class BatchService {
     }
   }
 
-  async updateBatchQuantity(batchId, quantityUsed, reason = 'Manual adjustment') {
+  async updateBatchQuantity(batchId, quantityUsed, adjustmentType = 'correction', adjustedBy = null, notes = null) {
     try {
-      console.log('📦 Updating batch quantity:', { batchId, quantityUsed, reason });
+      console.log('📦 Updating batch quantity:', { batchId, quantityUsed, adjustmentType, notes });
       const response = await api.put(`${this.baseEndpoint}/${batchId}/update-quantity/`, {
         quantity_used: quantityUsed,
-        reason: reason
+        adjustment_type: adjustmentType,
+        adjusted_by: adjustedBy,
+        notes: notes
+      });
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async processBatchAdjustment(productId, quantityUsed, adjustmentType = 'correction', adjustedBy = null, notes = null) {
+    try {
+      console.log('📦 Processing batch adjustment:', { productId, quantityUsed, adjustmentType, adjustedBy, notes });
+      const response = await api.post(`${this.baseEndpoint}/adjust/`, {
+        product_id: productId,
+        quantity_used: quantityUsed,
+        adjustment_type: adjustmentType,
+        adjusted_by: adjustedBy,
+        notes: notes
       });
       return this.handleResponse(response);
     } catch (error) {

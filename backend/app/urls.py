@@ -110,6 +110,7 @@ from .kpi_views.batch_views import (
     ProcessSaleFIFOView,
     CheckExpiryAlertsView,
     MarkExpiredBatchesView,
+    ProcessBatchAdjustmentView,
     
     # Integration
     ProductWithBatchSummaryView,
@@ -331,12 +332,13 @@ urlpatterns = [
     path('batches/create/', CreateBatchView.as_view(), name='batch-create'),  # POST
     path('batches/expiring/', ExpiringBatchesView.as_view(), name='expiring-batches'),  # GET
     path('batches/statistics/', BatchStatisticsView.as_view(), name='batch-statistics'),  # GET
-    
+
     # Batch operations
     path('batches/process-sale/', ProcessSaleFIFOView.as_view(), name='process-sale-fifo'),  # POST
     path('batches/check-expiry-alerts/', CheckExpiryAlertsView.as_view(), name='check-expiry-alerts'),  # POST
     path('batches/mark-expired/', MarkExpiredBatchesView.as_view(), name='mark-expired-batches'),  # POST
-    
+    path('batches/adjust/', ProcessBatchAdjustmentView.as_view(), name='process-batch-adjustment'),  # POST ✅ ADD HERE
+
     # Batch detail operations (parameterized paths last)
     path('batches/<str:batch_id>/', BatchDetailView.as_view(), name='batch-detail'),  # GET
     path('batches/<str:batch_id>/update-quantity/', UpdateBatchQuantityView.as_view(), name='batch-update-quantity'),  # PUT

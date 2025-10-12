@@ -104,14 +104,20 @@ export function useBatches() {
       const response = await batchService.getBatchesByProduct(productId, status)
       const productBatches = response.data || []
       
-      // Update the main batches array if it includes batches for this product
-      if (hasActiveFilters.value && filters.productId === productId) {
-        batches.value = productBatches
+      // ✅ FIX: Always update batches.value when called directly
+      // This ensures ProductAdjustments component gets the data
+      batches.value = productBatches
+      
+      // Also update filters to reflect current view
+      filters.productId = productId
+      if (status) {
+        filters.status = status
       }
       
       return productBatches
     } catch (err) {
       error.value = err.message
+      batches.value = []
       throw err
     } finally {
       loading.value = false
@@ -146,12 +152,12 @@ export function useBatches() {
     }
   }
 
-  async function updateBatchQuantity(batchId, quantityUsed, reason = 'Manual adjustment') {
+  async function updateBatchQuantity(batchId, quantityUsed, adjustmentType = 'correction', adjustedBy = null, notes = null) {
     loading.value = true
     error.value = null
 
     try {
-      const response = await batchService.updateBatchQuantity(batchId, quantityUsed, reason)
+      const response = await batchService.updateBatchQuantity(batchId, quantityUsed, adjustmentType, adjustedBy, notes)
       const updatedBatch = response.data
 
       // Update local state
@@ -179,6 +185,25 @@ export function useBatches() {
 
     try {
       const response = await batchService.processSaleFIFO(productId, quantitySold)
+      
+      // Refresh batches for this product to get updated quantities
+      await fetchBatchesByProduct(productId)
+      
+      return response.data
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function processBatchAdjustment(productId, quantityUsed, adjustmentType = 'correction', adjustedBy = null, notes = null) {
+    loading.value = true
+    error.value = null
+
+    try {
+      const response = await batchService.processBatchAdjustment(productId, quantityUsed, adjustmentType, adjustedBy, notes)
       
       // Refresh batches for this product to get updated quantities
       await fetchBatchesByProduct(productId)
@@ -341,6 +366,7 @@ export function useBatches() {
     checkExpiryAlerts,
     markExpiredBatches,
     restockWithBatch,
+    processBatchAdjustment,
 
     // Helpers
     clearFilters,

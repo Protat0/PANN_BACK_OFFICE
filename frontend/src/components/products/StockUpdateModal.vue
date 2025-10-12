@@ -38,19 +38,17 @@
             class="form-select"
             @change="onOperationChange"
           >
-            <option value="add">Add Stock (General)</option>
-            <option value="purchase">New Purchase Order</option>
-            <option value="remove">Remove Stock</option>
-            <option value="set">Set Exact Stock</option>
+            <option value="new_batch">New Purchase/Batch</option>
+            <option value="adjust">Adjust Existing Stock</option>
           </select>
           <div class="form-text text-tertiary-medium">
             {{ operationDescription }}
           </div>
         </div>
 
-        <!-- Batch Information Section - Show for purchases OR when reason is Purchase/Delivery -->
-        <div v-if="shouldShowBatchFields" class="batch-section mb-4 p-3 border rounded bg-light">
-          <h6 class="text-tertiary-dark mb-3">Batch Information</h6>
+        <!-- NEW BATCH SECTION -->
+        <div v-if="form.operation_type === 'new_batch'" class="batch-section mb-4 p-3 border rounded bg-light">
+          <h6 class="text-tertiary-dark mb-3">New Batch Information</h6>
           
           <div class="row">
             <div class="col-md-6 mb-3">
@@ -66,20 +64,20 @@
                 class="form-control"
               />
               <div class="form-text text-tertiary-medium">
-                Leave blank to auto-generate batch number
+                Leave blank to auto-generate
               </div>
             </div>
             
             <div class="col-md-6 mb-3">
-              <label for="supplier" class="form-label text-tertiary-dark fw-medium">
-                Supplier
+              <label for="supplier_id" class="form-label text-tertiary-dark fw-medium">
+                Supplier ID
               </label>
               <input 
-                id="supplier"
-                v-model="form.supplier" 
+                id="supplier_id"
+                v-model="form.supplier_id" 
                 type="text" 
                 :disabled="loading"
-                placeholder="Supplier name"
+                placeholder="Supplier ID (optional)"
                 class="form-control"
               />
             </div>
@@ -87,14 +85,31 @@
           
           <div class="row">
             <div class="col-md-6 mb-3">
-              <label for="unit_cost" class="form-label text-tertiary-dark fw-medium">
-                Unit Cost <span class="text-danger">*</span>
+              <label for="quantity_received" class="form-label text-tertiary-dark fw-medium">
+                Quantity Received <span class="text-danger">*</span>
+              </label>
+              <input 
+                id="quantity_received"
+                v-model.number="form.quantity_received" 
+                type="number" 
+                min="1"
+                required 
+                :disabled="loading"
+                placeholder="Enter quantity"
+                class="form-control"
+                @input="calculateNewStock"
+              />
+            </div>
+            
+            <div class="col-md-6 mb-3">
+              <label for="cost_price" class="form-label text-tertiary-dark fw-medium">
+                Cost Price <span class="text-danger">*</span>
               </label>
               <div class="input-group">
                 <span class="input-group-text">₱</span>
                 <input 
-                  id="unit_cost"
-                  v-model.number="form.unit_cost" 
+                  id="cost_price"
+                  v-model.number="form.cost_price" 
                   type="number" 
                   min="0"
                   step="0.01"
@@ -105,130 +120,106 @@
                 />
               </div>
             </div>
-            
-            <div class="col-md-6 mb-3">
-              <label for="expiry_date" class="form-label text-tertiary-dark fw-medium">
-                Expiry Date <span class="text-danger">*</span>
-              </label>
-              <input 
-                id="expiry_date"
-                v-model="form.expiry_date" 
-                type="date" 
-                required
-                :disabled="loading"
-                class="form-control"
-                :min="today"
-              />
-            </div>
           </div>
           
           <div class="mb-3">
-            <label for="purchase_notes" class="form-label text-tertiary-dark fw-medium">
-              Purchase Notes
+            <label for="expiry_date" class="form-label text-tertiary-dark fw-medium">
+              Expiry Date <span class="text-danger">*</span>
             </label>
-            <textarea 
-              id="purchase_notes"
-              v-model="form.purchase_notes" 
-              rows="2"
+            <input 
+              id="expiry_date"
+              v-model="form.expiry_date" 
+              type="date" 
+              required
               :disabled="loading"
-              placeholder="Additional notes about this purchase..."
               class="form-control"
+              :min="today"
             />
           </div>
-        </div>
-
-        <div class="mb-3">
-          <label for="quantity" class="form-label text-tertiary-dark fw-medium">
-            {{ getQuantityLabel() }}
-            <span class="text-danger">*</span>
-          </label>
-          <input 
-            id="quantity"
-            v-model.number="form.quantity" 
-            type="number" 
-            :min="1"
-            :max="getMaxQuantity()"
-            required 
-            :disabled="loading"
-            :placeholder="getQuantityPlaceholder()"
-            class="form-control"
-            @input="calculateNewStock"
-          />
-          <div v-if="newStockPreview !== null" class="mt-2 p-2 bg-light border rounded">
-            <small class="text-tertiary-medium">
-              New stock will be: 
-              <span :class="getPreviewStockClass(newStockPreview)" class="fw-semibold">
-                {{ newStockPreview }} {{ product?.unit }}
-              </span>
-            </small>
-          </div>
-        </div>
-
-        <div class="mb-3">
-          <label for="reason_select" class="form-label text-tertiary-dark fw-medium">
-            Reason <span class="text-danger">*</span>
-          </label>
-          <select 
-            id="reason_select" 
-            v-model="selectedReason" 
-            :disabled="loading"
-            class="form-select"
-            @change="onReasonChange"
-            required
-          >
-            <option value="">Select a reason</option>
-            <optgroup v-if="form.operation_type === 'purchase'" label="Purchase Orders">
-              <option value="New Stock Delivery">New Stock Delivery</option>
-              <option value="Purchase Order Received">Purchase Order Received</option>
-              <option value="Supplier Delivery">Supplier Delivery</option>
-              <option value="Inventory Replenishment">Inventory Replenishment</option>
-            </optgroup>
-            <optgroup v-else-if="form.operation_type === 'add'" label="Stock Increase">
-              <option value="Purchase/Delivery">Purchase/Delivery</option>
-              <option value="Stock Return">Stock Return</option>
-              <option value="Stock Transfer In">Stock Transfer In</option>
-              <option value="Manual Recount">Manual Recount</option>
-            </optgroup>
-            <optgroup v-else-if="form.operation_type === 'remove'" label="Stock Decrease">
-              <option value="Sale">Sale</option>
-              <option value="Damaged/Expired">Damaged/Expired</option>
-              <option value="Stock Transfer Out">Stock Transfer Out</option>
-              <option value="Theft/Loss">Theft/Loss</option>
-              <option value="Manual Adjustment">Manual Adjustment</option>
-            </optgroup>
-            <optgroup v-else label="Other">
-              <option value="Inventory Correction">Inventory Correction</option>
-              <option value="System Migration">System Migration</option>
-              <option value="Custom">Custom</option>
-            </optgroup>
-          </select>
           
-          <input 
-            v-if="selectedReason === 'Custom' || (selectedReason === '' && form.reason)"
-            id="reason"
-            v-model="form.reason" 
-            type="text" 
-            required 
-            :disabled="loading"
-            placeholder="Enter custom reason for stock update"
-            class="form-control mt-2"
-          />
-        </div>
-
-        <!-- Warning Messages -->
-        <div v-if="form.operation_type === 'remove'" class="alert alert-warning d-flex align-items-start">
-          <span class="me-2">⚠️</span>
-          <div>
-            <strong>Warning:</strong> This will remove {{ form.quantity || 0 }} units from stock.
-            <br>Make sure this is correct as this action will be logged.
+          <div class="alert alert-info d-flex align-items-start mb-0">
+            <span class="me-2">ℹ️</span>
+            <div>
+              <strong>New Batch:</strong> This will create a new batch with {{ form.quantity_received || 0 }} units.
+              <br>Total stock after: <strong>{{ newStockPreview }}</strong> {{ product?.unit }}
+            </div>
           </div>
         </div>
 
-        <div v-if="shouldShowBatchFields" class="alert alert-info d-flex align-items-start">
-          <span class="me-2">ℹ️</span>
-          <div>
-            <strong>New Batch:</strong> This will create a new batch with {{ form.quantity || 0 }} units.
-            <br>The batch will be tracked separately for inventory management.
+        <!-- ADJUSTMENT SECTION -->
+        <div v-else class="adjustment-section mb-4">
+          <div class="mb-3">
+            <label for="adjustment_type" class="form-label text-tertiary-dark fw-medium">
+              Adjustment Type <span class="text-danger">*</span>
+            </label>
+            <select 
+              id="adjustment_type" 
+              v-model="form.adjustment_type" 
+              required
+              :disabled="loading"
+              class="form-select"
+            >
+              <option value="">Select adjustment type</option>
+              <option value="sale">Sale</option>
+              <option value="damage">Damage</option>
+              <option value="theft">Theft/Loss</option>
+              <option value="spoilage">Spoilage/Expiry</option>
+              <option value="return">Return</option>
+              <option value="shrinkage">Shrinkage</option>
+              <option value="correction">Correction</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label for="quantity_used" class="form-label text-tertiary-dark fw-medium">
+              Quantity to Adjust <span class="text-danger">*</span>
+            </label>
+            <input 
+              id="quantity_used"
+              v-model.number="form.quantity_used" 
+              type="number" 
+              :min="1"
+              :max="getCurrentStock(product)"
+              required 
+              :disabled="loading"
+              placeholder="Enter quantity"
+              class="form-control"
+              @input="calculateNewStock"
+            />
+            <div v-if="newStockPreview !== null" class="mt-2 p-2 bg-light border rounded">
+              <small class="text-tertiary-medium">
+                New stock will be: 
+                <span :class="getPreviewStockClass(newStockPreview)" class="fw-semibold">
+                  {{ newStockPreview }} {{ product?.unit }}
+                </span>
+              </small>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="notes" class="form-label text-tertiary-dark fw-medium">
+              Notes
+            </label>
+            <textarea 
+              id="notes"
+              v-model="form.notes" 
+              rows="3"
+              :disabled="loading"
+              placeholder="Add detailed explanation for this adjustment..."
+              class="form-control"
+            />
+            <div class="form-text text-tertiary-medium">
+              Optional: Provide additional context for this adjustment
+            </div>
+          </div>
+
+          <div v-if="form.adjustment_type" class="alert alert-warning d-flex align-items-start">
+            <span class="me-2">⚠️</span>
+            <div>
+              <strong>Warning:</strong> This will {{ form.adjustment_type === 'return' ? 'add' : 'remove' }} 
+              {{ form.quantity_used || 0 }} units {{ form.adjustment_type === 'return' ? 'to' : 'from' }} stock using FIFO method.
+              <br>This action will be logged in batch usage history.
+            </div>
           </div>
         </div>
 
@@ -254,7 +245,7 @@
             <span v-if="loading" class="spinner-border spinner-border-sm me-2" role="status">
               <span class="visually-hidden">Loading...</span>
             </span>
-            {{ loading ? 'Updating...' : getSubmitButtonText() }}
+            {{ loading ? 'Processing...' : getSubmitButtonText() }}
           </button>
         </div>
       </form>
@@ -263,10 +254,10 @@
 </template>
 
 <script>
-import { useProducts } from '@/composables/api/useProducts'
 import { useBatches } from '@/composables/api/useBatches'
 import { useCategories } from '@/composables/api/useCategories'
 import { useToast } from '@/composables/ui/useToast'
+import { useAuth } from '@/composables/auth/useAuth'
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 
 export default {
@@ -274,70 +265,55 @@ export default {
   emits: ['success'],
   
   setup(props, { emit }) {
-    // Composables
-    const { updateProductStock, error: productError, loading: productLoading } = useProducts()
-    const { createBatch, error: batchError, loading: batchLoading } = useBatches()
+    // Composables - FIX: Properly destructure toast
+    const { createBatch, processBatchAdjustment, error: batchError, loading: batchLoading } = useBatches()
     const { activeCategories } = useCategories()
-    const { toast } = useToast()
+    const { success, error: showError, info } = useToast() // ✅ Fixed: destructure methods from useToast
+    const { user } = useAuth() 
     
     // State
     const show = ref(false)
     const product = ref(null)
-    const selectedReason = ref('')
     const newStockPreview = ref(null)
     
-    // Form data - properly initialized
+    // Form data
     const form = ref({
-      operation_type: 'add',
-      quantity: null,
-      reason: '',
+      operation_type: 'new_batch',
+      // New batch fields
       batch_number: '',
-      supplier: '',
-      unit_cost: null,
+      supplier_id: '',
+      quantity_received: null,
+      cost_price: null,
       expiry_date: '',
-      purchase_notes: ''
+      // Adjustment fields
+      adjustment_type: '',
+      quantity_used: null,
+      notes: ''
     })
     
     // Computed properties
-    const loading = computed(() => productLoading.value || batchLoading.value)
-    const error = computed(() => productError.value || batchError.value)
+    const loading = computed(() => batchLoading.value)
+    const error = computed(() => batchError.value)
     
     const today = computed(() => {
       return new Date().toISOString().split('T')[0]
     })
-        
-    const shouldShowBatchFields = computed(() => {
-      return form.value.operation_type === 'purchase' || 
-            (form.value.operation_type === 'add' && selectedReason.value === 'Purchase/Delivery')
-    })
     
     const isFormValid = computed(() => {
-      const hasQuantity = form.value.quantity != null && Number(form.value.quantity) > 0
-      const hasReason = selectedReason.value || form.value.reason
-      
-      if (shouldShowBatchFields.value) {
-        const hasUnitCost = form.value.unit_cost != null && Number(form.value.unit_cost) > 0
-        const hasExpiryDate = form.value.expiry_date
-        return hasQuantity && hasReason && hasUnitCost && hasExpiryDate
+      if (form.value.operation_type === 'new_batch') {
+        return form.value.quantity_received > 0 && 
+               form.value.cost_price > 0 && 
+               form.value.expiry_date
+      } else {
+        return form.value.adjustment_type && form.value.quantity_used > 0
       }
-      
-      return hasQuantity && hasReason
     })
     
     const operationDescription = computed(() => {
-      if (!form.value) return ''
-      
-      switch (form.value.operation_type) {
-        case 'add':
-          return 'Add the specified quantity to current stock'
-        case 'purchase':
-          return 'Create a new batch from purchase order'
-        case 'remove':
-          return 'Remove the specified quantity from stock'
-        case 'set':
-          return 'Set stock to exact quantity specified'
-        default:
-          return ''
+      if (form.value.operation_type === 'new_batch') {
+        return 'Create a new batch from purchase order or stock receipt'
+      } else {
+        return 'Adjust existing stock using FIFO (First In, First Out) method'
       }
     })
     
@@ -366,58 +342,15 @@ export default {
     }
     
     const getSubmitButtonClass = () => {
-      if (form.value.operation_type === 'remove') return 'btn-delete'
-      if (shouldShowBatchFields.value) return 'btn-add'
-      return 'btn-submit'
+      if (form.value.operation_type === 'adjust' && 
+          form.value.adjustment_type !== 'return') {
+        return 'btn-delete'
+      }
+      return 'btn-add'
     }
     
     const getSubmitButtonText = () => {
-      if (form.value.operation_type === 'purchase') return 'Create Batch'
-      if (shouldShowBatchFields.value) return 'Add Batch'
-      return 'Update Stock'
-    }
-    
-    const getQuantityLabel = () => {
-      if (!form.value) return 'Quantity'
-      
-      switch (form.value.operation_type) {
-        case 'purchase':
-          return 'Quantity Received'
-        case 'add':
-          return selectedReason.value === 'Purchase/Delivery' ? 'Quantity Received' : 'Quantity to Add'
-        case 'remove':
-          return 'Quantity to Remove'
-        case 'set':
-          return 'New Stock Quantity'
-        default:
-          return 'Quantity'
-      }
-    }
-    
-    const getQuantityPlaceholder = () => {
-      if (!form.value) return 'Enter quantity'
-      
-      switch (form.value.operation_type) {
-        case 'purchase':
-          return 'Enter received quantity'
-        case 'add':
-          return selectedReason.value === 'Purchase/Delivery' ? 'Enter received quantity' : 'Enter quantity to add'
-        case 'remove':
-          return 'Enter quantity to remove'
-        case 'set':
-          return 'Enter new stock level'
-        default:
-          return 'Enter quantity'
-      }
-    }
-    
-    const getMinQuantity = () => {
-      return 1
-    }
-    
-    const getMaxQuantity = () => {
-      if (!form.value || !product.value) return undefined
-      return form.value.operation_type === 'remove' ? getCurrentStock(product.value) : undefined
+      return form.value.operation_type === 'new_batch' ? 'Create Batch' : 'Adjust Stock'
     }
     
     const generateBatchNumber = () => {
@@ -427,54 +360,39 @@ export default {
       const day = String(now.getDate()).padStart(2, '0')
       const timestamp = now.getTime().toString().slice(-4)
       
-      return `BTH-${year}${month}${day}-${timestamp}`
+      return `B-${year}${month}${day}-${timestamp}`
     }
     
     const calculateNewStock = () => {
-      if (!product.value || !form.value) return
+      if (!product.value) return
       
       const currentStock = getCurrentStock(product.value)
-      const quantity = form.value.quantity || 0
       
-      switch (form.value.operation_type) {
-        case 'add':
-        case 'purchase':
+      if (form.value.operation_type === 'new_batch') {
+        const quantity = form.value.quantity_received || 0
+        newStockPreview.value = currentStock + quantity
+      } else {
+        const quantity = form.value.quantity_used || 0
+        if (form.value.adjustment_type === 'return') {
           newStockPreview.value = currentStock + quantity
-          break
-        case 'remove':
+        } else {
           newStockPreview.value = Math.max(0, currentStock - quantity)
-          break
-        case 'set':
-          newStockPreview.value = quantity
-          break
-        default:
-          newStockPreview.value = null
+        }
       }
     }
     
     // Event handlers
     const onOperationChange = () => {
-      selectedReason.value = ''
-      form.value.reason = ''
-      form.value.quantity = null
+      // Reset form fields
+      form.value.batch_number = ''
+      form.value.supplier_id = ''
+      form.value.quantity_received = null
+      form.value.cost_price = null
+      form.value.expiry_date = ''
+      form.value.adjustment_type = ''
+      form.value.quantity_used = null
+      form.value.notes = ''
       newStockPreview.value = null
-      
-      // Clear batch fields when not needed
-      if (!shouldShowBatchFields.value) {
-        form.value.batch_number = ''
-        form.value.supplier = ''
-        form.value.unit_cost = null
-        form.value.expiry_date = ''
-        form.value.purchase_notes = ''
-      }
-    }
-    
-    const onReasonChange = () => {
-      if (selectedReason.value !== 'Custom') {
-        form.value.reason = selectedReason.value
-      } else {
-        form.value.reason = ''
-      }
     }
     
     // Modal actions
@@ -492,86 +410,64 @@ export default {
     
     const resetForm = () => {
       form.value = {
-        operation_type: 'add',
-        quantity: null,
-        reason: '',
+        operation_type: 'new_batch',
         batch_number: '',
-        supplier: '',
-        unit_cost: null,
+        supplier_id: '',
+        quantity_received: null,
+        cost_price: null,
         expiry_date: '',
-        purchase_notes: ''
+        adjustment_type: '',
+        quantity_used: null,
+        notes: ''
       }
-      selectedReason.value = ''
       newStockPreview.value = null
     }
     
     const handleSubmit = async () => {
       try {
-        // Validate form data before submission
-        const quantityValue = Number(form.value.quantity)
-        if (!quantityValue || quantityValue <= 0) {
-          toast.error('Quantity must be greater than 0')
-          return
-        }
-
-        // Auto-generate batch number if creating batch and field is empty
-        if (shouldShowBatchFields.value && !form.value.batch_number) {
-          form.value.batch_number = generateBatchNumber()
-        }
-        
         let result
         
-        if (shouldShowBatchFields.value) {
-          // Create new batch - use the correct field names that match your backend
+        if (form.value.operation_type === 'new_batch') {
+          // Create new batch
+          const batchNumber = form.value.batch_number || generateBatchNumber()
+          
           const batchData = {
             product_id: product.value._id,
-            batch_number: form.value.batch_number,
-            quantity_received: quantityValue, // Backend expects this field name
-            cost_price: Number(form.value.unit_cost), // Backend expects this field name
+            batch_number: batchNumber,
+            quantity_received: form.value.quantity_received,
+            cost_price: form.value.cost_price,
             expiry_date: form.value.expiry_date,
-            supplier_id: form.value.supplier || null, // Backend might expect supplier_id
-            reason: form.value.reason || selectedReason.value
+            supplier_id: form.value.supplier_id || null
           }
           
-          // Add optional fields if they exist in your backend
-          if (form.value.purchase_notes) {
-            batchData.notes = form.value.purchase_notes
-          }
-          
-          console.log('Sending batch data with correct field names:', batchData)
+          console.log('Creating batch:', batchData)
           result = await createBatch(batchData)
-        } else {
-          // Regular stock update
-          const stockData = {
-            operation_type: form.value.operation_type,
-            quantity: quantityValue,
-            reason: form.value.reason || selectedReason.value
-          }
           
-          console.log('Sending stock data:', stockData)
-          result = await updateProductStock(product.value._id, stockData)
-        }
-        
-        const operation = form.value.operation_type
-        const quantity = form.value.quantity
-        let message = ''
-        
-        if (operation === 'purchase') {
-          message = `New batch created: ${quantity} units of "${product.value.product_name}"`
-        } else if (operation === 'add' && selectedReason.value === 'Purchase/Delivery') {
-          message = `New batch added: ${quantity} units of "${product.value.product_name}"`
-        } else if (operation === 'add') {
-          message = `Added ${quantity} units to "${product.value.product_name}"`
-        } else if (operation === 'remove') {
-          message = `Removed ${quantity} units from "${product.value.product_name}"`
+          success(`New batch created: ${form.value.quantity_received} units added`)
+          
         } else {
-          message = `Set stock to ${quantity} units for "${product.value.product_name}"`
+          // Adjust existing stock using FIFO
+          console.log('Adjusting stock:', {
+            product_id: product.value._id,
+            adjustment_type: form.value.adjustment_type,
+            quantity: form.value.quantity_used,
+            adjusted_by: user.value?._id, // ✅ User ID
+            notes: form.value.notes
+          })
+          
+          result = await processBatchAdjustment(
+            product.value._id,
+            form.value.quantity_used,
+            form.value.adjustment_type,
+            user.value?._id, // ✅ Pass user ID here
+            form.value.notes
+          )
+          
+          success(`Stock adjusted: ${form.value.quantity_used} units (${form.value.adjustment_type})`)
         }
-        
-        toast.success(message)
         
         emit('success', {
-          message,
+          message: 'Stock updated successfully',
           product: result,
           operation: form.value
         })
@@ -580,18 +476,7 @@ export default {
         
       } catch (err) {
         console.error('Stock update failed:', err)
-        console.error('Error details:', err.response?.data)
-        
-        // More specific error handling
-        if (err.response?.data?.message) {
-          toast.error(err.response.data.message)
-        } else if (err.response?.data?.error) {
-          toast.error(err.response.data.error)
-        } else if (err.message) {
-          toast.error(err.message)
-        } else {
-          toast.error('Failed to update stock')
-        }
+        showError(err.message || 'Failed to update stock')
       }
     }
     
@@ -628,10 +513,8 @@ export default {
       loading,
       error,
       form,
-      selectedReason,
       newStockPreview,
       today,
-      shouldShowBatchFields,
       
       // Computed
       isFormValid,
@@ -642,7 +525,6 @@ export default {
       handleSubmit,
       handleOverlayClick,
       onOperationChange,
-      onReasonChange,
       calculateNewStock,
       getCategoryName,
       getStockClass,
@@ -650,10 +532,6 @@ export default {
       getSubmitButtonClass,
       getSubmitButtonText,
       getCurrentStock,
-      getQuantityLabel,
-      getQuantityPlaceholder,
-      getMinQuantity,
-      getMaxQuantity,
       generateBatchNumber,
       
       // Exposed methods

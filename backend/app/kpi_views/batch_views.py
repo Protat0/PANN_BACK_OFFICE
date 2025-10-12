@@ -134,7 +134,9 @@ class UpdateBatchQuantityView(BatchView):
             data = json.loads(request.body)
             
             quantity_used = data.get('quantity_used')
-            reason = data.get('reason', 'Manual adjustment')
+            adjustment_type = data.get('adjustment_type', 'correction')
+            adjusted_by = data.get('adjusted_by')
+            notes = data.get('notes')
             
             if quantity_used is None:
                 return JsonResponse({
@@ -143,9 +145,11 @@ class UpdateBatchQuantityView(BatchView):
                 }, status=400)
             
             updated_batch = self.batch_service.update_batch_quantity(
-                batch_id, 
-                quantity_used, 
-                reason
+                batch_id,
+                quantity_used,
+                adjustment_type=adjustment_type,
+                adjusted_by=adjusted_by,
+                notes=notes
             )
             
             if not updated_batch:
@@ -459,6 +463,54 @@ class ProductsWithExpirySummaryView(BatchView):
             
         except Exception as e:
             logger.error(f"Error getting products with expiry summary: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+        
+@method_decorator(csrf_exempt, name='dispatch')
+class ProcessBatchAdjustmentView(BatchView):
+    def post(self, request):
+        """Process a batch adjustment using FIFO logic"""
+        try:
+            data = json.loads(request.body)
+            
+            product_id = data.get('product_id')
+            quantity_used = data.get('quantity_used')
+            adjustment_type = data.get('adjustment_type', 'correction')
+            adjusted_by = data.get('adjusted_by')  # User ID from frontend
+            notes = data.get('notes')
+            
+            # Validate required fields
+            if not product_id or quantity_used is None:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'product_id and quantity_used are required'
+                }, status=400)
+            
+            if quantity_used <= 0:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'quantity_used must be greater than 0'
+                }, status=400)
+            
+            # Process the adjustment
+            result = self.batch_service.process_batch_adjustment(
+                product_id, 
+                quantity_used,
+                adjustment_type,
+                adjusted_by,
+                notes
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Successfully adjusted {quantity_used} units using FIFO',
+                'data': result
+            })
+            
+        except Exception as e:
+            logger.error(f"Error processing batch adjustment: {str(e)}")
             return JsonResponse({
                 'success': False,
                 'error': str(e)
