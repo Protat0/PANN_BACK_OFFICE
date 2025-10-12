@@ -505,9 +505,10 @@
 
     <!-- Order Details Modal -->
     <OrderDetailsModal
+      v-if="selectedOrderForView"
       :show="showOrderDetailsModal"
       :order="selectedOrderForView"
-      :can-edit="selectedOrderForView && selectedOrderForView.status !== 'Received' && selectedOrderForView.status !== 'Cancelled'"
+      :can-edit="selectedOrderForView.status !== 'Received' && selectedOrderForView.status !== 'Cancelled'"
       :initial-mode="orderModalMode"
       @close="closeOrderDetailsModal"
       @save="handleOrderUpdate"
