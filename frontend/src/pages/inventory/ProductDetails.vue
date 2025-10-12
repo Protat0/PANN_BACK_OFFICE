@@ -210,9 +210,31 @@
                   <span class="text-secondary fw-semibold">₱{{ formatPrice(currentProduct.cost_price) }}</span>
                 </div>
                 
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <small class="text-tertiary-medium">Selling Price</small>
-                  <span class="text-secondary fw-semibold">₱{{ formatPrice(currentProduct.selling_price) }}</span>
+                <!-- ✅ UPDATED: Selling Price with Promotion -->
+                <div class="mb-2">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-tertiary-medium">Selling Price</small>
+                    <div class="text-end">
+                      <!-- Show original price crossed out if promotion exists -->
+                      <div v-if="activePromotion" class="text-tertiary-medium text-decoration-line-through" style="font-size: 0.75rem;">
+                        ₱{{ formatPrice(currentProduct.selling_price) }}
+                      </div>
+                      <!-- Show discounted or regular price -->
+                      <span 
+                        :class="activePromotion ? 'text-success' : 'text-secondary'" 
+                        class="fw-semibold"
+                      >
+                        ₱{{ formatPrice(discountedPrice) }}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <!-- ✅ NEW: Promotion Badge -->
+                  <div v-if="activePromotion" class="mt-2">
+                    <span class="badge bg-success text-white" style="font-size: 0.7rem;">
+                      🎉 {{ activePromotion.promotion_name }} - {{ formatDiscount(activePromotion) }}
+                    </span>
+                  </div>
                 </div>
 
                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -261,6 +283,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProducts } from '@/composables/api/useProducts'
 import { useCategories } from '@/composables/api/useCategories'
+import { usePromotions } from '@/composables/api/usePromotions' // ✅ ADD THIS
 import AddProductModal from '@/components/products/AddProductModal.vue'
 import StockUpdateModal from '@/components/products/StockUpdateModal.vue'
 import ProductPurchases from '@/components/products/ProductPurchases.vue'
@@ -303,10 +326,35 @@ export default {
       initializeCategories
     } = useCategories()
 
+    // ✅ ADD THIS: Promotions composable
+    const {
+      promotions,
+      fetchActivePromotions,
+      getApplicablePromotion,
+      calculateDiscountedPrice,
+      formatDiscount
+    } = usePromotions()
+
     // Local state
     const activeTab = ref('Overview')
     const tabs = ['Overview', 'Purchases', 'Adjustments']
     const successMessage = ref('')
+
+    // ✅ ADD THIS: Computed properties for promotion
+    const activePromotion = computed(() => {
+      if (!currentProduct.value) return null
+      return getApplicablePromotion(currentProduct.value)
+    })
+
+    const discountedPrice = computed(() => {
+      if (!currentProduct.value || !activePromotion.value) {
+        return currentProduct.value?.selling_price || 0
+      }
+      return calculateDiscountedPrice(
+        currentProduct.value.selling_price,
+        activePromotion.value
+      )
+    })
 
     // Utility functions
     const formatDate = (date) => {
@@ -380,7 +428,6 @@ export default {
 
     const handleExport = async () => {
       try {
-        // Export single product
         const filters = { _id: currentProduct.value._id }
         await exportProducts(filters)
       } catch (err) {
@@ -395,7 +442,6 @@ export default {
           successMessage.value = ''
         }, 3000)
       }
-      // Refresh the current product
       await fetchProductById(props.id)
     }
 
@@ -403,12 +449,13 @@ export default {
       activeTab.value = tab
     }
 
-    // Initialize data
+    // ✅ UPDATE THIS: Initialize data with promotions
     const initializeData = async () => {
       try {
         await Promise.all([
           initializeCategories(),
-          fetchProductById(props.id)
+          fetchProductById(props.id),
+          fetchActivePromotions() // ✅ ADD THIS
         ])
       } catch (err) {
         console.error('Failed to initialize data:', err)
@@ -429,6 +476,11 @@ export default {
       tabs,
       router,
       activeCategories,
+      
+      // ✅ ADD THESE: Promotion data
+      activePromotion,
+      discountedPrice,
+      formatDiscount,
       
       // Template refs
       addProductModal,

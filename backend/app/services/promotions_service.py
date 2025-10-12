@@ -555,7 +555,7 @@ class PromotionService:
                 products = []
                 for product_id in promotion['target_ids']:
                     product = self.product_service.get_product_by_id(product_id)
-                    if product['success']:
+                    if product and product.get('success'):
                         products.append({
                             'id': product_id,
                             'name': product['product'].get('name', 'Unknown')
@@ -563,15 +563,18 @@ class PromotionService:
                 target_details['target_products'] = products
             
             elif promotion['target_type'] == 'categories' and promotion.get('target_ids'):
-                # Get category names for audit context
+                # ✅ FIX: Get category names for audit context
                 categories = []
                 for category_id in promotion['target_ids']:
-                    category = self.category_service.get_category_by_id(category_id)
-                    if category['success']:
-                        categories.append({
-                            'id': category_id,
-                            'name': category['category'].get('name', 'Unknown')
-                        })
+                    try:
+                        category = self.category_service.get_category_by_id(category_id)
+                        if category:  # ✅ Check if category exists (not None)
+                            categories.append({
+                                'id': category_id,
+                                'name': category.get('category_name', 'Unknown')
+                            })
+                    except Exception as e:
+                        logger.error(f"Error getting category {category_id} for audit: {e}")
                 target_details['target_categories'] = categories
             
             return target_details
@@ -1186,15 +1189,28 @@ class PromotionService:
             
             if target_type == 'products':
                 for product_id in target_ids:
-                    product = self.product_service.get_product_by_id(product_id)
-                    if not product['success']:
-                        errors.append(f'Product {product_id} not found')
+                    try:
+                        product = self.product_service.get_product_by_id(product_id)
+                        # Assuming product_service returns dict with 'success' key
+                        if not product or not product.get('success'):
+                            errors.append(f'Product {product_id} not found')
+                    except Exception as e:
+                        logger.error(f"Error validating product {product_id}: {e}")
+                        errors.append(f'Product {product_id} validation failed')
             
             elif target_type == 'categories':
                 for category_id in target_ids:
-                    category = self.category_service.get_category_by_id(category_id)
-                    if not category['success']:
-                        errors.append(f'Category {category_id} not found')
+                    try:
+                        # ✅ FIX: CategoryService returns category object directly, not a dict
+                        category = self.category_service.get_category_by_id(category_id)
+                        
+                        # Check if category exists (returns None if not found)
+                        if category is None:
+                            errors.append(f'Category {category_id} not found')
+                            
+                    except Exception as e:
+                        logger.error(f"Error validating category {category_id}: {e}")
+                        errors.append(f'Category {category_id} validation failed: {str(e)}')
             
             return {
                 'is_valid': len(errors) == 0,
@@ -1202,10 +1218,10 @@ class PromotionService:
             }
             
         except Exception as e:
-            logger.error(f"Error validating targets exist: {e}")
+            logger.error(f"Error in _validate_targets_exist: {e}")
             return {
                 'is_valid': False,
-                'errors': [f'Target existence validation error: {str(e)}']
+                'errors': ['Target validation system error']
             }
     
     def _calculate_promotion_discount(self, promotion, order_data):
