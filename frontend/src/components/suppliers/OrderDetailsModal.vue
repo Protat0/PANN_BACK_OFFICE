@@ -3,11 +3,11 @@
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content modern-modal">
         <div class="modal-header">
-          <div class="d-flex align-items-center">
+          <div class="d-flex align-items-center flex-grow-1">
             <div class="modal-icon me-3">
               <component :is="isEditMode ? Edit : Eye" :size="24" />
             </div>
-            <div>
+            <div class="flex-grow-1">
               <h4 class="modal-title mb-1">
                 {{ isEditMode ? 'Edit Order' : 'Order Details' }}
               </h4>
@@ -16,7 +16,7 @@
               </p>
             </div>
           </div>
-          <div class="d-flex gap-2">
+          <div class="d-flex align-items-center gap-2">
             <button 
               v-if="!isEditMode && canEdit" 
               type="button" 
@@ -655,6 +655,33 @@ export default {
   align-items: center;
   justify-content: center;
   color: var(--primary-dark);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--neutral);
+}
+
+.modal-header .d-flex.align-items-center.flex-grow-1 {
+  min-width: 0; /* Prevents flex item from overflowing */
+}
+
+.modal-header .d-flex.align-items-center.gap-2 {
+  flex-shrink: 0; /* Prevents buttons from shrinking */
+  margin-left: auto; /* Pushes buttons to the right */
+}
+
+/* Ensure proper button spacing and alignment */
+.modal-header .btn {
+  white-space: nowrap;
+}
+
+.modal-header .btn-close {
+  padding: 0.5rem;
+  margin-left: 0.5rem;
 }
 
 .info-card {

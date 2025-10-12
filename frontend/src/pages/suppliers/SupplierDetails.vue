@@ -96,18 +96,6 @@
       <p class="mt-3 text-tertiary-medium">Loading supplier details...</p>
     </div>
 
-    <!-- Error State -->
-    <div v-if="error" class="alert alert-danger text-center" role="alert">
-      <p class="mb-3">{{ error }}</p>
-      <button class="btn btn-primary" @click="fetchSupplierDetails">Try Again</button>
-    </div>
-
-    <!-- Success Message -->
-    <div v-if="successMessage" class="alert alert-success alert-dismissible fade show" role="alert">
-      {{ successMessage }}
-      <button type="button" class="btn-close" @click="successMessage = null"></button>
-    </div>
-
     <!-- Quick Stats Card - Moved to Top -->
     <div v-if="!loading && !error && supplier" class="card stats-card mb-4">
       <div class="card-header">
@@ -687,6 +675,7 @@ import {
 } from 'lucide-vue-next'
 import CreateOrderModal from '@/components/suppliers/CreateOrderModal.vue'
 import OrderDetailsModal from '@/components/suppliers/OrderDetailsModal.vue'
+import { useToast } from '@/composables/ui/useToast'
 import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
@@ -732,6 +721,15 @@ export default {
       required: true
     }
   },
+  setup() {
+    // Initialize toast composable
+    const { success, error: showError } = useToast()
+    
+    return {
+      success,
+      showError
+    }
+  },
   data() {
     return {
       supplier: null,
@@ -740,7 +738,6 @@ export default {
       recentActivity: [],
       loading: false,
       error: null,
-      successMessage: null,
       saving: false,
       deleting: false,
       orderStatusFilter: 'all',
@@ -855,8 +852,10 @@ export default {
         
         if (error.response?.status === 404) {
           this.error = `Supplier with ID ${this.supplierId} not found`
+          this.showError(`Supplier with ID ${this.supplierId} not found`)
         } else {
           this.error = error.response?.data?.error || `Failed to load supplier details: ${error.message}`
+          this.showError(this.error)
         }
       } finally {
         this.loading = false
@@ -916,21 +915,19 @@ export default {
         console.log('Order created:', response.data)
         
         this.closeCreateOrderModal()
-        this.successMessage = `Purchase order ${orderData.id} created successfully!`
+        
+        // Show success toast instead of setting successMessage
+        this.success(`Purchase order ${orderData.id} created successfully!`)
         
         await this.fetchSupplierDetails()
         
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
-        
       } catch (error) {
         console.error('Error creating order:', error)
-        this.error = error.response?.data?.error || 'Failed to create order'
+        const errorMessage = error.response?.data?.error || 'Failed to create order'
         
-        setTimeout(() => {
-          this.error = null
-        }, 5000)
+        // Show error toast instead of setting error
+        this.showError(errorMessage)
+        
       } finally {
         this.saving = false
       }
@@ -945,26 +942,32 @@ export default {
     },
 
     viewPaymentHistory() {
-      alert('Payment history - Coming soon!')
+      this.showError('Payment history feature coming soon!')
     },
 
     viewDocuments() {
-      alert('View documents - Coming soon!')
+      this.showError('View documents feature coming soon!')
     },
 
     scheduleVisit() {
-      alert('Schedule visit - Coming soon!')
+      this.showError('Schedule visit feature coming soon!')
     },
 
     callSupplier() {
       if (this.supplier?.phone) {
         window.open(`tel:${this.supplier.phone}`)
+        this.success(`Calling ${this.supplier.name}...`)
+      } else {
+        this.showError('No phone number available for this supplier')
       }
     },
 
     emailSupplier() {
       if (this.supplier?.email) {
         window.open(`mailto:${this.supplier.email}`)
+        this.success(`Opening email to ${this.supplier.name}...`)
+      } else {
+        this.showError('No email address available for this supplier')
       }
     },
 
@@ -972,6 +975,9 @@ export default {
       if (this.supplier?.address) {
         const encodedAddress = encodeURIComponent(this.supplier.address)
         window.open(`https://maps.google.com/maps?q=${encodedAddress}`, '_blank')
+        this.success('Opening location in Google Maps...')
+      } else {
+        this.showError('No address available for this supplier')
       }
     },
 
@@ -1049,38 +1055,39 @@ export default {
         }
         
         this.closeEditModal()
-        this.successMessage = 'Supplier updated successfully!'
         
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
+        // Show success toast instead of setting successMessage
+        this.success(`${this.supplier.name} has been updated successfully!`)
         
       } catch (error) {
         console.error('Error updating supplier:', error)
-        this.error = error.response?.data?.error || `Failed to update supplier: ${error.message}`
+        const errorMessage = error.response?.data?.error || `Failed to update supplier: ${error.message}`
+        
+        // Show error toast instead of setting error
+        this.showError(errorMessage)
+        
       } finally {
         this.saving = false
       }
     },
 
     exportSupplierData(format) {
-      alert(`Export as ${format} - Coming soon!`)
+      this.showError(`Export as ${format} feature coming soon!`)
     },
 
     exportSupplierReport() {
-      alert('Export full report - Coming soon!')
+      this.showError('Export full report feature coming soon!')
     },
 
     toggleFavorite() {
       this.supplier.isFavorite = !this.supplier.isFavorite
-      this.successMessage = `Supplier ${this.supplier.isFavorite ? 'added to' : 'removed from'} favorites`
-      setTimeout(() => {
-        this.successMessage = null
-      }, 2000)
+      
+      // Show toast instead of setting successMessage
+      this.success(`${this.supplier.name} ${this.supplier.isFavorite ? 'added to' : 'removed from'} favorites`)
     },
 
     duplicateSupplier() {
-      alert('Duplicate supplier functionality - Coming soon!')
+      this.showError('Duplicate supplier functionality coming soon!')
     },
 
     deleteSupplier() {
@@ -1104,7 +1111,9 @@ export default {
         )
         
         this.showDeleteModal = false
-        this.successMessage = 'Supplier deleted successfully'
+        
+        // Show success toast
+        this.success(`${this.supplier.name} has been deleted successfully`)
         
         setTimeout(() => {
           this.goBack()
@@ -1112,7 +1121,11 @@ export default {
         
       } catch (error) {
         console.error('Error deleting supplier:', error)
-        this.error = error.response?.data?.error || `Failed to delete supplier: ${error.message}`
+        const errorMessage = error.response?.data?.error || `Failed to delete supplier: ${error.message}`
+        
+        // Show error toast instead of setting error
+        this.showError(errorMessage)
+        
       } finally {
         this.deleting = false
       }
@@ -1141,6 +1154,9 @@ export default {
             return 0
         }
       })
+      
+      // Show toast for feedback
+      this.success(`Orders sorted by ${criteria}`)
     },
 
     toggleSelectAllOrders() {
@@ -1235,20 +1251,18 @@ export default {
       if (confirm(`Are you sure you want to delete order ${order.id}?`)) {
         this.orders = this.orders.filter(o => o.id !== order.id)
         this.filterOrders()
-        this.successMessage = `Order ${order.id} deleted successfully`
         
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
+        // Show success toast instead of setting successMessage
+        this.success(`Order ${order.id} deleted successfully`)
       }
     },
 
     duplicateOrder(order) {
-      alert(`Duplicate order ${order.id} - Coming soon!`)
+      this.showError(`Duplicate order ${order.id} feature coming soon!`)
     },
 
     trackOrder(order) {
-      alert(`Track order ${order.id} - Coming soon!`)
+      this.showError(`Track order ${order.id} feature coming soon!`)
     },
 
     handleOrderUpdate(updatedOrder) {
@@ -1257,10 +1271,8 @@ export default {
         this.orders[index] = updatedOrder
         this.filterOrders()
         
-        this.successMessage = `Order ${updatedOrder.id} updated successfully`
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
+        // Show success toast instead of setting successMessage
+        this.success(`Order ${updatedOrder.id} updated successfully`)
       }
       
       this.closeOrderDetailsModal()
@@ -1271,11 +1283,11 @@ export default {
     },
 
     bulkExportOrders() {
-      alert(`Export ${this.selectedOrders.length} selected orders - Coming soon!`)
+      this.showError(`Export ${this.selectedOrders.length} selected orders feature coming soon!`)
     },
 
     bulkUpdateStatus() {
-      alert(`Update status for ${this.selectedOrders.length} selected orders - Coming soon!`)
+      this.showError(`Update status for ${this.selectedOrders.length} selected orders feature coming soon!`)
     },
 
     bulkDeleteOrders() {
@@ -1284,11 +1296,9 @@ export default {
         this.selectedOrders = []
         this.selectAllOrders = false
         this.filterOrders()
-        this.successMessage = 'Selected orders deleted successfully'
         
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
+        // Show success toast instead of setting successMessage
+        this.success('Selected orders deleted successfully')
       }
     },
 
@@ -1303,11 +1313,9 @@ export default {
     saveNotes() {
       this.supplier.notes = this.editableNotes
       this.editingNotes = false
-      this.successMessage = 'Notes updated successfully'
       
-      setTimeout(() => {
-        this.successMessage = null
-      }, 2000)
+      // Show success toast instead of setting successMessage
+      this.success('Notes updated successfully')
     },
 
     cancelNotesEdit() {
@@ -1389,6 +1397,7 @@ export default {
   }
 }
 </script>
+
 <style scoped>
 @import '@/assets/styles/colors.css';
 

@@ -10,7 +10,7 @@ const createToast = (options) => {
     id: ++toastIdCounter,
     type: 'success',
     message: '',
-    duration: 4000,
+    duration: 12000,
     dismissible: true,
     showProgressBar: true,
     persistent: false,
@@ -78,7 +78,7 @@ export function useToast() {
       ...options,
       type: 'success',
       message,
-      duration: options.duration || 4000
+      duration: options.duration || 12000
     })
   }
 
@@ -87,7 +87,7 @@ export function useToast() {
       ...options,
       type: 'error',
       message,
-      duration: options.duration || 6000
+      duration: options.duration || 12000
     })
   }
 
@@ -96,7 +96,7 @@ export function useToast() {
       ...options,
       type: 'warning',
       message,
-      duration: options.duration || 5000
+      duration: options.duration || 12000
     })
   }
 
@@ -105,7 +105,7 @@ export function useToast() {
       ...options,
       type: 'info',
       message,
-      duration: options.duration || 4000
+      duration: options.duration || 12000
     })
   }
 
