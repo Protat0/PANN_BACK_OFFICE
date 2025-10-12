@@ -74,7 +74,7 @@
         </div>
 
         <!-- Right Side: Filters and Search -->
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
           <!-- Search Toggle -->
           <button 
             class="btn btn-filter btn-sm search-toggle"
@@ -89,11 +89,11 @@
             <div 
               v-for="filter in filters" 
               :key="filter.key"
-              class="filter-dropdown"
+              class="filter-dropdown-wrapper"
             >
               <label class="filter-label">{{ filter.label }}</label>
               <select 
-                class="form-select form-select-sm" 
+                class="form-select form-select-sm filter-select" 
                 :value="filter.value"
                 @change="handleFilterChange(filter.key, $event.target.value)"
               >
@@ -287,6 +287,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 /* Dropdown Styles */
@@ -335,11 +336,12 @@ onUnmounted(() => {
   background-color: var(--state-hover);
 }
 
-/* Filter Styles */
-.filter-dropdown {
-  display: flex;
+/* Filter Styles - FIXED */
+.filter-dropdown-wrapper {
+  display: inline-flex;
   flex-direction: column;
   gap: 0.25rem;
+  min-width: 140px;
 }
 
 .filter-label {
@@ -349,24 +351,39 @@ onUnmounted(() => {
   text-transform: uppercase;
   letter-spacing: 0.025em;
   margin: 0;
+  padding: 0 0.25rem;
+  line-height: 1;
+  white-space: nowrap;
 }
 
-.form-select-sm {
-  padding: 0.25rem 0.5rem;
+.filter-select {
+  width: 100%;
+  padding: 0.375rem 0.75rem;
   font-size: 0.875rem;
+  line-height: 1.5;
   border-radius: 0.375rem;
   border: 1px solid var(--border-primary);
   background-color: var(--surface-primary);
   color: var(--text-primary);
   transition: all 0.2s ease;
+  cursor: pointer;
 }
 
-.form-select-sm:focus {
+.filter-select:focus {
   border-color: var(--border-accent);
+  outline: 0;
   box-shadow: 0 0 0 0.2rem rgba(160, 123, 227, 0.25);
 }
 
+.filter-select:hover {
+  border-color: var(--border-accent);
+}
+
 /* Search Styles */
+.search-toggle {
+  flex-shrink: 0;
+}
+
 .search-toggle.active {
   background-color: var(--state-selected);
   color: var(--text-accent);
@@ -396,6 +413,10 @@ onUnmounted(() => {
 
 .align-items-center {
   align-items: center !important;
+}
+
+.flex-wrap {
+  flex-wrap: wrap !important;
 }
 
 .gap-1 {
@@ -448,10 +469,11 @@ onUnmounted(() => {
   
   .search-container {
     min-width: auto;
+    width: 100%;
   }
   
-  .filter-dropdown {
-    min-width: 120px;
+  .filter-dropdown-wrapper {
+    min-width: 100%;
   }
 }
 
@@ -462,6 +484,11 @@ onUnmounted(() => {
   
   .d-flex.gap-2 {
     flex-wrap: wrap;
+  }
+  
+  .filter-dropdown-wrapper {
+    flex: 1 1 auto;
+    min-width: 120px;
   }
 }
 </style>

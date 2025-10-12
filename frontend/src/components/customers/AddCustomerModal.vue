@@ -61,10 +61,10 @@
               class="form-control"
               placeholder="Enter unique username"
               required
-              :disabled="isLoading"
+              :disabled="isLoading || currentMode === 'edit'"
             />
             <small class="form-text text-tertiary-medium">
-              Username must be unique and cannot be changed later
+              {{ currentMode === 'edit' ? 'Username cannot be changed' : 'Username must be unique and cannot be changed later' }}
             </small>
           </div>
 
@@ -106,22 +106,74 @@
             </div>
           </div>
 
-          <!-- NEW PASSWORD FIELD -->
-          <div v-if="mode === 'add'" class="mb-3">
-            <label for="password" class="form-label">Password <span class="text-danger">*</span></label>
-            <input 
-              id="password"
-              v-model="form.password" 
-              type="password" 
+          <!-- Password (for new customers) -->
+          <div v-if="currentMode === 'create'" class="mb-4">
+            <label class="form-label text-secondary fw-medium mb-2">
+              Password <span class="text-error">*</span>
+            </label>
+            <input
+              v-model="form.password"
+              type="password"
               class="form-control"
-              :class="{ 'is-invalid': errors.password }"
-              required 
-              :disabled="formLoading"
-              placeholder="Enter customer password"
+              placeholder="Enter password for customer account"
+              required
               minlength="6"
+              :disabled="isLoading"
             />
-            <div v-if="errors.password" class="invalid-feedback">{{ errors.password }}</div>
-        
+            <small class="form-text text-tertiary-medium">
+              Minimum 6 characters
+            </small>
+          </div>
+
+          <!-- Change Password Section (for editing customers) -->
+          <div v-if="currentMode === 'edit'" class="mb-4">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <label class="form-label text-secondary fw-medium mb-0">
+                Password
+              </label>
+              <button
+                type="button"
+                class="btn btn-sm btn-secondary"
+                @click="togglePasswordChange"
+                :disabled="isLoading"
+              >
+                {{ showPasswordFields ? 'Cancel Password Change' : 'Change Password' }}
+              </button>
+            </div>
+            
+            <!-- Password Change Fields -->
+            <div v-if="showPasswordFields" class="password-change-section">
+              <div class="mb-3">
+                <input
+                  v-model="form.new_password"
+                  type="password"
+                  class="form-control"
+                  placeholder="Enter new password"
+                  minlength="6"
+                  :disabled="isLoading"
+                />
+                <small class="form-text text-tertiary-medium">
+                  Minimum 6 characters
+                </small>
+              </div>
+              <div>
+                <input
+                  v-model="form.confirm_password"
+                  type="password"
+                  class="form-control"
+                  placeholder="Confirm new password"
+                  :class="{ 'is-invalid': passwordMismatch }"
+                  :disabled="isLoading"
+                />
+                <div v-if="passwordMismatch" class="invalid-feedback d-block">
+                  Passwords do not match
+                </div>
+              </div>
+            </div>
+            
+            <small v-else class="form-text text-tertiary-medium">
+              Click "Change Password" to update customer's password
+            </small>
           </div>
 
           <!-- Phone -->
@@ -142,21 +194,6 @@
             </div>
           </div>
 
-          <!-- Password (only for new customers) -->
-          <div v-if="mode === 'create'" class="mb-4">
-            <label class="form-label text-secondary fw-medium mb-2">
-              Password <span class="text-error">*</span>
-            </label>
-            <input
-              v-model="form.password"
-              type="password"
-              class="form-control"
-              placeholder="Enter password for customer account"
-              required
-              :disabled="isLoading"
-            />
-          </div>
-
           <!-- Delivery Address -->
           <div class="mb-4">
             <label class="form-label text-secondary fw-medium mb-2">
@@ -170,7 +207,7 @@
                     type="text"
                     class="form-control mb-2"
                     placeholder="Street address"
-                    :disabled="isLoading"
+                    :disabled="isLoading || currentMode === 'view'"
                   />
                 </div>
                 <div class="col-6">
@@ -179,7 +216,7 @@
                     type="text"
                     class="form-control"
                     placeholder="City"
-                    :disabled="isLoading"
+                    :disabled="isLoading || currentMode === 'view'"
                   />
                 </div>
                 <div class="col-6">
@@ -188,7 +225,7 @@
                     type="text"
                     class="form-control"
                     placeholder="Barangay"
-                    :disabled="isLoading"
+                    :disabled="isLoading || currentMode === 'view'"
                   />
                 </div>
                 <div class="col-6">
@@ -197,7 +234,7 @@
                     type="text"
                     class="form-control"
                     placeholder="Postal code"
-                    :disabled="isLoading"
+                    :disabled="isLoading || currentMode === 'view'"
                   />
                 </div>
               </div>
@@ -289,7 +326,8 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
+import { X, Edit, AlertTriangle } from 'lucide-vue-next'
 import { useModal } from '@/composables/ui/useModal.js'
 import { useCustomers } from '@/composables/api/useCustomers.js'
 
@@ -320,6 +358,8 @@ const form = ref({
   email: '',
   phone: '',
   password: '',
+  new_password: '',
+  confirm_password: '',
   delivery_address: {
     street: '',
     city: '',
@@ -332,14 +372,34 @@ const form = ref({
 
 // Local mode state for switching between view/edit
 const currentMode = ref(props.mode)
+const showPasswordFields = ref(false)
 
 // Computed
+const passwordMismatch = computed(() => {
+  if (!showPasswordFields.value) return false
+  if (!form.value.new_password || !form.value.confirm_password) return false
+  return form.value.new_password !== form.value.confirm_password
+})
+
 const isFormValid = computed(() => {
   const hasRequiredFields = form.value.username.trim() && 
                            form.value.full_name.trim() && 
                            form.value.email.trim()
-  const hasPasswordForCreate = props.mode === 'edit' || form.value.password.trim()
-  return hasRequiredFields && hasPasswordForCreate
+  
+  // For create mode, password is required
+  if (currentMode.value === 'create') {
+    return hasRequiredFields && form.value.password.trim() && form.value.password.length >= 6
+  }
+  
+  // For edit mode, if password change is enabled, validate passwords
+  if (currentMode.value === 'edit' && showPasswordFields.value) {
+    const hasValidPassword = form.value.new_password && 
+                            form.value.new_password.length >= 6 &&
+                            form.value.new_password === form.value.confirm_password
+    return hasRequiredFields && hasValidPassword
+  }
+  
+  return hasRequiredFields
 })
 
 // Methods
@@ -356,8 +416,17 @@ const switchToEditMode = () => {
   emit('mode-changed', 'edit')
 }
 
+const togglePasswordChange = () => {
+  showPasswordFields.value = !showPasswordFields.value
+  if (!showPasswordFields.value) {
+    form.value.new_password = ''
+    form.value.confirm_password = ''
+  }
+}
+
 const openModal = () => {
   clearError()
+  showPasswordFields.value = false
   currentMode.value = props.mode
   if ((props.mode === 'edit' || props.mode === 'view') && props.customer) {
     populateForm()
@@ -369,6 +438,7 @@ const openModal = () => {
 
 const closeModal = () => {
   if (!isLoading.value) {
+    showPasswordFields.value = false
     currentMode.value = props.mode // Reset to original mode
     hide()
     emit('close')
@@ -388,6 +458,8 @@ const resetForm = () => {
     email: '',
     phone: '',
     password: '',
+    new_password: '',
+    confirm_password: '',
     delivery_address: {
       street: '',
       city: '',
@@ -397,6 +469,7 @@ const resetForm = () => {
     loyalty_points: 0,
     status: 'active'
   }
+  showPasswordFields.value = false
 }
 
 const populateForm = () => {
@@ -407,6 +480,8 @@ const populateForm = () => {
       email: props.customer.email || '',
       phone: props.customer.phone || '',
       password: '', // Never populate password for security
+      new_password: '',
+      confirm_password: '',
       delivery_address: {
         street: props.customer.delivery_address?.street || '',
         city: props.customer.delivery_address?.city || '',
@@ -449,17 +524,19 @@ const handleSubmit = async () => {
       delivery_address: form.value.delivery_address
     }
 
+    // For create mode, password is required
     if (currentMode.value === 'create') {
       customerData.password = form.value.password
-    } else {
-      if (form.value.password.trim()) {
-        customerData.password = form.value.password
-      }
-    }
-
-    if (currentMode.value === 'edit') {
+    } 
+    // For edit mode, only include password if changing it
+    else if (currentMode.value === 'edit') {
       customerData.loyalty_points = form.value.loyalty_points
       customerData.status = form.value.status
+      
+      // Include new password only if user chose to change it
+      if (showPasswordFields.value && form.value.new_password) {
+        customerData.password = form.value.new_password
+      }
     }
 
     let result
@@ -502,8 +579,9 @@ defineExpose({
   closeModal
 })
 </script>
+
 <style scoped>
-/* All your existing styles remain the same */
+/* All existing styles remain the same */
 .modal-backdrop {
   position: fixed;
   top: 0;
@@ -555,6 +633,15 @@ defineExpose({
   background-color: var(--surface-secondary);
 }
 
+/* New Password Change Section Styles */
+.password-change-section {
+  padding: 1rem;
+  background-color: var(--surface-secondary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
+}
+
 .form-control:focus,
 .form-select:focus {
   border-color: var(--border-accent) !important;
@@ -563,17 +650,29 @@ defineExpose({
 
 .form-text {
   font-size: 0.875em;
-  color: #6c757d;
+  color: var(--text-tertiary-medium);
   margin-top: 0.25rem;
+  display: block;
 }
 
 .form-label {
   display: block;
 }
 
-.form-text {
-  font-size: 0.875rem;
+.is-invalid {
+  border-color: var(--border-error) !important;
+}
+
+.invalid-feedback {
+  display: none;
+  width: 100%;
   margin-top: 0.25rem;
+  font-size: 0.875em;
+  color: var(--status-error);
+}
+
+.invalid-feedback.d-block {
+  display: block !important;
 }
 
 .address-fields .row {
@@ -653,7 +752,9 @@ defineExpose({
 .gap-3 { gap: 0.75rem; }
 .mb-0 { margin-bottom: 0; }
 .mb-2 { margin-bottom: 0.5rem; }
+.mb-3 { margin-bottom: 0.75rem; }
 .mb-4 { margin-bottom: 1rem; }
+.me-1 { margin-right: 0.25rem; }
 .me-2 { margin-right: 0.5rem; }
 .fw-medium { font-weight: 500; }
 .fw-semibold { font-weight: 600; }

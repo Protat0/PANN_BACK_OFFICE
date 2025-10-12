@@ -20,8 +20,8 @@ class PromotionApiService {
     let targetType = 'all';
     let targetIds = [];
     
-    if (frontendData.affected_products) {
-      if (frontendData.affected_products === 'all') {
+    if (frontendData.affected_category) {
+      if (frontendData.affected_category === 'all') {
         targetType = 'all';
         targetIds = [];
       } else {
@@ -32,7 +32,7 @@ class PromotionApiService {
           'drinks': ['CTGY-002'], 
           'toppings': ['CTGY-003']
         };
-        targetIds = categoryMapping[frontendData.affected_products] || [];
+        targetIds = categoryMapping[frontendData.affected_category] || [];
       }
     }
 
@@ -60,6 +60,7 @@ class PromotionApiService {
       start_date: backendData.start_date,
       end_date: backendData.end_date,
       status: backendData.status,
+      is_deleted: backendData.isDeleted || false,
       last_updated: backendData.updated_at || backendData.last_updated,
       target_type: backendData.target_type,
       usage_limit: backendData.usage_limit,
