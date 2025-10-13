@@ -14,8 +14,8 @@
       :add-options="addOptions"
       :selected-items="selectedPromotions"
       :selection-actions="selectionActions"
-      :filters="filters"
-      :search-value="searchFilter"
+      :filters="filterOptions"
+      :search-value="searchQuery"
       :show-columns-button="false"
       :show-export-button="true"
       :exporting="exporting"
@@ -70,7 +70,7 @@
           <th>End Date</th>
           <th>Status</th>
           <th>Last Updated</th>
-          <th>Actions</th>
+          <th class="actions-column">Actions</th>
         </tr>
       </template>
 
@@ -118,7 +118,8 @@
             {{ formatDateTime(promotion.last_updated) }}
           </td>
           <td>
-            <div class="d-flex gap-1">
+            <div class="d-flex gap-1 justify-content-start">
+              <!-- View Button -->
               <button
                 class="btn btn-outline btn-sm action-btn action-btn-view"
                 @click="viewPromotion(promotion)"
@@ -126,6 +127,8 @@
               >
                 <Eye :size="14" />
               </button>
+              
+              <!-- Edit Button -->
               <button
                 class="btn btn-outline btn-sm action-btn action-btn-edit"
                 @click="editPromotion(promotion)"
@@ -133,9 +136,34 @@
               >
                 <Edit :size="14" />
               </button>
+              
+              <!-- ✅ Deactivate/Reactivate Button -->
+              <button
+                v-if="promotion.status === 'active'"
+                class="btn btn-outline btn-sm action-btn action-btn-pause"
+                @click="handleDeactivatePromotion(promotion)"
+                :disabled="togglingStatus[promotion.promotion_id]"
+                title="Deactivate Promotion"
+              >
+                <PauseCircle :size="14" v-if="!togglingStatus[promotion.promotion_id]" />
+                <span v-else class="spinner-border spinner-border-sm"></span>
+              </button>
+              
+              <button
+                v-else-if="promotion.status === 'inactive' || promotion.status === 'scheduled'"
+                class="btn btn-outline btn-sm action-btn action-btn-play"
+                @click="handleActivatePromotion(promotion)"
+                :disabled="togglingStatus[promotion.promotion_id]"
+                title="Activate Promotion"
+              >
+                <PlayCircle :size="14" v-if="!togglingStatus[promotion.promotion_id]" />
+                <span v-else class="spinner-border spinner-border-sm"></span>
+              </button>
+              
+              <!-- Delete Button -->
               <button
                 class="btn btn-outline btn-sm action-btn action-btn-delete"
-                @click="deletePromotion(promotion)"
+                @click="handleDeletePromotion(promotion)"
                 title="Delete Promotion"
               >
                 <Trash2 :size="14" />
@@ -164,356 +192,361 @@
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { Eye, Edit, Trash2, PauseCircle, PlayCircle } from 'lucide-vue-next'
 import ActionBar from '@/components/common/ActionBar.vue'
 import TableTemplate from '@/components/common/TableTemplate.vue'
 import AddPromoModal from '@/components/promotions/AddPromoModal.vue'
-import promotionApiService from '@/services/apiPromotions.js'
+import { usePromotions } from '@/composables/api/usePromotions'
+import { useToast } from '@/composables/ui/useToast'
 
-export default {
-  name: 'Promotions',
-  components: {
-    ActionBar,
-    TableTemplate,
-    AddPromoModal
+// ✅ Composables
+const {
+  promotions,
+  loading,
+  error,
+  pagination,
+  filters,
+  searchQuery,
+  selectedPromotions,
+  fetchPromotions,
+  deletePromotion: deletePromotionAction,
+  deleteMultiplePromotions,
+  activatePromotion: activatePromotionAction,
+  deactivatePromotion: deactivatePromotionAction,
+  setFilters,
+  setSearchQuery,
+  setPage,
+  clearSelection
+} = usePromotions()
+
+const { success: showSuccess, error: showError } = useToast()
+
+// ✅ Local State
+const addPromoModal = ref(null)
+const exporting = ref(false)
+const togglingStatus = ref({}) // Track loading state for each promo
+
+// ✅ Computed
+const isAllSelected = computed(() => {
+  return promotions.value.length > 0 && selectedPromotions.value.length === promotions.value.length
+})
+
+const isIndeterminate = computed(() => {
+  return selectedPromotions.value.length > 0 && selectedPromotions.value.length < promotions.value.length
+})
+
+const addOptions = computed(() => [
+  {
+    key: 'single',
+    icon: 'Plus',
+    title: 'Add Single Promotion',
+    description: 'Create a new promotional campaign'
+  }
+])
+
+const selectionActions = computed(() => [
+  {
+    key: 'delete',
+    icon: 'Trash2',
+    label: 'Delete',
+    buttonClass: selectedPromotions.value.length > 0 ? 'btn-delete-dynamic has-items' : 'btn-delete-dynamic no-items'
+  }
+])
+
+// ✅ Filter options for ActionBar
+const filterOptions = computed(() => [
+  {
+    key: 'discountType',
+    label: 'Discount Type',
+    value: filters.value.discountType,
+    options: [
+      { value: 'all', label: 'All Types' },
+      { value: 'percentage', label: 'Percentage' },
+      { value: 'fixed_amount', label: 'Fixed Amount' },
+      { value: 'buy_x_get_y', label: 'BOGO' }
+    ]
   },
-  data() {
-    return {
-      promotions: [],
-      selectedPromotions: [],
-      pagination: {
-        current_page: 1,
-        total_pages: 1,
-        total_items: 0,
-        items_per_page: 20
-      },
-      
-      // UI State
-      loading: false,
-      error: null,
-      exporting: false,
-      
-      // Filters
-      discountTypeFilter: 'all',
-      statusFilter: 'all',
-      searchFilter: ''
-    }
-  },
-  computed: {
-    isAllSelected() {
-      return this.promotions.length > 0 && this.selectedPromotions.length === this.promotions.length
-    },
-    isIndeterminate() {
-      return this.selectedPromotions.length > 0 && this.selectedPromotions.length < this.promotions.length
-    },
-    addOptions() {
-      return [
-        {
-          key: 'single',
-          icon: 'Plus',
-          title: 'Add Single Promotion',
-          description: 'Create a new promotional campaign'
-        }
-      ]
-    },
-    selectionActions() {
-      return [
-        {
-          key: 'delete',
-          icon: 'Trash2',
-          label: 'Delete',
-          buttonClass: 'btn-delete-dynamic has-items'
-        }
-      ]
-    },
-    filters() {
-      return [
-        {
-          key: 'discountType',
-          label: 'Discount Type',
-          value: this.discountTypeFilter,
-          options: [
-            { value: 'all', label: 'All Types' },
-            { value: 'percentage', label: 'Percentage' },
-            { value: 'fixed_amount', label: 'Fixed Amount' },
-            { value: 'buy_x_get_y', label: 'BOGO' }
-          ]
-        },
-        {
-          key: 'status',
-          label: 'Status',
-          value: this.statusFilter,
-          options: [
-            { value: 'all', label: 'All Status' },
-            { value: 'active', label: 'Active' },
-            { value: 'inactive', label: 'Inactive' },
-            { value: 'expired', label: 'Expired' },
-            { value: 'scheduled', label: 'Scheduled' }
-          ]
-        }
-      ]
-    }
-  },
-  async mounted() {
-    await this.loadPromotions()
-  },
-  methods: {
-    handleAddAction(actionKey) {
-      if (actionKey === 'single') {
-        this.handleSinglePromo()
-      }
-    },
+  {
+    key: 'status',
+    label: 'Status',
+    value: filters.value.status,
+    options: [
+      { value: 'all', label: 'All Status' },
+      { value: 'active', label: 'Active' },
+      { value: 'inactive', label: 'Inactive' },
+      { value: 'expired', label: 'Expired' },
+      { value: 'scheduled', label: 'Scheduled' }
+    ]
+  }
+])
 
-    handleSelectionAction(actionKey) {
-      if (actionKey === 'delete') {
-        this.deleteSelected()
-      }
-    },
-
-    handleFilterChange(filterKey, value) {
-      if (filterKey === 'discountType') {
-        this.discountTypeFilter = value
-      } else if (filterKey === 'status') {
-        this.statusFilter = value
-      }
-      this.applyFilters()
-    },
-
-    handleSearchInput(value) {
-      this.searchFilter = value
-      this.applyFilters()
-    },
-
-    handleSearchClear() {
-      this.searchFilter = ''
-      this.applyFilters()
-    },
-
-    toggleSelectAll(event) {
-      if (event.target.checked) {
-        this.selectedPromotions = this.promotions.map(p => p.promotion_id)
-      } else {
-        this.selectedPromotions = []
-      }
-    },
-
-    async loadPromotions() {
-      try {
-        this.loading = true
-        this.error = null
-        
-        const params = {
-          page: this.pagination.current_page,
-          limit: this.pagination.items_per_page
-        }
-        
-        if (this.discountTypeFilter !== 'all') {
-          params.discount_type = this.discountTypeFilter
-        }
-        if (this.statusFilter !== 'all') {
-          params.status = this.statusFilter
-        }
-        if (this.searchFilter.trim()) {
-          params.search_query = this.searchFilter.trim()
-        }
-        
-        const response = await promotionApiService.getAllPromotions(params)
-        
-        if (response.success) {
-          this.promotions = response.promotions
-          this.pagination = response.pagination
-        } else {
-          this.error = response.message || 'Failed to load promotions'
-        }
-        
-      } catch (error) {
-        console.error('Error loading promotions:', error)
-        this.error = error.message
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async refreshPromotions() {
-      this.selectedPromotions = []
-      await this.loadPromotions()
-    },
-
-    async applyFilters() {
-      this.pagination.current_page = 1
-      this.selectedPromotions = []
-      await this.loadPromotions()
-    },
-
-    async handlePageChange(page) {
-      this.pagination.current_page = page
-      await this.loadPromotions()
-    },
-
-    handleSinglePromo() {
-      if (this.$refs.addPromoModal && this.$refs.addPromoModal.openAdd) {
-        this.$refs.addPromoModal.openAdd()
-      }
-    },
-
-    async exportData() {
-      this.exporting = true
-      
-      try {
-        const filters = {}
-        if (this.discountTypeFilter !== 'all') {
-          filters.discount_type = this.discountTypeFilter
-        }
-        if (this.statusFilter !== 'all') {
-          filters.status = this.statusFilter
-        }
-        
-        const exportData = await promotionApiService.exportPromotions(filters, 'json')
-        
-        const blob = new Blob([exportData], { type: 'application/json' })
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `promotions_${new Date().toISOString().split('T')[0]}.json`
-        link.click()
-        window.URL.revokeObjectURL(url)
-        
-      } catch (error) {
-        console.error('Export error:', error)
-        this.error = 'Export failed: ' + error.message
-      } finally {
-        this.exporting = false
-      }
-    },
-
-    async deleteSelected() {
-      if (this.selectedPromotions.length === 0) return
-      
-      const confirmed = confirm(`Delete ${this.selectedPromotions.length} promotion(s)?`)
-      if (!confirmed) return
-
-      try {
-        this.loading = true
-        const result = await promotionApiService.deleteMultiplePromotions(this.selectedPromotions)
-        
-        if (result.success) {
-          const successCount = result.results.filter(r => r.success).length
-          alert(`Successfully deleted ${successCount} promotion(s)`)
-          this.selectedPromotions = []
-          await this.loadPromotions()
-        }
-      } catch (error) {
-        console.error('Bulk delete error:', error)
-        this.error = 'Delete failed: ' + error.message
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async deletePromotion(promotion) {
-      const confirmed = confirm(`Delete promotion "${promotion.promotion_name}"?`)
-      if (!confirmed) return
-
-      try {
-        this.loading = true
-        const result = await promotionApiService.deletePromotion(promotion.promotion_id)
-        
-        if (result.success) {
-          alert('Promotion deleted successfully')
-          await this.loadPromotions()
-        } else {
-          this.error = 'Delete failed: ' + result.message
-        }
-      } catch (error) {
-        console.error('Delete error:', error)
-        this.error = 'Delete failed: ' + error.message
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async handlePromotionSaved() {
-      await this.refreshPromotions()
-    },
-
-    viewPromotion(promotion) {
-      if (this.$refs.addPromoModal && this.$refs.addPromoModal.openView) {
-        this.$refs.addPromoModal.openView(promotion)
-      }
-    },
-
-    editPromotion(promotion) {
-      if (this.$refs.addPromoModal && this.$refs.addPromoModal.openEdit) {
-        this.$refs.addPromoModal.openEdit(promotion)
-      }
-    },
-
-    // Formatting methods
-    formatDiscountType(type) {
-      const types = {
-        'percentage': 'Percentage',
-        'fixed_amount': 'Fixed Amount',
-        'buy_x_get_y': 'BOGO'
-      }
-      return types[type] || type
-    },
-
-    formatDiscountValue(value, type) {
-      if (type === 'percentage') {
-        return `${value}%`
-      } else if (type === 'fixed_amount') {
-        return `₱${value}`
-      }
-      return value
-    },
-
-    formatStatus(status) {
-      const statuses = {
-        'active': 'Active',
-        'inactive': 'Inactive',
-        'expired': 'Expired',
-        'scheduled': 'Scheduled'
-      }
-      return statuses[status] || status
-    },
-
-    formatDate(dateString) {
-      if (!dateString) return '-'
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      })
-    },
-
-    formatDateTime(dateString) {
-      if (!dateString) return '-'
-      return new Date(dateString).toLocaleString()
-    },
-
-    getDiscountTypeBadgeClass(type) {
-      const classes = {
-        'percentage': 'bg-primary',
-        'fixed_amount': 'bg-success',
-        'buy_x_get_y': 'bg-info'
-      }
-      return classes[type] || 'bg-secondary'
-    },
-
-    getStatusBadgeClass(status) {
-      const classes = {
-        'active': 'bg-success',
-        'inactive': 'bg-secondary',
-        'expired': 'bg-danger',
-        'scheduled': 'bg-warning'
-      }
-      return classes[status] || 'bg-secondary'
-    }
+// ✅ Methods
+const handleAddAction = (actionKey) => {
+  if (actionKey === 'single') {
+    handleSinglePromo()
   }
 }
+
+const handleSelectionAction = async (actionKey) => {
+  if (actionKey === 'delete') {
+    await deleteSelected()
+  }
+}
+
+const handleFilterChange = (filterKey, value) => {
+  console.log('🔍 Filter changed:', filterKey, value)
+  setFilters({ [filterKey]: value })
+  fetchPromotions()
+}
+
+const handleSearchInput = (value) => {
+  console.log('🔍 Search input:', value)
+  setSearchQuery(value)
+  fetchPromotions()
+}
+
+const handleSearchClear = () => {
+  console.log('🔍 Search cleared')
+  setSearchQuery('')
+  fetchPromotions()
+}
+
+const toggleSelectAll = (event) => {
+  if (event.target.checked) {
+    selectedPromotions.value = promotions.value.map(p => p.promotion_id)
+  } else {
+    clearSelection()
+  }
+}
+
+const handlePageChange = (page) => {
+  console.log('📄 Page changed to:', page)
+  setPage(page)
+  fetchPromotions()
+}
+
+const refreshPromotions = async () => {
+  clearSelection()
+  await fetchPromotions()
+}
+
+const handleSinglePromo = () => {
+  if (addPromoModal.value && addPromoModal.value.openAdd) {
+    addPromoModal.value.openAdd()
+  }
+}
+
+const exportData = async () => {
+  exporting.value = true
+  
+  try {
+    const exportFilters = {}
+    if (filters.value.discountType !== 'all') {
+      exportFilters.discount_type = filters.value.discountType
+    }
+    if (filters.value.status !== 'all') {
+      exportFilters.status = filters.value.status
+    }
+    
+    // Basic export to JSON for now
+    const dataToExport = {
+      promotions: promotions.value,
+      filters: exportFilters,
+      exported_at: new Date().toISOString(),
+      total_count: pagination.value.total_items
+    }
+    
+    const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `promotions_${new Date().toISOString().split('T')[0]}.json`
+    link.click()
+    window.URL.revokeObjectURL(url)
+    
+    showSuccess('✅ Export completed successfully!')
+  } catch (err) {
+    console.error('Export error:', err)
+    showError('❌ Export failed: ' + err.message)
+  } finally {
+    exporting.value = false
+  }
+}
+
+const deleteSelected = async () => {
+  if (selectedPromotions.value.length === 0) return
+  
+  const confirmed = confirm(`Delete ${selectedPromotions.value.length} promotion(s)?`)
+  if (!confirmed) return
+
+  try {
+    const result = await deleteMultiplePromotions(selectedPromotions.value)
+    
+    if (result.success) {
+      const successCount = result.results.filter(r => r.success).length
+      showSuccess(`✅ Successfully deleted ${successCount} promotion(s)`)
+      clearSelection()
+      await fetchPromotions()
+    } else {
+      showError('❌ Some promotions could not be deleted')
+    }
+  } catch (err) {
+    console.error('Bulk delete error:', err)
+    showError('❌ Delete failed: ' + err.message)
+  }
+}
+
+const handleDeletePromotion = async (promotion) => {
+  const confirmed = confirm(`Delete promotion "${promotion.promotion_name}"?`)
+  if (!confirmed) return
+
+  try {
+    const result = await deletePromotionAction(promotion.promotion_id)
+    
+    if (result.success) {
+      showSuccess('✅ Promotion deleted successfully')
+      await fetchPromotions()
+    } else {
+      showError('❌ Delete failed: ' + (result.message || 'Unknown error'))
+    }
+  } catch (err) {
+    console.error('Delete error:', err)
+    showError('❌ Delete failed: ' + err.message)
+  }
+}
+
+// ✅ Activate Promotion
+const handleActivatePromotion = async (promotion) => {
+  const confirmed = confirm(`Activate promotion "${promotion.promotion_name}"?`)
+  if (!confirmed) return
+
+  try {
+    togglingStatus.value[promotion.promotion_id] = true
+    const result = await activatePromotionAction(promotion.promotion_id)
+    
+    if (result && result.success) {
+      showSuccess(`✅ Promotion "${promotion.promotion_name}" activated successfully`)
+      await fetchPromotions()
+    } else {
+      showError('❌ Activation failed: ' + (result?.message || 'Unknown error'))
+    }
+  } catch (err) {
+    console.error('Activation error:', err)
+    showError('❌ Activation failed: ' + err.message)
+  } finally {
+    togglingStatus.value[promotion.promotion_id] = false
+  }
+}
+
+// ✅ Deactivate Promotion
+const handleDeactivatePromotion = async (promotion) => {
+  const confirmed = confirm(`Deactivate promotion "${promotion.promotion_name}"?`)
+  if (!confirmed) return
+
+  try {
+    togglingStatus.value[promotion.promotion_id] = true
+    const result = await deactivatePromotionAction(promotion.promotion_id)
+    
+    if (result && result.success) {
+      showSuccess(`✅ Promotion "${promotion.promotion_name}" deactivated successfully`)
+      await fetchPromotions()
+    } else {
+      showError('❌ Deactivation failed: ' + (result?.message || 'Unknown error'))
+    }
+  } catch (err) {
+    console.error('Deactivation error:', err)
+    showError('❌ Deactivation failed: ' + err.message)
+  } finally {
+    togglingStatus.value[promotion.promotion_id] = false
+  }
+}
+
+const handlePromotionSaved = async () => {
+  await refreshPromotions()
+}
+
+const viewPromotion = (promotion) => {
+  if (addPromoModal.value && addPromoModal.value.openView) {
+    addPromoModal.value.openView(promotion)
+  }
+}
+
+const editPromotion = (promotion) => {
+  if (addPromoModal.value && addPromoModal.value.openEdit) {
+    addPromoModal.value.openEdit(promotion)
+  }
+}
+
+// ✅ Formatting methods
+const formatDiscountType = (type) => {
+  const types = {
+    'percentage': 'Percentage',
+    'fixed_amount': 'Fixed Amount',
+    'buy_x_get_y': 'BOGO'
+  }
+  return types[type] || type
+}
+
+const formatDiscountValue = (value, type) => {
+  if (type === 'percentage') return `${value}%`
+  if (type === 'fixed_amount') return `₱${value}`
+  return value
+}
+
+const formatStatus = (status) => {
+  const statuses = {
+    'active': 'Active',
+    'inactive': 'Inactive',
+    'expired': 'Expired',
+    'scheduled': 'Scheduled'
+  }
+  return statuses[status] || status
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return '-'
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  })
+}
+
+const formatDateTime = (dateString) => {
+  if (!dateString) return '-'
+  return new Date(dateString).toLocaleString()
+}
+
+const getDiscountTypeBadgeClass = (type) => {
+  const classes = {
+    'percentage': 'bg-primary',
+    'fixed_amount': 'bg-success',
+    'buy_x_get_y': 'bg-info'
+  }
+  return classes[type] || 'bg-secondary'
+}
+
+const getStatusBadgeClass = (status) => {
+  const classes = {
+    'active': 'bg-success',
+    'inactive': 'bg-secondary',
+    'expired': 'bg-danger',
+    'scheduled': 'bg-warning'
+  }
+  return classes[status] || 'bg-secondary'
+}
+
+// ✅ Lifecycle
+onMounted(async () => {
+  console.log('🚀 Promotions page mounted, fetching promotions...')
+  await fetchPromotions()
+})
 </script>
 
 <style scoped>
+/* ... keep all existing styles ... */
 .promotions-page {
   padding: 1.5rem;
   max-width: 1400px;
@@ -555,6 +588,12 @@ export default {
   border-right-color: transparent;
   border-radius: 50%;
   animation: spinner-border 0.75s linear infinite;
+}
+
+.spinner-border-sm {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-width: 0.15em;
 }
 
 @keyframes spinner-border {
@@ -600,12 +639,21 @@ export default {
   text-align: center;
 }
 
+.actions-column {
+  width: 180px;
+  text-align: left;
+}
+
 .d-flex {
   display: flex;
 }
 
 .gap-1 {
   gap: 0.25rem;
+}
+
+.justify-content-start {
+  justify-content: flex-start;
 }
 
 .badge {
@@ -645,5 +693,10 @@ export default {
 .badge.bg-danger {
   background: var(--status-error-bg);
   color: var(--status-error);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

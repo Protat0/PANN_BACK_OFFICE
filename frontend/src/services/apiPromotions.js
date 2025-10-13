@@ -3,20 +3,73 @@ import { api } from './api.js';
 
 class PromotionApiService {
   handleResponse(response) {
+    console.log("🔍 Handling response:", response);
+    console.log("🔍 Response data:", response.data);
+    
+    if (!response || !response.data) {
+      console.warn("⚠️ No response data");
+      return {
+        success: false,
+        message: "No response from server"
+      };
+    }
+    
     return response.data;
   }
 
   handleError(error) {
-    const message = error.response?.data?.error || 
-                   error.response?.data?.message || 
-                   error.message || 
-                   'An unexpected error occurred';
-    throw new Error(message);
+    console.error("❌ Full error object:", error);
+    console.error("❌ Error response:", error.response);
+    console.error("❌ Error response data:", error.response?.data);
+    console.error("❌ Error response status:", error.response?.status);
+    console.error("❌ Error message:", error.message);
+    
+    if (error.response) {
+      const { data, status } = error.response;
+      
+      // ✅ NEW: Extract and log all error details
+      let errorMessage = data.message || data.detail || `Request failed with status ${status}`;
+      let errorDetails = [];
+      
+      // Log detailed validation errors
+      if (data.errors) {
+        console.error("❌ Validation errors:", data.errors);
+        if (Array.isArray(data.errors)) {
+          errorDetails = data.errors;
+          // Join array errors into a readable message
+          if (data.errors.length > 0) {
+            errorMessage += '\n' + data.errors.join('\n');
+          }
+        }
+      }
+      if (data.message) {
+        console.error("❌ Backend message:", data.message);
+      }
+      if (data.detail) {
+        console.error("❌ Backend detail:", data.detail);
+      }
+      
+      // ✅ Return proper error object with full details
+      return {
+        success: false,
+        message: errorMessage,
+        errors: errorDetails,
+        status
+      };
+    }
+    
+    // ✅ Return proper error object for non-response errors
+    return {
+      success: false,
+      message: error.message || "An unknown error occurred",
+      errors: []
+    };
   }
 
   // Data transformation methods
   transformToBackend(frontendData) {
-    // Map affected_products to target_type and target_ids
+    console.log('🔄 Transforming frontend data to backend format:', frontendData)
+    
     let targetType = 'all';
     let targetIds = [];
     
@@ -26,32 +79,45 @@ class PromotionApiService {
         targetIds = [];
       } else {
         targetType = 'categories';
-        // Map the category selection to actual category IDs
-        const categoryMapping = {
-          'noodles': ['CTGY-001'],
-          'drinks': ['CTGY-002'], 
-          'toppings': ['CTGY-003']
-        };
-        targetIds = categoryMapping[frontendData.affected_category] || [];
+        targetIds = [frontendData.affected_category];
       }
     }
 
-    return {
+    console.log('📤 Target mapping:', {
+      affected_category: frontendData.affected_category,
+      target_type: targetType,
+      target_ids: targetIds
+    })
+
+    // ✅ FIX: Changed formData → frontendData and formendData → frontendData
+    const backendData = {
       name: frontendData.promotion_name,
       type: frontendData.discount_type,
-      discount_value: frontendData.discount_value,
+      discount_value: parseFloat(frontendData.discount_value),
       target_type: targetType,
       target_ids: targetIds,
-      start_date: frontendData.start_date,
-      end_date: frontendData.end_date,
+      start_date: frontendData.start_date,  // ✅ Fixed: was formData.end_date
+      end_date: frontendData.end_date,      // ✅ Fixed: was formData.end_date
       description: frontendData.description || '',
-      usage_limit: frontendData.usage_limit,
-      created_by: frontendData.created_by,
-      status: frontendData.status  // Add this line
+      usage_limit: frontendData.usage_limit ? parseInt(frontendData.usage_limit) : null, // ✅ Fixed: was formendData
+      status: frontendData.status
     };
+    
+    console.log('📦 Final backend data:', backendData)
+    return backendData;
   }
 
   transformToFrontend(backendData) {
+    console.log('🔄 Transforming backend data to frontend format:', backendData)
+    
+    // ✅ UPDATED: Reverse transformation for editing
+    let affectedCategory = 'all';
+    
+    if (backendData.target_type === 'categories' && backendData.target_ids?.length > 0) {
+      // Use the first target_id (which is already the real MongoDB category ID)
+      affectedCategory = backendData.target_ids[0];
+    }
+
     return {
       promotion_id: backendData.promotion_id || backendData._id,
       promotion_name: backendData.name,
@@ -63,9 +129,11 @@ class PromotionApiService {
       is_deleted: backendData.isDeleted || false,
       last_updated: backendData.updated_at || backendData.last_updated,
       target_type: backendData.target_type,
+      target_ids: backendData.target_ids || [], // ✅ ADD THIS LINE
       usage_limit: backendData.usage_limit,
       current_usage: backendData.current_usage || 0,
-      description: backendData.description || ''
+      description: backendData.description || '',
+      affected_category: affectedCategory // ✅ Will be real MongoDB ID
     };
   }
 
@@ -151,22 +219,42 @@ class PromotionApiService {
 
   async createPromotion(promotionData) {
     try {
-      console.log("Creating new promotion:", promotionData);
+      console.log("📤 Creating new promotion with frontend data:", promotionData);
       const backendData = this.transformToBackend(promotionData);
-      const response = await api.post('/promotions/', backendData);
-      const data = this.handleResponse(response);
+      console.log("📦 Transformed backend data:", backendData);
+      console.log("📦 Backend data stringified:", JSON.stringify(backendData, null, 2));
       
-      if (data.success && data.promotion) {
+      const response = await api.post('/promotions/', backendData);
+      console.log("✅ API response:", response);
+      
+      const data = this.handleResponse(response);
+      console.log("✅ Handled response data:", data);
+      
+      if (data && data.promotion) {
         return {
           success: true,
           promotion: this.transformToFrontend(data.promotion),
-          message: data.message
+          message: data.message || "Promotion created successfully"
         };
       }
-      return data;
+      
+      return {
+        success: true,
+        promotion: data,
+        message: "Promotion created successfully"
+      };
     } catch (error) {
-      console.error("Error creating promotion:", error);
-      this.handleError(error);
+      console.error("❌ Error creating promotion:", error);
+      console.error("❌ Error response:", error.response?.data);
+      console.error("❌ Error response errors:", error.response?.data?.errors);
+      
+      // ✅ FIX: Always return an object, never undefined
+      const errorResult = this.handleError(error);
+      return errorResult || {
+        success: false,
+        message: "Failed to create promotion",
+        errors: []
+      };
     }
   }
 
