@@ -210,11 +210,11 @@ class BatchService:
             if active_batches:
                 # Get expiry dates (filter out None values)
                 expiry_dates = [batch['expiry_date'] for batch in active_batches if batch.get('expiry_date')]
-                
+
                 if expiry_dates:
                     update_data['oldest_batch_expiry'] = min(expiry_dates)
                     update_data['newest_batch_expiry'] = max(expiry_dates)
-                    
+
                     # Check if any batch is expiring within 30 days
                     warning_date = datetime.utcnow() + timedelta(days=30)
                     update_data['expiry_alert'] = any(exp_date <= warning_date for exp_date in expiry_dates)
@@ -223,17 +223,25 @@ class BatchService:
                     update_data['oldest_batch_expiry'] = None
                     update_data['newest_batch_expiry'] = None
                     update_data['expiry_alert'] = False
-                
+
                 # Calculate total stock from active batches
                 total_stock = sum(batch['quantity_remaining'] for batch in active_batches)
                 update_data['total_stock'] = total_stock
+                update_data['stock'] = total_stock  # Sync stock field with total_stock
+
+                # Update cost_price from oldest batch (FIFO)
+                # active_batches is already sorted by expiry_date (oldest first)
+                oldest_batch = active_batches[0]
+                update_data['cost_price'] = oldest_batch.get('cost_price', 0)
             else:
                 # No active batches
                 update_data.update({
                     'oldest_batch_expiry': None,
                     'newest_batch_expiry': None,
                     'expiry_alert': False,
-                    'total_stock': 0
+                    'total_stock': 0,
+                    'stock': 0,
+                    'cost_price': 0
                 })
             
             update_data['updated_at'] = datetime.utcnow()

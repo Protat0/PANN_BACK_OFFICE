@@ -3,7 +3,7 @@
     <!-- Main Content -->
     <div class="flex-1 flex flex-col overflow-hidden">
       <!-- Loading State -->
-      <div v-if="loading" class="flex items-center justify-center h-full">
+      <div v-if="loading && !currentProduct" class="flex items-center justify-center h-full">
         <div class="text-center">
           <div class="spinner-border text-accent" role="status">
             <span class="visually-hidden">Loading...</span>
@@ -13,7 +13,7 @@
       </div>
 
       <!-- Error State -->
-      <div v-else-if="error" class="flex items-center justify-center h-full">
+      <div v-else-if="error && !currentProduct" class="flex items-center justify-center h-full">
         <div class="text-center">
           <div class="text-6xl mb-4">❌</div>
           <h2 class="text-2xl font-bold mb-2 text-error">Error Loading Product</h2>
@@ -93,173 +93,30 @@
 
         <!-- Content Area -->
         <div class="flex-1 overflow-auto p-6 surface-secondary">
-          <!-- Overview Tab -->
-          <div v-if="activeTab === 'Overview'" class="row g-4">
-            <!-- Left Column - Product Details -->
-            <div class="col-lg-8">
-              <!-- Primary Details Card -->
-              <div class="card-theme p-4 mb-4">
-                <h3 class="text-primary mb-3">Primary Details</h3>
-                
-                <div class="row mb-3">
-                  <div class="col-6">
-                    <small class="text-tertiary-medium d-block">Product Name</small>
-                    <span class="text-secondary">{{ currentProduct.product_name || 'N/A' }}</span>
-                  </div>
-                  <div class="col-6">
-                    <small class="text-tertiary-medium d-block">SKU</small>
-                    <span class="text-secondary">{{ currentProduct.SKU || 'N/A' }}</span>
-                  </div>
-                </div>
-                
-                <div class="row mb-3">
-                  <div class="col-6">
-                    <small class="text-tertiary-medium d-block">Category</small>
-                    <span class="text-secondary">{{ getCategoryDisplayName(currentProduct.category_id) }}</span>
-                  </div>
-                  <div class="col-6">
-                    <small class="text-tertiary-medium d-block">Subcategory</small>
-                    <span class="text-secondary">{{ currentProduct.subcategory_name || 'General' }}</span>
-                  </div>
-                </div>
-                
-                <div class="row mb-3">
-                  <div class="col-6">
-                    <small class="text-tertiary-medium d-block">Threshold Value</small>
-                    <span class="text-secondary">{{ currentProduct.low_stock_threshold || 0 }}</span>
-                  </div>
-                  <div class="col-6">
-                    <small class="text-tertiary-medium d-block">Expiry Date</small>
-                    <span class="text-secondary">{{ formatDate(currentProduct.expiry_date) }}</span>
-                  </div>
-                </div>
+          <!-- Overview Tab - Only render when active -->
+          <ProductOverview 
+            v-if="activeTab === 'Overview'"
+            :key="`overview-${id}`"
+            :product-id="id"
+            @adjust-stock="handleStockAdjustment"
+            @change-image="handleImageUpload"
+            @reorder="handleReorder"
+            @view-history="() => setActiveTab('Purchases')"
+          />
 
-                <div class="row">
-                  <div class="col-6">
-                    <small class="text-tertiary-medium d-block">Status</small>
-                    <span :class="currentProduct.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">
-                      {{ currentProduct.status || 'active' }}
-                    </span>
-                  </div>
-                  <div class="col-6">
-                    <small class="text-tertiary-medium d-block">Created</small>
-                    <span class="text-secondary">{{ formatDate(currentProduct.created_at) }}</span>
-                  </div>
-                </div>
-              </div>
+          <!-- Purchases Tab - Only render when active and has been visited -->
+          <ProductPurchases 
+            v-else-if="activeTab === 'Purchases' && hasVisitedTab('Purchases')"
+            :key="`purchases-${id}`"
+            :product-id="id" 
+          />
 
-              <!-- Supplier Details Card -->
-              <div class="card-theme p-4">
-                <h3 class="text-primary mb-3">Supplier Details</h3>
-                
-                <div class="row">
-                  <div class="col-6">
-                    <small class="text-tertiary-medium d-block">Supplier Name</small>
-                    <span class="text-secondary">{{ currentProduct.supplier || 'No supplier specified' }}</span>
-                  </div>
-                  <div class="col-6">
-                    <small class="text-tertiary-medium d-block">Barcode</small>
-                    <span class="text-secondary">{{ currentProduct.barcode || 'No barcode' }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Right Column - Image and Stock -->
-            <div class="col-lg-4">
-              <!-- Product Image Card -->
-              <div class="card-theme p-3 mb-4">
-                <img 
-                  :src="currentProduct.image_url || 'https://via.placeholder.com/300x200?text=No+Image'" 
-                  :alt="currentProduct.product_name" 
-                  class="img-fluid rounded"
-                  style="width: 100%; height: 200px; object-fit: cover;"
-                />
-                <div class="text-center mt-2">
-                  <button @click="handleImageUpload" class="btn btn-filter btn-sm">
-                    Change Image
-                  </button>
-                </div>
-              </div>
-
-              <!-- Stock Information Card -->
-              <div class="card-theme p-4">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                  <h5 class="text-primary mb-0">Stock Information</h5>
-                  <button @click="handleStockAdjustment" class="btn btn-edit btn-sm">
-                    Adjust Stock
-                  </button>
-                </div>
-                
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <small class="text-tertiary-medium">Current Stock</small>
-                  <span :class="getStockClass(currentProduct)" class="fw-semibold">
-                    {{ currentProduct.stock || 0 }}
-                  </span>
-                </div>
-                
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <small class="text-tertiary-medium">Low Stock Threshold</small>
-                  <span class="text-secondary fw-semibold">{{ currentProduct.low_stock_threshold || 0 }}</span>
-                </div>
-                
-                <div class="divider-theme my-3"></div>
-                
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <small class="text-tertiary-medium">Cost Price</small>
-                  <span class="text-secondary fw-semibold">₱{{ formatPrice(currentProduct.cost_price) }}</span>
-                </div>
-                
-                <!-- ✅ UPDATED: Selling Price with Promotion -->
-                <div class="mb-2">
-                  <div class="d-flex justify-content-between align-items-center">
-                    <small class="text-tertiary-medium">Selling Price</small>
-                    <div class="text-end">
-                      <!-- Show original price crossed out if promotion exists -->
-                      <div v-if="activePromotion" class="text-tertiary-medium text-decoration-line-through" style="font-size: 0.75rem;">
-                        ₱{{ formatPrice(currentProduct.selling_price) }}
-                      </div>
-                      <!-- Show discounted or regular price -->
-                      <span 
-                        :class="activePromotion ? 'text-success' : 'text-secondary'" 
-                        class="fw-semibold"
-                      >
-                        ₱{{ formatPrice(discountedPrice) }}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <!-- ✅ NEW: Promotion Badge -->
-                  <div v-if="activePromotion" class="mt-2">
-                    <span class="badge bg-success text-white" style="font-size: 0.7rem;">
-                      🎉 {{ activePromotion.promotion_name }} - {{ formatDiscount(activePromotion) }}
-                    </span>
-                  </div>
-                </div>
-
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <small class="text-tertiary-medium">Profit Margin</small>
-                  <span :class="getMarginClass(currentProduct)" class="fw-semibold">
-                    {{ calculateMargin(currentProduct) }}%
-                  </span>
-                </div>
-                
-                <div class="d-flex justify-content-between align-items-center">
-                  <small class="text-tertiary-medium">Unit Type</small>
-                  <span class="text-accent fw-semibold">{{ currentProduct.unit || 'piece' }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Other Tabs -->
-          <div v-else-if="activeTab === 'Purchases'">
-            <ProductPurchases :product-id="id" />
-          </div>
-
-          <div v-else-if="activeTab === 'Adjustments'">
-            <ProductAdjustments :product-id="id" />
-          </div>
+          <!-- Adjustments Tab - Only render when active and has been visited -->
+          <ProductAdjustments 
+            v-else-if="activeTab === 'Adjustments' && hasVisitedTab('Adjustments')"
+            :key="`adjustments-${id}`"
+            :product-id="id" 
+          />
         </div>
       </div>
     </div>
@@ -279,21 +136,24 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ChevronRight } from 'lucide-vue-next'
 import { useProducts } from '@/composables/api/useProducts'
 import { useCategories } from '@/composables/api/useCategories'
-import { usePromotions } from '@/composables/api/usePromotions' // ✅ ADD THIS
 import AddProductModal from '@/components/products/AddProductModal.vue'
 import StockUpdateModal from '@/components/products/StockUpdateModal.vue'
+import ProductOverview from '@/components/products/ProductOverview.vue'
 import ProductPurchases from '@/components/products/ProductPurchases.vue'
 import ProductAdjustments from '@/components/products/ProductAdjustments.vue'
 
 export default {
   name: 'ProductDetails',
   components: {
+    ChevronRight,
     AddProductModal,
     StockUpdateModal,
+    ProductOverview,
     ProductPurchases,
     ProductAdjustments 
   },
@@ -304,6 +164,8 @@ export default {
     }
   },
   setup(props) {
+    console.log('🎬 ProductDetails setup() called with id:', props.id)
+    
     const router = useRouter()
     
     // Template refs
@@ -316,7 +178,6 @@ export default {
       loading,
       error,
       fetchProductById,
-      updateProduct,
       deleteProduct,
       exportProducts
     } = useProducts()
@@ -326,88 +187,43 @@ export default {
       initializeCategories
     } = useCategories()
 
-    // ✅ ADD THIS: Promotions composable
-    const {
-      promotions,
-      fetchActivePromotions,
-      getApplicablePromotion,
-      calculateDiscountedPrice,
-      formatDiscount
-    } = usePromotions()
-
     // Local state
     const activeTab = ref('Overview')
     const tabs = ['Overview', 'Purchases', 'Adjustments']
     const successMessage = ref('')
+    const isInitialized = ref(false)
+    const visitedTabs = ref(new Set(['Overview'])) // Track which tabs have been visited
 
-    // ✅ ADD THIS: Computed properties for promotion
-    const activePromotion = computed(() => {
-      if (!currentProduct.value) return null
-      return getApplicablePromotion(currentProduct.value)
-    })
-
-    const discountedPrice = computed(() => {
-      if (!currentProduct.value || !activePromotion.value) {
-        return currentProduct.value?.selling_price || 0
-      }
-      return calculateDiscountedPrice(
-        currentProduct.value.selling_price,
-        activePromotion.value
-      )
-    })
-
-    // Utility functions
-    const formatDate = (date) => {
-      if (!date) return 'Not set'
-      return new Date(date).toLocaleDateString()
-    }
-
-    const formatPrice = (price) => {
-      return parseFloat(price || 0).toFixed(2)
-    }
-
-    const getCategoryDisplayName = (categoryId) => {
-      if (!categoryId) return 'Uncategorized'
-      const category = activeCategories.value.find(c => c._id === categoryId)
-      return category?.category_name || 'Unknown Category'
-    }
-
-    const getStockClass = (product) => {
-      if (product.stock === 0) return 'text-error'
-      if (product.stock <= (product.low_stock_threshold || 15)) return 'text-warning'
-      return 'text-success'
-    }
-
-    const getMarginClass = (product) => {
-      const margin = calculateMargin(product)
-      if (margin >= 40) return 'text-success'
-      if (margin >= 20) return 'text-warning'
-      return 'text-error'
-    }
-
-    const calculateMargin = (product) => {
-      const { cost_price, selling_price } = product
-      if (!cost_price || !selling_price || cost_price >= selling_price) return 0
-      return Math.round(((selling_price - cost_price) / selling_price) * 100)
+    // Check if a tab has been visited
+    const hasVisitedTab = (tab) => {
+      return visitedTabs.value.has(tab)
     }
 
     // Methods
     const handleEdit = () => {
+      console.log('✏️ Edit clicked')
       if (currentProduct.value && currentProduct.value._id) {
         addProductModal.value?.openEdit?.(currentProduct.value)
       }
     }
 
     const handleStockAdjustment = () => {
+      console.log('📦 Stock adjustment clicked')
       if (currentProduct.value && currentProduct.value._id) {
         stockUpdateModal.value?.openStock?.(currentProduct.value)
       }
     }
 
     const handleImageUpload = () => {
+      console.log('🖼️ Image upload clicked')
       if (currentProduct.value && currentProduct.value._id) {
         addProductModal.value?.openEdit?.(currentProduct.value)
       }
+    }
+
+    const handleReorder = () => {
+      console.log('🔄 Reorder clicked for product:', currentProduct.value)
+      // TODO: Implement reorder logic
     }
 
     const handleDelete = async () => {
@@ -418,51 +234,81 @@ export default {
       const confirmed = confirm(`Are you sure you want to delete "${currentProduct.value.product_name}"?`)
       if (confirmed) {
         try {
+          console.log('🗑️ Deleting product:', currentProduct.value._id)
           await deleteProduct(currentProduct.value._id)
           router.push('/products')
         } catch (err) {
-          console.error('Error deleting product:', err)
+          console.error('❌ Error deleting product:', err)
         }
       }
     }
 
     const handleExport = async () => {
       try {
+        console.log('📤 Exporting product:', currentProduct.value._id)
         const filters = { _id: currentProduct.value._id }
         await exportProducts(filters)
       } catch (err) {
-        console.error('Error exporting:', err)
+        console.error('❌ Error exporting:', err)
       }
     }
 
     const handleModalSuccess = async (result) => {
+      console.log('✅ Modal success:', result)
+      
       if (result?.message) {
         successMessage.value = result.message
         setTimeout(() => {
           successMessage.value = ''
         }, 3000)
       }
-      await fetchProductById(props.id)
+      
+      // Refresh product data after modal success
+      try {
+        await fetchProductById(props.id)
+      } catch (err) {
+        console.error('❌ Failed to refresh product after modal:', err)
+      }
     }
 
     const setActiveTab = (tab) => {
+      console.log('🔄 Switching to tab:', tab)
       activeTab.value = tab
+      
+      // Mark this tab as visited for lazy loading
+      visitedTabs.value.add(tab)
     }
 
-    // ✅ UPDATE THIS: Initialize data with promotions
     const initializeData = async () => {
+      // Prevent multiple initialization
+      if (isInitialized.value) {
+        console.log('⏭️ Already initialized, skipping')
+        return
+      }
+      
+      console.log('🚀 Initializing ProductDetails data...')
+      
       try {
+        // Only fetch product and categories here
+        // Let child components fetch their own batch data
         await Promise.all([
           initializeCategories(),
-          fetchProductById(props.id),
-          fetchActivePromotions() // ✅ ADD THIS
+          fetchProductById(props.id)
         ])
+        
+        console.log('✅ ProductDetails initialized')
+        console.log('Product:', currentProduct.value?.product_name)
+        console.log('Categories:', activeCategories.value.length)
+        
+        isInitialized.value = true
       } catch (err) {
-        console.error('Failed to initialize data:', err)
+        console.error('❌ Failed to initialize data:', err)
+        isInitialized.value = false // Allow retry
       }
     }
 
     onMounted(() => {
+      console.log('🎬 ProductDetails mounted')
       initializeData()
     })
 
@@ -477,35 +323,26 @@ export default {
       router,
       activeCategories,
       
-      // ✅ ADD THESE: Promotion data
-      activePromotion,
-      discountedPrice,
-      formatDiscount,
-      
       // Template refs
       addProductModal,
       stockUpdateModal,
       
       // Methods
       setActiveTab,
+      hasVisitedTab,
       handleDelete,
       handleEdit,
       handleStockAdjustment,
       handleImageUpload,
+      handleReorder,
       handleExport,
       handleModalSuccess,
-      initializeData,
-      formatDate,
-      formatPrice,
-      getCategoryDisplayName,
-      getStockClass,
-      getMarginClass,
-      calculateMargin
+      initializeData
     }
   }
 }
 </script>
-
+  
 <style scoped>
 /* Breadcrumb Navigation Styles */
 .breadcrumb-nav {
