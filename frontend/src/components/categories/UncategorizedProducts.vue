@@ -409,14 +409,10 @@ export default {
           throw new Error('Product or category not found')
         }
         
-        console.log(`Moving product ${product.product_name} to category ${category.category_name} > ${subcategoryName}`)
-        
         await moveProduct(productId, categoryId, subcategoryName)
-        
+
         // Remove from selections if selected
         selectedProducts.value = selectedProducts.value.filter(id => id !== productId)
-        
-        console.log(`"${product.product_name}" moved to "${category.category_name}" > "${subcategoryName}"`)
         
       } catch (error) {
         console.error('Error moving product:', error)
@@ -433,16 +429,12 @@ export default {
           throw new Error('Target category not found')
         }
         
-        console.log(`Bulk moving ${selectedProducts.value.length} products to ${category.category_name} > ${bulkTargetSubcategory.value}`)
-        
         await bulkMoveProductsToCategory(selectedProducts.value, bulkTargetCategory.value, bulkTargetSubcategory.value)
-        
+
         // Clear selections and reset form
         selectedProducts.value = []
         bulkTargetCategory.value = ''
         bulkTargetSubcategory.value = ''
-        
-        console.log(`Products moved to "${category.category_name}" > "${bulkTargetSubcategory.value}" successfully!`)
         
       } catch (error) {
         console.error('Error in bulk move:', error)
@@ -476,12 +468,10 @@ export default {
         isExporting.value = true
         
         // Export products with no category filter to get uncategorized ones
-        await exportProducts({ 
+        await exportProducts({
           category_id: null,
-          uncategorized_only: true 
+          uncategorized_only: true
         })
-        
-        console.log('Uncategorized products exported successfully')
         
       } catch (error) {
         console.error('Export failed:', error)

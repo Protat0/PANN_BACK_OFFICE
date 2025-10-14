@@ -145,11 +145,8 @@ export default {
           }
         })
 
-        console.log('Recent notifications API Response status:', response.status)
-        
         if (response.ok) {
           const result = await response.json()
-          console.log('Recent notifications response:', result)
           
           if (result.success) {
             this.notifications = result.data || []
@@ -240,7 +237,6 @@ export default {
 
         if (response.ok) {
           const result = await response.json()
-          console.log('Mark all as read response:', result)
           
           // Update all notifications to read status
           this.notifications.forEach(notification => {

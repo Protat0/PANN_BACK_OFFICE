@@ -595,7 +595,6 @@ export default {
       if (confirm(`Are you sure you want to delete "${product.product_name}"?`)) {
         try {
           await deleteProduct(product._id)
-          console.log('Product deleted successfully')
         } catch (error) {
           console.error('Failed to delete product:', error)
         }
@@ -607,7 +606,6 @@ export default {
         try {
           await bulkDeleteProducts(selectedProductIds.value)
           selectedProductIds.value = []
-          console.log('Products deleted successfully')
         } catch (error) {
           console.error('Failed to delete products:', error)
         }
@@ -617,7 +615,6 @@ export default {
     const handleExport = async () => {
       try {
         await exportProducts(filters.value)
-        console.log('Products exported successfully')
       } catch (error) {
         console.error('Export failed:', error)
       }
@@ -732,7 +729,6 @@ export default {
       try {
         const newStatus = product.status === 'active' ? 'inactive' : 'active'
         await updateProduct(product._id, { status: newStatus })
-        console.log(`Product "${product.product_name}" is now ${newStatus}`)
       } catch (error) {
         console.error('Error toggling product status:', error)
       }
@@ -743,9 +739,8 @@ export default {
         const timestamp = Date.now().toString()
         const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
         const newBarcode = `${timestamp}${random}`
-        
+
         await updateProduct(product._id, { barcode: newBarcode })
-        console.log(`Barcode generated for "${product.product_name}"`)
       } catch (error) {
         console.error('Error generating barcode:', error)
       }
@@ -865,13 +860,11 @@ export default {
     },
     
     viewProduct(product) {
-      console.log('Viewing product:', product)
-      
       if (!product || !product._id) {
         console.error('Cannot view product: missing ID')
         return
       }
-      
+
       try {
         this.$router.push(`/products/${product._id}`)
       } catch (error) {
@@ -919,22 +912,15 @@ export default {
     },
 
     handleProductSuccess(result) {
-      console.log(result.message || 'Item added')
+      // Item added successfully
     },
 
     handleStockUpdateSuccess(result) {
-      console.log(result.message || 'Stock updated successfully')
+      // Stock updated successfully
     },
 
     handleImportSuccess(result) {
-      const successCount = result.totalSuccessful || 0
-      const failedCount = result.totalFailed || 0
-      
-      if (failedCount > 0) {
-        console.log(`Import completed with warnings: ${successCount} products imported, ${failedCount} failed`)
-      } else {
-        console.log(`Import completed successfully! ${successCount} products imported`)
-      }
+      // Import completed
     },
 
     handleImportError(error) {

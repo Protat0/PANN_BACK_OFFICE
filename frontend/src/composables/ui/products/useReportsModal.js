@@ -46,7 +46,6 @@ export function useReportsModal() {
       
       if (result.success) {
         categoryStats.value = result.stats
-        console.log('Category stats fetched:', result.stats)
         return result.stats
       } else {
         throw new Error(result.error || 'Failed to fetch category stats')
@@ -107,8 +106,7 @@ export function useReportsModal() {
       
       const response = await productsApiService.getLowStockProducts(params)
       updateData(response || [])
-      
-      console.log('Low stock items fetched:', response)
+
       return response
     } catch (err) {
       error.value = err.message || 'Failed to fetch low stock items'
@@ -132,8 +130,7 @@ export function useReportsModal() {
       
       const response = await productsApiService.getExpiringProducts(queryParams)
       updateData(response || [])
-      
-      console.log('Expiring items fetched:', response)
+
       return response
     } catch (err) {
       error.value = err.message || 'Failed to fetch expiring items'

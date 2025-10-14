@@ -770,13 +770,11 @@ export default {
     }
   },
   async mounted() {
-    console.log('SupplierDetails mounted with ID:', this.supplierId)
     await this.fetchSupplierDetails()
   },
   watch: {
     supplierId: {
       handler(newId, oldId) {
-        console.log('Supplier ID changed from', oldId, 'to', newId)
         this.fetchSupplierDetails()
       },
       immediate: false
@@ -784,7 +782,6 @@ export default {
   },
   methods: {
     async fetchSupplierDetails() {
-      console.log('fetchSupplierDetails called with ID:', this.supplierId)
       this.loading = true
       this.error = null
       
@@ -845,9 +842,6 @@ export default {
             date: backendSupplier.updated_at
           }
         ]
-        
-        console.log('Supplier loaded successfully:', this.supplier.name)
-        console.log('Orders loaded:', this.orders.length)
         
       } catch (error) {
         console.error('Error fetching supplier details:', error)
@@ -911,9 +905,7 @@ export default {
             }
           }
         )
-        
-        console.log('Order created:', response.data)
-        
+
         this.closeCreateOrderModal()
         this.successMessage = `Purchase order ${orderData.id} created successfully!`
         
@@ -1266,7 +1258,7 @@ export default {
     },
 
     handleOrderEditModeChanged(isEditMode) {
-      console.log('Order edit mode changed:', isEditMode)
+      // Edit mode changed
     },
 
     bulkExportOrders() {

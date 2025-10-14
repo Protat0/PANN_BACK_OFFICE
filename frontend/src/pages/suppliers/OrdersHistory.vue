@@ -632,10 +632,7 @@ export default {
     }
 
     const refreshData = async () => {
-      console.log('Fetching orders from backend...')
       await ordersComposable.fetchOrders()
-      console.log('Orders fetched:', ordersComposable.allOrders.value.length)
-      console.log('Filtered orders:', ordersComposable.filteredOrders.value.length)
     }
 
     const applyFilters = () => {
@@ -875,7 +872,6 @@ export default {
 
     // Initialize - fetch from backend
     onMounted(async () => {
-      console.log('OrdersHistory mounted - fetching from backend')
       await refreshData()
     })
 

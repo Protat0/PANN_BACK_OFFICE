@@ -356,19 +356,13 @@ export default {
           logType = 'audit'
         }
 
-        console.log("🔍 Requesting logs with params:", {
-          limit: 100,
-          type: logType,
-          categoryFilter: this.categoryFilter
-        });
 
         const response = await APILogs.DisplayCombinedLogs({
           limit: 100,
           type: logType
         })
-        
-        console.log("📦 Raw API Response:", response);
-        
+
+
         const previousLogsLength = this.session_logs.length
         
         // FIXED: Improved response handling with better error checking
@@ -377,24 +371,19 @@ export default {
         // Check for different response formats
         if (response && response.success && Array.isArray(response.data)) {
           newLogs = response.data
-          console.log("✅ Using response.data (success format)")
         } else if (Array.isArray(response)) {
           newLogs = response
-          console.log("✅ Using direct array response")
         } else if (response && Array.isArray(response.data)) {
           newLogs = response.data
-          console.log("✅ Using response.data (direct format)")
         } else if (response && response.results && Array.isArray(response.results)) {
           // Django REST framework pagination format
           newLogs = response.results
-          console.log("✅ Using response.results (DRF pagination)")
         } else {
           console.warn("⚠️ Unexpected response format:", response)
           newLogs = []
         }
-        
-        console.log(`📊 Processed ${newLogs.length} logs`);
-        
+
+
         // FIXED: Validate that we actually have data
         if (!Array.isArray(newLogs)) {
           throw new Error('Invalid response format: expected array of logs')
@@ -442,9 +431,8 @@ export default {
         if (!isAutoRefresh) {
           this.currentPage = 1
         }
-        
-        console.log(`✅ Successfully loaded ${newLogs.length} logs`);
-        
+
+
       } catch (error) {
         console.error("❌ Error loading combined logs:", error)
         
@@ -467,9 +455,8 @@ export default {
         if (!isAutoRefresh) {
           this.session_logs = []
         }
-        
-        console.log(`❌ Error count: ${this.consecutiveErrors}, Connection lost: ${this.connectionLost}`);
-        
+
+
       } finally {
         this.loading = false
       }

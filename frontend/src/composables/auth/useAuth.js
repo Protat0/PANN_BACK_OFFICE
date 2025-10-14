@@ -26,7 +26,6 @@ export function useAuth() {
  
   // Clear authentication state
   const clearAuth = () => {
-    console.log('🧹 useAuth: Clearing authentication state')
     user.value = null
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
@@ -36,17 +35,13 @@ export function useAuth() {
 
   // ✅ NEW: Fetch current user from /auth/me/
   const fetchCurrentUser = async () => {
-    console.log('👤 useAuth: Fetching current user...')
-    
     if (!token.value) {
-      console.log('👤 useAuth: No token available, cannot fetch user')
       return false
     }
 
     try {
       const userData = await apiService.getCurrentUser()
       user.value = userData
-      console.log('👤 useAuth: User data loaded:', userData)
       return true
     } catch (err) {
       console.error('❌ useAuth: Failed to fetch user:', err.message)
@@ -58,40 +53,26 @@ export function useAuth() {
 
   // Initialize user from token on composable creation
   const initializeAuth = async () => {
-    console.log('🚀 useAuth: Initializing auth...')
-    
     if (token.value && !user.value) {
-      console.log('👤 useAuth: Token exists but no user data, fetching user...')
       await fetchCurrentUser() // ✅ Fetch user data
-    } else if (token.value && user.value) {
-      console.log('👤 useAuth: Token and user both exist, already authenticated')
     }
   }
  
   // Login method
   const login = async (email, password) => {
-    console.log('🔐 useAuth: Starting login...')
     isLoading.value = true
     error.value = null
 
     try {
       const response = await apiService.login(email, password)
-      console.log('🔐 useAuth: Login API response:', response)
-    
+
       // Sync token
       syncToken()
       await nextTick()
 
       // ✅ Fetch full user data after login
       await fetchCurrentUser()
-      
-      console.log('🎫 useAuth: Auth complete:', {
-        tokenExists: !!token.value,
-        userExists: !!user.value,
-        userId: user.value?._id,
-        isAuthenticated: isAuthenticated.value
-      })
-      
+
       return true
     } catch (err) {
       console.error('❌ useAuth: Login failed:', err.message)
@@ -105,13 +86,11 @@ export function useAuth() {
  
   // Logout method
   const logout = async () => {
-    console.log('🚪 useAuth: Starting logout...')
     isLoading.value = true
     error.value = null
-   
+
     try {
       await apiService.logout()
-      console.log('✅ useAuth: Logout API successful')
     } catch (err) {
       // Log error but still clear local state
       console.error('⚠️ useAuth: Logout API error (continuing anyway):', err.message)
@@ -119,22 +98,18 @@ export function useAuth() {
     } finally {
       clearAuth()
       isLoading.value = false
-      console.log('🧹 useAuth: Logout complete, state cleared')
     }
   }
  
   // Refresh token method
   const refresh = async () => {
-    console.log('🔄 useAuth: Refreshing token...')
-    
     if (!refreshToken.value) {
       throw new Error('No refresh token available')
     }
-   
+
     try {
       await apiService.refreshToken()
       syncToken() // Sync after refresh
-      console.log('✅ useAuth: Token refreshed successfully')
       return true
     } catch (err) {
       console.error('❌ useAuth: Token refresh failed:', err.message)
@@ -146,16 +121,12 @@ export function useAuth() {
  
   // Validate current token
   const validateToken = async () => {
-    console.log('🎫 useAuth: Validating token...')
-    
     if (!token.value) {
-      console.log('🎫 useAuth: No token to validate')
       return false
     }
-   
+
     try {
       await apiService.validateToken()
-      console.log('✅ useAuth: Token is valid')
       return true
     } catch (err) {
       console.error('❌ useAuth: Token validation failed:', err.message)
@@ -166,18 +137,10 @@ export function useAuth() {
  
   // Watch for token changes and initialize user
   watch(token, async (newToken, oldToken) => {
-    console.log('🔍 useAuth: Token changed:', { 
-      hasNew: !!newToken, 
-      hasOld: !!oldToken,
-      hasUser: !!user.value 
-    })
-    
     if (newToken && !user.value) {
-      console.log('🚀 useAuth: Token added, initializing auth...')
       await nextTick()
       await initializeAuth()
     } else if (!newToken && user.value) {
-      console.log('🧹 useAuth: Token removed, clearing user...')
       user.value = null
     }
   }, { immediate: true })

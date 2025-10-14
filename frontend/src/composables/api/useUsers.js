@@ -40,8 +40,6 @@ export function useUsers() {
     error.value = null
 
     try {
-      console.log('🔄 useUsers: Fetching users with params:', params)
-      
       const response = await userApiService.getAll({
         page: params.page || pagination.value.page,
         limit: params.limit || pagination.value.limit,
@@ -50,7 +48,7 @@ export function useUsers() {
       })
 
       users.value = response.users || []
-      
+
       // Update pagination
       pagination.value = {
         page: response.page || 1,
@@ -59,7 +57,6 @@ export function useUsers() {
         hasMore: response.has_more || false
       }
 
-      console.log(`✅ useUsers: Fetched ${users.value.length} users`)
       return response
     } catch (err) {
       error.value = err.message
@@ -80,10 +77,8 @@ export function useUsers() {
     error.value = null
 
     try {
-      console.log(`🔄 useUsers: Fetching user ${userId}`)
       const user = await userApiService.getById(userId, includeDeleted)
       selectedUser.value = user
-      console.log(`✅ useUsers: Fetched user ${userId}`)
       return user
     } catch (err) {
       error.value = err.message
@@ -103,10 +98,8 @@ export function useUsers() {
     error.value = null
 
     try {
-      console.log(`🔄 useUsers: Fetching user by email: ${email}`)
       const user = await userApiService.getByEmail(email, includeDeleted)
       selectedUser.value = user
-      console.log(`✅ useUsers: Fetched user by email`)
       return user
     } catch (err) {
       error.value = err.message
@@ -126,10 +119,8 @@ export function useUsers() {
     error.value = null
 
     try {
-      console.log(`🔄 useUsers: Fetching user by username: ${username}`)
       const user = await userApiService.getByUsername(username, includeDeleted)
       selectedUser.value = user
-      console.log(`✅ useUsers: Fetched user by username`)
       return user
     } catch (err) {
       error.value = err.message
@@ -149,10 +140,8 @@ export function useUsers() {
     error.value = null
 
     try {
-      console.log('🔄 useUsers: Fetching deleted users')
       const response = await userApiService.getDeleted(params)
       deletedUsers.value = response.users || []
-      console.log(`✅ useUsers: Fetched ${deletedUsers.value.length} deleted users`)
       return response
     } catch (err) {
       error.value = err.message
@@ -172,14 +161,12 @@ export function useUsers() {
     error.value = null
 
     try {
-      console.log('🔄 useUsers: Creating user:', userData.email)
       const newUser = await userApiService.create(userData)
-      
+
       // Add to local state
       users.value.unshift(newUser)
       pagination.value.total += 1
 
-      console.log(`✅ useUsers: User created: ${newUser._id}`)
       return newUser
     } catch (err) {
       error.value = err.message
@@ -200,9 +187,8 @@ export function useUsers() {
     error.value = null
 
     try {
-      console.log(`🔄 useUsers: Updating user ${userId}`)
       const updatedUser = await userApiService.update(userId, userData)
-      
+
       // Update in local state
       const index = users.value.findIndex(u => u._id === userId)
       if (index !== -1) {
@@ -214,7 +200,6 @@ export function useUsers() {
         selectedUser.value = updatedUser
       }
 
-      console.log(`✅ useUsers: User updated: ${userId}`)
       return updatedUser
     } catch (err) {
       error.value = err.message
@@ -234,14 +219,12 @@ export function useUsers() {
     error.value = null
 
     try {
-      console.log(`🔄 useUsers: Soft deleting user ${userId}`)
       const response = await userApiService.softDelete(userId)
-      
+
       // Remove from local state
       users.value = users.value.filter(u => u._id !== userId)
       pagination.value.total -= 1
 
-      console.log(`✅ useUsers: User deleted: ${userId}`)
       return response
     } catch (err) {
       error.value = err.message
@@ -261,16 +244,14 @@ export function useUsers() {
     error.value = null
 
     try {
-      console.log(`🔄 useUsers: Restoring user ${userId}`)
       const response = await userApiService.restore(userId)
-      
+
       // Remove from deleted users list
       deletedUsers.value = deletedUsers.value.filter(u => u._id !== userId)
-      
+
       // Optionally refetch all users to show restored user
       // await fetchUsers()
 
-      console.log(`✅ useUsers: User restored: ${userId}`)
       return response
     } catch (err) {
       error.value = err.message
@@ -290,15 +271,13 @@ export function useUsers() {
     error.value = null
 
     try {
-      console.log(`🔄 useUsers: PERMANENTLY deleting user ${userId}`)
       const response = await userApiService.hardDelete(userId)
-      
+
       // Remove from both local states
       users.value = users.value.filter(u => u._id !== userId)
       deletedUsers.value = deletedUsers.value.filter(u => u._id !== userId)
       pagination.value.total -= 1
 
-      console.log(`✅ useUsers: User permanently deleted: ${userId}`)
       return response
     } catch (err) {
       error.value = err.message

@@ -136,9 +136,6 @@ export default {
     }
   },
   setup(props) {
-    console.log('🎯 ProductDetails component mounted!');
-    console.log('🆔 Product ID from route:', props.id);
-
     const router = useRouter();
     // Remove productData ref - will be handled by composable
     const loading = ref(false);
@@ -162,17 +159,14 @@ export default {
     // Remove fetchProductData function - will come from composable
 
     const setActiveTab = (tab) => {
-      console.log('📑 Tab changed to:', tab);
       activeTab.value = tab;
     };
 
     const handleDelete = async () => {
-      console.log('🗑️ Delete button clicked for product:', props.id);
       // Will be implemented with composable
     };
 
     const handleEdit = () => {
-      console.log('✏️ Edit button clicked for product:', props.id);
       // Will be implemented with composable
     };
 
@@ -186,13 +180,11 @@ export default {
     };
 
     const handleExport = () => {
-      console.log('📤 Export button clicked for product:', props.id);
       // Will be implemented with composable
     };
 
     // Stock modal handlers
     const handleUpdateStock = () => {
-      console.log('📦 Update Stock button clicked for product:', props.id);
       // Will be implemented with composable
     };
 
@@ -207,22 +199,18 @@ export default {
 
     // ProductOverview event handlers
     const handleStockAdjustment = (product) => {
-      console.log('📦 Stock adjustment requested for:', product);
       handleUpdateStock();
     };
 
     const handleReorder = (product) => {
-      console.log('🔄 Reorder requested for:', product);
       // Will be implemented with composable
     };
 
     const handleViewHistory = (product) => {
-      console.log('📜 View history requested for:', product);
       setActiveTab('History');
     };
 
     const handleImageUpload = (product) => {
-      console.log('🖼️ Image upload requested for:', product);
       // Will be implemented with composable
     };
 

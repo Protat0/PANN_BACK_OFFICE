@@ -155,10 +155,8 @@ export function useOrdersHistory() {
       const response = await api.get('/suppliers/', {
         params: { per_page: 1000 }
       })
-      
+
       allSuppliers.value = response.data.suppliers
-      
-      console.log('Orders fetched from suppliers:', allOrders.value.length)
       
     } catch (err) {
       error.value = err.response?.data?.error || 'Failed to fetch orders history'
@@ -169,7 +167,7 @@ export function useOrdersHistory() {
   }
 
   const applyFilters = () => {
-    console.log('Filters applied:', filters.value)
+    // Filters applied via computed property
   }
 
   const clearFilters = () => {

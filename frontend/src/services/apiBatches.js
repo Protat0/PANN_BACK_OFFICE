@@ -50,7 +50,6 @@ class BatchService {
 
   async createBatch(batchData) {
     try {
-      console.log('📦 Creating batch:', batchData);
       const response = await api.post(`${this.baseEndpoint}/create/`, batchData);
       return this.handleResponse(response);
     } catch (error) {
@@ -60,7 +59,6 @@ class BatchService {
 
   async getAllBatches(filters = {}) {
     try {
-      console.log('📦 Getting all batches with filters:', filters);
       const response = await api.get(`${this.baseEndpoint}/`, { params: filters });
       return this.handleResponse(response);
     } catch (error) {
@@ -70,7 +68,6 @@ class BatchService {
 
   async getBatchById(batchId) {
     try {
-      console.log('📦 Getting batch by ID:', batchId);
       const response = await api.get(`${this.baseEndpoint}/${batchId}/`);
       return this.handleResponse(response);
     } catch (error) {
@@ -80,7 +77,6 @@ class BatchService {
 
   async updateBatchQuantity(batchId, quantityUsed, adjustmentType = 'correction', adjustedBy = null, notes = null) {
     try {
-      console.log('📦 Updating batch quantity:', { batchId, quantityUsed, adjustmentType, notes });
       const response = await api.put(`${this.baseEndpoint}/${batchId}/update-quantity/`, {
         quantity_used: quantityUsed,
         adjustment_type: adjustmentType,
@@ -95,7 +91,6 @@ class BatchService {
 
   async processBatchAdjustment(productId, quantityUsed, adjustmentType = 'correction', adjustedBy = null, notes = null) {
     try {
-      console.log('📦 Processing batch adjustment:', { productId, quantityUsed, adjustmentType, adjustedBy, notes });
       const response = await api.post(`${this.baseEndpoint}/adjust/`, {
         product_id: productId,
         quantity_used: quantityUsed,
@@ -115,7 +110,6 @@ class BatchService {
 
   async getBatchesByProduct(productId, status = null) {
     try {
-      console.log('📦 Getting batches for product:', { productId, status });
       const params = status ? { status } : {};
       const response = await api.get(`/products/${productId}/batches/`, { params });
       return this.handleResponse(response);
@@ -126,7 +120,6 @@ class BatchService {
 
   async getExpiringBatches(daysAhead = 30) {
     try {
-      console.log('📦 Getting expiring batches:', { daysAhead });
       const response = await api.get(`${this.baseEndpoint}/expiring/`, {
         params: { days_ahead: daysAhead }
       });
@@ -138,7 +131,6 @@ class BatchService {
 
   async getProductsWithExpirySummary() {
     try {
-      console.log('📦 Getting products with expiry summary');
       const response = await api.get('/products/expiry-summary/');
       return this.handleResponse(response);
     } catch (error) {
@@ -148,7 +140,6 @@ class BatchService {
 
   async getBatchStatistics() {
     try {
-      console.log('📦 Getting batch statistics');
       const response = await api.get(`${this.baseEndpoint}/statistics/`);
       return this.handleResponse(response);
     } catch (error) {
@@ -162,7 +153,6 @@ class BatchService {
 
   async processSaleFIFO(productId, quantitySold) {
     try {
-      console.log('📦 Processing FIFO sale:', { productId, quantitySold });
       const response = await api.post(`${this.baseEndpoint}/process-sale/`, {
         product_id: productId,
         quantity_sold: quantitySold
@@ -175,7 +165,6 @@ class BatchService {
 
   async getProductWithBatches(productId) {
     try {
-      console.log('📦 Getting product with batches:', productId);
       const response = await api.get(`/products/${productId}/with-batches/`);
       return this.handleResponse(response);
     } catch (error) {
@@ -185,7 +174,6 @@ class BatchService {
 
   async restockWithBatch(productId, restockData) {
     try {
-      console.log('📦 Restocking with batch:', { productId, restockData });
       const response = await api.post(`/products/${productId}/restock-batch/`, restockData);
       return this.handleResponse(response);
     } catch (error) {
@@ -199,7 +187,6 @@ class BatchService {
 
   async checkExpiryAlerts(daysAhead = 7) {
     try {
-      console.log('📦 Checking expiry alerts:', { daysAhead });
       const response = await api.post(`${this.baseEndpoint}/check-expiry-alerts/`, {
         days_ahead: daysAhead
       });
@@ -211,7 +198,6 @@ class BatchService {
 
   async markExpiredBatches() {
     try {
-      console.log('📦 Marking expired batches');
       const response = await api.post(`${this.baseEndpoint}/mark-expired/`);
       return this.handleResponse(response);
     } catch (error) {

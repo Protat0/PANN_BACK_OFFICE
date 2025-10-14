@@ -350,7 +350,6 @@ const handleAddAction = (actionKey) => {
       openAddCustomerModal()
       break
     case 'import':
-      console.log('Import customers')
       break
   }
 }
@@ -358,13 +357,11 @@ const handleAddAction = (actionKey) => {
 const handleSelectionAction = (actionKey, selectedItems) => {
   switch (actionKey) {
     case 'delete':
-      console.log('Delete selected customers:', selectedItems)
       break
   }
 }
 
 const handleFilterChange = (filterKey, value) => {
-  console.log('Filter changed:', filterKey, value)
   const filter = filters.value.find(f => f.key === filterKey)
   if (filter) {
     filter.value = value
@@ -388,7 +385,6 @@ const handleSearchClear = async () => {
 }
 
 const handleExport = () => {
-  console.log('Export customers')
 }
 
 // Modal methods
@@ -416,18 +412,16 @@ const handleModalClose = () => {
 }
 
 const handleModalSuccess = async (customerData) => {
-  console.log('Customer saved successfully:', customerData)
-  
+
   // Refresh the customers list to show the new/updated customer
   try {
     await fetchCustomers()
-    console.log('Customer list refreshed successfully')
-    
+
     // Optional: Reset to first page if adding new customer to show it at the top
     if (modalMode.value === 'create') {
       currentPage.value = 1
     }
-    
+
   } catch (error) {
     console.error('Failed to refresh customer list:', error)
     // You could add a toast notification here if you have one
@@ -463,10 +457,7 @@ const confirmDelete = async () => {
 
   try {
     await deleteCustomerAPI(customerToDelete.value._id || customerToDelete.value.customer_id)
-    
-    // Show success message
-    console.log('Customer deleted successfully')
-    
+
     closeDeleteModal()
   } catch (error) {
     console.error('Failed to delete customer:', error)
@@ -493,8 +484,7 @@ onMounted(async () => {
       deleteModalElement.value.addEventListener('hidden.bs.modal', () => {
         customerToDelete.value = null
       })
-      
-      console.log('Delete modal initialized successfully') // Add this for debugging
+
     } else {
       console.error('Delete modal element not found')
     }

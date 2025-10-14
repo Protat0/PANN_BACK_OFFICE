@@ -27,20 +27,16 @@ class SessionLogsAPI {
    */
   async DisplayCombinedLogs(params = {}) {
     try {
-        console.log("API call: Getting combined session and audit logs", params);
-        
         const queryParams = new URLSearchParams();
         if (params.limit) queryParams.append('limit', params.limit);
         if (params.type) queryParams.append('type', params.type);
-        
+
         const url = `/session-logs/combined/${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-        console.log("Making request to:", url);
-        
+
         const response = await api.get(url);
-        console.log("API Response:", response);
-        
+
         return this.handleResponse(response);
-        
+
     } catch (error) {
         console.error("Error fetching combined logs:", error);
         this.handleError(error);
@@ -52,7 +48,6 @@ class SessionLogsAPI {
    */
   async DisplayLogs(params = {}) {
     try {
-        console.log("API call: Getting all session logs");
         const response = await api.get('/session-logs/display/');
         return this.handleResponse(response);
     } catch (error) {
@@ -66,7 +61,6 @@ class SessionLogsAPI {
    */
   async DisplaySessionLogsOnly(params = {}) {
     try {
-        console.log("API call: Getting session logs only");
         return await this.DisplayCombinedLogs({ ...params, type: 'session' });
     } catch (error) {
         console.error("Error fetching session logs:", error);
@@ -79,7 +73,6 @@ class SessionLogsAPI {
    */
   async DisplayAuditLogsOnly(params = {}) {
     try {
-        console.log("API call: Getting audit logs only");
         return await this.DisplayCombinedLogs({ ...params, type: 'audit' });
     } catch (error) {
         console.error("Error fetching audit logs:", error);
@@ -92,7 +85,6 @@ class SessionLogsAPI {
    */
   async SearchLogs(params = {}) {
     try {
-        console.log("API call: Searching specific logs");
         // This endpoint doesn't exist in your URLs yet
         const response = await api.get('/session-logs/search/', { params });
         return this.handleResponse(response);

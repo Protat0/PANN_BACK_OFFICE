@@ -109,12 +109,6 @@ const isDev = computed(() => import.meta.env.DEV)
 
 // Enhanced login handler with debugging
 const handleLogin = async () => {
-  console.log('=== LOGIN PAGE: Starting login process ===')
-  console.log('LOGIN PAGE: Form data:', {
-    email: loginForm.value.email,
-    passwordLength: loginForm.value.password.length
-  })
-  
   successMessage.value = null
   
   try {
@@ -122,22 +116,9 @@ const handleLogin = async () => {
       throw new Error('Please fill in all fields')
     }
 
-    console.log('LOGIN PAGE: Calling useAuth login method...')
     const success = await login(loginForm.value.email, loginForm.value.password)
-    
-    console.log('LOGIN PAGE: Login method result:', success)
-    console.log('LOGIN PAGE: Auth state after login:', {
-      isAuthenticated: isAuthenticated.value,
-      hasUser: !!user.value,
-      hasToken: !!token.value,
-      userRole: user.value?.role,
-      userId: user.value?.id,
-      userName: user.value?.name,
-      userEmail: user.value?.email
-    })
-    
+
     if (success) {
-      console.log('LOGIN PAGE: Login successful, handling success...')
       await handleLoginSuccess()
     } else {
       console.error('LOGIN PAGE: Login failed, no success result')
@@ -152,42 +133,17 @@ const handleLogin = async () => {
 }
 
 const handleLoginSuccess = async () => {
-  console.log('LOGIN PAGE: Handling login success...')
-  
   // Wait a bit more for reactivity to settle
   await new Promise(resolve => setTimeout(resolve, 100))
-  
-  // Final verification before redirect
-  console.log('LOGIN PAGE: Final auth state check:', {
-    isAuthenticated: isAuthenticated.value,
-    user: user.value,
-    token: token.value ? 'EXISTS' : 'MISSING',
-    tokenPreview: token.value ? token.value.substring(0, 20) + '...' : null
-  })
-  
+
   successMessage.value = 'Login successful! Redirecting...'
-  
-  // Check localStorage as well
-  const storedToken = localStorage.getItem('access_token')
-  const storedRefresh = localStorage.getItem('refresh_token')
-  console.log('LOGIN PAGE: Tokens in localStorage:', {
-    accessToken: storedToken ? 'EXISTS' : 'MISSING',
-    refreshToken: storedRefresh ? 'EXISTS' : 'MISSING'
-  })
-  
+
   // Proceed with redirect even if isAuthenticated is still false
   // The router guard will handle the final token check
-  console.log('LOGIN PAGE: Redirecting to dashboard in 1 second...')
-  
   setTimeout(() => {
-    console.log('LOGIN PAGE: Executing redirect...')
     router.push('/dashboard')
-      .then(() => {
-        console.log('LOGIN PAGE: Successfully navigated to dashboard')
-      })
       .catch((error) => {
         console.error('LOGIN PAGE: Navigation error:', error)
-        console.log('LOGIN PAGE: Falling back to home route')
         router.push('/home')
       })
   }, 1000)
@@ -199,35 +155,10 @@ const handleForgotPassword = () => {
 
 // Enhanced onMounted with debugging
 onMounted(() => {
-  console.log('=== LOGIN PAGE: Component mounted ===')
-  console.log('LOGIN PAGE: Environment:', {
-    isDev: isDev.value,
-    apiBaseUrl: apiBaseUrl.value
-  })
-  
-  console.log('LOGIN PAGE: Initial auth state:', {
-    isAuthenticated: isAuthenticated.value,
-    hasUser: !!user.value,
-    hasToken: !!token.value,
-    isLoading: isLoading.value,
-    error: error.value
-  })
-  
   // Check if already authenticated
   if (isAuthenticated.value) {
-    console.log('LOGIN PAGE: User already authenticated, redirecting to dashboard')
     router.push('/dashboard')
-  } else {
-    console.log('LOGIN PAGE: User not authenticated, ready for login')
   }
-  
-  // Check localStorage tokens
-  const storedToken = localStorage.getItem('access_token')
-  const storedRefresh = localStorage.getItem('refresh_token')
-  console.log('LOGIN PAGE: Stored tokens:', {
-    accessToken: storedToken ? 'EXISTS' : 'MISSING',
-    refreshToken: storedRefresh ? 'EXISTS' : 'MISSING'
-  })
 })
 </script>
 

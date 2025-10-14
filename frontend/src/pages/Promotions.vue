@@ -296,19 +296,16 @@ const handleSelectionAction = async (actionKey) => {
 }
 
 const handleFilterChange = (filterKey, value) => {
-  console.log('🔍 Filter changed:', filterKey, value)
   setFilters({ [filterKey]: value })
   fetchPromotions()
 }
 
 const handleSearchInput = (value) => {
-  console.log('🔍 Search input:', value)
   setSearchQuery(value)
   fetchPromotions()
 }
 
 const handleSearchClear = () => {
-  console.log('🔍 Search cleared')
   setSearchQuery('')
   fetchPromotions()
 }
@@ -322,7 +319,6 @@ const toggleSelectAll = (event) => {
 }
 
 const handlePageChange = (page) => {
-  console.log('📄 Page changed to:', page)
   setPage(page)
   fetchPromotions()
 }

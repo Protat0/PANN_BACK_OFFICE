@@ -207,19 +207,11 @@ export default {
 
     // Flatten all usage_history from all batches into one array
     const allAdjustments = computed(() => {
-      console.log('🔍 Computing allAdjustments...')
-      console.log('📦 Batches:', batches.value)
-      console.log('📦 Batches length:', batches.value.length)
-      
       const adjustments = []
-      
+
       batches.value.forEach(batch => {
-        console.log('🔍 Processing batch:', batch._id, batch.batch_number)
-        console.log('📋 Usage history:', batch.usage_history)
-        
         if (batch.usage_history && batch.usage_history.length > 0) {
           batch.usage_history.forEach(entry => {
-            console.log('✅ Adding adjustment entry:', entry)
             adjustments.push({
               ...entry,
               batch_id: batch._id,
@@ -227,13 +219,8 @@ export default {
               id: `${batch._id}-${entry.timestamp}` // Unique ID
             })
           })
-        } else {
-          console.log('❌ No usage_history for batch:', batch.batch_number)
         }
       })
-      
-      console.log('📊 Total adjustments found:', adjustments.length)
-      console.log('📊 All adjustments:', adjustments)
       
       // Sort by timestamp (newest first)
       return adjustments.sort((a, b) => 
@@ -348,7 +335,6 @@ export default {
     }
 
     const handleExport = () => {
-      console.log('Export adjustments:', filteredAdjustments.value)
       // TODO: Implement export functionality
     }
 
@@ -362,10 +348,8 @@ export default {
 
     // Initialize data
     const loadData = async () => {
-      console.log('🚀 Loading batches for product:', props.productId)
       try {
         await fetchBatchesByProduct(props.productId)
-        console.log('✅ Batches loaded:', batches.value)
       } catch (err) {
         console.error('❌ Failed to load batches:', err)
       }
@@ -373,7 +357,6 @@ export default {
 
     // Watch for product ID changes
     watch(() => props.productId, (newId) => {
-      console.log('🔄 Product ID changed to:', newId)
       if (newId) {
         currentPage.value = 1
         loadData()
@@ -381,7 +364,6 @@ export default {
     })
 
     onMounted(() => {
-      console.log('🎬 Component mounted with productId:', props.productId)
       loadData()
     })
 

@@ -269,23 +269,14 @@ export default {
     },
     
     handleImageUpload(event) {
-      console.log('=== handleImageUpload called ===')
-      
       const file = event.target.files[0]
       if (!file) {
-        console.log('No file selected')
         return
       }
-      
-      console.log('File selected:', {
-        name: file.name,
-        size: file.size,
-        type: file.type
-      })
-      
+
       // Store the actual file
       this.selectedImageFile = file
-      
+
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         console.error('File too large:', file.size)
@@ -293,7 +284,7 @@ export default {
         this.clearImageData()
         return
       }
-      
+
       // Validate file type
       const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
       if (!validTypes.includes(file.type)) {
@@ -302,29 +293,24 @@ export default {
         this.clearImageData()
         return
       }
-      
-      console.log('File validation passed')
-      
+
       const reader = new FileReader()
-      
+
       reader.onload = (e) => {
-        console.log('FileReader onload triggered')
         this.imagePreview = e.target.result
         this.hasExistingImage = false // This is a new upload
-        console.log('Image preview set, length:', this.imagePreview.length)
       }
-      
+
       reader.onerror = (e) => {
         console.error('FileReader error:', e)
         alert('Error reading the image file')
         this.clearImageData()
       }
-      
+
       reader.readAsDataURL(file)
     },
 
     removeImage() {
-      console.log('Removing image')
       this.clearImageData()
     },
     
@@ -363,28 +349,23 @@ export default {
         // Handle image data
         if (this.selectedImageFile && this.imagePreview) {
           // New image uploaded
-          console.log('Adding NEW image data')
           categoryData.image_filename = this.selectedImageFile.name
           categoryData.image_size = this.selectedImageFile.size
           categoryData.image_type = this.selectedImageFile.type
           categoryData.image_url = this.imagePreview
           categoryData.image_uploaded_at = new Date().toISOString()
-        } 
+        }
         else if (this.hasExistingImage && this.imagePreview) {
           // Existing image kept (in edit mode) - don't modify image fields
-          console.log('Keeping existing image')
         }
         else if (this.isEditMode && !this.imagePreview) {
           // Image was removed in edit mode
-          console.log('Removing image in edit mode')
           categoryData.image_url = null
           categoryData.image_filename = null
           categoryData.image_size = null
           categoryData.image_type = null
           categoryData.image_uploaded_at = null
         }
-        
-        console.log('Category data to send:', categoryData)
         
         // Call the appropriate composable method
         if (this.isEditMode) {
@@ -411,22 +392,19 @@ export default {
     },
 
     openAddMode() {
-      console.log('openAddMode called')
       this.isEditMode = false
       this.editingCategoryId = null
       this.resetForm()
-      
+
       this.$nextTick(() => {
         this.showModal()
       })
     },
-    
+
     openEditMode(categoryData) {
-      console.log('Opening edit mode with data:', categoryData)
-      
       this.isEditMode = true
       this.editingCategoryId = categoryData._id || categoryData.id
-      
+
       // Populate form with existing data
       this.formData = {
         category_name: categoryData.category_name || '',
@@ -434,18 +412,16 @@ export default {
         status: categoryData.status || 'active',
         sub_categories: this.processSubCategories(categoryData.sub_categories || [])
       }
-      
+
       // Handle existing image
       if (categoryData.image_url) {
         this.imagePreview = categoryData.image_url
         this.hasExistingImage = true
         this.selectedImageFile = null
-        console.log('Loaded existing image for edit')
       } else {
         this.clearImageData()
-        console.log('No existing image to load')
       }
-      
+
       this.showModal()
     },
     

@@ -39,7 +39,6 @@ class UserApiService {
    */
   async getAll(params = {}) {
     try {
-      console.log('👥 User API: Getting all users with params:', params);
       const response = await api.get('/users/', { params });
       return this.handleResponse(response);
     } catch (error) {
@@ -54,7 +53,6 @@ class UserApiService {
    */
   async getById(userId, includeDeleted = false) {
     try {
-      console.log(`👤 User API: Getting user ${userId}`);
       const params = includeDeleted ? { include_deleted: true } : {};
       const response = await api.get(`/users/${userId}/`, { params });
       return this.handleResponse(response);
@@ -70,7 +68,6 @@ class UserApiService {
    */
   async getByEmail(email, includeDeleted = false) {
     try {
-      console.log(`📧 User API: Getting user by email: ${email}`);
       const params = includeDeleted ? { include_deleted: true } : {};
       const response = await api.get(`/users/email/${email}/`, { params });
       return this.handleResponse(response);
@@ -86,7 +83,6 @@ class UserApiService {
    */
   async getByUsername(username, includeDeleted = false) {
     try {
-      console.log(`👤 User API: Getting user by username: ${username}`);
       const params = includeDeleted ? { include_deleted: true } : {};
       const response = await api.get(`/users/username/${username}/`, { params });
       return this.handleResponse(response);
@@ -103,7 +99,6 @@ class UserApiService {
    */
   async getDeleted(params = {}) {
     try {
-      console.log('🗑️ User API: Getting deleted users');
       const response = await api.get('/users/deleted/', { params });
       return this.handleResponse(response);
     } catch (error) {
@@ -123,7 +118,6 @@ class UserApiService {
    */
   async create(userData) {
     try {
-      console.log('➕ User API: Creating user:', userData.email);
       const response = await api.post('/users/', userData);
       return this.handleResponse(response);
     } catch (error) {
@@ -138,7 +132,6 @@ class UserApiService {
    */
   async update(userId, userData) {
     try {
-      console.log(`✏️ User API: Updating user ${userId}`);
       const response = await api.put(`/users/${userId}/`, userData);
       return this.handleResponse(response);
     } catch (error) {
@@ -152,7 +145,6 @@ class UserApiService {
    */
   async softDelete(userId) {
     try {
-      console.log(`🗑️ User API: Soft deleting user ${userId}`);
       const response = await api.delete(`/users/${userId}/`);
       return this.handleResponse(response);
     } catch (error) {
@@ -166,7 +158,6 @@ class UserApiService {
    */
   async restore(userId) {
     try {
-      console.log(`♻️ User API: Restoring user ${userId}`);
       const response = await api.post(`/users/${userId}/restore/`);
       return this.handleResponse(response);
     } catch (error) {
@@ -180,7 +171,6 @@ class UserApiService {
    */
   async hardDelete(userId) {
     try {
-      console.log(`⚠️ User API: PERMANENTLY deleting user ${userId}`);
       const response = await api.delete(`/users/${userId}/hard-delete/?confirm=yes`);
       return this.handleResponse(response);
     } catch (error) {

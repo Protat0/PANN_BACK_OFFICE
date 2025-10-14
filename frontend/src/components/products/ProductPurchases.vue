@@ -315,17 +315,14 @@ export default {
     }
 
     const handleExport = () => {
-      console.log('Export batches:', batches.value)
       // TODO: Implement export functionality
     }
 
     const viewDetails = (batch) => {
-      console.log('View batch details:', batch)
       // TODO: Implement view details modal or navigation
     }
 
     const adjustQuantity = (batch) => {
-      console.log('Adjust quantity:', batch)
       // TODO: Implement adjust quantity modal
     }
 

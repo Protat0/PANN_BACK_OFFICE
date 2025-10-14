@@ -122,16 +122,14 @@ export function useSuppliers() {
       }
 
       const response = await api.get('/suppliers/', { params })
-      
+
       // Transform the backend data
       const transformedSuppliers = response.data.suppliers.map(transformSupplier)
-      
+
       suppliers.value = transformedSuppliers
       pagination.value = response.data.pagination
-      
+
       updateReportData()
-      
-      console.log('Suppliers loaded:', transformedSuppliers.length)
       
     } catch (err) {
       console.error('Error fetching suppliers:', err)

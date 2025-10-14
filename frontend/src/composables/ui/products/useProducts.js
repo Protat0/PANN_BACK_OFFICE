@@ -65,9 +65,8 @@ export function useProducts() {
   // Methods
   const fetchCategories = async () => {
     try {
-      console.log('Fetching categories for product enrichment...')
       const response = await categoryApiService.getAllCategories()
-      
+
       // Handle different response formats
       if (Array.isArray(response)) {
         categories.value = response
@@ -76,8 +75,6 @@ export function useProducts() {
       } else {
         categories.value = []
       }
-      
-      console.log(`Fetched ${categories.value.length} categories:`, categories.value.map(c => c.category_name))
     } catch (err) {
       console.error('Error fetching categories:', err)
       categories.value = [] // Fallback to empty array
@@ -87,12 +84,10 @@ export function useProducts() {
   const fetchProducts = async () => {
     loading.value = true
     error.value = null
-    
+
     try {
-      console.log('Fetching products from API...')
       const response = await productsApiService.getProducts()
-      console.log('API response:', response)
-      
+
       // Fix: Your Django API returns data in response.data
       if (response.data && Array.isArray(response.data)) {
         products.value = response.data
@@ -101,12 +96,10 @@ export function useProducts() {
       } else {
         products.value = []
       }
-      
-      console.log(`Loaded ${products.value.length} products`)
-      
+
       // ALWAYS enrich products with category info after fetching categories
       await enrichProductsWithCategoryNames()
-      
+
       applyFilters()
       await fetchReportCounts()
     } catch (err) {
@@ -123,19 +116,17 @@ export function useProducts() {
       if (categories.value.length === 0) {
         await fetchCategories()
       }
-      
+
       // Create a map for faster lookups
       const categoryMap = new Map(
         categories.value.map(cat => [cat._id, cat.category_name])
       )
-      
+
       // Enrich each product with category name
       products.value = products.value.map(product => ({
         ...product,
         category_name: categoryMap.get(product.category_id) || 'Uncategorized'
       }))
-      
-      console.log('Products enriched with category names:', products.value.slice(0, 2))
     } catch (err) {
       console.error('Error enriching products with category names:', err)
       // Fallback: add 'Uncategorized' to all products without breaking the flow

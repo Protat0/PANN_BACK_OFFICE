@@ -453,22 +453,18 @@ export default {
     }
 
     const editOrder = (order) => {
-      console.log('Edit order:', order.id)
       // Navigate to edit page or open edit modal
     }
 
     const downloadOrder = (order) => {
-      console.log('Download order:', order.id)
       // Generate and download PDF
     }
 
     const createNewOrder = () => {
-      console.log('Create new order')
       // Navigate to create order page or open modal
     }
 
     const exportOrders = () => {
-      console.log('Export orders')
       // Export filtered orders to CSV/Excel
     }
 

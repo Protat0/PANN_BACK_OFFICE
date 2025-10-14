@@ -355,26 +355,19 @@ export default {
       try {
         categoryId.value = id
         
-        console.log('🔄 Loading category data for ID:', id)
-        
         // Load category details
         await fetchCategoryById(id)
-        console.log('✅ Category loaded:', currentCategory.value)
-        
+
         // Load products for this category
         productsLoading.value = true
         productsError.value = null
-        
-        console.log('🔄 Fetching products for category:', id)
+
         const products = await fetchProductsByCategory(id)
-        console.log('✅ Products received:', products)
-        
+
         // ✅ FIXED: Ensure we're getting an array
         if (Array.isArray(products)) {
           categoryProducts.value = products
-          console.log(`✅ Set ${products.length} products to categoryProducts`)
         } else {
-          console.warn('⚠️ Products is not an array:', products)
           categoryProducts.value = []
         }
         
@@ -484,12 +477,7 @@ export default {
     }
 
     const handleAddSubCategory = () => {
-      console.log('Add subcategory button clicked')
-      console.log('Modal ref:', addSubcategoryModal.value)
-      console.log('Current category:', currentCategory.value)
-      
       if (addSubcategoryModal.value) {
-        console.log('Opening modal...')
         addSubcategoryModal.value.openModal(
           currentCategory.value._id,
           currentCategory.value.category_name || 'Unknown Category'

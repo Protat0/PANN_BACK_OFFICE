@@ -19,7 +19,6 @@ class CategoryApiService {
    */
   async CategoryData(params = {}) {
     try {
-        console.log("This API call is getting all Category");
         const response = await api.get('/category/', { params });
         return response.data;
     } catch (error) {
@@ -30,10 +29,8 @@ class CategoryApiService {
 
   async getActiveCategories() {
     try {
-      console.log("🔍 getActiveCategories: Fetching active categories only");
       const allCategories = await this.getAllCategories();
       const activeCategories = allCategories.filter(cat => cat.status === 'active' && !cat.isDeleted);
-      console.log(`✅ getActiveCategories: Found ${activeCategories.length} active categories`);
       return activeCategories;
     } catch (error) {
       console.error("❌ getActiveCategories: Error:", error);
@@ -43,10 +40,8 @@ class CategoryApiService {
 
   async getCategoryById(categoryId, includeDeleted = false) {
     try {
-      console.log(`🔍 getCategoryById: Fetching category ${categoryId}`);
       const params = includeDeleted ? { include_deleted: true } : {};
       const response = await api.get(`/category/${categoryId}/`, { params });
-      console.log(`✅ getCategoryById: Got category data:`, response.data);
       return response.data;
     } catch (error) {
       console.error(`❌ getCategoryById: Error fetching category ${categoryId}:`, error);
@@ -66,18 +61,14 @@ class CategoryApiService {
 
   async getAllCategories(params = {}) {
     try {
-      console.log("🔍 getAllCategories: Fetching all categories for products");
-      
       const response = await api.get('/category/', { params });
-      console.log("✅ getAllCategories: Got response from /category/:", response.data);
-      
+
       // Handle different response formats
       if (response.data && Array.isArray(response.data)) {
         return response.data;
       } else if (response.data && response.data.categories) {
         return response.data.categories;
       } else {
-        console.log("⚠️ getAllCategories: Unexpected response format, returning empty array");
         return [];
       }
     } catch (error) {
@@ -93,15 +84,13 @@ class CategoryApiService {
    */
   async AddCategoryData(params = {}) {
       try {
-          console.log(`This API call is making a new category called ${params.category_name}`);
-          
           const categoryData = {
               category_name: params.category_name,
               description: params.description || '',
               status: params.status || 'active',
               sub_categories: params.sub_categories || []
           };
-          
+
           // ADD IMAGE FIELDS if they exist
           if (params.image_url) {
               categoryData.image_url = params.image_url;
@@ -110,13 +99,11 @@ class CategoryApiService {
               categoryData.image_type = params.image_type;
               categoryData.image_uploaded_at = params.image_uploaded_at;
           }
-          
-          console.log('Sending category data:', categoryData);
+
           const response = await api.post('/category/', categoryData);
-          
-          console.log('Category created successfully:', response.data);
+
           return response.data;
-          
+
       } catch (error) {
           console.error(`Error creating category ${params.category_name}:`, error);
           throw error;
@@ -130,15 +117,13 @@ class CategoryApiService {
    */
     async UpdateCategoryData(params = {}) {
       try {
-          console.log(`This API call is updating category ${params.id}`);
-          
           const updateData = {
               category_name: params.category_name,
               description: params.description || '',
               status: params.status || 'active',
               sub_categories: params.sub_categories || []
           };
-          
+
           // ADD IMAGE FIELDS if they exist
           if (params.image_url) {
               updateData.image_url = params.image_url;
@@ -155,20 +140,18 @@ class CategoryApiService {
               updateData.image_type = null;
               updateData.image_uploaded_at = null;
           }
-          
+
           // Remove undefined values
           Object.keys(updateData).forEach(key => {
               if (updateData[key] === undefined) {
                   delete updateData[key];
               }
           });
-          
-          console.log('Sending update data:', updateData);
+
           const response = await api.put(`/category/${params.id}/`, updateData);
-          
-          console.log('Category updated successfully:', response.data);
+
           return response.data;
-          
+
       } catch (error) {
           console.error(`Error updating category ${params.id}:`, error);
           throw error;
@@ -182,16 +165,14 @@ class CategoryApiService {
    */
   async FindCategoryData(params = {}) {
     try {
-      console.log(`This API call is getting ${params.id} Category`);
-      
       const queryParams = {};
       if (params.include_deleted !== undefined) {
         queryParams.include_deleted = params.include_deleted;
       }
-      
+
       const response = await api.get(`/category/${params.id}/`, { params: queryParams });
       return response.data;
-      
+
     } catch (error) {
       console.error(`Error fetching specific category ${params.id} data:`, error);
       throw error;
@@ -205,43 +186,33 @@ class CategoryApiService {
    */
   async FindProdcategory(params = {}) {
     try {
-      console.log(`🔍 FindProdcategory: Fetching products for category ${params.id}`);
-      
       if (!params.id) {
         throw new Error('Category ID is required');
       }
-      
+
       let response;
-      
+
       if (params.subcategory_name) {
         // Get products for specific subcategory
-        console.log(`   Filtering by subcategory: ${params.subcategory_name}`);
         response = await api.get(`/category/${params.id}/subcategories/${encodeURIComponent(params.subcategory_name)}/products/`);
       } else {
         // Get all products for category using products API
-        console.log(`   Getting all products for category`);
         response = await api.get(`/products/reports/by-category/${params.id}/`);
       }
-      
-      console.log(`✅ FindProdcategory: Response:`, response.data);
-      
+
       // ✅ FIXED: Handle different response formats
       if (response.data) {
         if (Array.isArray(response.data)) {
-          console.log(`   Returning ${response.data.length} products (direct array)`);
           return response.data;
         } else if (response.data.products && Array.isArray(response.data.products)) {
-          console.log(`   Returning ${response.data.products.length} products (from .products)`);
           return response.data.products;
         } else if (response.data.data && Array.isArray(response.data.data)) {
-          console.log(`   Returning ${response.data.data.length} products (from .data)`);
           return response.data.data;
         }
       }
-      
-      console.log(`⚠️ FindProdcategory: Unexpected response format, returning empty array`);
+
       return [];
-      
+
     } catch (error) {
       console.error(`❌ FindProdcategory: Error fetching products for category ${params.id}:`, error);
       this.handleError(error);
@@ -258,16 +229,12 @@ class CategoryApiService {
    */
   async AddSubCategoryData(categoryId, subcategoryData) {
     try {
-      console.log(`➕ Adding subcategory to category: ${categoryId}`);
-      console.log('Subcategory data:', subcategoryData);
-      
       const response = await api.post(`/category/${categoryId}/subcategories/`, {
         subcategory: subcategoryData
       });
-      
-      console.log('✅ Subcategory added successfully:', response.data);
+
       return response.data;
-      
+
     } catch (error) {
       console.error('❌ Error adding subcategory:', error);
       throw error;
@@ -282,15 +249,12 @@ class CategoryApiService {
    */
   async RemoveSubCategoryData(categoryId, subcategoryName) {
     try {
-      console.log(`➖ Removing subcategory ${subcategoryName} from category: ${categoryId}`);
-      
       const response = await api.delete(`/category/${categoryId}/subcategories/`, {
         data: { subcategory_name: subcategoryName }
       });
-      
-      console.log('✅ Subcategory removed successfully:', response.data);
+
       return response.data;
-      
+
     } catch (error) {
       console.error('❌ Error removing subcategory:', error);
       throw error;
@@ -309,12 +273,10 @@ class CategoryApiService {
    */
   async MoveProductToCategory(params = {}) {
     try {
-      console.log('🔄 Moving product to different category:', params);
-      
       if (!params.product_id) {
         throw new Error('Product ID is required');
       }
-      
+
       if (!params.new_category_id) {
         throw new Error('New category ID is required');
       }
@@ -327,7 +289,6 @@ class CategoryApiService {
 
       const response = await api.put('/category/product-management/', payload);
 
-      console.log('✅ Product moved successfully:', response.data);
       return response.data;
 
     } catch (error) {
@@ -346,12 +307,10 @@ class CategoryApiService {
    */
   async BulkMoveProductsToCategory(params = {}) {
     try {
-      console.log('🔄 Bulk moving products to category:', params);
-      
       if (!params.product_ids || !Array.isArray(params.product_ids)) {
         throw new Error('Product IDs array is required');
       }
-      
+
       if (!params.new_category_id) {
         throw new Error('New category ID is required');
       }
@@ -364,7 +323,6 @@ class CategoryApiService {
 
       const response = await api.post('/category/product-management/', payload);
 
-      console.log('✅ Products bulk moved successfully:', response.data);
       return response.data;
 
     } catch (error) {
@@ -416,13 +374,10 @@ class CategoryApiService {
    */
   async SoftDeleteCategory(categoryId) {
     try {
-      console.log(`🗑️ Soft deleting category: ${categoryId}`);
-      
       const response = await api.delete(`/category/${categoryId}/soft-delete/`);
-      
-      console.log('✅ Category soft deleted successfully:', response.data);
+
       return response.data;
-      
+
     } catch (error) {
       console.error('❌ Error soft deleting category:', error);
       this.handleError(error);
@@ -436,13 +391,10 @@ class CategoryApiService {
    */
   async HardDeleteCategory(categoryId) {
     try {
-      console.log(`💀 Hard deleting category: ${categoryId}`);
-      
       const response = await api.delete(`/category/${categoryId}/hard-delete/`);
-      
-      console.log('✅ Category hard deleted successfully:', response.data);
+
       return response.data;
-      
+
     } catch (error) {
       console.error('❌ Error hard deleting category:', error);
       this.handleError(error);
@@ -456,13 +408,10 @@ class CategoryApiService {
    */
   async RestoreCategory(categoryId) {
     try {
-      console.log(`🔄 Restoring category: ${categoryId}`);
-      
       const response = await api.post(`/category/${categoryId}/restore/`);
-      
-      console.log('✅ Category restored successfully:', response.data);
+
       return response.data;
-      
+
     } catch (error) {
       console.error('❌ Error restoring category:', error);
       this.handleError(error);
@@ -476,13 +425,10 @@ class CategoryApiService {
    */
   async GetCategoryDeleteInfo(categoryId) {
     try {
-      console.log(`ℹ️ Getting delete info for category: ${categoryId}`);
-      
       const response = await api.get(`/category/${categoryId}/delete-info/`);
-      
-      console.log('✅ Category delete info fetched successfully:', response.data);
+
       return response.data;
-      
+
     } catch (error) {
       console.error('❌ Error fetching category delete info:', error);
       this.handleError(error);
@@ -497,13 +443,10 @@ class CategoryApiService {
    */
   async GetUncategorizedCategory() {
     try {
-      console.log('🔍 Getting Uncategorized category');
-      
       const response = await api.get('/category/uncategorized/');
-      
-      console.log('✅ Uncategorized category retrieved:', response.data);
+
       return response.data;
-      
+
     } catch (error) {
       console.error('❌ Error getting Uncategorized category:', error);
       this.handleError(error);
@@ -518,8 +461,6 @@ class CategoryApiService {
    */
   async MoveProductToUncategorized(params = {}) {
     try {
-      console.log('🔄 Moving product to Uncategorized category:', params);
-      
       if (!params.product_id) {
         throw new Error('Product ID is required');
       }
@@ -549,8 +490,6 @@ class CategoryApiService {
    */
   async BulkMoveProductsToUncategorized(params = {}) {
     try {
-      console.log('🔄 Bulk moving products to Uncategorized:', params);
-      
       if (!params.product_ids || !Array.isArray(params.product_ids)) {
         throw new Error('Product IDs array is required');
       }
@@ -580,13 +519,10 @@ class CategoryApiService {
    */
   async GetCategoryStats() {
     try {
-      console.log('📊 Getting category statistics');
-      
       const response = await api.get('/category/stats/');
-      
-      console.log('✅ Category stats retrieved:', response.data);
+
       return response.data;
-      
+
     } catch (error) {
       console.error('❌ Error getting category stats:', error);
       this.handleError(error);
@@ -602,10 +538,8 @@ class CategoryApiService {
    */
   async ExportCategoryData(params = {}) {
     try {
-      console.log('Exporting categories:', params.categories?.length)
-      
       const categories = params.categories || [];
-      
+
       if (categories.length === 0) {
         throw new Error('No categories to export')
       }

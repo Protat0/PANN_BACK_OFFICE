@@ -399,17 +399,12 @@ export default {
     const addDropdownRef = ref(null)
     const searchInputRef = ref(null)
 
-    // Debug log to check if composables are working
-    console.log('Suppliers composable:', suppliersComposable)
-    console.log('Loading state:', suppliersComposable.loading?.value)
-
     // Load suppliers on mount
     onMounted(async () => {
-      console.log('Suppliers component mounted')
       try {
         await suppliersComposable.fetchSuppliers()
         await reportsComposable.refreshReports()
-        
+
         // Add click outside listener
         document.addEventListener('click', handleClickOutside)
       } catch (error) {
@@ -600,12 +595,10 @@ export default {
     }
 
     const showActiveOrdersReport = () => {
-      console.log('Active Orders Report clicked')
       reportsComposable.openActiveOrdersModal()
     }
 
     const showTopSuppliersReport = () => {
-      console.log('Top Suppliers Report clicked')
       reportsComposable.openTopPerformersModal()
     }
 

@@ -76,8 +76,6 @@ export function useCreateOrder() {
         backendOrderData
       )
 
-      console.log('Order created:', response.data)
-
       // Close modal AFTER saving supplier name
       closeCreateOrderModal()
 

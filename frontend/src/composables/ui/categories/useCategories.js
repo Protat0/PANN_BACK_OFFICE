@@ -36,13 +36,12 @@ export function useCategories() {
     try {
       // Check if uncategorized category exists in our current categories
       const uncategorized = categories.value.find(cat => cat._id === 'UNCTGRY-001')
-      
+
       if (!uncategorized) {
-        console.log('Uncategorized category not found, will be created on next fetch')
         // The backend will create it automatically when we fetch categories
         await fetchCategories()
       }
-      
+
       return uncategorized || categories.value.find(cat => cat._id === 'UNCTGRY-001')
     } catch (error) {
       console.error('Error ensuring uncategorized category exists:', error)
@@ -82,22 +81,20 @@ export function useCategories() {
   const fetchCategories = async (params = {}) => {
     loading.value = true
     error.value = null
-    
+
     try {
-      console.log('Fetching categories...')
       const data = await categoryApiService.getAllCategories({
         include_deleted: includeDeleted.value,
         ...params
       })
-      
+
       categories.value = Array.isArray(data) ? data : []
-      console.log(`Fetched ${categories.value.length} categories`)
-      
+
       // Ensure uncategorized category exists
       await ensureUncategorizedExists()
-      
+
       applyFilters()
-      
+
     } catch (err) {
       console.error('Error fetching categories:', err)
       error.value = `Failed to load categories: ${err.message}`
@@ -110,16 +107,14 @@ export function useCategories() {
   const fetchCategoriesWithSalesData = async (params = {}) => {
     loading.value = true
     error.value = null
-    
+
     try {
-      console.log('Fetching categories with sales data...')
       const data = await categoryApiService.CategoryData(params)
-      
+
       categories.value = Array.isArray(data) ? data : (data.categories || [])
-      console.log(`Fetched ${categories.value.length} categories with sales data`)
-      
+
       applyFilters()
-      
+
     } catch (err) {
       console.error('Error fetching categories with sales data:', err)
       error.value = `Failed to load category data: ${err.message}`
@@ -149,27 +144,22 @@ export function useCategories() {
   // Fixed: Use the actual API method that exists
   const fetchUncategorizedCount = async () => {
     try {
-      console.log('Fetching uncategorized products count...')
-      
       // First, make sure we have categories loaded
       if (categories.value.length === 0) {
         await fetchCategories()
       }
-      
+
       // Check if uncategorized category exists in our loaded categories
       const uncategorizedCategory = categories.value.find(cat => cat._id === 'UNCTGRY-001')
-      
+
       if (!uncategorizedCategory) {
-        console.log('Uncategorized category not found in loaded categories')
         uncategorizedCount.value = 0
         return
       }
-      
+
       // Get products count from the category data we already have
       const productCount = getProductCount(uncategorizedCategory)
       uncategorizedCount.value = productCount
-      
-      console.log(`Found ${uncategorizedCount.value} uncategorized products`)
     } catch (error) {
       console.error('Error fetching uncategorized count:', error)
       uncategorizedCount.value = 0
@@ -179,14 +169,12 @@ export function useCategories() {
   // Fixed: Use the actual API method
   const getCategoryById = async (categoryId, includeDeleted = false) => {
     try {
-      console.log(`Fetching category ${categoryId}`)
-      
       // Use FindCategoryData which matches your API service
-      const response = await categoryApiService.FindCategoryData({ 
+      const response = await categoryApiService.FindCategoryData({
         id: categoryId,
-        include_deleted: includeDeleted 
+        include_deleted: includeDeleted
       })
-      
+
       // Handle different response formats
       let category = null
       if (response && response.category) {
@@ -194,7 +182,7 @@ export function useCategories() {
       } else if (response && typeof response === 'object' && !Array.isArray(response)) {
         category = response
       }
-      
+
       if (category) {
         // Update category in local state if it exists
         const index = categories.value.findIndex(cat => cat._id === categoryId)
@@ -203,7 +191,7 @@ export function useCategories() {
           applyFilters()
         }
       }
-      
+
       return category
     } catch (err) {
       console.error(`Error fetching category ${categoryId}:`, err)
@@ -215,21 +203,20 @@ export function useCategories() {
   const createCategory = async (categoryData) => {
     loading.value = true
     error.value = null
-    
+
     try {
-      console.log('Creating category...', categoryData)
       const newCategory = await categoryApiService.AddCategoryData(categoryData)
-      
+
       // Add to local state
       categories.value.unshift(newCategory)
       applyFilters()
-      
+
       successMessage.value = `Category "${categoryData.category_name}" created successfully`
-      
+
       setTimeout(() => {
         successMessage.value = null
       }, 3000)
-      
+
       return newCategory
     } catch (err) {
       console.error('Error creating category:', err)
@@ -243,27 +230,26 @@ export function useCategories() {
   const updateCategory = async (categoryId, updateData) => {
     loading.value = true
     error.value = null
-    
+
     try {
-      console.log(`Updating category ${categoryId}...`, updateData)
       const updatedCategory = await categoryApiService.UpdateCategoryData({
         id: categoryId,
         ...updateData
       })
-      
+
       // Update in local state
       const index = categories.value.findIndex(cat => cat._id === categoryId)
       if (index !== -1) {
         categories.value[index] = updatedCategory
         applyFilters()
       }
-      
+
       successMessage.value = `Category "${updateData.category_name || 'Unknown'}" updated successfully`
-      
+
       setTimeout(() => {
         successMessage.value = null
       }, 3000)
-      
+
       return updatedCategory
     } catch (err) {
       console.error(`Error updating category ${categoryId}:`, err)
@@ -276,23 +262,22 @@ export function useCategories() {
 
   const softDeleteCategory = async (categoryId) => {
     try {
-      console.log(`Soft deleting category ${categoryId}`)
       const result = await categoryApiService.SoftDeleteCategory(categoryId)
-      
+
       // Update in local state
       const category = categories.value.find(cat => cat._id === categoryId)
       if (category) {
         category.isDeleted = true
         category.deleted_at = new Date().toISOString()
       }
-      
+
       applyFilters()
       successMessage.value = `Category moved to trash successfully`
-      
+
       setTimeout(() => {
         successMessage.value = null
       }, 3000)
-      
+
       return result
     } catch (err) {
       console.error(`Error soft deleting category ${categoryId}:`, err)
@@ -303,20 +288,19 @@ export function useCategories() {
 
   const hardDeleteCategory = async (categoryId) => {
     try {
-      console.log(`Hard deleting category ${categoryId}`)
       const result = await categoryApiService.HardDeleteCategory(categoryId)
-      
+
       // Remove from local state
       categories.value = categories.value.filter(cat => cat._id !== categoryId)
       selectedCategories.value = selectedCategories.value.filter(id => id !== categoryId)
-      
+
       applyFilters()
       successMessage.value = `Category permanently deleted`
-      
+
       setTimeout(() => {
         successMessage.value = null
       }, 3000)
-      
+
       return result
     } catch (err) {
       console.error(`Error hard deleting category ${categoryId}:`, err)
@@ -327,23 +311,22 @@ export function useCategories() {
 
   const restoreCategory = async (categoryId) => {
     try {
-      console.log(`Restoring category ${categoryId}`)
       const result = await categoryApiService.RestoreCategory(categoryId)
-      
+
       // Update in local state
       const category = categories.value.find(cat => cat._id === categoryId)
       if (category) {
         category.isDeleted = false
         category.deleted_at = null
       }
-      
+
       applyFilters()
       successMessage.value = `Category restored successfully`
-      
+
       setTimeout(() => {
         successMessage.value = null
       }, 3000)
-      
+
       return result
     } catch (err) {
       console.error(`Error restoring category ${categoryId}:`, err)
@@ -354,7 +337,6 @@ export function useCategories() {
 
   const getCategoryDeleteInfo = async (categoryId) => {
     try {
-      console.log(`Getting delete info for category ${categoryId}`)
       return await categoryApiService.GetCategoryDeleteInfo(categoryId)
     } catch (err) {
       console.error(`Error getting delete info for category ${categoryId}:`, err)
@@ -365,16 +347,14 @@ export function useCategories() {
   // Product Management Methods - Fixed to match API
   const fetchCategoryProducts = async (categoryId, forceRefresh = false) => {
     if (loadingProducts.value[categoryId] && !forceRefresh) return
-    
+
     loadingProducts.value[categoryId] = true
-    
+
     try {
-      console.log(`Fetching products for category ${categoryId}`)
       const products = await categoryApiService.FindProdcategory({ id: categoryId })
-      
+
       categoryProducts.value[categoryId] = products
-      console.log(`Fetched ${products.length} products for category ${categoryId}`)
-      
+
       return products
     } catch (err) {
       console.error(`Error fetching products for category ${categoryId}:`, err)
@@ -387,23 +367,22 @@ export function useCategories() {
 
   const moveProductToUncategorized = async (productId, currentCategoryId) => {
     try {
-      console.log(`Moving product ${productId} to uncategorized`)
       const result = await categoryApiService.MoveProductToUncategorized({
         product_id: productId,
         current_category_id: currentCategoryId
       })
-      
+
       // Refresh category products if we have them loaded
       if (categoryProducts.value[currentCategoryId]) {
         await fetchCategoryProducts(currentCategoryId, true)
       }
-      
+
       successMessage.value = `Product moved to uncategorized successfully`
-      
+
       setTimeout(() => {
         successMessage.value = null
       }, 3000)
-      
+
       return result
     } catch (err) {
       console.error(`Error moving product to uncategorized:`, err)
@@ -414,23 +393,22 @@ export function useCategories() {
 
   const bulkMoveProductsToUncategorized = async (productIds, currentCategoryId) => {
     try {
-      console.log(`Bulk moving ${productIds.length} products to uncategorized`)
       const result = await categoryApiService.BulkMoveProductsToUncategorized({
         product_ids: productIds,
         current_category_id: currentCategoryId
       })
-      
+
       // Refresh category products if we have them loaded
       if (categoryProducts.value[currentCategoryId]) {
         await fetchCategoryProducts(currentCategoryId, true)
       }
-      
+
       successMessage.value = `${productIds.length} products moved to uncategorized successfully`
-      
+
       setTimeout(() => {
         successMessage.value = null
       }, 3000)
-      
+
       return result
     } catch (err) {
       console.error(`Error in bulk move to uncategorized:`, err)
@@ -441,24 +419,23 @@ export function useCategories() {
 
   const updateProductSubcategory = async (productId, categoryId, newSubcategory) => {
     try {
-      console.log(`Updating product ${productId} subcategory to ${newSubcategory}`)
       const result = await categoryApiService.SubCatChangeTab({
         product_id: productId,
         category_id: categoryId,
         new_subcategory: newSubcategory
       })
-      
+
       // Refresh category products if we have them loaded
       if (categoryProducts.value[categoryId]) {
         await fetchCategoryProducts(categoryId, true)
       }
-      
+
       successMessage.value = `Product subcategory updated successfully`
-      
+
       setTimeout(() => {
         successMessage.value = null
       }, 3000)
-      
+
       return result
     } catch (err) {
       console.error(`Error updating product subcategory:`, err)
@@ -470,18 +447,17 @@ export function useCategories() {
   // Subcategory Methods
   const addSubcategory = async (categoryId, subcategoryData) => {
     try {
-      console.log(`Adding subcategory to category ${categoryId}`)
       const result = await categoryApiService.AddSubCategoryData(categoryId, subcategoryData)
-      
+
       // Refresh category data
       await getCategoryById(categoryId)
-      
+
       successMessage.value = `Subcategory "${subcategoryData.name}" added successfully`
-      
+
       setTimeout(() => {
         successMessage.value = null
       }, 3000)
-      
+
       return result
     } catch (err) {
       console.error(`Error adding subcategory:`, err)
@@ -492,7 +468,6 @@ export function useCategories() {
 
   const getSubcategories = async (categoryId) => {
     try {
-      console.log(`Fetching subcategories for category ${categoryId}`)
       return await categoryApiService.getSubcategories(categoryId)
     } catch (err) {
       console.error(`Error fetching subcategories:`, err)
@@ -503,9 +478,8 @@ export function useCategories() {
   // Export Methods
   const exportCategories = async (params = {}) => {
     try {
-      console.log('Exporting categories...', params)
       const blob = await categoryApiService.ExportCategoryData(params)
-      
+
       // Create download link
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -513,13 +487,13 @@ export function useCategories() {
       a.download = `categories_${new Date().toISOString().split('T')[0]}.${params.format || 'csv'}`
       a.click()
       window.URL.revokeObjectURL(url)
-      
+
       successMessage.value = 'Categories exported successfully'
-      
+
       setTimeout(() => {
         successMessage.value = null
       }, 3000)
-      
+
     } catch (err) {
       console.error('Export failed:', err)
       error.value = `Export failed: ${err.message}`

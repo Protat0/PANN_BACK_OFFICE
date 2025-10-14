@@ -91,7 +91,6 @@ export function useAddProduct() {
   // Handle manual selling price changes
   const handleSellingPriceChange = () => {
     hasManuallyEditedSellingPrice.value = true
-    console.log('User manually edited selling price')
   }
 
   // Form initialization
@@ -187,35 +186,28 @@ export function useAddProduct() {
   // Image handling methods
   const handleImageUpload = (event) => {
     const file = event.target.files[0]
-    console.log('=== IMAGE UPLOAD DEBUG ===')
-    console.log('File selected:', file)
-    
+
     if (!file) {
-      console.log('No file selected')
       return
     }
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      console.log('Invalid file type:', file.type)
       alert('Please select a valid image file (PNG, JPG, JPEG)')
       return
     }
 
     // Validate file size (5MB limit)
     if (file.size > 5 * 1024 * 1024) {
-      console.log('File too large:', file.size)
       alert('Image size should be less than 5MB')
       return
     }
 
-    console.log('Setting imageFile.value to:', file)
     imageFile.value = file
-    
+
     // Create preview
     const reader = new FileReader()
     reader.onload = (e) => {
-      console.log('Preview created, length:', e.target.result.length)
       imagePreview.value = e.target.result
     }
     reader.onerror = (error) => {
@@ -225,11 +217,10 @@ export function useAddProduct() {
   }
   
   const removeImage = () => {
-    console.log('Removing image')
     imagePreview.value = null
     imageFile.value = null
     form.value.image = null
-    
+
     // Clear file input if it exists
     const fileInput = document.querySelector('input[type="file"]')
     if (fileInput) {
@@ -239,14 +230,12 @@ export function useAddProduct() {
   
   const convertImageToBase64 = async () => {
     if (!imageFile.value) {
-      console.log('No image file to convert')
       return null
     }
-    
+
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = (e) => {
-        console.log('Base64 conversion successful, length:', e.target.result.length)
         resolve(e.target.result)
       }
       reader.onerror = (error) => {
@@ -318,33 +307,15 @@ export function useAddProduct() {
       formData.description = form.value.description.trim()
     }
     
-    // DEBUG IMAGE HANDLING
-    console.log('=== FRONTEND IMAGE DEBUG ===')
-    console.log('imageFile.value:', imageFile.value)
-    console.log('imagePreview.value:', imagePreview.value)
-    
     // Handle image upload - ONLY add image fields if image exists
      if (imageFile.value && imagePreview.value) {
       // New image uploaded - SAME AS CATEGORY
-      console.log('Adding NEW image data')
       formData.image_filename = imageFile.value.name
       formData.image_size = imageFile.value.size
       formData.image_type = imageFile.value.type
       formData.image_url = imagePreview.value  // Use the base64 preview directly
       formData.image_uploaded_at = new Date().toISOString()
-      
-      console.log('Image data added:', {
-        image_filename: formData.image_filename,
-        image_size: formData.image_size,
-        image_type: formData.image_type,
-        image_url_length: formData.image_url.length
-      })
-    } else {
-      console.log('No image data to process')
     }
-    
-    console.log('Final formData keys:', Object.keys(formData))
-    console.log('Has image in formData:', 'image' in formData)
     
     let result
     if (isEditMode.value) {

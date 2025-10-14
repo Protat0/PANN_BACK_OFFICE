@@ -120,11 +120,8 @@ export function useSupplierReports() {
       const response = await api.get('/suppliers/', {
         params: { per_page: 1000 }
       })
-      
+
       allSuppliers.value = response.data.suppliers
-      console.log('Suppliers fetched for reports:', allSuppliers.value.length)
-      console.log('Active orders found:', activeOrders.value.length)
-      console.log('Top performers found:', topPerformers.value.length)
       
     } catch (err) {
       error.value = err.response?.data?.error || 'Failed to fetch supplier reports'

@@ -14,22 +14,16 @@ export default {
   },
   methods: {
     checkAuthStatus() {
-      const token = localStorage.getItem('authToken')  
+      const token = localStorage.getItem('authToken')
       const currentPath = this.$route.path
-      
-      console.log('App mounted - Current path:', currentPath)
-      console.log('App mounted - Has token:', !!token)
-      console.log('App mounted - Token key used:', 'authToken')  // ✅ Update log message
-      
+
       // If no token and not on login page, redirect to login
       if (!token && currentPath !== '/login') {
-        console.log('No auth token, redirecting to login')
         this.$router.push('/login')
       }
-      
+
       // If has token and on login page, redirect to dashboard
       if (token && currentPath === '/login') {
-        console.log('Already authenticated, redirecting to dashboard')
         this.$router.push('/dashboard')
       }
     }

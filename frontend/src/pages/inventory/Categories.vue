@@ -370,10 +370,6 @@ export default {
     try {
       await this.initializeCategories()
       await this.fetchUncategorizedCount()
-      
-      console.log('Categories loaded:', this.categories.length)
-      console.log('Displayed categories:', this.displayedCategories.length)
-      console.log('Uncategorized count:', this.uncategorizedCount)
     } catch (error) {
       console.error('Error initializing categories page:', error)
     }
@@ -382,8 +378,6 @@ export default {
   methods: {
     // Modal handlers - keeping these untouched as requested
     async handleAddCategory() {
-      console.log('Add Category button clicked')
-      
       if (this.$refs.addCategoryModal) {
         this.$refs.addCategoryModal.openAddMode()
       } else {
@@ -393,11 +387,7 @@ export default {
 
     async onCategoryAdded(newCategory) {
       try {
-        console.log('New category added:', newCategory)
-        
         await this.refreshCategories()
-        
-        console.log(`Category "${newCategory.category_name}" added successfully!`)
       } catch (error) {
         console.error('Error refreshing categories after add:', error)
       }
@@ -405,8 +395,6 @@ export default {
 
     // Navigation
     viewCategory(categoryId) {
-      console.log('View category ID:', categoryId)
-      
       if (!categoryId || !categoryId.startsWith('CTGY-')) {
         console.error('Invalid category ID format:', categoryId)
         alert(`Invalid category ID format: ${categoryId}. Expected CTGY-XXX format.`)
@@ -428,8 +416,7 @@ export default {
         )
         
         if (!confirmed) return
-        
-        console.log('Deleting category:', category._id)
+
         await this.softDeleteCategory(category._id)
         
         // Refresh uncategorized count since products might be moved there
@@ -445,7 +432,6 @@ export default {
       try {
         // Export only the displayed categories (excluding uncategorized)
         await this.exportCategories(this.displayedCategories)
-        console.log('Export completed successfully')
       } catch (error) {
         console.error('Export failed:', error)
         alert('Export failed. Please try again.')

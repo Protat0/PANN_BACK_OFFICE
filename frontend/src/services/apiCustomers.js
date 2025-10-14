@@ -33,7 +33,6 @@ class CustomerApiService {
    */
   async getCustomers(params = {}) {
     try {
-      console.log('Fetching customers with params:', params);
       const response = await api.get('/customers/', { params });
       return this.handleResponse(response);
     } catch (error) {
@@ -49,7 +48,6 @@ class CustomerApiService {
    */
   async getCustomer(customerId) {
     try {
-      console.log(`Fetching customer with ID: ${customerId}`);
       const response = await api.get(`/customers/${customerId}/`);
       return this.handleResponse(response);
     } catch (error) {
@@ -65,7 +63,6 @@ class CustomerApiService {
    */
   async createCustomer(customerData) {
     try {
-      console.log('Creating new customer:', customerData);
       const response = await api.post('/customers/', customerData);
       return this.handleResponse(response);
     } catch (error) {
@@ -82,7 +79,6 @@ class CustomerApiService {
    */
   async updateCustomer(customerId, customerData) {
     try {
-      console.log(`Updating customer ${customerId}:`, customerData);
       const response = await api.put(`/customers/${customerId}/`, customerData);
       return this.handleResponse(response);
     } catch (error) {
@@ -98,7 +94,6 @@ class CustomerApiService {
    */
   async deleteCustomer(customerId) {
     try {
-      console.log(`Soft deleting customer with ID: ${customerId}`);
       // Try using DELETE on the main endpoint (same pattern as create but with DELETE)
       const response = await api.delete(`/customers/${customerId}/`);
       return this.handleResponse(response);
@@ -115,7 +110,6 @@ class CustomerApiService {
    */
   async restoreCustomer(customerId) {
     try {
-      console.log(`Restoring customer ${customerId}`);
       const response = await api.patch(`/customers/${customerId}/restore/`);
       return this.handleResponse(response);
     } catch (error) {
@@ -131,7 +125,6 @@ class CustomerApiService {
    */
   async getDeletedCustomers(params = {}) {
     try {
-      console.log('Fetching deleted customers');
       const response = await api.get('/customers/deleted/', { params });
       return this.handleResponse(response);
     } catch (error) {
@@ -149,9 +142,8 @@ class CustomerApiService {
    */
   async searchCustomers(query) {
     try {
-      console.log(`Searching customers with query: ${query}`);
-      const response = await api.get('/customers/search/', { 
-        params: { search: query } 
+      const response = await api.get('/customers/search/', {
+        params: { search: query }
       });
       return this.handleResponse(response);
     } catch (error) {
@@ -167,9 +159,8 @@ class CustomerApiService {
    */
   async getCustomersByStatus(status) {
     try {
-      console.log(`Fetching customers with status: ${status}`);
-      const response = await api.get('/customers/', { 
-        params: { status } 
+      const response = await api.get('/customers/', {
+        params: { status }
       });
       return this.handleResponse(response);
     } catch (error) {
@@ -189,8 +180,7 @@ class CustomerApiService {
    */
   async updateLoyaltyPoints(customerId, points, reason = 'Manual adjustment') {
     try {
-      console.log(`Updating loyalty points for customer ${customerId}: +${points}`);
-      const response = await api.patch(`/customers/${customerId}/loyalty/`, { 
+      const response = await api.patch(`/customers/${customerId}/loyalty/`, {
         points_to_add: points,
         reason: reason
       });
@@ -209,7 +199,6 @@ class CustomerApiService {
    */
   async getCustomerStatistics() {
     try {
-      console.log('Fetching customer statistics');
       const response = await api.get('/customers/statistics/');
       return this.handleResponse(response);
     } catch (error) {
@@ -227,7 +216,6 @@ class CustomerApiService {
    */
   async restoreCustomer(customerId) {
     try {
-      console.log(`Restoring customer ${customerId}`);
       const response = await api.patch(`/customers/${customerId}/restore/`);
       return this.handleResponse(response);
     } catch (error) {
@@ -244,7 +232,6 @@ class CustomerApiService {
    */
   async hardDeleteCustomer(customerId, confirmationToken) {
     try {
-      console.log(`Permanently deleting customer ${customerId}`);
       const response = await api.delete(`/customers/${customerId}/hard/`, {
         data: { confirmation_token: confirmationToken }
       });
@@ -264,9 +251,8 @@ class CustomerApiService {
    */
   async deleteMultipleCustomers(customerIds) {
     try {
-      console.log('Deleting multiple customers:', customerIds);
-      const response = await api.delete('/customers/bulk/', { 
-        data: { customer_ids: customerIds } 
+      const response = await api.delete('/customers/bulk/', {
+        data: { customer_ids: customerIds }
       });
       return this.handleResponse(response);
     } catch (error) {

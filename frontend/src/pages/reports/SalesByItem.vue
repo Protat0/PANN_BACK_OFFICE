@@ -536,32 +536,23 @@ export default {
   // LIFECYCLE HOOKS
   // ====================================================================
   async mounted() {
-    console.log("=== Component Mounted ===");
-    console.log("SalesAPIService:", SalesAPIService);
-    
     // Load data sequentially - separate calls for different purposes
     try {
-      console.log("1. Loading top items list...");
       await this.getTopItems();
-      console.log("✅ Top items list loaded");
     } catch (error) {
-      console.error("❌ Top items list failed:", error);
+      console.error("Top items list failed:", error);
     }
-    
+
     try {
-      console.log("2. Loading chart data...");
       await this.getTopChartItems();
-      console.log("✅ Chart data loaded");
     } catch (error) {
-      console.error("❌ Chart data failed:", error);
+      console.error("Chart data failed:", error);
     }
-    
+
     try {
-      console.log("3. Loading transaction history...");
       await this.loadTransactionHistory();
-      console.log("✅ Transaction history loaded");
     } catch (error) {
-      console.error("❌ Transaction history failed:", error);
+      console.error("Transaction history failed:", error);
     }
     
     // Start auto-refresh
@@ -572,7 +563,6 @@ export default {
 
   beforeUnmount() {
     this.stopAutoRefresh();
-    console.log('🧹 Component cleanup complete');
   },
   
   // ====================================================================
@@ -588,7 +578,6 @@ export default {
      */
     async getTopItems() {
       try {
-        console.log("=== Loading Top Items List Only ===");
         this.loadingTopItems = true;
         
         if (!SalesAPIService?.getTopItems) {
@@ -596,8 +585,7 @@ export default {
         }
         
         const response = await SalesAPIService.getTopItems({ limit: 5 });
-        console.log("Raw API Response:", response);
-        
+
         let items = [];
         
         // Try different response structures
@@ -610,9 +598,7 @@ export default {
         } else if (Array.isArray(response)) {
           items = response;
         }
-        
-        console.log("Extracted items:", items);
-        
+
         if (items && items.length > 0) {
           this.topItems = items.slice(0, 5).map((item, index) => ({
             name: item.item_name || item.name || item.product_name || `Item ${index + 1}`,
@@ -621,7 +607,6 @@ export default {
               item.sales || item.price || item.amount || 0
             )
           }));
-          console.log("✅ Top items successfully formatted:", this.topItems);
         } else {
           this.topItems = [
             { name: 'No data available', price: '₱0.00' }
@@ -640,12 +625,11 @@ export default {
         // ✅ ADD ERROR TRACKING
         this.consecutiveErrors++;
         this.error = `Failed to load top items: ${error.message}`;
-        
+
         if (this.consecutiveErrors >= 3) {
           this.connectionLost = true;
-          console.log('Connection marked as lost after 3 consecutive errors');
         }
-        
+
         this.topItems = [{ name: 'Error loading data', price: '₱0.00' }];
       } finally {
         this.loadingTopItems = false;
@@ -657,11 +641,8 @@ export default {
      */
     async getTopChartItems() {
       try {
-        console.log("=== Loading Chart Data Only ===");
-        
         // Don't set loading for chart specifically, use separate flag
         const dateRange = this.calculateDateRange(this.selectedFrequency);
-        console.log("Date range for", this.selectedFrequency, ":", dateRange);
         
         // Try the enhanced chart API first
         if (SalesAPIService?.getTopChartItems) {
@@ -671,12 +652,9 @@ export default {
             end_date: dateRange.end_date,
             frequency: this.selectedFrequency
           };
-          
-          console.log("Request params for chart:", requestParams);
-          
+
           try {
             const response = await SalesAPIService.getTopChartItems(requestParams);
-            console.log("Chart API Response:", response);
             
             let items = [];
             if (response?.success && response.data) {
@@ -684,31 +662,27 @@ export default {
             } else if (Array.isArray(response)) {
               items = response;
             }
-            
+
             if (items && items.length > 0) {
               this.updateChartData(items.slice(0, 10));
-              console.log("✅ Chart data updated successfully");
-              
+
               // ✅ ADD CONNECTION HEALTH TRACKING
               this.connectionLost = false;
               this.consecutiveErrors = 0;
               this.lastSuccessfulLoad = Date.now();
               this.error = null;
-              
+
               return; // Success, exit early
             }
           } catch (chartError) {
-            console.warn("Chart API failed, trying fallback:", chartError.message);
             // Don't return, fall through to fallback
           }
         }
-        
+
         // Fallback: Use regular top items API for chart
-        console.log("🔄 Using fallback: regular top items API for chart");
         if (SalesAPIService?.getTopItems) {
           try {
             const response = await SalesAPIService.getTopItems({ limit: 10 });
-            console.log("Fallback API Response:", response);
             
             let items = [];
             if (response?.data?.items && Array.isArray(response.data.items)) {
@@ -729,8 +703,7 @@ export default {
               }));
               
               this.updateChartData(chartItems.slice(0, 10));
-              console.log("✅ Fallback chart data loaded successfully");
-              
+
               // ✅ ADD CONNECTION HEALTH TRACKING
               this.connectionLost = false;
               this.consecutiveErrors = 0;
@@ -750,12 +723,11 @@ export default {
         // ✅ ADD ERROR TRACKING
         this.consecutiveErrors++;
         this.error = 'Failed to load chart data';
-        
+
         if (this.consecutiveErrors >= 3) {
           this.connectionLost = true;
-          console.log('Connection marked as lost after 3 consecutive errors');
         }
-        
+
         this.setDefaultChartData();
         
       } catch (error) {
@@ -764,12 +736,11 @@ export default {
         // ✅ ADD ERROR TRACKING
         this.consecutiveErrors++;
         this.error = `Failed to load chart data: ${error.message}`;
-        
+
         if (this.consecutiveErrors >= 3) {
           this.connectionLost = true;
-          console.log('Connection marked as lost after 3 consecutive errors');
         }
-        
+
         this.setDefaultChartData();
       }
     },
@@ -779,7 +750,6 @@ export default {
      */
     async loadTransactionHistory(page = 1, pageSize = 10) {
       try {
-        console.log("=== Loading Transaction History ===");
         this.loading = true;
         
         if (!SalesAPIService.getSalesItemHistory) {
@@ -807,8 +777,6 @@ export default {
           this.consecutiveErrors = 0;
           this.lastSuccessfulLoad = Date.now();
           this.error = null;
-          
-          console.log("Loaded transactions:", this.transactions.length);
         } else {
           throw new Error(response?.message || 'Failed to load transaction history');
         }
@@ -818,12 +786,11 @@ export default {
         // ✅ ADD ERROR TRACKING
         this.consecutiveErrors++;
         this.error = `Failed to load transaction history: ${error.message}`;
-        
+
         if (this.consecutiveErrors >= 3) {
           this.connectionLost = true;
-          console.log('Connection marked as lost after 3 consecutive errors');
         }
-        
+
         this.transactions = [];
       } finally {
         this.loading = false;
@@ -933,14 +900,11 @@ export default {
      * Handle frequency change - FIXED to not interfere with modals
      */
     async onFrequencyChange() {
-      console.log("Frequency changed to:", this.selectedFrequency);
-      
       // IMPORTANT: Don't reload chart if modal is open
       if (this.showTransactionModal || this.showImportProgressModal) {
-        console.log("Modal is open, deferring chart reload");
         return;
       }
-      
+
       // Only reload chart data, not top items list
       await this.getTopChartItems();
     },
@@ -954,62 +918,56 @@ export default {
      */
     async goToPage(page) {
       if (this.showTransactionModal || this.showImportProgressModal) {
-        console.log("Modal is open, preventing page change");
         return;
       }
-      
+
       if (page >= 1 && page <= this.pagination.total_pages) {
         await this.loadTransactionHistory(page, this.pagination.page_size);
       }
     },
-    
+
     /**
      * Change page size - FIXED to not interfere with modals
      */
     async changePageSize(newPageSize) {
       if (this.showTransactionModal || this.showImportProgressModal) {
-        console.log("Modal is open, preventing page size change");
         return;
       }
-      
+
       await this.loadTransactionHistory(1, newPageSize);
     },
-    
+
     /**
      * Refresh all data - FIXED to not interfere with modals
      */
     async refreshData() {
       if (this.showTransactionModal || this.showImportProgressModal) {
-        console.log("Modal is open, preventing data refresh");
         return;
       }
 
       try {
         this.error = null; // Clear any previous errors
-        
+
         await Promise.all([
           this.loadTransactionHistory(this.pagination.current_page, this.pagination.page_size),
           this.getTopItems(),
           this.getTopChartItems()
         ]);
-        
+
         // Connection health tracking - SUCCESS
         this.connectionLost = false;
         this.consecutiveErrors = 0;
         this.lastSuccessfulLoad = Date.now();
-        
-        console.log('✅ Data refresh completed successfully');
-        
+
       } catch (error) {
-        console.error('❌ Error refreshing data:', error);
-        
+        console.error('Error refreshing data:', error);
+
         // Handle connection errors
         this.consecutiveErrors++;
         this.error = `Failed to refresh data: ${error.message}`;
-        
+
         if (this.consecutiveErrors >= 3) {
           this.connectionLost = true;
-          console.log('Connection marked as lost after 3 consecutive errors');
         }
       }
     },
@@ -1022,10 +980,6 @@ export default {
      * View transaction details - FIXED to handle proper data structure
      */
     viewTransaction(transaction) {
-      console.log('=== VIEW TRANSACTION DEBUG ===');
-      console.log('1. Transaction received:', transaction);
-      console.log('2. Item list:', transaction.item_list);
-      
       try {
         // FORCE close any other modals first
         this.showImportProgressModal = false;
@@ -1050,11 +1004,7 @@ export default {
             }
           });
         }
-        
-        console.log('3. Calculated totalQuantity:', totalQuantity);
-        console.log('4. Calculated unitPrice:', unitPrice);
-        console.log('5. Item names:', itemNames);
-        
+
         // Force Vue to update the DOM
         this.$nextTick(() => {
           // Set the selected transaction with proper data mapping
@@ -1066,44 +1016,39 @@ export default {
             latest_transaction_date: this.formatDate(transaction.transaction_date),
             _original: transaction // Keep original data for reference
           };
-          
-          console.log('6. Final selectedTransactionData:', this.selectedTransactionData);
-          
+
           // Show the modal
           this.showTransactionModal = true;
-          console.log('7. Modal state set to:', this.showTransactionModal);
-          
+
           // Force another update
           this.$forceUpdate();
         });
-        
+
       } catch (error) {
-        console.error('❌ Error in viewTransaction:', error);
+        console.error('Error in viewTransaction:', error);
         this.showError('Failed to display transaction details');
       }
     },
-    
+
     /**
      * Close transaction view modal - ENHANCED
      */
     closeTransactionModal() {
-      console.log('Closing transaction modal...');
       this.showTransactionModal = false;
       this.selectedTransactionData = null;
-      
+
       // Force update to ensure DOM changes
       this.$nextTick(() => {
-        console.log('Transaction modal closed, state:', this.showTransactionModal);
+        // Modal closed
       });
     },
-    
+
     /**
      * Edit transaction (placeholder)
      */
     editTransaction(transaction) {
-      console.log('Edit transaction called with:', transaction);
       this.closeTransactionModal();
-      
+
       // TODO: Implement edit functionality
       this.showSuccess('Edit functionality not implemented yet');
     },
@@ -1353,10 +1298,9 @@ export default {
      * Show success message
      */
     showSuccess(message) {
-      console.log('Success:', message);
       alert(message); // Replace with your notification system
     },
-    
+
     /**
      * Show error message
      */
@@ -1369,11 +1313,9 @@ export default {
       if (this.autoRefreshEnabled) {
         this.autoRefreshEnabled = false
         this.stopAutoRefresh()
-        console.log('Auto-refresh disabled by user')
       } else {
         this.autoRefreshEnabled = true
         this.startAutoRefresh()
-        console.log('Auto-refresh enabled by user')
       }
     },
     
@@ -1393,32 +1335,27 @@ export default {
       this.autoRefreshTimer = setInterval(() => {
         this.refreshData() // Use your existing refresh method
       }, this.autoRefreshInterval)
-      
-      console.log(`Auto-refresh started (${this.autoRefreshInterval / 1000}s interval)`)
     },
-    
+
     stopAutoRefresh() {
       if (this.autoRefreshTimer) {
         clearInterval(this.autoRefreshTimer)
         this.autoRefreshTimer = null
       }
-      
+
       if (this.countdownTimer) {
         clearInterval(this.countdownTimer)
         this.countdownTimer = null
       }
-      
-      console.log('Auto-refresh stopped')
     },
 
     // Emergency reconnect method
     async emergencyReconnect() {
-      console.log('Emergency reconnect initiated')
       this.consecutiveErrors = 0
       this.connectionLost = false
       this.error = null
       await this.refreshData()
-      
+
       if (!this.autoRefreshEnabled) {
         this.autoRefreshEnabled = true
         this.startAutoRefresh()

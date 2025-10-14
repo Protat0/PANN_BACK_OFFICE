@@ -439,22 +439,13 @@ export default {
             expiry_date: form.value.expiry_date,
             supplier_id: form.value.supplier_id || null
           }
-          
-          console.log('Creating batch:', batchData)
+
           result = await createBatch(batchData)
           
           success(`New batch created: ${form.value.quantity_received} units added`)
           
         } else {
           // Adjust existing stock using FIFO
-          console.log('Adjusting stock:', {
-            product_id: product.value._id,
-            adjustment_type: form.value.adjustment_type,
-            quantity: form.value.quantity_used,
-            adjusted_by: user.value?._id, // ✅ User ID
-            notes: form.value.notes
-          })
-          
           result = await processBatchAdjustment(
             product.value._id,
             form.value.quantity_used,

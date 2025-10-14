@@ -374,22 +374,15 @@ class ApiProductsService {
 
   async downloadImportTemplate(format = 'csv') {
     try {
-      console.log('🔍 Starting template download...')
-      console.log('Format requested:', format)
-      
       // Use raw axios WITHOUT interceptors
       const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
       const url = `${baseURL}/products/import/template/`
-      
-      console.log('Direct URL:', url)
-      
+
       const response = await axios.get(url, {
         params: { format },
         responseType: 'blob',
         // NO Authorization header
       })
-      
-      console.log('✅ Template download successful')
       
       const blob = new Blob([response.data])
       const downloadUrl = window.URL.createObjectURL(blob)

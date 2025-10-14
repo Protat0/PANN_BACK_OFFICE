@@ -34,13 +34,10 @@ function hasValidToken() {
 
 // Auth guard function
 function requireAuth(to, from, next) {
-  console.log('🛡️ ROUTER requireAuth:', { from: from.path, to: to.path })
   const token = localStorage.getItem('access_token')
   if (token) {
-    console.log('🛡️ ROUTER: Token found, allowing access')
     next()
   } else {
-    console.log('🛡️ ROUTER: No token, redirecting to login') 
     next('/login')
   }
 }
@@ -259,22 +256,19 @@ const router = createRouter({
 
 // Global navigation guard
 router.beforeEach((to, from, next) => {
-  console.log(`Navigating from ${from.path} to ${to.path}`)
-  
   // Set page title
   if (to.meta?.title) {
     document.title = `${to.meta.title} - PANN POS`
   } else {
     document.title = 'PANN POS'
   }
-  
+
   // Handle development-only routes in production
   if (to.meta?.isDevelopmentOnly && import.meta.env.PROD) {
-    console.log('Development route accessed in production, redirecting to dashboard')
     next('/dashboard')
     return
   }
-  
+
   next()
 })
 

@@ -138,11 +138,9 @@ export default {
   },
   methods: {
     handleMenuChange(menu) {
-      console.log('Menu changed to:', menu)
       this.$router.push(`/${menu}`)
     },
     handleShowProfile() {
-      console.log('Show profile modal')
       this.showProfileModal = true
     },
     closeProfileModal() {
@@ -152,8 +150,6 @@ export default {
       this.sidebarCollapsed = collapsed
     },
     async handleLogout() {
-      console.log('MainLayout: User logging out')
-      
       const logoutToastId = this.toast.loading('Logging out...')
       
       try {
@@ -181,8 +177,6 @@ export default {
     }
   },
   mounted() {
-    console.log('MainLayout: Component mounted')
-    
     // Load sidebar state from localStorage
     const savedState = localStorage.getItem('sidebar-collapsed')
     if (savedState !== null) {
