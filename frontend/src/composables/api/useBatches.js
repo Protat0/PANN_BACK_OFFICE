@@ -124,6 +124,32 @@ export function useBatches() {
     }
   }
 
+  async function fetchBatchesBySupplier(supplierId, customFilters = {}) {
+    loading.value = true
+    error.value = null
+
+    try {
+      const filterParams = { ...customFilters }
+      
+      const response = await batchService.getBatchesBySupplier(supplierId, filterParams)
+      const supplierBatches = response.data || []
+      
+      // Update batches.value when called directly
+      batches.value = supplierBatches
+      
+      // Update filters to reflect current view
+      filters.supplierId = supplierId
+      
+      return supplierBatches
+    } catch (err) {
+      error.value = err.message
+      batches.value = []
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function createBatch(batchData) {
     loading.value = true
     error.value = null
@@ -359,6 +385,7 @@ export function useBatches() {
     fetchBatches,
     fetchBatchById,
     fetchBatchesByProduct,
+    fetchBatchesBySupplier,
     createBatch,
     updateBatchQuantity,
     processSaleFIFO,

@@ -70,10 +70,16 @@
           <Edit :size="16" class="me-1" />
           Edit
         </button>
-        <button class="btn btn-success" @click="createOrder">
-          <Plus :size="16" class="me-1" />
-          New Order
-        </button>
+        <div class="d-flex gap-2">
+          <button class="btn btn-primary" @click="createOrder">
+            <ShoppingCart :size="16" class="me-1" />
+            Create Purchase Order
+          </button>
+          <button class="btn btn-success" @click="openReceiveStockModal">
+            <Package :size="16" class="me-1" />
+            Receive Stock
+          </button>
+        </div>
         <div class="dropdown">
           <button class="btn btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown">
             <Download :size="16" class="me-1" />
@@ -306,16 +312,17 @@
           <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
               <h5 class="card-title mb-0">
-                <ShoppingCart :size="18" class="me-2" />
-                Purchase Orders
+                <Package :size="18" class="me-2" />
+                Stock Receipt History
                 <span class="badge bg-secondary ms-2">{{ filteredOrders.length }}</span>
               </h5>
               <div class="d-flex gap-2 align-items-center" v-if="orders.length > 0">
-                <select class="form-select form-select-sm" v-model="orderStatusFilter" @change="filterOrders" style="width: auto;">
-                  <option value="all">All Orders</option>
-                  <option value="pending">Pending</option>
+                <select class="form-select form-select-sm" v-model="orderStatusFilter" @change="filterOrders">
+                  <option value="all">All Receipts</option>
+                  <option value="pending delivery">Pending Delivery</option>
                   <option value="received">Received</option>
-                  <option value="cancelled">Cancelled</option>
+                  <option value="partially received">Partially Received</option>
+                  <option value="depleted">Depleted</option>
                 </select>
                 <div class="dropdown">
                   <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
@@ -387,15 +394,16 @@
                       <div class="action-buttons">
                         <button 
                           class="btn btn-outline-primary btn-sm" 
-                          @click="viewOrder(order)" 
-                          title="View Order"
+                          @click="viewReceipt(order)" 
+                          title="View Receipt Details"
                         >
                           <Eye :size="14" />
                         </button>
                         <button 
-                          class="btn btn-outline-info btn-sm" 
-                          @click="editOrder(order)" 
-                          title="Edit Order"
+                          class="btn btn-outline-warning btn-sm" 
+                          @click="editBatchDetails(order)" 
+                          title="Edit Order Details"
+                          :disabled="order.status === 'Received' || order.status === 'Depleted'"
                         >
                           <Edit :size="14" />
                         </button>
@@ -421,11 +429,11 @@
             <div v-if="orders.length === 0" class="text-center text-muted py-5">
               <Package :size="48" class="text-muted mb-3" />
               <div>
-                <h6 class="text-muted">No purchase orders found</h6>
-                <p class="mb-3">This supplier has no purchase orders yet.</p>
-                <button class="btn btn-primary btn-sm" @click="createOrder">
+                <h6 class="text-muted">No stock receipts found</h6>
+                <p class="mb-3">No stock has been received from this supplier yet.</p>
+                <button class="btn btn-primary btn-sm" @click="openReceiveStockModal">
                   <Plus :size="16" class="me-1" />
-                  Create First Order
+                  Receive First Stock
                 </button>
               </div>
             </div>
@@ -484,13 +492,40 @@
       <button class="btn btn-primary" @click="goBack">Go Back to Suppliers</button>
     </div>
 
-    <!-- Create Order Modal - Fixed for Options API -->
+    <!-- Create Order Modal -->
     <CreateOrderModal
-      v-if="showCreateOrderModal"
+      v-if="showCreateOrderModal && supplier"
       :show="showCreateOrderModal"
-      :supplier="selectedSupplier"
+      :supplier="supplier"
       @close="closeCreateOrderModal"
-      @save="handleOrderSave"
+      @saved="handleOrderSave"
+    />
+
+    <!-- Receive Stock Modal (Shows ALL pending batches for bulk receiving) -->
+    <ReceiveStockModal
+      v-if="showReceiveStockModal && supplier"
+      :show="showReceiveStockModal"
+      :supplier="supplier"
+      @close="closeReceiveStockModal"
+      @received="handleStockReceived"
+    />
+
+    <!-- Batch Details Modal (View only) -->
+    <BatchDetailsModal
+      v-if="showBatchDetailsModal"
+      :show="showBatchDetailsModal"
+      :receipt="selectedReceiptForView"
+      @close="closeBatchDetailsModal"
+    />
+
+    <!-- Edit Batch Details Modal -->
+    <EditBatchDetailsModal
+      v-if="showEditBatchDetailsModal && supplier"
+      :show="showEditBatchDetailsModal"
+      :receipt="selectedReceiptForEdit"
+      :supplier="supplier"
+      @close="closeEditBatchDetailsModal"
+      @saved="handleBatchDetailsUpdated"
     />
 
     <!-- Order Details Modal -->
@@ -676,9 +711,13 @@ import {
   Activity
 } from 'lucide-vue-next'
 import CreateOrderModal from '@/components/suppliers/CreateOrderModal.vue'
+import ReceiveStockModal from '@/components/suppliers/ReceiveStockModal.vue'
+import BatchDetailsModal from '@/components/suppliers/BatchDetailsModal.vue'
+import EditBatchDetailsModal from '@/components/suppliers/EditBatchDetailsModal.vue'
 import OrderDetailsModal from '@/components/suppliers/OrderDetailsModal.vue'
 import { useToast } from '@/composables/ui/useToast'
 import { useAuth } from '@/composables/auth/useAuth'
+import { useProducts } from '@/composables/api/useProducts'
 import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
@@ -716,6 +755,9 @@ export default {
     AlertTriangle,
     Activity,
     CreateOrderModal,
+    ReceiveStockModal,
+    BatchDetailsModal,
+    EditBatchDetailsModal,
     OrderDetailsModal
   },
   props: {
@@ -727,11 +769,13 @@ export default {
   setup() {
     const { user } = useAuth()
     const { success, error: showError } = useToast()
+    const { fetchProductById } = useProducts()
     
     return {
       user,
       success,
-      showError
+      showError,
+      fetchProductById
     }
   },
   data() {
@@ -747,9 +791,13 @@ export default {
       orderStatusFilter: 'all',
       selectedOrders: [],
       selectAllOrders: false,
-      
+
       showCreateOrderModal: false,
-      selectedSupplier: null,
+      showReceiveStockModal: false,
+      showBatchDetailsModal: false,
+      showEditBatchDetailsModal: false,
+      selectedReceiptForView: null,
+      selectedReceiptForEdit: null,
       showOrderDetailsModal: false,
       selectedOrderForView: null,
       orderModalMode: 'view',
@@ -793,6 +841,7 @@ export default {
       try {
         const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
         
+        // ===== STEP 1: Fetch Supplier Info =====
         const supplierResponse = await axios.get(
           `${API_BASE_URL}/suppliers/${this.supplierId}/`,
           {
@@ -804,7 +853,51 @@ export default {
         )
         
         const backendSupplier = supplierResponse.data
+        console.log('✅ Supplier loaded:', backendSupplier.supplier_name)
         
+        // ===== STEP 2: Fetch Batches for this Supplier =====
+        let batchesList = []
+        try {
+          const batchesResponse = await axios.get(
+            `${API_BASE_URL}/batches/by-supplier/${this.supplierId}/`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          )
+          
+          console.log('=== BATCHES RESPONSE DEBUG ===')
+          console.log('Response data:', batchesResponse.data)
+          console.log('Type:', typeof batchesResponse.data)
+          console.log('Is array?', Array.isArray(batchesResponse.data))
+          console.log('==============================')
+          
+          // Handle different response formats
+          const rawBatches = batchesResponse.data.batches || batchesResponse.data || []
+          
+          // Ensure it's always an array
+          if (Array.isArray(rawBatches)) {
+            batchesList = rawBatches
+          } else if (rawBatches.data && Array.isArray(rawBatches.data)) {
+            batchesList = rawBatches.data
+          } else {
+            console.warn('⚠️ Batches response is not an array:', rawBatches)
+            batchesList = []
+          }
+          
+          console.log(`📦 Found ${batchesList.length} batches`)
+          
+        } catch (batchesError) {
+          console.error('❌ Error fetching batches:', batchesError)
+          if (batchesError.response?.status === 404) {
+            console.warn('⚠️ Batches endpoint returned 404 - batches will be empty')
+          }
+          batchesList = []
+        }
+        
+        // ===== STEP 3: Map Supplier Data =====
         this.supplier = {
           id: backendSupplier._id,
           name: backendSupplier.supplier_name,
@@ -812,7 +905,7 @@ export default {
           email: backendSupplier.email || '',
           phone: backendSupplier.phone_number || '',
           address: backendSupplier.address || '',
-          purchaseOrders: backendSupplier.purchase_orders?.length || 0,
+          purchaseOrders: 0, // Will be set after grouping batches into orders
           status: backendSupplier.isDeleted ? 'inactive' : 'active',
           type: backendSupplier.type || 'food',
           rating: 4.5,
@@ -822,45 +915,154 @@ export default {
           updatedAt: backendSupplier.updated_at
         }
         
-        this.orders = (backendSupplier.purchase_orders || [])
-          .filter(order => !order.isDeleted)
-          .map(order => ({
-            id: order.order_id,
-            date: order.order_date,
-            quantity: order.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0,
-            total: order.total_cost || 0,
-            expectedDate: order.expected_delivery_date,
-            status: order.status.charAt(0).toUpperCase() + order.status.slice(1),
-            description: order.description || '',
-            notes: order.notes || '',
-            priority: order.priority || 'normal',
-            subtotal: order.subtotal || 0,
-            tax: order.tax_amount || 0,
-            shippingCost: order.shipping_cost || 0,
-            taxRate: order.tax_rate || 12,
-            // Map your actual items structure
-            items: (order.items || []).map(item => ({
-              name: item.product_name || 'Unknown Product',
-              quantity: item.quantity || 0,
-              unit: item.unit || 'pcs',
-              unitPrice: item.unit_price || 0,
-              totalPrice: (item.quantity || 0) * (item.unit_price || 0),
-              notes: item.notes || '',
-              productId: item.product_id
+        // ===== STEP 4: Group Batches by Date to Create "Receipts" =====
+        // Safety check
+        if (!Array.isArray(batchesList)) {
+          console.error('❌ batchesList is not an array:', batchesList)
+          batchesList = []
+        }
+        
+        // If no batches, set empty orders
+        if (batchesList.length === 0) {
+          console.log('ℹ️ No batches found for this supplier')
+          this.orders = []
+          this.filteredOrders = []
+          this.editableNotes = this.supplier.notes
+          this.recentActivity = [
+            {
+              id: 1,
+              type: 'supplier_updated',
+              title: 'Supplier Information Updated',
+              description: 'Contact details updated',
+              user: 'Admin User',
+              date: backendSupplier.updated_at
+            }
+          ]
+          
+          console.log('=== SUMMARY (No Batches) ===')
+          console.log('Supplier:', this.supplier.name)
+          console.log('Stock Receipts: 0')
+          console.log('============================')
+          return
+        }
+        
+        // Group batches by receipt (either date_received for completed or expected_delivery_date for pending)
+        const batchesByDate = {}
+        batchesList.forEach(batch => {
+          // For pending orders, group by expected_delivery_date
+          // For received orders, group by date_received
+          let dateKey
+          if (batch.date_received) {
+            dateKey = typeof batch.date_received === 'string' ? batch.date_received.split('T')[0] : new Date(batch.date_received).toISOString().split('T')[0]
+          } else if (batch.expected_delivery_date) {
+            dateKey = typeof batch.expected_delivery_date === 'string' ? batch.expected_delivery_date.split('T')[0] : new Date(batch.expected_delivery_date).toISOString().split('T')[0]
+          } else {
+            dateKey = batch.created_at.split('T')[0]
+          }
+          
+          if (!batchesByDate[dateKey]) {
+            batchesByDate[dateKey] = []
+          }
+          batchesByDate[dateKey].push(batch)
+        })
+        
+        // ===== STEP 4.5: Enrich batches with product details for complete category info =====
+        const enrichedBatchesByDate = {}
+        for (const [dateKey, batches] of Object.entries(batchesByDate)) {
+          enrichedBatchesByDate[dateKey] = await Promise.all(
+            batches.map(async (batch) => {
+              try {
+                // Always fetch product details to get category info (don't rely on batch fields)
+                if (batch.product_id) {
+                  const productResponse = await this.fetchProductById(batch.product_id)
+                  const product = productResponse.data
+                  
+                  if (product) {
+                    return {
+                      ...batch,
+                      // Get category info from product, not from batch
+                      category_id: product.category_id || '',
+                      category_name: product.category_name || '',
+                      subcategory_name: product.subcategory_name || ''
+                    }
+                  }
+                }
+                
+                return batch
+              } catch (err) {
+                console.warn(`Failed to fetch product details for batch ${batch._id}:`, err)
+                return batch
+              }
+            })
+          )
+        }
+        
+        // Convert grouped batches to "orders" format
+        this.orders = Object.entries(enrichedBatchesByDate).map(([date, batches]) => {
+          const totalCost = batches.reduce((sum, b) => sum + ((b.cost_price || 0) * (b.quantity_received || 0)), 0)
+          const totalQuantity = batches.reduce((sum, b) => sum + (b.quantity_received || 0), 0)
+          
+          let receiptId = `SR-${date.replace(/-/g, '')}`
+          const firstBatchNotes = batches[0].notes || ''
+          const receiptMatch = firstBatchNotes.match(/Receipt:\s*([^\|]+)/)
+          if (receiptMatch) {
+            receiptId = receiptMatch[1].trim()
+          }
+          
+          // Get expected_delivery_date and date_received from first batch
+          const firstBatch = batches[0]
+          const expectedDate = firstBatch.expected_delivery_date ? 
+            (typeof firstBatch.expected_delivery_date === 'string' ? firstBatch.expected_delivery_date.split('T')[0] : new Date(firstBatch.expected_delivery_date).toISOString().split('T')[0]) : 
+            date
+          const receivedDate = firstBatch.date_received ? 
+            (typeof firstBatch.date_received === 'string' ? firstBatch.date_received.split('T')[0] : new Date(firstBatch.date_received).toISOString().split('T')[0]) : 
+            null
+          
+          return {
+            id: receiptId,
+            date: firstBatch.created_at ? firstBatch.created_at.split('T')[0] : date, // Order date (when PO was created)
+            quantity: totalQuantity,
+            total: totalCost,
+            expectedDate: expectedDate, // Expected delivery date
+            receivedDate: receivedDate, // Actual received date (null for pending)
+            status: this.getReceiptStatus(batches),
+            description: `Stock receipt with ${batches.length} item(s)`,
+            notes: firstBatchNotes,
+            priority: 'normal',
+            subtotal: totalCost,
+            tax: 0,
+            shippingCost: 0,
+            taxRate: 0,
+            items: batches.map(batch => ({
+              name: batch.product_name || batch.product_id || 'Unknown Product',
+              quantity: batch.quantity_received,
+              unit: 'pcs',
+              unitPrice: batch.cost_price || 0,
+              totalPrice: (batch.cost_price || 0) * (batch.quantity_received || 0),
+              notes: batch.notes || '',
+              productId: batch.product_id,
+              batchNumber: batch.batch_number,  // ✅ Pass batch number for activation
+              batchId: batch._id,  // ✅ Pass batch ID 
+              expiryDate: batch.expiry_date,
+              quantityRemaining: batch.quantity_remaining,
+              // ✅ Enhanced category info from product details
+              categoryId: batch.category_id || '',
+              categoryName: batch.category_name || '',
+              subcategoryName: batch.subcategory_name || ''
             })),
-            // Map order history with real user data
-            orderHistory: (order.order_history || []).map(historyItem => ({
-              id: historyItem.timestamp,
-              type: historyItem.action,
-              title: historyItem.title,
-              description: historyItem.description,
-              user: historyItem.user,
-              date: historyItem.timestamp,
-              userId: historyItem.user_id,
-              previousData: historyItem.previous_data,
-              newData: historyItem.new_data
-            }))
-          }))
+            orderHistory: [{
+              id: batches[0].created_at,
+              type: 'stock_received',
+              title: 'Stock Received',
+              description: `Received ${batches.length} batch(es) containing ${totalQuantity} units`,
+              user: 'System',
+              date: batches[0].created_at
+            }]
+          }
+        }).sort((a, b) => new Date(b.date) - new Date(a.date))
+        
+        // Update total orders count after grouping
+        this.supplier.purchaseOrders = this.orders.length
         
         this.filteredOrders = [...this.orders]
         this.editableNotes = this.supplier.notes
@@ -876,8 +1078,12 @@ export default {
           }
         ]
         
-        console.log('Supplier loaded successfully:', this.supplier.name)
-        console.log('Orders loaded:', this.orders.length)
+        console.log('=== SUMMARY ===')
+        console.log('Supplier:', this.supplier.name)
+        console.log('Stock Receipts:', this.orders.length)
+        console.log('Total Batches:', batchesList.length)
+        console.log('First Receipt:', this.orders[0])
+        console.log('===============')
         
       } catch (error) {
         console.error('Error fetching supplier details:', error)
@@ -894,89 +1100,116 @@ export default {
       }
     },
 
-    openCreateOrderModal(supplier) {
-      this.selectedSupplier = supplier
+    getReceiptStatus(batches) {
+      if (!batches || batches.length === 0) return 'Unknown'
+      
+      const allPending = batches.every(b => b.status === 'pending')
+      const allActive = batches.every(b => b.status === 'active')
+      const allInactive = batches.every(b => b.status === 'inactive')
+      const hasPending = batches.some(b => b.status === 'pending')
+      
+      if (allPending) return 'Pending Delivery'
+      if (allActive) return 'Received'
+      if (allInactive) return 'Depleted'
+      if (hasPending) return 'Partially Received'
+      
+      return 'Mixed Status'
+    },
+
+    openReceiveStockModal() {
+      // Open the "Receive Stock" modal that shows ALL pending batches
+      this.showReceiveStockModal = true
+    },
+
+    closeReceiveStockModal() {
+      this.showReceiveStockModal = false
+    },
+    
+    async handleStockReceived(results) {
+      console.log('✅ Stock received:', results)
+      
+      if (results.successful?.length > 0) {
+        this.success(`Successfully received ${results.successful.length} batch(es)`)
+      }
+      
+      if (results.failed?.length > 0) {
+        this.showError(`Failed to receive ${results.failed.length} batch(es)`)
+      }
+      
+      // Refresh supplier details to show updated batches
+      await this.fetchSupplierDetails()
+    },
+
+
+    createOrder() {
+      this.openCreateOrderModal()
+    },
+
+    openCreateOrderModal() {
       this.showCreateOrderModal = true
     },
 
     closeCreateOrderModal() {
       this.showCreateOrderModal = false
-      this.selectedSupplier = null
     },
 
-    async handleOrderSave(orderData) {
-      this.saving = true
+    async handleOrderSave(result) {
+      console.log('✅ Order created:', result)
       
-      try {
-        const token = localStorage.getItem('access_token')
-        
-        const currentUserId = this.user?._id || 'system'
-        console.log('Current user ID from useAuth:', currentUserId)
-        
-        const backendData = {
-          order_id: orderData.id,
-          status: orderData.status || 'pending',
-          order_date: orderData.orderDate,
-          expected_delivery_date: orderData.expectedDate,
-          priority: orderData.priority,
-          description: orderData.description,
-          notes: orderData.notes,
-          shipping_cost: orderData.shippingCost || 0,
-          tax_rate: 12,
-          subtotal: orderData.subtotal,
-          tax_amount: orderData.tax,
-          total_cost: orderData.total,
-          items: orderData.items.map((item, index) => ({
-            product_id: `TEMP-${Date.now()}-${index}`,
-            product_name: item.name,
-            quantity: item.quantity,
-            unit: item.unit || 'pcs',
-            unit_price: item.unitPrice || 0,
-            notes: item.notes || ''
-          }))
-          // Remove created_by - let backend handle it via authentication
-        }
-        
-        console.log('Sending order data:', backendData)
-        
-        const response = await axios.post(
-          `${API_BASE_URL}/suppliers/${this.supplier.id}/orders/`,
-          backendData,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        )
-        
-        console.log('Order created:', response.data)
-        
-        this.closeCreateOrderModal()
-        
-        // Show success toast instead of setting successMessage
-        this.success(`Purchase order ${orderData.id} created successfully!`)
-        
-        await this.fetchSupplierDetails()
-        
-      } catch (error) {
-        console.error('Error creating order:', error)
-        const errorMessage = error.response?.data?.error || 'Failed to create order'
-        
-        // Show error toast instead of setting error
-        this.showError(errorMessage)
-        
-      } finally {
-        this.saving = false
+      const { successful, failed } = result.results
+      
+      if (successful.length > 0) {
+        this.success(`Successfully created ${successful.length} pending order(s)`)
       }
+      
+      if (failed.length > 0) {
+        this.showError(`Failed to create ${failed.length} order(s)`)
+      }
+      
+      // Refresh supplier details to show new batches
+      await this.fetchSupplierDetails()
+    },
+
+    canReceiveOrder(order) {
+      return order.status === 'Pending' || order.status === 'Active'
+    },
+
+
+    viewReceipt(receipt) {
+      console.log('Viewing receipt:', receipt)
+      this.selectedReceiptForView = receipt
+      this.showBatchDetailsModal = true
+    },
+    
+    closeBatchDetailsModal() {
+      this.showBatchDetailsModal = false
+      this.selectedReceiptForView = null
+    },
+
+    editBatchDetails(receipt) {
+      console.log('📝 Editing batch details for receipt:', receipt)
+      console.log('Receipt has', receipt.items?.length || 0, 'items')
+      console.log('Order Date (created_at):', receipt.date)
+      console.log('Expected Delivery:', receipt.expectedDate)
+      this.selectedReceiptForEdit = receipt
+      this.showEditBatchDetailsModal = true
+    },
+    
+    closeEditBatchDetailsModal() {
+      this.showEditBatchDetailsModal = false
+      this.selectedReceiptForEdit = null
+    },
+
+    async handleBatchDetailsUpdated(updatedReceipt) {
+      console.log('✅ Batch details updated:', updatedReceipt)
+      this.success('Purchase order updated successfully')
+      
+      // Refresh supplier details to show updated batches
+      await this.fetchSupplierDetails()
     },
 
     goBack() {
       this.$router.push({ name: 'Suppliers' })
-    },
-
-    createOrder() {
-      this.openCreateOrderModal(this.supplier)
     },
 
     viewPaymentHistory() {
@@ -1371,9 +1604,13 @@ export default {
     getOrderStatusClass(status) {
       const classes = {
         'Received': 'bg-success',
+        'Pending Delivery': 'bg-warning',
+        'Partially Received': 'bg-info',
         'Pending': 'bg-warning',
+        'Partial': 'bg-info',
         'Cancelled': 'bg-danger',
-        'Active': 'bg-primary'
+        'Active': 'bg-primary',
+        'Depleted': 'bg-secondary'
       }
       return classes[status] || 'bg-secondary'
     },
@@ -1391,8 +1628,9 @@ export default {
     },
 
     getActiveOrders() {
+      // Count orders that are currently pending (not yet received)
       return this.orders.filter(order => 
-        order.status === 'Active' || order.status === 'Pending'
+        order.status === 'Pending Delivery' || order.status === 'Partially Received'
       ).length
     },
 

@@ -12,6 +12,7 @@ class SupplierService:
     def __init__(self):
         self.db = db_manager.get_database()
         self.supplier_collection = self.db.suppliers
+        self.batch_collection = self.db.batches
         self.audit_service = AuditLogService()
         self.notification_service = NotificationService()
     
@@ -24,7 +25,6 @@ class SupplierService:
                     'email': 'system@pann.com'
                 }
             
-            # Query the users collection
             user = self.db.users.find_one({'_id': user_id})
             if user:
                 display_name = user.get('full_name') or user.get('username') or user.get('email', 'Unknown User')
@@ -47,13 +47,12 @@ class SupplierService:
     def generate_supplier_id(self):
         """Generate sequential SUPP-### ID"""
         try:
-            # Get the highest existing supplier ID number
             pipeline = [
                 {'$match': {'_id': {'$regex': r'^SUPP-\d{3}$'}}},
                 {'$project': {
                     'id_number': {
                         '$toInt': {
-                            '$substr': ['$_id', 5, -1]  # Extract number after "SUPP-"
+                            '$substr': ['$_id', 5, -1]
                         }
                     }
                 }},
@@ -67,7 +66,6 @@ class SupplierService:
             return f"SUPP-{next_number:03d}"
         
         except Exception:
-            # Fallback: count all suppliers + 1
             count = self.supplier_collection.count_documents({}) + 1
             return f"SUPP-{count:03d}"
     
@@ -88,13 +86,11 @@ class SupplierService:
             if not supplier_data.get(field):
                 raise ValueError(f"Required field '{field}' is missing or empty")
         
-        # Validate email format if provided
         if supplier_data.get('email'):
             email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
             if not re.match(email_pattern, supplier_data['email']):
                 raise ValueError("Invalid email format")
         
-        # Validate phone number if provided (basic validation)
         if supplier_data.get('phone_number'):
             phone = supplier_data['phone_number'].strip()
             if len(phone) < 10:
@@ -109,12 +105,7 @@ class SupplierService:
                 'contact_updated': "Supplier Contact Updated",
                 'soft_deleted': "Supplier Deleted",
                 'hard_deleted': "Supplier Permanently Deleted",
-                'restored': "Supplier Restored",
-                'purchase_order_added': "Purchase Order Added",
-                'purchase_order_updated': "Purchase Order Updated",
-                'purchase_order_soft_deleted': "Purchase Order Deleted",
-                'purchase_order_hard_deleted': "Purchase Order Permanently Deleted",
-                'purchase_order_restored': "Purchase Order Restored"
+                'restored': "Supplier Restored"
             }
             
             messages = {
@@ -123,12 +114,7 @@ class SupplierService:
                 'contact_updated': f"Contact information for '{supplier_name}' has been updated",
                 'soft_deleted': f"Supplier '{supplier_name}' has been moved to trash",
                 'hard_deleted': f"Supplier '{supplier_name}' has been permanently removed",
-                'restored': f"Supplier '{supplier_name}' has been restored from trash",
-                'purchase_order_added': f"New purchase order added for supplier '{supplier_name}'",
-                'purchase_order_updated': f"Purchase order updated for supplier '{supplier_name}'",
-                'purchase_order_soft_deleted': f"Purchase order deleted for supplier '{supplier_name}' (can be restored)",
-                'purchase_order_hard_deleted': f"Purchase order permanently removed for supplier '{supplier_name}'",
-                'purchase_order_restored': f"Purchase order restored for supplier '{supplier_name}'"
+                'restored': f"Supplier '{supplier_name}' has been restored from trash"
             }
             
             if action_type in titles:
@@ -156,7 +142,7 @@ class SupplierService:
                 resource_type='supplier',
                 resource_id=supplier_id,
                 user_id=user_id,
-                changes=None,  # You can pass changes here if needed
+                changes=None,
                 metadata={
                     'supplier_name': supplier_name,
                     **(details or {})
@@ -166,16 +152,13 @@ class SupplierService:
             logger.error(f"Failed to log audit action: {e}")
 
     def create_supplier(self, supplier_data, user_id='system'):
-        """Create a new supplier"""
+        """Create a new supplier - NO PURCHASE ORDERS"""
         try:
-            # Validate supplier data
             self.validate_supplier_data(supplier_data)
             
-            # Generate supplier ID
             if not supplier_data.get('_id'):
                 supplier_data['_id'] = self.generate_supplier_id()
             
-            # Check for duplicate supplier name
             existing_supplier = self.supplier_collection.find_one({
                 'supplier_name': {'$regex': f'^{re.escape(supplier_data["supplier_name"])}$', '$options': 'i'},
                 'isDeleted': {'$ne': True}
@@ -183,23 +166,19 @@ class SupplierService:
             if existing_supplier:
                 raise ValueError(f"Supplier with name '{supplier_data['supplier_name']}' already exists")
             
-            # Set default values
             current_time = datetime.utcnow()
             supplier_data.update({
                 'isDeleted': False,
                 'created_at': current_time,
                 'updated_at': current_time,
                 'created_by': user_id,
-                'purchase_orders': [],  # Initialize empty purchase orders array
                 'sync_logs': [
                     self.add_sync_log(source='cloud', status='pending', details={'action': 'created'})
                 ]
             })
             
-            # Insert supplier
             result = self.supplier_collection.insert_one(supplier_data)
             
-            # Log audit trail
             self._log_audit(
                 action='supplier_created',
                 supplier_id=supplier_data['_id'],
@@ -207,330 +186,22 @@ class SupplierService:
                 user_id=user_id
             )
             
-            # Send notification
             self._send_supplier_notification('created', supplier_data['supplier_name'], supplier_data['_id'])
             
-            # Return created supplier
             return self.supplier_collection.find_one({'_id': supplier_data['_id']})
         
         except Exception as e:
             raise Exception(f"Error creating supplier: {str(e)}")
-        
-    def add_purchase_order(self, supplier_id, order_data, user_id='system'):
-        """Add a purchase order to a supplier"""
-        try:
-            if not supplier_id or not isinstance(supplier_id, str):
-                raise ValueError("Invalid supplier ID")
-            
-            # Check if supplier exists
-            supplier = self.get_supplier_by_id(supplier_id, include_deleted=False)
-            if not supplier:
-                raise Exception(f"Supplier with ID {supplier_id} not found or is deleted")
-            
-            # Validate required order fields
-            required_fields = ['order_id', 'items']
-            for field in required_fields:
-                if not order_data.get(field):
-                    raise ValueError(f"Required field '{field}' is missing from order data")
-            
-            # Validate items array
-            if not isinstance(order_data['items'], list) or len(order_data['items']) == 0:
-                raise ValueError("Order must contain at least one item")
-            
-            # Validate each item
-            for i, item in enumerate(order_data['items']):
-                if not item.get('product_id'):
-                    raise ValueError(f"Item {i+1} is missing product_id")
-                if not item.get('quantity') or item['quantity'] <= 0:
-                    raise ValueError(f"Item {i+1} must have a positive quantity")
-                if not item.get('unit_price') or item['unit_price'] <= 0:
-                    raise ValueError(f"Item {i+1} must have a positive unit price")
-            
-            # Calculate total cost if not provided
-            if 'total_cost' not in order_data:
-                total_cost = sum(item['quantity'] * item['unit_price'] for item in order_data['items'])
-                order_data['total_cost'] = total_cost
-            
-            # Set default order values
-            current_time = datetime.utcnow()
-            order_data.update({
-                'status': order_data.get('status', 'pending'),
-                'order_date': order_data.get('order_date', current_time),
-                'created_at': current_time,
-                'updated_at': current_time,
-                'created_by': user_id,
-                'isDeleted': False
-            })
-            
-            # Add purchase order to supplier
-            result = self.supplier_collection.update_one(
-                {'_id': supplier_id, 'isDeleted': {'$ne': True}},
-                {
-                    '$push': {'purchase_orders': order_data},
-                    '$set': {'updated_at': current_time}
-                }
-            )
-            
-            if result.modified_count > 0:
-                # Log audit trail
-                self._log_audit(
-                    action='purchase_order_added',
-                    supplier_id=supplier_id,
-                    supplier_name=supplier['supplier_name'],
-                    user_id=user_id,
-                    details={'order_id': order_data['order_id']}
-                )
-                
-                # Send notification
-                self._send_supplier_notification('purchase_order_added', supplier['supplier_name'], supplier_id)
-                
-                # Return updated supplier
-                return self.supplier_collection.find_one({'_id': supplier_id})
-            
-            # Get user information for history
-            user_info = self._get_user_info(user_id)
-            
-            # Set default order values
-            current_time = datetime.utcnow()
-            order_data.update({
-                'status': order_data.get('status', 'pending'),
-                'order_date': order_data.get('order_date', current_time),
-                'created_at': current_time,
-                'updated_at': current_time,
-                'created_by': user_id,
-                'isDeleted': False,
-                # Add initial order history
-                'order_history': [
-                    {
-                        'timestamp': current_time.isoformat(),
-                        'action': 'created',
-                        'title': 'Order Created',
-                        'description': f'Purchase order {order_data["order_id"]} was created with {len(order_data["items"])} item(s)',
-                        'user': user_info['display_name'],
-                        'user_id': user_id,
-                        'previous_data': None,
-                        'new_data': {
-                            'status': order_data.get('status', 'pending'),
-                            'total_cost': order_data.get('total_cost', 0),
-                            'items_count': len(order_data.get('items', []))
-                        }
-                    }
-                ]
-            })
 
-            return None
-        
-        except Exception as e:
-            raise Exception(f"Error adding purchase order: {str(e)}")
-    
-    def update_purchase_order(self, supplier_id, order_id, update_data, user_id='system'):
-        """Update a specific purchase order for a supplier"""
-        try:
-            if not supplier_id or not isinstance(supplier_id, str):
-                raise ValueError("Invalid supplier ID")
-            
-            if not order_id:
-                raise ValueError("Order ID is required")
-            
-            # Check if supplier exists
-            supplier = self.get_supplier_by_id(supplier_id, include_deleted=False)
-            if not supplier:
-                raise Exception(f"Supplier with ID {supplier_id} not found or is deleted")
-            
-            # Find the order in the purchase_orders array
-            order_found = False
-            for order in supplier.get('purchase_orders', []):
-                if order.get('order_id') == order_id and not order.get('isDeleted', False):
-                    order_found = True
-                    break
-            
-            if not order_found:
-                raise Exception(f"Purchase order with ID {order_id} not found for supplier {supplier_id}")
-            
-            # Prepare update data
-            current_time = datetime.utcnow()
-            update_data['updated_at'] = current_time
-            update_data['updated_by'] = user_id
-            
-            # Recalculate total if items are updated
-            if 'items' in update_data:
-                if isinstance(update_data['items'], list):
-                    total_cost = sum(item.get('quantity', 0) * item.get('unit_price', 0) for item in update_data['items'])
-                    update_data['total_cost'] = total_cost
-            
-            # Update the specific purchase order
-            update_fields = {}
-            for key, value in update_data.items():
-                update_fields[f'purchase_orders.$.{key}'] = value
-            
-            result = self.supplier_collection.update_one(
-                {
-                    '_id': supplier_id, 
-                    'purchase_orders.order_id': order_id,
-                    'isDeleted': {'$ne': True}
-                },
-                {
-                    '$set': {
-                        **update_fields,
-                        'updated_at': current_time
-                    }
-                }
-            )
-            
-            if result.modified_count > 0:
-                # Log audit trail
-                self._log_audit(
-                    action='purchase_order_updated',
-                    supplier_id=supplier_id,
-                    supplier_name=supplier['supplier_name'],
-                    user_id=user_id,
-                    details={'order_id': order_id}
-                )
-                
-                # Send notification
-                self._send_supplier_notification('purchase_order_updated', supplier['supplier_name'], supplier_id)
-                
-                # Return updated supplier
-                return self.supplier_collection.find_one({'_id': supplier_id})
-            
-            # Get user information
-            user_info = self._get_user_info(user_id)
-            
-            # Get current order data for comparison
-            current_supplier = self.get_supplier_by_id(supplier_id, include_deleted=False)
-            current_order = None
-            for order in current_supplier.get('purchase_orders', []):
-                if order.get('order_id') == order_id and not order.get('isDeleted', False):
-                    current_order = order
-                    break
-            
-            # Prepare update data
-            current_time = datetime.utcnow()
-            update_data['updated_at'] = current_time
-            update_data['updated_by'] = user_id
-            
-            # Create history entry
-            history_entry = {
-                'timestamp': current_time.isoformat(),
-                'action': 'updated',
-                'title': 'Order Updated',
-                'description': f'Purchase order {order_id} was updated',
-                'user': user_info['display_name'],
-                'user_id': user_id,
-                'previous_data': {
-                    'status': current_order.get('status') if current_order else None,
-                    'total_cost': current_order.get('total_cost') if current_order else None
-                },
-                'new_data': {
-                    'status': update_data.get('status'),
-                    'total_cost': update_data.get('total_cost')
-                }
-            }
-            
-            # If status is being changed, create more specific history
-            if current_order and update_data.get('status') and update_data['status'] != current_order.get('status'):
-                history_entry.update({
-                    'action': 'status_changed',
-                    'title': 'Status Updated',
-                    'description': f'Order status changed from {current_order.get("status", "unknown")} to {update_data["status"]}'
-                })
-            
-            # Recalculate total if items are updated
-            if 'items' in update_data:
-                if isinstance(update_data['items'], list):
-                    total_cost = sum(item.get('quantity', 0) * item.get('unit_price', 0) for item in update_data['items'])
-                    update_data['total_cost'] = total_cost
-            
-            # Update the specific purchase order and add history
-            update_fields = {}
-            for key, value in update_data.items():
-                update_fields[f'purchase_orders.$.{key}'] = value
-            
-            result = self.supplier_collection.update_one(
-                {
-                    '_id': supplier_id, 
-                    'purchase_orders.order_id': order_id,
-                    'isDeleted': {'$ne': True}
-                },
-                {
-                    '$set': {
-                        **update_fields,
-                        'updated_at': current_time
-                    },
-                    '$push': {
-                        'purchase_orders.$.order_history': history_entry
-                    }
-                }
-            )
-            
-            return None
-        
-        except Exception as e:
-            raise Exception(f"Error updating purchase order: {str(e)}")
-    
-    def get_purchase_orders(self, supplier_id, status=None, include_deleted=False):
-        """
-        Get purchase orders for a specific supplier
-        
-        Args:
-            supplier_id: Supplier's string ID
-            status: Filter by order status (optional)
-            include_deleted: Include soft-deleted orders (default: False)
-        
-        Returns:
-            List of purchase orders
-        """
-        try:
-            if not supplier_id or not isinstance(supplier_id, str):
-                raise ValueError("Invalid supplier ID")
-            
-            supplier = self.get_supplier_by_id(supplier_id, include_deleted=False)
-            if not supplier:
-                return []
-            
-            orders = supplier.get('purchase_orders', [])
-            
-            # Filter by deletion status
-            if not include_deleted:
-                orders = [order for order in orders if not order.get('isDeleted', False)]
-            
-            # Filter by status if provided
-            if status:
-                orders = [order for order in orders if order.get('status') == status]
-            
-            # Sort by order date (newest first)
-            orders.sort(key=lambda x: x.get('order_date', datetime.min), reverse=True)
-            
-            return orders
-        
-        except Exception as e:
-            raise Exception(f"Error getting purchase orders: {str(e)}")
-    
-    def get_purchase_order_by_id(self, supplier_id, order_id):
-        """Get a specific purchase order by ID"""
-        try:
-            orders = self.get_purchase_orders(supplier_id, include_deleted=False)
-            
-            for order in orders:
-                if order.get('order_id') == order_id:
-                    return order
-            
-            return None
-        
-        except Exception as e:
-            raise Exception(f"Error getting purchase order: {str(e)}")
-    
     def get_suppliers(self, filters=None, include_deleted=False, page=1, per_page=50):
         """Get suppliers with optional filters and pagination"""
         try:
             query = {}
             
-            # By default, exclude deleted suppliers
             if not include_deleted:
                 query['isDeleted'] = {'$ne': True}
             
             if filters:
-                # Search filter
                 if filters.get('search'):
                     search_regex = {'$regex': filters['search'], '$options': 'i'}
                     query['$or'] = [
@@ -540,23 +211,45 @@ class SupplierService:
                         {'_id': search_regex}
                     ]
                 
-                # Status filter (for future use if needed)
                 if filters.get('status'):
                     query['status'] = filters['status']
+                
+                if filters.get('type'):
+                    query['type'] = filters['type']
             
-            # Calculate pagination
             skip = (page - 1) * per_page
-            
-            # Get total count for pagination info
             total_count = self.supplier_collection.count_documents(query)
             
-            # Get suppliers with pagination
-            suppliers = list(
-                self.supplier_collection.find(query)
-                .sort('supplier_name', 1)
-                .skip(skip)
-                .limit(per_page)
-            )
+            # Aggregate to include batch statistics
+            pipeline = [
+                {'$match': query},
+                {'$lookup': {
+                    'from': 'batches',
+                    'localField': '_id',
+                    'foreignField': 'supplier_id',
+                    'as': 'batches'
+                }},
+                {'$addFields': {
+                    'total_batches': {'$size': '$batches'},
+                    'active_batches': {
+                        '$size': {
+                            '$filter': {
+                                'input': '$batches',
+                                'as': 'batch',
+                                'cond': {'$eq': ['$$batch.status', 'active']}
+                            }
+                        }
+                    }
+                }},
+                {'$project': {
+                    'batches': 0  # Remove the full batches array from response
+                }},
+                {'$sort': {'supplier_name': 1}},
+                {'$skip': skip},
+                {'$limit': per_page}
+            ]
+            
+            suppliers = list(self.supplier_collection.aggregate(pipeline))
             
             return {
                 'suppliers': suppliers,
@@ -571,8 +264,8 @@ class SupplierService:
         except Exception as e:
             raise Exception(f"Error getting suppliers: {str(e)}")
     
-    def get_supplier_by_id(self, supplier_id, include_deleted=False):
-        """Get supplier by ID"""
+    def get_supplier_by_id(self, supplier_id, include_deleted=False, include_batch_stats=True):
+        """Get supplier by ID with optional batch statistics"""
         try:
             if not supplier_id or not isinstance(supplier_id, str):
                 return None
@@ -582,10 +275,149 @@ class SupplierService:
             if not include_deleted:
                 query['isDeleted'] = {'$ne': True}
             
-            return self.supplier_collection.find_one(query)
+            if include_batch_stats:
+                pipeline = [
+                    {'$match': query},
+                    {'$lookup': {
+                        'from': 'batches',
+                        'localField': '_id',
+                        'foreignField': 'supplier_id',
+                        'as': 'batches'
+                    }},
+                    {'$addFields': {
+                        'total_batches': {'$size': '$batches'},
+                        'active_batches': {
+                            '$size': {
+                                '$filter': {
+                                    'input': '$batches',
+                                    'as': 'batch',
+                                    'cond': {'$eq': ['$$batch.status', 'active']}
+                                }
+                            }
+                        },
+                        'depleted_batches': {
+                            '$size': {
+                                '$filter': {
+                                    'input': '$batches',
+                                    'as': 'batch',
+                                    'cond': {'$eq': ['$$batch.status', 'depleted']}
+                                }
+                            }
+                        }
+                    }},
+                    {'$project': {
+                        'batches': 0
+                    }}
+                ]
+                
+                result = list(self.supplier_collection.aggregate(pipeline))
+                return result[0] if result else None
+            else:
+                return self.supplier_collection.find_one(query)
         
         except Exception as e:
             raise Exception(f"Error getting supplier: {str(e)}")
+    
+    def get_supplier_batches(self, supplier_id, filters=None):
+        """Get all batches for a specific supplier"""
+        try:
+            if not supplier_id or not isinstance(supplier_id, str):
+                raise ValueError("Invalid supplier ID")
+            
+            supplier = self.get_supplier_by_id(supplier_id, include_deleted=False, include_batch_stats=False)
+            if not supplier:
+                raise Exception(f"Supplier with ID {supplier_id} not found or is deleted")
+            
+            query = {'supplier_id': supplier_id}
+            
+            if filters:
+                if filters.get('status'):
+                    query['status'] = filters['status']
+                
+                if filters.get('product_id'):
+                    query['product_id'] = filters['product_id']
+                
+                if filters.get('expiring_soon'):
+                    days = filters.get('days_ahead', 30)
+                    future_date = datetime.utcnow() + timedelta(days=days)
+                    query['expiry_date'] = {'$lte': future_date, '$gte': datetime.utcnow()}
+            
+            # Lookup product information for each batch
+            pipeline = [
+                {'$match': query},
+                {'$lookup': {
+                    'from': 'products',
+                    'localField': 'product_id',
+                    'foreignField': '_id',
+                    'as': 'product_info'
+                }},
+                {'$unwind': {
+                    'path': '$product_info',
+                    'preserveNullAndEmptyArrays': True
+                }},
+                {'$sort': {'date_received': -1}}
+            ]
+            
+            batches = list(self.batch_collection.aggregate(pipeline))
+            return batches
+        
+        except Exception as e:
+            raise Exception(f"Error getting supplier batches: {str(e)}")
+    
+    def get_supplier_statistics(self, supplier_id):
+        """Get comprehensive statistics for a supplier"""
+        try:
+            if not supplier_id or not isinstance(supplier_id, str):
+                raise ValueError("Invalid supplier ID")
+            
+            pipeline = [
+                {'$match': {'supplier_id': supplier_id}},
+                {'$group': {
+                    '_id': None,
+                    'total_batches': {'$sum': 1},
+                    'active_batches': {
+                        '$sum': {'$cond': [{'$eq': ['$status', 'active']}, 1, 0]}
+                    },
+                    'depleted_batches': {
+                        '$sum': {'$cond': [{'$eq': ['$status', 'depleted']}, 1, 0]}
+                    },
+                    'expired_batches': {
+                        '$sum': {'$cond': [{'$eq': ['$status', 'expired']}, 1, 0]}
+                    },
+                    'total_quantity_received': {'$sum': '$quantity_received'},
+                    'total_quantity_remaining': {'$sum': '$quantity_remaining'},
+                    'total_cost_value': {
+                        '$sum': {'$multiply': ['$quantity_remaining', '$cost_price']}
+                    },
+                    'unique_products': {'$addToSet': '$product_id'}
+                }},
+                {'$addFields': {
+                    'unique_products_count': {'$size': '$unique_products'}
+                }},
+                {'$project': {
+                    '_id': 0,
+                    'unique_products': 0
+                }}
+            ]
+            
+            result = list(self.batch_collection.aggregate(pipeline))
+            
+            if result:
+                return result[0]
+            else:
+                return {
+                    'total_batches': 0,
+                    'active_batches': 0,
+                    'depleted_batches': 0,
+                    'expired_batches': 0,
+                    'total_quantity_received': 0,
+                    'total_quantity_remaining': 0,
+                    'total_cost_value': 0,
+                    'unique_products_count': 0
+                }
+        
+        except Exception as e:
+            raise Exception(f"Error getting supplier statistics: {str(e)}")
     
     def update_supplier(self, supplier_id, supplier_data, user_id='system'):
         """Update supplier"""
@@ -593,15 +425,12 @@ class SupplierService:
             if not supplier_id or not isinstance(supplier_id, str):
                 raise ValueError("Invalid supplier ID")
             
-            # Check if supplier exists and is not deleted
-            existing_supplier = self.get_supplier_by_id(supplier_id, include_deleted=False)
+            existing_supplier = self.get_supplier_by_id(supplier_id, include_deleted=False, include_batch_stats=False)
             if not existing_supplier:
                 raise Exception(f"Supplier with ID {supplier_id} not found or is deleted")
             
-            # Validate updated data
             self.validate_supplier_data(supplier_data)
             
-            # Check for duplicate name (excluding current supplier)
             if 'supplier_name' in supplier_data:
                 existing_name = self.supplier_collection.find_one({
                     'supplier_name': {'$regex': f'^{re.escape(supplier_data["supplier_name"])}$', '$options': 'i'},
@@ -611,11 +440,9 @@ class SupplierService:
                 if existing_name:
                     raise ValueError(f"Supplier with name '{supplier_data['supplier_name']}' already exists")
             
-            # Add updated timestamp and user
             supplier_data['updated_at'] = datetime.utcnow()
             supplier_data['updated_by'] = user_id
             
-            # Update supplier
             result = self.supplier_collection.update_one(
                 {'_id': supplier_id, 'isDeleted': {'$ne': True}},
                 {'$set': supplier_data}
@@ -624,7 +451,6 @@ class SupplierService:
             if result.modified_count > 0:
                 updated_supplier = self.supplier_collection.find_one({'_id': supplier_id})
                 
-                # Log audit trail
                 self._log_audit(
                     action='supplier_updated',
                     supplier_id=supplier_id,
@@ -632,7 +458,6 @@ class SupplierService:
                     user_id=user_id
                 )
                 
-                # Send notification
                 self._send_supplier_notification('updated', updated_supplier['supplier_name'], supplier_id)
                 
                 return updated_supplier
@@ -648,17 +473,23 @@ class SupplierService:
             if not supplier_id or not isinstance(supplier_id, str):
                 return False
             
-            # Get supplier details before deletion
             supplier_to_delete = self.supplier_collection.find_one({'_id': supplier_id})
             if not supplier_to_delete:
                 return False
             
+            # Check if supplier has active batches
+            active_batches_count = self.batch_collection.count_documents({
+                'supplier_id': supplier_id,
+                'status': 'active'
+            })
+            
+            if active_batches_count > 0 and hard_delete:
+                raise Exception(f"Cannot delete supplier with {active_batches_count} active batches. Please deplete or reassign batches first.")
+            
             if hard_delete:
-                # Hard delete - permanently remove
                 result = self.supplier_collection.delete_one({'_id': supplier_id})
                 
                 if result.deleted_count > 0:
-                    # Log audit trail
                     self._log_audit(
                         action='supplier_hard_deleted',
                         supplier_id=supplier_id,
@@ -666,13 +497,11 @@ class SupplierService:
                         user_id=user_id
                     )
                     
-                    # Send notification
                     self._send_supplier_notification('hard_deleted', supplier_to_delete['supplier_name'], supplier_id)
                     
                     return True
                 return False
             else:
-                # Soft delete
                 current_time = datetime.utcnow()
                 deletion_log = {
                     'deleted_at': current_time,
@@ -692,7 +521,6 @@ class SupplierService:
                 )
                 
                 if result.modified_count > 0:
-                    # Log audit trail
                     self._log_audit(
                         action='supplier_soft_deleted',
                         supplier_id=supplier_id,
@@ -700,7 +528,6 @@ class SupplierService:
                         user_id=user_id
                     )
                     
-                    # Send notification
                     self._send_supplier_notification('soft_deleted', supplier_to_delete['supplier_name'], supplier_id)
                     
                     return True
@@ -740,7 +567,6 @@ class SupplierService:
             if result.modified_count > 0:
                 restored_supplier = self.supplier_collection.find_one({'_id': supplier_id})
                 
-                # Log audit trail
                 self._log_audit(
                     action='supplier_restored',
                     supplier_id=supplier_id,
@@ -748,7 +574,6 @@ class SupplierService:
                     user_id=user_id
                 )
                 
-                # Send notification
                 self._send_supplier_notification('restored', restored_supplier['supplier_name'], supplier_id)
                 
                 return True
@@ -785,194 +610,3 @@ class SupplierService:
         
         except Exception as e:
             raise Exception(f"Error getting deleted suppliers: {str(e)}")
-        
-    def delete_purchase_order(self, supplier_id, order_id, hard_delete=False, user_id='system'):
-        """Soft delete or hard delete a purchase order"""
-        try:
-            if not supplier_id or not isinstance(supplier_id, str):
-                raise ValueError("Invalid supplier ID")
-            
-            if not order_id:
-                raise ValueError("Order ID is required")
-            
-            # Get supplier
-            supplier = self.get_supplier_by_id(supplier_id, include_deleted=False)
-            if not supplier:
-                raise Exception(f"Supplier with ID {supplier_id} not found or is deleted")
-            
-            # Find the order in the purchase_orders array
-            order_to_delete = None
-            for order in supplier.get('purchase_orders', []):
-                if order.get('order_id') == order_id and not order.get('isDeleted', False):
-                    order_to_delete = order
-                    break
-            
-            if not order_to_delete:
-                raise Exception(f"Active purchase order with ID {order_id} not found for supplier {supplier_id}")
-            
-            current_time = datetime.utcnow()
-            
-            if hard_delete:
-                # Hard delete - permanently remove from array
-                result = self.supplier_collection.update_one(
-                    {'_id': supplier_id, 'isDeleted': {'$ne': True}},
-                    {
-                        '$pull': {'purchase_orders': {'order_id': order_id}},
-                        '$set': {'updated_at': current_time}
-                    }
-                )
-                
-                if result.modified_count > 0:
-                    # Log audit trail
-                    self._log_audit(
-                        action='purchase_order_hard_deleted',
-                        supplier_id=supplier_id,
-                        supplier_name=supplier['supplier_name'],
-                        user_id=user_id,
-                        details={'order_id': order_id}
-                    )
-                    
-                    # Send notification
-                    self._send_supplier_notification('purchase_order_hard_deleted', supplier['supplier_name'], supplier_id)
-                    return True
-                return False
-            
-            else:
-                # Soft delete - mark as deleted with timestamp
-                deletion_log = {
-                    'deleted_at': current_time,
-                    'deleted_by': user_id,
-                    'reason': 'Manual deletion'
-                }
-                
-                result = self.supplier_collection.update_one(
-                    {
-                        '_id': supplier_id, 
-                        'purchase_orders.order_id': order_id,
-                        'isDeleted': {'$ne': True}
-                    },
-                    {
-                        '$set': {
-                            'purchase_orders.$.isDeleted': True,
-                            'purchase_orders.$.deletion_log': deletion_log,
-                            'purchase_orders.$.updated_at': current_time,
-                            'updated_at': current_time
-                        }
-                    }
-                )
-                
-                if result.modified_count > 0:
-                    # Log audit trail
-                    self._log_audit(
-                        action='purchase_order_soft_deleted',
-                        supplier_id=supplier_id,
-                        supplier_name=supplier['supplier_name'],
-                        user_id=user_id,
-                        details={'order_id': order_id}
-                    )
-                    
-                    # Send notification
-                    self._send_supplier_notification('purchase_order_soft_deleted', supplier['supplier_name'], supplier_id)
-                    return True
-                return False
-        
-        except Exception as e:
-            raise Exception(f"Error deleting purchase order: {str(e)}")
-
-    def restore_purchase_order(self, supplier_id, order_id, user_id='system'):
-        """Restore a soft-deleted purchase order"""
-        try:
-            if not supplier_id or not isinstance(supplier_id, str):
-                raise ValueError("Invalid supplier ID")
-            
-            if not order_id:
-                raise ValueError("Order ID is required")
-            
-            # Get supplier
-            supplier = self.get_supplier_by_id(supplier_id, include_deleted=False)
-            if not supplier:
-                raise Exception(f"Supplier with ID {supplier_id} not found or is deleted")
-            
-            # Find the deleted order
-            order_found = False
-            for order in supplier.get('purchase_orders', []):
-                if order.get('order_id') == order_id and order.get('isDeleted', False):
-                    order_found = True
-                    break
-            
-            if not order_found:
-                raise Exception(f"Deleted purchase order with ID {order_id} not found for supplier {supplier_id}")
-            
-            current_time = datetime.utcnow()
-            restoration_log = {
-                'restored_at': current_time,
-                'restored_by': user_id,
-                'reason': 'Manual restoration'
-            }
-            
-            result = self.supplier_collection.update_one(
-                {
-                    '_id': supplier_id,
-                    'purchase_orders.order_id': order_id,
-                    'purchase_orders.isDeleted': True,
-                    'isDeleted': {'$ne': True}
-                },
-                {
-                    '$set': {
-                        'purchase_orders.$.isDeleted': False,
-                        'purchase_orders.$.restoration_log': restoration_log,
-                        'purchase_orders.$.updated_at': current_time,
-                        'updated_at': current_time
-                    },
-                    '$unset': {
-                        'purchase_orders.$.deletion_log': 1
-                    }
-                }
-            )
-            
-            if result.modified_count > 0:
-                # Log audit trail
-                self._log_audit(
-                    action='purchase_order_restored',
-                    supplier_id=supplier_id,
-                    supplier_name=supplier['supplier_name'],
-                    user_id=user_id,
-                    details={'order_id': order_id}
-                )
-                
-                # Send notification
-                self._send_supplier_notification('purchase_order_restored', supplier['supplier_name'], supplier_id)
-                return True
-            
-            return False
-        
-        except Exception as e:
-            raise Exception(f"Error restoring purchase order: {str(e)}")
-
-    def get_deleted_purchase_orders(self, supplier_id):
-        """Get all soft-deleted purchase orders for a supplier"""
-        try:
-            if not supplier_id or not isinstance(supplier_id, str):
-                raise ValueError("Invalid supplier ID")
-            
-            # Get supplier
-            supplier = self.get_supplier_by_id(supplier_id, include_deleted=False)
-            if not supplier:
-                return []
-            
-            # Filter for deleted orders
-            deleted_orders = [
-                order for order in supplier.get('purchase_orders', [])
-                if order.get('isDeleted', False)
-            ]
-            
-            # Sort by deletion date (newest first)
-            deleted_orders.sort(
-                key=lambda x: x.get('deletion_log', {}).get('deleted_at', datetime.min), 
-                reverse=True
-            )
-            
-            return deleted_orders
-        
-        except Exception as e:
-            raise Exception(f"Error getting deleted purchase orders: {str(e)}")

@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 
 from ..services.batch_service import BatchService
 from ..services.product_service import ProductService
+from ..services.supplier_service import SupplierService
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ class BatchView(View):
         super().__init__()
         self.batch_service = BatchService()
         self.product_service = ProductService()
+        self.supplier_service = SupplierService()
 
     @method_decorator(csrf_exempt)
     def dispatch(self, request, *args, **kwargs):
@@ -43,6 +45,19 @@ class CreateBatchView(BatchView):
                         'error': f'Missing required field: {field}'
                     }, status=400)
             
+            # Validate supplier_id if provided
+            if data.get('supplier_id'):
+                supplier = self.supplier_service.get_supplier_by_id(
+                    data['supplier_id'], 
+                    include_deleted=False,
+                    include_batch_stats=False
+                )
+                if not supplier:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f"Supplier with ID {data['supplier_id']} not found"
+                    }, status=400)
+            
             # Create batch
             batch = self.batch_service.create_batch(data)
             
@@ -52,6 +67,11 @@ class CreateBatchView(BatchView):
                 'data': batch
             })
             
+        except ValueError as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=400)
         except Exception as e:
             logger.error(f"Error creating batch: {str(e)}")
             return JsonResponse({
@@ -71,9 +91,9 @@ class BatchListView(BatchView):
             if product_id:
                 filters['product_id'] = product_id
             
-            status = request.GET.get('status')
-            if status:
-                filters['status'] = status
+            status_filter = request.GET.get('status')
+            if status_filter:
+                filters['status'] = status_filter
                 
             supplier_id = request.GET.get('supplier_id')
             if supplier_id:
@@ -104,7 +124,7 @@ class BatchListView(BatchView):
 @method_decorator(csrf_exempt, name='dispatch')
 class BatchDetailView(BatchView):
     def get(self, request, batch_id):
-        """Get batch details by ID"""
+        """Get batch details by ID with supplier information"""
         try:
             batch = self.batch_service.get_batch_by_id(batch_id)
             
@@ -114,6 +134,18 @@ class BatchDetailView(BatchView):
                     'error': 'Batch not found'
                 }, status=404)
             
+            # Optionally include supplier information
+            include_supplier = request.GET.get('include_supplier', 'false').lower() == 'true'
+            
+            if include_supplier and batch.get('supplier_id'):
+                supplier = self.supplier_service.get_supplier_by_id(
+                    batch['supplier_id'],
+                    include_deleted=False,
+                    include_batch_stats=False
+                )
+                if supplier:
+                    batch['supplier_info'] = supplier
+            
             return JsonResponse({
                 'success': True,
                 'data': batch
@@ -121,6 +153,38 @@ class BatchDetailView(BatchView):
             
         except Exception as e:
             logger.error(f"Error getting batch details: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+    
+    def put(self, request, batch_id):
+        """Update batch details"""
+        try:
+            data = json.loads(request.body)
+            
+            # Update the batch
+            updated_batch = self.batch_service.update_batch(batch_id, data)
+            
+            if not updated_batch:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Failed to update batch or batch not found'
+                }, status=404)
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Batch updated successfully',
+                'data': updated_batch
+            })
+            
+        except ValueError as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=400)
+        except Exception as e:
+            logger.error(f"Error updating batch: {str(e)}")
             return JsonResponse({
                 'success': False,
                 'error': str(e)
@@ -142,6 +206,12 @@ class UpdateBatchQuantityView(BatchView):
                 return JsonResponse({
                     'success': False,
                     'error': 'quantity_used is required'
+                }, status=400)
+            
+            if quantity_used <= 0:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'quantity_used must be greater than 0'
                 }, status=400)
             
             updated_batch = self.batch_service.update_batch_quantity(
@@ -178,11 +248,29 @@ class UpdateBatchQuantityView(BatchView):
 @method_decorator(csrf_exempt, name='dispatch')
 class ProductBatchesView(BatchView):
     def get(self, request, product_id):
-        """Get all batches for a specific product"""
+        """Get all batches for a specific product with supplier information"""
         try:
-            status = request.GET.get('status')  # Optional status filter
+            status_filter = request.GET.get('status')  # Optional status filter
+            include_supplier = request.GET.get('include_supplier', 'false').lower() == 'true'
             
-            batches = self.batch_service.get_batches_by_product(product_id, status)
+            batches = self.batch_service.get_batches_by_product(product_id, status_filter)
+            
+            # Optionally include supplier information for each batch
+            if include_supplier:
+                for batch in batches:
+                    if batch.get('supplier_id'):
+                        supplier = self.supplier_service.get_supplier_by_id(
+                            batch['supplier_id'],
+                            include_deleted=False,
+                            include_batch_stats=False
+                        )
+                        if supplier:
+                            batch['supplier_info'] = {
+                                '_id': supplier['_id'],
+                                'supplier_name': supplier['supplier_name'],
+                                'contact_person': supplier.get('contact_person'),
+                                'phone_number': supplier.get('phone_number')
+                            }
             
             return JsonResponse({
                 'success': True,
@@ -199,6 +287,79 @@ class ProductBatchesView(BatchView):
             }, status=500)
 
 @method_decorator(csrf_exempt, name='dispatch')
+class SupplierBatchesView(BatchView):
+    def get(self, request, supplier_id):
+        """Get all batches for a specific supplier"""
+        try:
+            # Verify supplier exists
+            supplier = self.supplier_service.get_supplier_by_id(
+                supplier_id,
+                include_deleted=False,
+                include_batch_stats=False
+            )
+            
+            if not supplier:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Supplier with ID {supplier_id} not found'
+                }, status=404)
+            
+            # Build filters
+            filters = {}
+            
+            status_filter = request.GET.get('status')
+            if status_filter:
+                filters['status'] = status_filter
+            
+            product_id = request.GET.get('product_id')
+            if product_id:
+                filters['product_id'] = product_id
+            
+            if request.GET.get('expiring_soon', 'false').lower() == 'true':
+                filters['expiring_soon'] = True
+                filters['days_ahead'] = int(request.GET.get('days_ahead', 30))
+            
+            # Add supplier_id to filters
+            filters['supplier_id'] = supplier_id
+            
+            batches = self.batch_service.get_all_batches(filters)
+            
+            # Enrich batches with product information
+            enriched_batches = []
+            for batch in batches:
+                batch_data = batch.copy() if isinstance(batch, dict) else dict(batch)
+                
+                # Get product name if not already present
+                if 'product_name' not in batch_data:
+                    try:
+                        product = self.batch_service.product_collection.find_one(
+                            {'_id': batch_data.get('product_id')}
+                        )
+                        if product:
+                            batch_data['product_name'] = product.get('product_name', 'Unknown Product')
+                        else:
+                            batch_data['product_name'] = batch_data.get('product_id', 'Unknown Product')
+                    except Exception:
+                        batch_data['product_name'] = batch_data.get('product_id', 'Unknown Product')
+                
+                enriched_batches.append(batch_data)
+            
+            return JsonResponse({
+                'success': True,
+                'data': enriched_batches,
+                'count': len(enriched_batches),
+                'supplier_id': supplier_id,
+                'supplier_name': supplier['supplier_name']
+            })
+            
+        except Exception as e:
+            logger.error(f"Error getting supplier batches: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+
+@method_decorator(csrf_exempt, name='dispatch')
 class ExpiringBatchesView(BatchView):
     def get(self, request):
         """Get batches expiring within specified days"""
@@ -206,6 +367,24 @@ class ExpiringBatchesView(BatchView):
             days_ahead = int(request.GET.get('days_ahead', 30))
             
             expiring_batches = self.batch_service.get_expiring_batches(days_ahead)
+            
+            # Group by supplier if requested
+            group_by_supplier = request.GET.get('group_by_supplier', 'false').lower() == 'true'
+            
+            if group_by_supplier:
+                supplier_groups = {}
+                for batch in expiring_batches:
+                    supplier_id = batch.get('supplier_id', 'unknown')
+                    if supplier_id not in supplier_groups:
+                        supplier_groups[supplier_id] = []
+                    supplier_groups[supplier_id].append(batch)
+                
+                return JsonResponse({
+                    'success': True,
+                    'data': supplier_groups,
+                    'total_batches': len(expiring_batches),
+                    'days_ahead': days_ahead
+                })
             
             return JsonResponse({
                 'success': True,
@@ -261,6 +440,12 @@ class ProcessSaleFIFOView(BatchView):
                     'error': 'product_id and quantity_sold are required'
                 }, status=400)
             
+            if quantity_sold <= 0:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'quantity_sold must be greater than 0'
+                }, status=400)
+            
             batches_used = self.batch_service.process_sale_fifo(product_id, quantity_sold)
             
             return JsonResponse({
@@ -275,6 +460,54 @@ class ProcessSaleFIFOView(BatchView):
             
         except Exception as e:
             logger.error(f"Error processing FIFO sale: {str(e)}")
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+
+@method_decorator(csrf_exempt, name='dispatch')
+class ProcessBatchAdjustmentView(BatchView):
+    def post(self, request):
+        """Process a batch adjustment using FIFO logic"""
+        try:
+            data = json.loads(request.body)
+            
+            product_id = data.get('product_id')
+            quantity_used = data.get('quantity_used')
+            adjustment_type = data.get('adjustment_type', 'correction')
+            adjusted_by = data.get('adjusted_by')
+            notes = data.get('notes')
+            
+            # Validate required fields
+            if not product_id or quantity_used is None:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'product_id and quantity_used are required'
+                }, status=400)
+            
+            if quantity_used <= 0:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'quantity_used must be greater than 0'
+                }, status=400)
+            
+            # Process the adjustment
+            result = self.batch_service.process_batch_adjustment(
+                product_id, 
+                quantity_used,
+                adjustment_type,
+                adjusted_by,
+                notes
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Successfully adjusted {quantity_used} units using FIFO',
+                'data': result
+            })
+            
+        except Exception as e:
+            logger.error(f"Error processing batch adjustment: {str(e)}")
             return JsonResponse({
                 'success': False,
                 'error': str(e)
@@ -369,10 +602,10 @@ class RestockWithBatchView(BatchView):
             data = json.loads(request.body)
             
             quantity_received = data.get('quantity_received')
-            if quantity_received is None:
+            if quantity_received is None or quantity_received <= 0:
                 return JsonResponse({
                     'success': False,
-                    'error': 'quantity_received is required'
+                    'error': 'quantity_received is required and must be greater than 0'
                 }, status=400)
             
             supplier_info = data.get('supplier_info')
@@ -405,7 +638,7 @@ class RestockWithBatchView(BatchView):
 @method_decorator(csrf_exempt, name='dispatch')
 class BatchStatisticsView(BatchView):
     def get(self, request):
-        """Get batch statistics and analytics"""
+        """Get batch statistics and analytics with optional supplier breakdown"""
         try:
             # Get all batches for analysis
             all_batches = self.batch_service.get_all_batches()
@@ -436,6 +669,33 @@ class BatchStatisticsView(BatchView):
                 }
             }
             
+            # Optional: Group by supplier
+            group_by_supplier = request.GET.get('group_by_supplier', 'false').lower() == 'true'
+            
+            if group_by_supplier:
+                supplier_stats = {}
+                for batch in all_batches:
+                    supplier_id = batch.get('supplier_id', 'unknown')
+                    if supplier_id not in supplier_stats:
+                        supplier_stats[supplier_id] = {
+                            'total_batches': 0,
+                            'active_batches': 0,
+                            'depleted_batches': 0,
+                            'expired_batches': 0,
+                            'total_stock': 0
+                        }
+                    
+                    supplier_stats[supplier_id]['total_batches'] += 1
+                    if batch.get('status') == 'active':
+                        supplier_stats[supplier_id]['active_batches'] += 1
+                        supplier_stats[supplier_id]['total_stock'] += batch.get('quantity_remaining', 0)
+                    elif batch.get('status') == 'depleted':
+                        supplier_stats[supplier_id]['depleted_batches'] += 1
+                    elif batch.get('status') == 'expired':
+                        supplier_stats[supplier_id]['expired_batches'] += 1
+                
+                statistics['by_supplier'] = supplier_stats
+            
             return JsonResponse({
                 'success': True,
                 'data': statistics
@@ -447,70 +707,56 @@ class BatchStatisticsView(BatchView):
                 'success': False,
                 'error': str(e)
             }, status=500)
-        
+
 @method_decorator(csrf_exempt, name='dispatch')
-class ProductsWithExpirySummaryView(BatchView):
-    def get(self, request):
-        """Get products with their expiry summary information"""
-        try:
-            products = self.batch_service.get_products_with_expiry_summary()
-            
-            return JsonResponse({
-                'success': True,
-                'data': products,
-                'count': len(products)
-            })
-            
-        except Exception as e:
-            logger.error(f"Error getting products with expiry summary: {str(e)}")
-            return JsonResponse({
-                'success': False,
-                'error': str(e)
-            }, status=500)
-        
-@method_decorator(csrf_exempt, name='dispatch')
-class ProcessBatchAdjustmentView(BatchView):
+class ActivateBatchView(BatchView):
     def post(self, request):
-        """Process a batch adjustment using FIFO logic"""
+        """Activate a pending batch (change status from pending to active)"""
         try:
             data = json.loads(request.body)
             
+            batch_number = data.get('batch_number')
             product_id = data.get('product_id')
-            quantity_used = data.get('quantity_used')
-            adjustment_type = data.get('adjustment_type', 'correction')
-            adjusted_by = data.get('adjusted_by')  # User ID from frontend
+            supplier_id = data.get('supplier_id')
+            
+            if not all([batch_number, product_id, supplier_id]):
+                return JsonResponse({
+                    'success': False,
+                    'error': 'batch_number, product_id, and supplier_id are required'
+                }, status=400)
+            
+            # Optional fields
+            quantity_received = data.get('quantity_received')
+            cost_price = data.get('cost_price')
+            expiry_date = data.get('expiry_date')
+            date_received = data.get('date_received')
             notes = data.get('notes')
             
-            # Validate required fields
-            if not product_id or quantity_used is None:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'product_id and quantity_used are required'
-                }, status=400)
-            
-            if quantity_used <= 0:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'quantity_used must be greater than 0'
-                }, status=400)
-            
-            # Process the adjustment
-            result = self.batch_service.process_batch_adjustment(
-                product_id, 
-                quantity_used,
-                adjustment_type,
-                adjusted_by,
-                notes
+            activated_batch = self.batch_service.activate_batch(
+                batch_number=batch_number,
+                product_id=product_id,
+                supplier_id=supplier_id,
+                quantity_received=quantity_received,
+                cost_price=cost_price,
+                expiry_date=expiry_date,
+                date_received=date_received,
+                notes=notes
             )
+            
+            if not activated_batch:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Failed to activate batch'
+                }, status=500)
             
             return JsonResponse({
                 'success': True,
-                'message': f'Successfully adjusted {quantity_used} units using FIFO',
-                'data': result
+                'message': 'Batch activated successfully',
+                'data': activated_batch
             })
             
         except Exception as e:
-            logger.error(f"Error processing batch adjustment: {str(e)}")
+            logger.error(f"Error activating batch: {str(e)}")
             return JsonResponse({
                 'success': False,
                 'error': str(e)

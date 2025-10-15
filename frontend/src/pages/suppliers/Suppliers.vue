@@ -79,7 +79,7 @@
                 :class="{ 'active': showAddDropdown }"
               >
                 <Plus :size="14" />
-                ADD ITEM
+                ADD SUPPLIER
               </button>
               
               <div 
