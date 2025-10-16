@@ -5,7 +5,7 @@
         <div class="modal-header">
           <h5 class="modal-title">
             <Package :size="20" class="me-2 text-warning" />
-            Active Purchase Orders
+            {{ modalTitle }}
           </h5>
           <button type="button" class="btn-close" @click="$emit('close')"></button>
         </div>
@@ -14,15 +14,17 @@
             <div class="spinner-border text-primary" role="status">
               <span class="visually-hidden">Loading...</span>
             </div>
+            <p class="mt-2 text-muted">Loading active orders...</p>
           </div>
           
-          <div v-else-if="orders.length === 0" class="text-center py-4">
+          <div v-else-if="processedOrders.length === 0" class="text-center py-4">
             <Package :size="48" class="text-tertiary-medium mb-3" />
             <p class="text-tertiary-medium">No active orders found</p>
+            <small class="text-muted">There are currently no pending purchase orders</small>
           </div>
           
           <div v-else class="row g-3">
-            <div v-for="order in orders" :key="order.id" class="col-12">
+            <div v-for="order in processedOrders" :key="order.id" class="col-12">
               <div class="card border-start border-warning border-3">
                 <div class="card-body">
                   <div class="d-flex justify-content-between align-items-start mb-3">
@@ -48,8 +50,14 @@
                     <small class="text-tertiary-medium">Items ({{ order.items?.length || 0 }}):</small>
                     <div class="mt-1">
                       <div v-for="(item, index) in order.items" :key="index" class="d-flex justify-content-between small">
-                        <span>{{ item.name }} ({{ item.quantity }}x)</span>
-                        <span>₱{{ formatCurrency(item.quantity * item.unitPrice) }}</span>
+                        <div>
+                          <div class="fw-medium">{{ getProductName(item) }}</div>
+                          <small class="text-muted">{{ getProductId(item) }}</small>
+                        </div>
+                        <div class="text-end">
+                          <div>{{ item.quantity }}x</div>
+                          <div class="fw-medium">₱{{ formatCurrency(item.quantity * item.unitPrice) }}</div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -91,6 +99,10 @@ export default {
     loading: {
       type: Boolean,
       default: false
+    },
+    supplier: {
+      type: Object,
+      default: null
     }
   },
   emits: ['close'],
@@ -98,10 +110,7 @@ export default {
     const router = useRouter()
 
     const handleViewAllOrders = () => {
-      // Close the modal first
       emit('close')
-      
-      // Navigate to the orders history page
       router.push({ name: 'OrdersHistory' })
     }
 
@@ -109,8 +118,62 @@ export default {
       handleViewAllOrders
     }
   },
+  computed: {
+    modalTitle() {
+      if (this.supplier) {
+        return `Active Orders - ${this.supplier.name}`
+      }
+      return 'Active Purchase Orders'
+    },
+
+    processedOrders() {
+      if (!this.orders || this.orders.length === 0) {
+        return []
+      }
+
+      // Filter orders based on supplier if provided
+      let filtered = this.orders
+      if (this.supplier) {
+        filtered = this.orders.filter(order => 
+          order.supplierId === this.supplier.id || 
+          order.supplier === this.supplier.name ||
+          order.supplierId === this.supplier.id
+        )
+      }
+      
+      // Process each order to ensure consistent data structure
+      return filtered.map(order => ({
+        ...order,
+        items: (order.items || []).map(item => ({
+          ...item,
+          // Ensure we have consistent product name and ID fields
+          productName: this.getProductName(item),
+          productId: this.getProductId(item)
+        }))
+      }))
+    }
+  },
   methods: {
+    getProductName(item) {
+      // Try multiple possible fields for product name
+      return item.name || 
+             item.product_name || 
+             item.productName || 
+             item.product_id || 
+             item.productId || 
+             'Unknown Product'
+    },
+
+    getProductId(item) {
+      // Try multiple possible fields for product ID
+      return item.product_id || 
+             item.productId || 
+             item.id || 
+             'N/A'
+    },
+
     formatDate(dateString) {
+      if (!dateString) return 'N/A'
       const date = new Date(dateString)
       return date.toLocaleDateString('en-US', { 
         year: 'numeric', 
@@ -120,29 +183,26 @@ export default {
     },
 
     formatCurrency(amount) {
-      return new Intl.NumberFormat('en-PH').format(amount)
+      if (!amount || isNaN(amount)) return '0.00'
+      return new Intl.NumberFormat('en-PH', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(amount)
     },
 
     getStatusBadgeClass(status) {
       const statusClasses = {
-        'pending': 'bg-warning text-dark',
-        'confirmed': 'bg-info text-white',
-        'in_transit': 'bg-primary text-white',
-        'delivered': 'bg-success text-white',
-        'cancelled': 'bg-danger text-white'
+        'Pending Delivery': 'bg-warning text-dark',
+        'Partially Received': 'bg-info text-white',
+        'Received': 'bg-success text-white',
+        'Depleted': 'bg-secondary text-white',
+        'Mixed Status': 'bg-primary text-white'
       }
       return statusClasses[status] || 'bg-secondary text-white'
     },
 
     getStatusText(status) {
-      const statusTexts = {
-        'pending': 'Pending',
-        'confirmed': 'Confirmed',
-        'in_transit': 'In Transit',
-        'delivered': 'Delivered',
-        'cancelled': 'Cancelled'
-      }
-      return statusTexts[status] || status
+      return status || 'Unknown'
     }
   }
 }

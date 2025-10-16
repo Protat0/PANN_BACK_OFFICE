@@ -260,8 +260,8 @@
     <!-- Active Orders Modal -->
      <ActiveOrdersModal
       :show="reportsComposable.showActiveOrdersModal.value"
-      :orders="reportsComposable.activeOrders.value"
-      :loading="reportsComposable.loading.value"
+      :orders="activeOrdersForModal"
+      :loading="activeOrdersLoading"
       @close="reportsComposable.closeActiveOrdersModal"
     />
 
@@ -326,7 +326,7 @@
 </template>
 
 <script>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   Plus, 
@@ -398,14 +398,14 @@ export default {
     const searchMode = ref(false)
     const addDropdownRef = ref(null)
     const searchInputRef = ref(null)
+    
+    // Active orders modal data
+    const activeOrdersForModal = ref([])
+    const activeOrdersLoading = ref(false)
 
-    // Debug log to check if composables are working
-    console.log('Suppliers composable:', suppliersComposable)
-    console.log('Loading state:', suppliersComposable.loading?.value)
 
     // Load suppliers on mount
     onMounted(async () => {
-      console.log('Suppliers component mounted')
       try {
         await suppliersComposable.fetchSuppliers()
         await reportsComposable.refreshReports()
@@ -414,6 +414,13 @@ export default {
         document.addEventListener('click', handleClickOutside)
       } catch (error) {
         console.error('Error fetching suppliers:', error)
+      }
+    })
+
+    // Watch for modal opening to load active orders
+    watch(() => reportsComposable.showActiveOrdersModal.value, (isOpen) => {
+      if (isOpen) {
+        loadActiveOrdersForModal()
       }
     })
 
@@ -620,6 +627,21 @@ export default {
       router.push(route)
     }
 
+    // Load active orders for modal
+    const loadActiveOrdersForModal = async () => {
+      activeOrdersLoading.value = true
+      try {
+        const orders = await suppliersComposable.getActiveOrdersForModal()
+        activeOrdersForModal.value = orders
+      } catch (error) {
+        console.error('Error loading active orders:', error)
+        activeOrdersForModal.value = []
+      } finally {
+        activeOrdersLoading.value = false
+      }
+    }
+
+
     return {
       // Composables
       suppliersComposable,
@@ -636,6 +658,8 @@ export default {
       searchMode,
       addDropdownRef,
       searchInputRef,
+      activeOrdersForModal,
+      activeOrdersLoading,
       
       // Methods
       handleSingleSupplier,

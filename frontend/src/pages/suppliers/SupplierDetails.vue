@@ -116,7 +116,7 @@
             <div class="stat-number text-primary">{{ supplier.purchaseOrders || 0 }}</div>
             <div class="stat-label">Total Orders</div>
           </div>
-          <div class="stat-item">
+          <div class="stat-item clickable-stat" @click="openActiveOrdersModal">
             <div class="stat-number text-warning">{{ getActiveOrders() }}</div>
             <div class="stat-label">Active Orders</div>
           </div>
@@ -528,6 +528,16 @@
       @saved="handleBatchDetailsUpdated"
     />
 
+    <!-- Active Orders Modal -->
+    <ActiveOrdersModal
+      v-if="showActiveOrdersModal && supplier"
+      :show="showActiveOrdersModal"
+      :orders="getActiveOrdersForModal()"
+      :supplier="supplier"
+      :loading="false"
+      @close="closeActiveOrdersModal"
+    />
+
     <!-- Order Details Modal -->
     <OrderDetailsModal
       v-if="selectedOrderForView"
@@ -715,6 +725,7 @@ import ReceiveStockModal from '@/components/suppliers/ReceiveStockModal.vue'
 import BatchDetailsModal from '@/components/suppliers/BatchDetailsModal.vue'
 import EditBatchDetailsModal from '@/components/suppliers/EditBatchDetailsModal.vue'
 import OrderDetailsModal from '@/components/suppliers/OrderDetailsModal.vue'
+import ActiveOrdersModal from '@/components/suppliers/ActiveOrdersModal.vue'
 import { useToast } from '@/composables/ui/useToast'
 import { useAuth } from '@/composables/auth/useAuth'
 import { useProducts } from '@/composables/api/useProducts'
@@ -758,7 +769,8 @@ export default {
     ReceiveStockModal,
     BatchDetailsModal,
     EditBatchDetailsModal,
-    OrderDetailsModal
+    OrderDetailsModal,
+    ActiveOrdersModal
   },
   props: {
     supplierId: {
@@ -796,6 +808,7 @@ export default {
       showReceiveStockModal: false,
       showBatchDetailsModal: false,
       showEditBatchDetailsModal: false,
+      showActiveOrdersModal: false,
       selectedReceiptForView: null,
       selectedReceiptForEdit: null,
       showOrderDetailsModal: false,
@@ -980,7 +993,8 @@ export default {
                   if (product) {
                     return {
                       ...batch,
-                      // Get category info from product, not from batch
+                      // Get product name and category info from product, not from batch
+                      product_name: product.product_name || product.name || batch.product_id || 'Unknown Product',
                       category_id: product.category_id || '',
                       category_name: product.category_name || '',
                       subcategory_name: product.subcategory_name || ''
@@ -1041,6 +1055,7 @@ export default {
               totalPrice: (batch.cost_price || 0) * (batch.quantity_received || 0),
               notes: batch.notes || '',
               productId: batch.product_id,
+              product_name: batch.product_name || 'Unknown Product', // Add product_name for ActiveOrdersModal
               batchNumber: batch.batch_number,  // ✅ Pass batch number for activation
               batchId: batch._id,  // ✅ Pass batch ID 
               expiryDate: batch.expiry_date,
@@ -1123,6 +1138,15 @@ export default {
 
     closeReceiveStockModal() {
       this.showReceiveStockModal = false
+    },
+
+    openActiveOrdersModal() {
+      // Open the "Active Orders" modal that shows pending orders for this supplier
+      this.showActiveOrdersModal = true
+    },
+
+    closeActiveOrdersModal() {
+      this.showActiveOrdersModal = false
     },
     
     async handleStockReceived(results) {
@@ -1634,6 +1658,58 @@ export default {
       ).length
     },
 
+    getActiveOrdersForModal() {
+      console.log('🔍 Getting active orders for modal...')
+      console.log('All orders:', this.orders.length)
+      console.log('Orders with statuses:', this.orders.map(o => ({ id: o.id, status: o.status })))
+      
+      // Filter for pending orders (both Pending Delivery and Partially Received)
+      const activeOrders = this.orders.filter(order => {
+        const isActive = order.status === 'Pending Delivery' || order.status === 'Partially Received'
+        console.log(`Order ${order.id}: status=${order.status}, isActive=${isActive}`)
+        return isActive
+      })
+      
+      console.log('Active orders found:', activeOrders.length)
+      
+      // Transform the orders to match the format expected by ActiveOrdersModal
+      const transformedOrders = activeOrders.map(order => {
+        console.log(`Transforming order ${order.id} with ${order.items?.length || 0} items`)
+        
+        return {
+          id: order.id,
+          supplier: this.supplier.name,
+          supplierId: this.supplier.id,
+          supplierEmail: this.supplier.email || 'N/A',
+          orderDate: order.date, // Map date to orderDate
+          expectedDelivery: order.expectedDate, // Map expectedDate to expectedDelivery
+          deliveredDate: order.receivedDate, // Map receivedDate to deliveredDate
+          totalAmount: order.total, // Map total to totalAmount
+          status: order.status,
+          items: order.items.map(item => {
+            console.log(`Item: name="${item.name}", product_name="${item.product_name}", productId="${item.productId}"`)
+            return {
+              name: item.name || item.product_name || item.productId || 'Unknown Product',
+              product_name: item.name || item.product_name || 'Unknown Product',
+              product_id: item.productId,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
+              batchNumber: item.batchNumber,
+              batchId: item.batchId,
+              expiryDate: item.expiryDate,
+              quantityRemaining: item.quantityRemaining
+            }
+          }),
+          description: order.description,
+          notes: order.notes
+        }
+      })
+      
+      console.log('Transformed orders:', transformedOrders.length)
+      return transformedOrders
+    },
+
     getTotalSpent() {
       return this.orders
         .filter(order => order.status === 'Received')
@@ -1952,6 +2028,17 @@ export default {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.clickable-stat {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clickable-stat:hover {
+  background-color: var(--primary-light);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .text-primary-dark {
