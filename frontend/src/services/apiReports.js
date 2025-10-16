@@ -262,6 +262,41 @@ class SalesAPIService {
     }
   }
 
+  /**
+   * Get sales display by item
+   * @param {Object} params - Query parameters (date_range, item_id, etc.)
+   * @returns {Promise<Object>} Sales display by item data
+   */
+  async getSalesDisplayByItem(params = {}) {
+    try {
+      const response = await api.get('/sales-display/by-item/', { params });
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error('Error fetching sales display by item:', error);
+      this.handleError(error);
+    }
+  }
+
+  async getSalesDisplayPosSales(params = {}) {
+    try {
+      const response = await api.get('/sales-display/pos-sales/', { params });
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error('Error fetching POS sales:', error);
+      this.handleError(error);
+    }
+  }
+
+  async getSalesDisplayOnlineTransactions(params = {}) {
+    try {
+      const response = await api.get('/sales-display/online-transactions/', { params });
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error('Error fetching online transactions:', error);
+      this.handleError(error);
+    }
+  }
+
   // ====================================================================
   // BULK IMPORT OPERATIONS - CSV ONLY
   // ====================================================================
