@@ -35,12 +35,22 @@ class SalesDisplayService {
   }
 
   // 5. Combined Display by Item
-  async getSalesByItem(startDate, endDate) {
+  async getSalesByItem(startDate, endDate, includeVoided = false) {
+    const params = {};
+    if (startDate) params.start_date = startDate;
+    if (endDate) params.end_date = endDate;
+    if (includeVoided) params.include_voided = includeVoided;
+
+    const response = await api.get('sales-display/by-item/', { params });
+    return response.data;
+  }
+  
+  async getSalesSummary(startDate, endDate) {
     const params = {};
     if (startDate) params.start_date = startDate;
     if (endDate) params.end_date = endDate;
 
-    const response = await api.get('sales-display/by-item/', { params });
+    const response = await api.get('sales-display/summary/', { params });
     return response.data;
   }
 }

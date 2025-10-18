@@ -219,6 +219,7 @@ from .kpi_views.sales_display_views import (
     SalesDisplayAllSalesView,
     SalesDisplayAllOnlineTransactionsView,
     SalesDisplayByItemView,
+    SalesDisplaySummaryView 
 )
 
 from .views import (
@@ -461,4 +462,5 @@ urlpatterns = [
     path('sales-display/pos-sales/', SalesDisplayAllSalesView.as_view(), name='sales-display-all-pos-sales'),
     path('sales-display/online-transactions/', SalesDisplayAllOnlineTransactionsView.as_view(), name='sales-display-all-online-transactions'),
     path('sales-display/by-item/', SalesDisplayByItemView.as_view(), name='sales-display-by-item'),
+    path('sales-display/summary/', SalesDisplaySummaryView.as_view(), name='sales-display-summary'),  
 ]

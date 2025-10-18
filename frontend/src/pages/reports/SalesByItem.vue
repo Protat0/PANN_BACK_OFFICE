@@ -656,7 +656,7 @@ export default {
     },
 
     /**
-     * Load sales by item table data
+     * Load sales by item table data with improved date filtering and error handling
      */
     async loadSalesByItemTable() {
       try {
@@ -665,39 +665,61 @@ export default {
         
         const dateRange = this.calculateDateRange(this.selectedFrequency);
         
-        console.log('📊 Fetching sales data with date range:', dateRange);
+        // Validate date range
+        if (!this.validateDateRange(dateRange.start_date, dateRange.end_date)) {
+          this.salesByItemError = 'Invalid date range: start date cannot be after end date';
+          this.allSalesByItemRows = [];
+          this.salesByItemRows = [];
+          return;
+        }
         
+        console.log('📊 Fetching sales data with date range:', dateRange);
+        console.log('📅 Frequency:', this.selectedFrequency);
+        
+        // Use the improved API method with proper date filtering
         const response = await salesDisplayService.getSalesByItem(
           dateRange.start_date, 
-          dateRange.end_date
+          dateRange.end_date,
+          false // exclude voided transactions by default
         );
 
         console.log('📦 Raw API response:', response);
         
         let data = [];
         
+        // Handle different response formats
         if (Array.isArray(response)) {
           data = response;
         } else if (response?.data && Array.isArray(response.data)) {
           data = response.data;
+        } else if (response?.results && Array.isArray(response.results)) {
+          data = response.results;
+        } else {
+          console.warn('⚠️ Unexpected API response format:', response);
+          data = [];
         }
 
         console.log('📈 Processed data for table:', data);
 
         // Store all data and update pagination
         this.allSalesByItemRows = data
-          .sort((a, b) => (b.total_sales || 0) - (a.total_sales || 0))
+          .filter(item => item && typeof item === 'object') // Filter out invalid items
+          .sort((a, b) => {
+            const salesA = parseFloat(a.total_sales) || 0;
+            const salesB = parseFloat(b.total_sales) || 0;
+            return salesB - salesA; // Descending order by total sales
+          })
           .map(item => ({
-            id: item.product_id || 'N/A',
-            product: item.product_name || 'Unknown Product',
-            category: item.category_name || 'Uncategorized',
-            stock: item.stock || 0,
-            items_sold: item.items_sold || 0,
-            total_sales: item.total_sales || 0,
-            selling_price: item.selling_price || 0,
+            id: item.product_id || item.id || 'N/A',
+            product: item.product_name || item.name || item.product || 'Unknown Product',
+            category: item.category_name || item.category || 'Uncategorized',
+            stock: parseInt(item.stock) || 0,
+            items_sold: parseInt(item.items_sold) || 0,
+            total_sales: parseFloat(item.total_sales) || 0,
+            selling_price: parseFloat(item.selling_price) || 0,
             unit: item.unit || 'unit',
             sku: item.sku || 'N/A',
-            is_taxable: item.is_taxable || false
+            is_taxable: Boolean(item.is_taxable)
           }));
 
         // Reset to first page and update displayed data
@@ -707,13 +729,77 @@ export default {
         console.log('🎯 Final table rows:', this.salesByItemRows);
         console.log('📄 Pagination info:', this.salesByItemPagination);
 
+        // Update connection health on success
+        this.connectionLost = false;
+        this.consecutiveErrors = 0;
+        this.lastSuccessfulLoad = Date.now();
+        this.error = null;
+
       } catch (error) {
         console.error('❌ loadSalesByItemTable error:', error);
-        this.salesByItemError = error.message || 'Failed to load sales by item data.';
+        
+        // Update connection health on error
+        this.consecutiveErrors++;
+        this.salesByItemError = this.getErrorMessage(error);
+
+        if (this.consecutiveErrors >= 3) {
+          this.connectionLost = true;
+        }
+
+        // Set empty data state
         this.allSalesByItemRows = [];
         this.salesByItemRows = [];
+        this.salesByItemPagination.current_page = 1;
+        this.updateSalesByItemPageData();
+        
       } finally {
         this.salesByItemLoading = false;
+      }
+    },
+
+    /**
+     * Format date for API (YYYY-MM-DD) using local timezone
+     */
+    formatDateForAPI(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    },
+
+    /**
+     * Validate that start date is before end date
+     */
+    validateDateRange(startDate, endDate) {
+      if (!startDate || !endDate) return true;
+      
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      if (start > end) {
+        console.error('Invalid date range: start date is after end date', { startDate, endDate });
+        return false;
+      }
+      
+      return true;
+    },
+
+    /**
+     * Get user-friendly error messages
+     */
+    getErrorMessage(error) {
+      if (error.response?.status === 400) {
+        return 'Invalid date range or parameters. Please try a different time period.';
+      } else if (error.response?.status === 404) {
+        return 'Sales data not found for the selected period.';
+      } else if (error.response?.status === 500) {
+        return 'Server error. Please try again later.';
+      } else if (error.message?.includes('Network Error') || error.message?.includes('Failed to fetch')) {
+        return 'Network connection failed. Please check your internet connection.';
+      } else if (error.message?.includes('Invalid date range')) {
+        return error.message;
+      } else {
+        return error.message || 'Failed to load sales data. Please try again.';
       }
     },
 
@@ -773,32 +859,39 @@ export default {
      */
     calculateDateRange(frequency) {
       const now = new Date();
-      const end_date = now.toISOString().split('T')[0];
+      const end_date = this.formatDateForAPI(now);
       let start_date;
       
       switch (frequency) {
         case 'daily':
-          start_date = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000))
-            .toISOString().split('T')[0];
+          // Last 30 days
+          const dailyDate = new Date(now);
+          dailyDate.setDate(dailyDate.getDate() - 30);
+          start_date = this.formatDateForAPI(dailyDate);
           break;
         case 'weekly':
-          start_date = new Date(now.getTime() - (8 * 7 * 24 * 60 * 60 * 1000))
-            .toISOString().split('T')[0];
+          // Last 12 weeks
+          const weeklyDate = new Date(now);
+          weeklyDate.setDate(weeklyDate.getDate() - (12 * 7));
+          start_date = this.formatDateForAPI(weeklyDate);
           break;
         case 'monthly':
-          const monthsAgo = new Date(now);
-          monthsAgo.setMonth(monthsAgo.getMonth() - 12);
-          start_date = monthsAgo.toISOString().split('T')[0];
+          // Last 12 months
+          const monthlyDate = new Date(now);
+          monthlyDate.setMonth(monthlyDate.getMonth() - 12);
+          start_date = this.formatDateForAPI(monthlyDate);
           break;
         case 'yearly':
-          const yearsAgo = new Date(now);
-          yearsAgo.setFullYear(yearsAgo.getFullYear() - 5);
-          start_date = yearsAgo.toISOString().split('T')[0];
+          // Last 3 years
+          const yearlyDate = new Date(now);
+          yearlyDate.setFullYear(yearlyDate.getFullYear() - 3);
+          start_date = this.formatDateForAPI(yearlyDate);
           break;
         default:
+          // Default to last 30 days
           const defaultDate = new Date(now);
-          defaultDate.setMonth(defaultDate.getMonth() - 1);
-          start_date = defaultDate.toISOString().split('T')[0];
+          defaultDate.setDate(defaultDate.getDate() - 30);
+          start_date = this.formatDateForAPI(defaultDate);
       }
       
       console.log(`📅 ${frequency} date range:`, { start_date, end_date });

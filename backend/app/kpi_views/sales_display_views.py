@@ -55,6 +55,8 @@ class SalesDisplayByItemView(APIView):
     def get(self, request):
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
+        include_voided = request.query_params.get('include_voided', 'false').lower() == 'true'
+        
         try:
             if start_date:
                 start_date = datetime.strptime(start_date, "%Y-%m-%d")
@@ -62,6 +64,33 @@ class SalesDisplayByItemView(APIView):
                 end_date = datetime.strptime(end_date, "%Y-%m-%d")
         except ValueError:
             return Response({"error": "Invalid date format, use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+        
         service = SalesDisplayService()
-        rows = service.build_sales_by_item_display(start_date=start_date, end_date=end_date)
+        # Use the new method with proper date filtering
+        rows = service.get_sales_by_item_with_date_filter(
+            start_date=start_date, 
+            end_date=end_date,
+            include_voided=include_voided
+        )
         return Response(rows, status=status.HTTP_200_OK)
+
+# New view for sales summary statistics
+class SalesDisplaySummaryView(APIView):
+    def get(self, request):
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        
+        try:
+            if start_date:
+                start_date = datetime.strptime(start_date, "%Y-%m-%d")
+            if end_date:
+                end_date = datetime.strptime(end_date, "%Y-%m-%d")
+        except ValueError:
+            return Response({"error": "Invalid date format, use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        service = SalesDisplayService()
+        summary = service.get_sales_summary_by_date_range(
+            start_date=start_date, 
+            end_date=end_date
+        )
+        return Response(summary, status=status.HTTP_200_OK)
