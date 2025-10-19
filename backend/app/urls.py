@@ -213,6 +213,15 @@ from .kpi_views.pos.salesServiceView import (
     FetchRecentSales,
 )
 
+from .kpi_views.sales_display_views import (
+    SalesDisplayPOSItemSummaryView,
+    SalesDisplayOnlineItemSummaryView,
+    SalesDisplayAllSalesView,
+    SalesDisplayAllOnlineTransactionsView,
+    SalesDisplayByItemView,
+    SalesDisplaySummaryView 
+)
+
 from .views import (
     APIDocumentationView,
 )
@@ -447,4 +456,11 @@ urlpatterns = [
     path('pos/kpi/transactions/', POSTransactionKPIView.as_view(), name='pos_transaction_kpi'),
     path('pos/kpi/inventory/', InventoryKPIView.as_view(), name='inventory_kpi'),
     path('pos/kpi/stock-alerts/', StockAlertKPIView.as_view(), name='stock_alert_kpi'),
+   
+    path('sales-display/pos-item-summary/', SalesDisplayPOSItemSummaryView.as_view(), name='sales-display-pos-item-summary'),
+    path('sales-display/online-item-summary/', SalesDisplayOnlineItemSummaryView.as_view(), name='sales-display-online-item-summary'),
+    path('sales-display/pos-sales/', SalesDisplayAllSalesView.as_view(), name='sales-display-all-pos-sales'),
+    path('sales-display/online-transactions/', SalesDisplayAllOnlineTransactionsView.as_view(), name='sales-display-all-online-transactions'),
+    path('sales-display/by-item/', SalesDisplayByItemView.as_view(), name='sales-display-by-item'),
+    path('sales-display/summary/', SalesDisplaySummaryView.as_view(), name='sales-display-summary'),  
 ]

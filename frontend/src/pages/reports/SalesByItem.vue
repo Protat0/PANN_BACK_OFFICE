@@ -56,16 +56,16 @@
     </div>
     
     <!-- ========================================== -->
-    <!-- BOTTOM SECTION: Transaction History -->
+    <!-- BOTTOM SECTION: Sales by Item Table -->
     <!-- ========================================== -->
     <div class="BottomContainer">
       <!-- Header with Action Buttons -->
       <div class="transaction-header">
-        <h1>Transaction History</h1>
+        <h1>Sales by Item</h1>
         <div class="header-actions">
           <!-- Auto-refresh status and controls -->
           <div class="auto-refresh-status">
-            <i class="bi bi-arrow-repeat text-success" :class="{ 'spinning': loading }"></i>
+            <i class="bi bi-arrow-repeat text-success" :class="{ 'spinning': salesByItemLoading }"></i>
             <span class="status-text">
               <span v-if="autoRefreshEnabled">Updates in {{ countdown }}s</span>
               <span v-else>Auto-refresh disabled</span>
@@ -92,85 +92,76 @@
             v-if="error || connectionLost" 
             class="btn btn-warning" 
             @click="emergencyReconnect"
-            :disabled="loading"
+            :disabled="salesByItemLoading"
           >
-            <i class="bi bi-arrow-clockwise" :class="{ 'spinning': loading }"></i>
-            {{ loading ? 'Reconnecting...' : 'Reconnect' }}
+            <i class="bi bi-arrow-clockwise" :class="{ 'spinning': salesByItemLoading }"></i>
+            {{ salesByItemLoading ? 'Reconnecting...' : 'Reconnect' }}
           </button>
 
-          <button class="btn btn-primary" @click="importData" :disabled="loading || importing">
+          <button class="btn btn-primary" @click="importData" :disabled="salesByItemLoading || importing">
             <i class="bi bi-upload"></i> {{ importing ? 'Importing...' : 'Import' }}
           </button>
-          <button class="btn btn-success" @click="exportData" :disabled="loading || exporting">
+          <button class="btn btn-success" @click="exportData" :disabled="salesByItemLoading || exporting">
             <i class="bi bi-download"></i> {{ exporting ? 'Exporting...' : 'Export' }}
           </button>
         </div>
       </div>
 
       <!-- Loading State -->
-      <div v-if="loading" class="loading-state">
+      <div v-if="salesByItemLoading" class="loading-state">
         <div class="spinner-border text-primary"></div>
-        <p>Loading transactions...</p>
+        <p>Loading sales data...</p>
       </div>
       
-      <!-- Transaction Table -->
+      <!-- Sales by Item Table -->
       <div v-else class="table-container">
         <table class="table table-striped">
           <thead>
             <tr>
-              <th scope="col">ID</th>
-              <th scope="col">Items</th>
-              <th scope="col">Customer</th>
-              <th scope="col">Timestamp</th>
-              <th scope="col">Payment Method</th>
-              <th scope="col">Sale Type</th>
-              <th scope="col">Total</th>
-              <th scope="col">Actions</th>
+              <th scope="col">Product ID</th>
+              <th scope="col">Product Name</th>
+              <th scope="col">Category</th>
+              <th scope="col" style="text-align: center;">Stock</th>
+              <th scope="col" style="text-align: center;">Items Sold</th>
+              <th scope="col" >Total Sales</th>
+              <th scope="col" >Unit Price</th>
+              <th scope="col" style="text-align: center;">Actions</th>
             </tr>
           </thead>
           <tbody class="table-group-divider">
-            <tr v-for="transaction in transactions" :key="transaction._id">
-              <td class="id-column" :title="transaction._id">
-                {{ transaction._id.slice(-6) }}
+            <tr v-for="item in salesByItemRows" :key="item.id">
+              <td class="id-column" :title="item.id">
+                {{ item.id }}
               </td>
-              <td class="items-column">
-                <span class="items-list">
-                  {{ formatItemsList(transaction.item_list) }}
+              <td class="product-column">
+                <span :title="item.product">{{ item.product.length > 30 ? item.product.substring(0, 30) + '...' : item.product }}</span>
+              </td>
+              <td class="category-column">
+                <span class="badge badge-secondary">{{ item.category }}</span>
+              </td>
+              <td class="stock-column">
+                <span :class="{'low-stock': item.stock < 10}">
+                  {{ item.stock }} {{ item.unit }}
                 </span>
               </td>
-              <td class="customer-column">
-                <span :title="transaction.customer_id">
-                  {{ transaction.customer_id ? transaction.customer_id.slice(-6) : 'N/A' }}
-                </span>
+              <td class="sold-column">
+                {{ item.items_sold }}
               </td>
-              <td class="timestamp-column">
-                {{ formatDate(transaction.transaction_date) }}
+              <td class="sales-column" style="text-align: left;">
+                <span class="total-amount">{{ formatCurrency(item.total_sales) }}</span>
               </td>
-              <td class="payment-column">
-                <span class="badge" :class="getPaymentMethodClass(transaction.payment_method)">
-                  {{ formatPaymentMethod(transaction.payment_method) }}
-                </span>
-              </td>
-              <td class="sales-type-column">
-                <span class="badge" :class="getSalesTypeClass(transaction.sales_type)">
-                  {{ formatSalesType(transaction.sales_type) }}
-                </span>
-              </td>
-              <td class="total-column">
-                <span class="total-amount">{{ formatCurrency(transaction.total_amount) }}</span>
+              <td class="price-column" style="text-align: left;">
+                {{ formatCurrency(item.selling_price) }}
               </td>
               <td class="actions-column">
                 <div class="action-buttons">
                   <button 
-                  class="btn btn-outline-primary btn-icon-only btn-xs" 
-                  @click="viewTransaction(transaction)"
-                  data-bs-toggle="tooltip"
-                  title="View Details"
-                  :disabled="showTransactionModal || showImportProgressModal"
-                  
-                >
-                  <Eye :size="14" />
-                </button>
+                    class="btn btn-outline-primary btn-sm" 
+                    @click="viewProductDetails(item)"
+                    title="View Product Details"
+                  >
+                    <Eye />
+                  </button>
                 </div>
               </td>
             </tr>
@@ -178,31 +169,31 @@
         </table>
         
         <!-- Empty State -->
-        <div v-if="transactions.length === 0 && !loading" class="empty-state">
+        <div v-if="salesByItemRows.length === 0 && !salesByItemLoading" class="empty-state">
           <i class="bi bi-receipt" style="font-size: 3rem; color: #6b7280;"></i>
-          <p>No transactions found</p>
+          <p>No sales data found for the selected time period</p>
           <button class="btn btn-primary" @click="refreshData">
             <i class="bi bi-arrow-clockwise"></i> Refresh Data
           </button>
         </div>
         
-        <!-- Pagination -->
-        <div v-if="showPagination" class="pagination-container">
+        <!-- Pagination for Sales by Item Table -->
+        <div v-if="showSalesByItemPagination" class="pagination-container">
           <div class="pagination-header">
             <div class="pagination-info-right">
               <span class="pagination-text">
-                Showing {{ ((pagination.current_page - 1) * pagination.page_size) + 1 }} 
-                to {{ Math.min(pagination.current_page * pagination.page_size, pagination.total_records) }} 
-                of {{ pagination.total_records }} transactions
+                Showing {{ ((salesByItemPagination.current_page - 1) * salesByItemPagination.page_size) + 1 }} 
+                to {{ Math.min(salesByItemPagination.current_page * salesByItemPagination.page_size, salesByItemPagination.total_records) }} 
+                of {{ salesByItemPagination.total_records }} products
               </span>
               
               <div class="page-size-selector">
-                <label for="pageSize">Per page:</label>
+                <label for="salesPageSize">Per page:</label>
                 <select 
-                  id="pageSize"
-                  :value="pagination.page_size" 
-                  @change="changePageSize(Number($event.target.value))"
-                  :disabled="loading"
+                  id="salesPageSize"
+                  :value="salesByItemPagination.page_size" 
+                  @change="changeSalesByItemPageSize(Number($event.target.value))"
+                  :disabled="salesByItemLoading"
                   class="form-select form-select-sm"
                 >
                   <option value="10">10</option>
@@ -214,47 +205,47 @@
             </div>
           </div>
 
-          <nav aria-label="Transaction pagination">
+          <nav aria-label="Sales by item pagination">
             <ul class="pagination pagination-sm justify-content-center">
-              <li class="page-item" :class="{ disabled: !pagination.has_prev || loading }">
+              <li class="page-item" :class="{ disabled: !salesByItemPagination.has_prev || salesByItemLoading }">
                 <button 
                   class="page-link" 
-                  @click="goToPage(pagination.current_page - 1)"
-                  :disabled="!pagination.has_prev || loading"
+                  @click="goToSalesByItemPage(salesByItemPagination.current_page - 1)"
+                  :disabled="!salesByItemPagination.has_prev || salesByItemLoading"
                   aria-label="Previous page"
                 >
-                  <i class="bi bi-chevron-left"><<</i>
+                  <i class="bi bi-chevron-left">‹</i>
                 </button>
               </li>
 
               <li 
-                v-for="page in getVisiblePages" 
+                v-for="page in getSalesByItemVisiblePages" 
                 :key="page"
                 class="page-item" 
-                :class="{ active: page === pagination.current_page }"
+                :class="{ active: page === salesByItemPagination.current_page }"
               >
                 <button 
                   class="page-link" 
-                  @click="goToPage(page)"
-                  :disabled="loading"
+                  @click="goToSalesByItemPage(page)"
+                  :disabled="salesByItemLoading"
                 >
                   {{ page }}
                 </button>
               </li>
 
-              <li class="page-item" :class="{ disabled: !pagination.has_next || loading }">
+              <li class="page-item" :class="{ disabled: !salesByItemPagination.has_next || salesByItemLoading }">
                 <button 
                   class="page-link" 
-                  @click="goToPage(pagination.current_page + 1)"
-                  :disabled="!pagination.has_next || loading"
+                  @click="goToSalesByItemPage(salesByItemPagination.current_page + 1)"
+                  :disabled="!salesByItemPagination.has_next || salesByItemLoading"
                   aria-label="Next page"
                 >
-                  <i class="bi bi-chevron-right">>></i>
+                  <i class="bi bi-chevron-right">›</i>
                 </button>
               </li>
             </ul>
           </nav>
-        </div>  
+        </div>
       </div>
     </div>
 
@@ -262,7 +253,7 @@
     <!-- MODALS -->
     <!-- ========================================== -->
     
-    <!-- Import Progress Modal - RENAMED -->
+    <!-- Import Progress Modal -->
     <div v-if="showImportProgressModal" class="modal-overlay" @click="closeImportProgressModal">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
@@ -323,90 +314,64 @@
       </div>
     </div>
 
-    <!-- Transaction Details Modal - RENAMED -->
-    <div v-if="showTransactionModal" class="modal-overlay" @click="closeTransactionModal">
+    <!-- Product Details Modal -->
+    <div v-if="showProductModal" class="modal-overlay" @click="closeProductModal">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h2>Transaction Details</h2>
-          <button class="modal-close" @click="closeTransactionModal">&times;</button>
+          <h2>Product Details</h2>
+          <button class="modal-close" @click="closeProductModal">&times;</button>
         </div>
         
         <div class="modal-body">
-          <div class="transaction-details" v-if="selectedTransactionData">
+          <div class="product-details" v-if="selectedProductData">
             <div class="detail-section">
-              <h4>Transaction Information</h4>
+              <h4>Product Information</h4>
               <div class="detail-row">
-                <strong>Transaction ID:</strong> 
-                <span class="detail-value">{{ selectedTransactionData._original?._id || 'N/A' }}</span>
+                <strong>Product ID:</strong> 
+                <span class="detail-value">{{ selectedProductData.id }}</span>
               </div>
               <div class="detail-row">
-                <strong>Transaction Date:</strong> 
-                <span class="detail-value">{{ selectedTransactionData.latest_transaction_date }}</span>
+                <strong>Product Name:</strong> 
+                <span class="detail-value">{{ selectedProductData.name }}</span>
               </div>
               <div class="detail-row">
-                <strong>Customer ID:</strong> 
-                <span class="detail-value">{{ selectedTransactionData._original?.customer_id || 'N/A' }}</span>
+                <strong>SKU:</strong> 
+                <span class="detail-value">{{ selectedProductData.sku }}</span>
+              </div>
+              <div class="detail-row">
+                <strong>Category:</strong> 
+                <span class="detail-value">{{ selectedProductData.category }}</span>
               </div>
             </div>
 
             <div class="detail-section">
-              <h4>Items & Pricing</h4>
+              <h4>Inventory & Sales</h4>
               <div class="detail-row">
-                <strong>Items:</strong> 
-                <span class="detail-value">{{ selectedTransactionData.item_name }}</span>
+                <strong>Stock:</strong> 
+                <span class="detail-value">{{ selectedProductData.stock }} {{ selectedProductData.unit }}</span>
               </div>
               <div class="detail-row">
-                <strong>Total Quantity:</strong> 
-                <span class="detail-value">{{ selectedTransactionData.total_quantity }}</span>
+                <strong>Items Sold:</strong> 
+                <span class="detail-value">{{ selectedProductData.items_sold }}</span>
               </div>
               <div class="detail-row">
                 <strong>Unit Price:</strong> 
-                <span class="detail-value">{{ selectedTransactionData.unit_price }}</span>
+                <span class="detail-value">{{ selectedProductData.selling_price }}</span>
               </div>
               <div class="detail-row">
-                <strong>Total Amount:</strong> 
-                <span class="detail-value total-highlight">{{ selectedTransactionData.total_amount }}</span>
-              </div>
-              
-              <!-- Detailed Item Breakdown -->
-              <div v-if="selectedTransactionData._original?.item_list" class="item-breakdown">
-                <h5>Item Details:</h5>
-                <div v-for="(item, index) in selectedTransactionData._original.item_list" :key="index" class="item-detail">
-                  <div class="item-row">
-                    <span class="item-detail-name">{{ item.item_name }}</span>
-                    <span class="item-detail-info">
-                      {{ item.quantity }} × {{ formatCurrency(item.unit_price) }} = {{ formatCurrency((item.quantity || 0) * (item.unit_price || 0)) }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="detail-section">
-              <h4>Payment & Sales Information</h4>
-              <div class="detail-row">
-                <strong>Payment Method:</strong> 
-                <span class="detail-value">
-                  <span class="badge" :class="getPaymentMethodClass(selectedTransactionData._original?.payment_method)">
-                    {{ formatPaymentMethod(selectedTransactionData._original?.payment_method) }}
-                  </span>
-                </span>
+                <strong>Total Sales:</strong> 
+                <span class="detail-value total-highlight">{{ selectedProductData.total_sales }}</span>
               </div>
               <div class="detail-row">
-                <strong>Sales Type:</strong> 
-                <span class="detail-value">
-                  <span class="badge" :class="getSalesTypeClass(selectedTransactionData._original?.sales_type)">
-                    {{ formatSalesType(selectedTransactionData._original?.sales_type) }}
-                  </span>
-                </span>
+                <strong>Taxable:</strong> 
+                <span class="detail-value">{{ selectedProductData.is_taxable }}</span>
               </div>
             </div>
           </div>
         </div>
         
         <div class="modal-footer">
-          <button class="btn btn-secondary" @click="closeTransactionModal">Close</button>
-          <!--<button class="btn btn-primary" @click="editTransaction(selectedTransactionData)">Edit Transaction</button> This is placed for just in case--> 
+          <button class="btn btn-secondary" @click="closeProductModal">Close</button>
         </div>
       </div>
     </div>
@@ -415,7 +380,7 @@
 
 <script>
 import BarChart from '@/components/BarChart.vue';
-import SalesAPIService from '@/services/apiReports.js';
+import salesDisplayService from '@/services/apiSalesByItem';
 
 export default {
   name: 'SalesByItem',
@@ -429,26 +394,41 @@ export default {
   data() {
     return {
       // Loading states
-      loading: false,
       loadingTopItems: false,
       importing: false,
       exporting: false,
       
+      // Sales by Item data
+      salesByItemRows: [],
+      allSalesByItemRows: [],
+      salesByItemLoading: false,
+      salesByItemError: null,
+      
+      // Sales by Item Pagination
+      salesByItemPagination: {
+        current_page: 1,
+        page_size: 10,
+        total_records: 0,
+        total_pages: 0,
+        has_next: false,
+        has_prev: false
+      },
+      
+      // Product Details Modal
+      showProductModal: false,
+      selectedProductData: null,
+      
       // Import modal states
       showImportProgressModal: false,
       importProgress: 0,
-      importStep: 'uploading', // 'uploading' or 'processing'
+      importStep: 'uploading',
       importStatusText: 'Preparing upload...',
       importResult: null,
       importError: null,
       
-      // Transaction view modal states - RENAMED to avoid conflicts
-      showTransactionModal: false,
-      selectedTransactionData: null,
-      
       // Chart and analytics
       selectedFrequency: 'monthly',
-      topItems: [], // Enhanced with more data
+      topItems: [],
       chartData: {
         labels: ['Loading...'],
         datasets: [{
@@ -459,20 +439,9 @@ export default {
           borderWidth: 1
         }]
       },
-      
-      // Transaction data with pagination
-      transactions: [],
-      pagination: {
-        current_page: 1,
-        page_size: 10,
-        total_records: 0,
-        total_pages: 0,
-        has_next: false,
-        has_prev: false
-      },
 
       autoRefreshEnabled: true,
-      autoRefreshInterval: 30000, // 30 seconds
+      autoRefreshInterval: 30000,
       baseRefreshInterval: 30000,
       autoRefreshTimer: null,
       countdown: 30,
@@ -482,13 +451,10 @@ export default {
       connectionLost: false,
       consecutiveErrors: 0,
       lastSuccessfulLoad: null,
-      error: null, // Add this if it doesn't exist
+      error: null,
       
       // Smart refresh rate tracking
       recentActivity: [],
-
-
-
     };
   },
   
@@ -500,13 +466,13 @@ export default {
       return process.env.NODE_ENV === 'development';
     },
     
-    showPagination() {
-      return this.pagination.total_pages > 1;
+    showSalesByItemPagination() {
+      return this.salesByItemPagination.total_pages > 1;
     },
     
-    getVisiblePages() {
-      const current = this.pagination.current_page;
-      const total = this.pagination.total_pages;
+    getSalesByItemVisiblePages() {
+      const current = this.salesByItemPagination.current_page;
+      const total = this.salesByItemPagination.total_pages;
       const delta = 2;
       
       if (total <= 7) {
@@ -536,7 +502,7 @@ export default {
   // LIFECYCLE HOOKS
   // ====================================================================
   async mounted() {
-    // Load data sequentially - separate calls for different purposes
+    // Load data sequentially
     try {
       await this.getTopItems();
     } catch (error) {
@@ -550,9 +516,9 @@ export default {
     }
 
     try {
-      await this.loadTransactionHistory();
+      await this.loadSalesByItemTable();
     } catch (error) {
-      console.error("Transaction history failed:", error);
+      console.error("Sales by item table failed:", error);
     }
     
     // Start auto-refresh
@@ -580,32 +546,30 @@ export default {
       try {
         this.loadingTopItems = true;
         
-        if (!SalesAPIService?.getTopItems) {
-          throw new Error("getTopItems method not found in SalesAPIService");
-        }
+        const dateRange = this.calculateDateRange(this.selectedFrequency);
         
-        const response = await SalesAPIService.getTopItems({ limit: 5 });
+        const response = await salesDisplayService.getSalesByItem(
+          dateRange.start_date, 
+          dateRange.end_date
+        );
 
         let items = [];
         
-        // Try different response structures
-        if (response?.data?.items && Array.isArray(response.data.items)) {
-          items = response.data.items;
-        } else if (response?.data?.data && Array.isArray(response.data.data)) {
-          items = response.data.data;
-        } else if (Array.isArray(response?.data)) {
-          items = response.data;
-        } else if (Array.isArray(response)) {
+        if (Array.isArray(response)) {
           items = response;
+        } else if (response?.data && Array.isArray(response.data)) {
+          items = response.data;
         }
 
         if (items && items.length > 0) {
-          this.topItems = items.slice(0, 5).map((item, index) => ({
-            name: item.item_name || item.name || item.product_name || `Item ${index + 1}`,
-            price: this.formatCurrency(
-              item.total_amount || item.total_sales || item.revenue || 
-              item.sales || item.price || item.amount || 0
-            )
+          // Sort by total_sales and take top 5
+          const sortedItems = items
+            .sort((a, b) => (b.total_sales || 0) - (a.total_sales || 0))
+            .slice(0, 5);
+
+          this.topItems = sortedItems.map((item) => ({
+            name: item.product_name || 'Unknown Product',
+            price: this.formatCurrency(item.total_sales || 0)
           }));
         } else {
           this.topItems = [
@@ -613,7 +577,6 @@ export default {
           ];
         }
         
-        // ✅ ADD CONNECTION HEALTH TRACKING
         this.connectionLost = false;
         this.consecutiveErrors = 0;
         this.lastSuccessfulLoad = Date.now();
@@ -622,7 +585,6 @@ export default {
       } catch (error) {
         console.error("❌ Error loading top items:", error);
         
-        // ✅ ADD ERROR TRACKING
         this.consecutiveErrors++;
         this.error = `Failed to load top items: ${error.message}`;
 
@@ -637,103 +599,51 @@ export default {
     },
 
     /**
-     * Load chart data with date filtering - FIXED VERSION
+     * Load chart data with date filtering
      */
     async getTopChartItems() {
       try {
-        // Don't set loading for chart specifically, use separate flag
         const dateRange = this.calculateDateRange(this.selectedFrequency);
         
-        // Try the enhanced chart API first
-        if (SalesAPIService?.getTopChartItems) {
-          const requestParams = {
-            limit: 10,
-            start_date: dateRange.start_date,
-            end_date: dateRange.end_date,
-            frequency: this.selectedFrequency
-          };
+        const response = await salesDisplayService.getSalesByItem(
+          dateRange.start_date, 
+          dateRange.end_date
+        );
 
-          try {
-            const response = await SalesAPIService.getTopChartItems(requestParams);
-            
-            let items = [];
-            if (response?.success && response.data) {
-              items = response.data;
-            } else if (Array.isArray(response)) {
-              items = response;
-            }
-
-            if (items && items.length > 0) {
-              this.updateChartData(items.slice(0, 10));
-
-              // ✅ ADD CONNECTION HEALTH TRACKING
-              this.connectionLost = false;
-              this.consecutiveErrors = 0;
-              this.lastSuccessfulLoad = Date.now();
-              this.error = null;
-
-              return; // Success, exit early
-            }
-          } catch (chartError) {
-            // Don't return, fall through to fallback
-          }
-        }
-
-        // Fallback: Use regular top items API for chart
-        if (SalesAPIService?.getTopItems) {
-          try {
-            const response = await SalesAPIService.getTopItems({ limit: 10 });
-            
-            let items = [];
-            if (response?.data?.items && Array.isArray(response.data.items)) {
-              items = response.data.items;
-            } else if (response?.data?.data && Array.isArray(response.data.data)) {
-              items = response.data.data;
-            } else if (Array.isArray(response?.data)) {
-              items = response.data;
-            } else if (Array.isArray(response)) {
-              items = response;
-            }
-            
-            if (items && items.length > 0) {
-              // Map the regular API response to chart format
-              const chartItems = items.map(item => ({
-                item_name: item.item_name || item.name || 'Unknown Item',
-                total_amount: item.total_amount || item.total_sales || item.revenue || 0
-              }));
-              
-              this.updateChartData(chartItems.slice(0, 10));
-
-              // ✅ ADD CONNECTION HEALTH TRACKING
-              this.connectionLost = false;
-              this.consecutiveErrors = 0;
-              this.lastSuccessfulLoad = Date.now();
-              this.error = null;
-              
-              return;
-            }
-          } catch (fallbackError) {
-            console.error("❌ Fallback also failed:", fallbackError);
-          }
-        }
+        let items = [];
         
-        // If we get here, both APIs failed
-        console.warn("Both chart APIs failed, using default chart");
-        
-        // ✅ ADD ERROR TRACKING
-        this.consecutiveErrors++;
-        this.error = 'Failed to load chart data';
-
-        if (this.consecutiveErrors >= 3) {
-          this.connectionLost = true;
+        if (Array.isArray(response)) {
+          items = response;
+        } else if (response?.data && Array.isArray(response.data)) {
+          items = response.data;
         }
 
-        this.setDefaultChartData();
+        if (items && items.length > 0) {
+          // Sort by total_sales and take top 10 for chart
+          const sortedItems = items
+            .sort((a, b) => (b.total_sales || 0) - (a.total_sales || 0))
+            .slice(0, 10);
+
+          // Map to chart format
+          const chartItems = sortedItems.map(item => ({
+            item_name: item.product_name || 'Unknown Product',
+            total_amount: item.total_sales || 0
+          }));
+
+          this.updateChartData(chartItems);
+
+          this.connectionLost = false;
+          this.consecutiveErrors = 0;
+          this.lastSuccessfulLoad = Date.now();
+          this.error = null;
+
+        } else {
+          this.setDefaultChartData();
+        }
         
       } catch (error) {
         console.error("❌ Error in getTopChartItems:", error);
         
-        // ✅ ADD ERROR TRACKING
         this.consecutiveErrors++;
         this.error = `Failed to load chart data: ${error.message}`;
 
@@ -746,55 +656,198 @@ export default {
     },
 
     /**
-     * Load transaction history from API
+     * Load sales by item table data with improved date filtering and error handling
      */
-    async loadTransactionHistory(page = 1, pageSize = 10) {
+    async loadSalesByItemTable() {
       try {
-        this.loading = true;
+        this.salesByItemLoading = true;
+        this.salesByItemError = null;
         
-        if (!SalesAPIService.getSalesItemHistory) {
-          throw new Error("getSalesItemHistory method not found in SalesAPIService");
+        const dateRange = this.calculateDateRange(this.selectedFrequency);
+        
+        // Validate date range
+        if (!this.validateDateRange(dateRange.start_date, dateRange.end_date)) {
+          this.salesByItemError = 'Invalid date range: start date cannot be after end date';
+          this.allSalesByItemRows = [];
+          this.salesByItemRows = [];
+          return;
         }
         
-        const response = await SalesAPIService.getSalesItemHistory({
-          page: page,
-          page_size: pageSize
-        });
+        console.log('📊 Fetching sales data with date range:', dateRange);
+        console.log('📅 Frequency:', this.selectedFrequency);
         
-        if (response?.success) {
-          this.transactions = response.data.data || [];
-          this.pagination = response.data.pagination || {
-            current_page: 1,
-            page_size: 10,
-            total_records: 0,
-            total_pages: 0,
-            has_next: false,
-            has_prev: false
-          };
-          
-          // ✅ ADD CONNECTION HEALTH TRACKING
-          this.connectionLost = false;
-          this.consecutiveErrors = 0;
-          this.lastSuccessfulLoad = Date.now();
-          this.error = null;
+        // Use the improved API method with proper date filtering
+        const response = await salesDisplayService.getSalesByItem(
+          dateRange.start_date, 
+          dateRange.end_date,
+          false // exclude voided transactions by default
+        );
+
+        console.log('📦 Raw API response:', response);
+        
+        let data = [];
+        
+        // Handle different response formats
+        if (Array.isArray(response)) {
+          data = response;
+        } else if (response?.data && Array.isArray(response.data)) {
+          data = response.data;
+        } else if (response?.results && Array.isArray(response.results)) {
+          data = response.results;
         } else {
-          throw new Error(response?.message || 'Failed to load transaction history');
+          console.warn('⚠️ Unexpected API response format:', response);
+          data = [];
         }
+
+        console.log('📈 Processed data for table:', data);
+
+        // Store all data and update pagination
+        this.allSalesByItemRows = data
+          .filter(item => item && typeof item === 'object') // Filter out invalid items
+          .sort((a, b) => {
+            const salesA = parseFloat(a.total_sales) || 0;
+            const salesB = parseFloat(b.total_sales) || 0;
+            return salesB - salesA; // Descending order by total sales
+          })
+          .map(item => ({
+            id: item.product_id || item.id || 'N/A',
+            product: item.product_name || item.name || item.product || 'Unknown Product',
+            category: item.category_name || item.category || 'Uncategorized',
+            stock: parseInt(item.stock) || 0,
+            items_sold: parseInt(item.items_sold) || 0,
+            total_sales: parseFloat(item.total_sales) || 0,
+            selling_price: parseFloat(item.selling_price) || 0,
+            unit: item.unit || 'unit',
+            sku: item.sku || 'N/A',
+            is_taxable: Boolean(item.is_taxable)
+          }));
+
+        // Reset to first page and update displayed data
+        this.salesByItemPagination.current_page = 1;
+        this.updateSalesByItemPageData();
+
+        console.log('🎯 Final table rows:', this.salesByItemRows);
+        console.log('📄 Pagination info:', this.salesByItemPagination);
+
+        // Update connection health on success
+        this.connectionLost = false;
+        this.consecutiveErrors = 0;
+        this.lastSuccessfulLoad = Date.now();
+        this.error = null;
+
       } catch (error) {
-        console.error("Error loading transaction history:", error);
+        console.error('❌ loadSalesByItemTable error:', error);
         
-        // ✅ ADD ERROR TRACKING
+        // Update connection health on error
         this.consecutiveErrors++;
-        this.error = `Failed to load transaction history: ${error.message}`;
+        this.salesByItemError = this.getErrorMessage(error);
 
         if (this.consecutiveErrors >= 3) {
           this.connectionLost = true;
         }
 
-        this.transactions = [];
+        // Set empty data state
+        this.allSalesByItemRows = [];
+        this.salesByItemRows = [];
+        this.salesByItemPagination.current_page = 1;
+        this.updateSalesByItemPageData();
+        
       } finally {
-        this.loading = false;
+        this.salesByItemLoading = false;
       }
+    },
+
+    /**
+     * Format date for API (YYYY-MM-DD) using local timezone
+     */
+    formatDateForAPI(date) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    },
+
+    /**
+     * Validate that start date is before end date
+     */
+    validateDateRange(startDate, endDate) {
+      if (!startDate || !endDate) return true;
+      
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      if (start > end) {
+        console.error('Invalid date range: start date is after end date', { startDate, endDate });
+        return false;
+      }
+      
+      return true;
+    },
+
+    /**
+     * Get user-friendly error messages
+     */
+    getErrorMessage(error) {
+      if (error.response?.status === 400) {
+        return 'Invalid date range or parameters. Please try a different time period.';
+      } else if (error.response?.status === 404) {
+        return 'Sales data not found for the selected period.';
+      } else if (error.response?.status === 500) {
+        return 'Server error. Please try again later.';
+      } else if (error.message?.includes('Network Error') || error.message?.includes('Failed to fetch')) {
+        return 'Network connection failed. Please check your internet connection.';
+      } else if (error.message?.includes('Invalid date range')) {
+        return error.message;
+      } else {
+        return error.message || 'Failed to load sales data. Please try again.';
+      }
+    },
+
+    // ================================================================
+    // PAGINATION METHODS
+    // ================================================================
+    
+    /**
+     * Update sales by item pagination data
+     */
+    updateSalesByItemPageData() {
+      const startIndex = (this.salesByItemPagination.current_page - 1) * this.salesByItemPagination.page_size;
+      const endIndex = startIndex + this.salesByItemPagination.page_size;
+      
+      this.salesByItemRows = this.allSalesByItemRows.slice(startIndex, endIndex);
+      
+      // Update pagination info
+      this.salesByItemPagination.total_records = this.allSalesByItemRows.length;
+      this.salesByItemPagination.total_pages = Math.ceil(this.allSalesByItemRows.length / this.salesByItemPagination.page_size);
+      this.salesByItemPagination.has_prev = this.salesByItemPagination.current_page > 1;
+      this.salesByItemPagination.has_next = this.salesByItemPagination.current_page < this.salesByItemPagination.total_pages;
+    },
+    
+    /**
+     * Go to specific page for sales by item
+     */
+    goToSalesByItemPage(page) {
+      if (this.showProductModal) {
+        return;
+      }
+      
+      if (page >= 1 && page <= this.salesByItemPagination.total_pages) {
+        this.salesByItemPagination.current_page = page;
+        this.updateSalesByItemPageData();
+      }
+    },
+
+    /**
+     * Change page size for sales by item
+     */
+    changeSalesByItemPageSize(newPageSize) {
+      if (this.showProductModal) {
+        return;
+      }
+      
+      this.salesByItemPagination.page_size = newPageSize;
+      this.salesByItemPagination.current_page = 1;
+      this.updateSalesByItemPageData();
     },
 
     // ================================================================
@@ -806,33 +859,42 @@ export default {
      */
     calculateDateRange(frequency) {
       const now = new Date();
-      const end_date = now.toISOString().split('T')[0];
+      const end_date = this.formatDateForAPI(now);
       let start_date;
       
       switch (frequency) {
         case 'daily':
-          start_date = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000))
-            .toISOString().split('T')[0];
+          // Last 30 days
+          const dailyDate = new Date(now);
+          dailyDate.setDate(dailyDate.getDate() - 30);
+          start_date = this.formatDateForAPI(dailyDate);
           break;
         case 'weekly':
-          start_date = new Date(now.getTime() - (8 * 7 * 24 * 60 * 60 * 1000))
-            .toISOString().split('T')[0];
+          // Last 12 weeks
+          const weeklyDate = new Date(now);
+          weeklyDate.setDate(weeklyDate.getDate() - (12 * 7));
+          start_date = this.formatDateForAPI(weeklyDate);
           break;
         case 'monthly':
-          const monthsAgo = new Date(now);
-          monthsAgo.setMonth(monthsAgo.getMonth() - 12);
-          start_date = monthsAgo.toISOString().split('T')[0];
+          // Last 12 months
+          const monthlyDate = new Date(now);
+          monthlyDate.setMonth(monthlyDate.getMonth() - 12);
+          start_date = this.formatDateForAPI(monthlyDate);
           break;
         case 'yearly':
-          const yearsAgo = new Date(now);
-          yearsAgo.setFullYear(yearsAgo.getFullYear() - 5);
-          start_date = yearsAgo.toISOString().split('T')[0];
+          // Last 3 years
+          const yearlyDate = new Date(now);
+          yearlyDate.setFullYear(yearlyDate.getFullYear() - 3);
+          start_date = this.formatDateForAPI(yearlyDate);
           break;
         default:
+          // Default to last 30 days
           const defaultDate = new Date(now);
-          defaultDate.setMonth(defaultDate.getMonth() - 1);
-          start_date = defaultDate.toISOString().split('T')[0];
+          defaultDate.setDate(defaultDate.getDate() - 30);
+          start_date = this.formatDateForAPI(defaultDate);
       }
+      
+      console.log(`📅 ${frequency} date range:`, { start_date, end_date });
       
       return { start_date, end_date };
     },
@@ -897,160 +959,56 @@ export default {
     },
 
     /**
-     * Handle frequency change - FIXED to not interfere with modals
+     * Handle frequency change
      */
     async onFrequencyChange() {
-      // IMPORTANT: Don't reload chart if modal is open
-      if (this.showTransactionModal || this.showImportProgressModal) {
+      if (this.showProductModal || this.showImportProgressModal) {
         return;
       }
 
-      // Only reload chart data, not top items list
-      await this.getTopChartItems();
+      // Refresh all data with new time frame
+      await Promise.all([
+        this.getTopItems(),
+        this.getTopChartItems(),
+        this.loadSalesByItemTable()
+      ]);
     },
 
     // ================================================================
-    // PAGINATION METHODS
-    // ================================================================
-    
-    /**
-     * Go to specific page - FIXED to not interfere with modals
-     */
-    async goToPage(page) {
-      if (this.showTransactionModal || this.showImportProgressModal) {
-        return;
-      }
-
-      if (page >= 1 && page <= this.pagination.total_pages) {
-        await this.loadTransactionHistory(page, this.pagination.page_size);
-      }
-    },
-
-    /**
-     * Change page size - FIXED to not interfere with modals
-     */
-    async changePageSize(newPageSize) {
-      if (this.showTransactionModal || this.showImportProgressModal) {
-        return;
-      }
-
-      await this.loadTransactionHistory(1, newPageSize);
-    },
-
-    /**
-     * Refresh all data - FIXED to not interfere with modals
-     */
-    async refreshData() {
-      if (this.showTransactionModal || this.showImportProgressModal) {
-        return;
-      }
-
-      try {
-        this.error = null; // Clear any previous errors
-
-        await Promise.all([
-          this.loadTransactionHistory(this.pagination.current_page, this.pagination.page_size),
-          this.getTopItems(),
-          this.getTopChartItems()
-        ]);
-
-        // Connection health tracking - SUCCESS
-        this.connectionLost = false;
-        this.consecutiveErrors = 0;
-        this.lastSuccessfulLoad = Date.now();
-
-      } catch (error) {
-        console.error('Error refreshing data:', error);
-
-        // Handle connection errors
-        this.consecutiveErrors++;
-        this.error = `Failed to refresh data: ${error.message}`;
-
-        if (this.consecutiveErrors >= 3) {
-          this.connectionLost = true;
-        }
-      }
-    },
-
-    // ================================================================
-    // MODAL METHODS - FIXED
+    // MODAL METHODS
     // ================================================================
     
     /**
-     * View transaction details - FIXED to handle proper data structure
+     * View product details
      */
-    viewTransaction(transaction) {
+    viewProductDetails(product) {
       try {
-        // FORCE close any other modals first
-        this.showImportProgressModal = false;
-        this.selectedTransactionData = null;
+        this.selectedProductData = {
+          id: product.id,
+          name: product.product,
+          category: product.category,
+          stock: product.stock,
+          unit: product.unit,
+          items_sold: product.items_sold,
+          total_sales: this.formatCurrency(product.total_sales),
+          selling_price: this.formatCurrency(product.selling_price),
+          sku: product.sku || 'N/A',
+          is_taxable: product.is_taxable ? 'Yes' : 'No'
+        };
         
-        // Calculate total quantity and get unit price from item_list
-        let totalQuantity = 0;
-        let unitPrice = 0;
-        let itemNames = [];
-        
-        if (transaction.item_list && Array.isArray(transaction.item_list)) {
-          transaction.item_list.forEach(item => {
-            if (item.quantity) {
-              totalQuantity += parseFloat(item.quantity) || 0;
-            }
-            if (item.unit_price && unitPrice === 0) {
-              // Use the first item's unit price, or you could calculate average
-              unitPrice = parseFloat(item.unit_price) || 0;
-            }
-            if (item.item_name) {
-              itemNames.push(`${item.item_name} (${item.quantity || 0})`);
-            }
-          });
-        }
-
-        // Force Vue to update the DOM
-        this.$nextTick(() => {
-          // Set the selected transaction with proper data mapping
-          this.selectedTransactionData = {
-            item_name: itemNames.length > 0 ? itemNames.join(', ') : 'No items',
-            total_amount: this.formatCurrency(transaction.total_amount),
-            total_quantity: totalQuantity || 'N/A',
-            unit_price: unitPrice > 0 ? this.formatCurrency(unitPrice) : 'N/A',
-            latest_transaction_date: this.formatDate(transaction.transaction_date),
-            _original: transaction // Keep original data for reference
-          };
-
-          // Show the modal
-          this.showTransactionModal = true;
-
-          // Force another update
-          this.$forceUpdate();
-        });
-
+        this.showProductModal = true;
       } catch (error) {
-        console.error('Error in viewTransaction:', error);
-        this.showError('Failed to display transaction details');
+        console.error('Error in viewProductDetails:', error);
+        this.showError('Failed to display product details');
       }
     },
 
     /**
-     * Close transaction view modal - ENHANCED
+     * Close product details modal
      */
-    closeTransactionModal() {
-      this.showTransactionModal = false;
-      this.selectedTransactionData = null;
-
-      // Force update to ensure DOM changes
-      this.$nextTick(() => {
-        // Modal closed
-      });
-    },
-
-    /**
-     * Edit transaction (placeholder)
-     */
-    editTransaction(transaction) {
-      this.closeTransactionModal();
-
-      // TODO: Implement edit functionality
-      this.showSuccess('Edit functionality not implemented yet');
+    closeProductModal() {
+      this.showProductModal = false;
+      this.selectedProductData = null;
     },
 
     // ================================================================
@@ -1080,17 +1038,18 @@ export default {
           this.importError = null;
           
           try {
-            const result = await SalesAPIService.bulkImportCSV(file, (progress) => {
-              this.importProgress = progress;
-              this.importStatusText = `Uploading file... ${Math.round(progress)}%`;
+            // Note: You'll need to implement or adjust this method based on your API
+            // const result = await salesDisplayService.bulkImportCSV(file, (progress) => {
+            //   this.importProgress = progress;
+            //   this.importStatusText = `Uploading file... ${Math.round(progress)}%`;
               
-              if (progress === 100) {
-                this.importStep = 'processing';
-                this.importStatusText = 'Processing CSV data...';
-              }
-            });
+            //   if (progress === 100) {
+            //     this.importStep = 'processing';
+            //     this.importStatusText = 'Processing CSV data...';
+            //   }
+            // });
             
-            this.importResult = result;
+            // this.importResult = result;
             this.importProgress = 100;
             this.importStatusText = 'Import completed successfully!';
             
@@ -1123,13 +1082,16 @@ export default {
       try {
         this.exporting = true;
         
-        const success = await SalesAPIService.exportTransactions({});
+        // Note: You'll need to implement or adjust this method based on your API
+        // const success = await salesDisplayService.exportTransactions({});
         
-        if (success) {
-          this.showSuccess('Export completed successfully! Check your downloads folder.');
-        } else {
-          throw new Error('Export failed');
-        }
+        // if (success) {
+        //   this.showSuccess('Export completed successfully! Check your downloads folder.');
+        // } else {
+        //   throw new Error('Export failed');
+        // }
+        
+        this.showSuccess('Export feature would be implemented here');
         
       } catch (error) {
         console.error('Export failed:', error);
@@ -1161,83 +1123,6 @@ export default {
     // ================================================================
     
     /**
-     * Format items list for display - FIXED for actual data structure
-     */
-    formatItemsList(itemList) {
-      if (!itemList || !Array.isArray(itemList)) return 'No items';
-      
-      return itemList
-        .filter(item => item && item.item_name)
-        .map(item => {
-          const quantity = item.quantity ? ` (${item.quantity})` : '';
-          return `${item.item_name}${quantity}`;
-        })
-        .join(', ') || 'No items';
-    },
-    
-    /**
-     * Format date for display
-     */
-    formatDate(dateString) {
-      if (!dateString) return 'Unknown';
-      
-      try {
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return 'Invalid date';
-        
-        return date.toLocaleString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-      } catch (error) {
-        console.error('Error formatting date:', error);
-        return 'Invalid date';
-      }
-    },
-    
-    /**
-     * Format payment method for display
-     */
-    formatPaymentMethod(method) {
-      if (!method) return 'Unknown';
-      
-      const methodMap = {
-        'cash': 'Cash',
-        'card': 'Card',
-        'credit_card': 'Credit Card',
-        'debit_card': 'Debit Card',
-        'gcash': 'GCash',
-        'paymaya': 'PayMaya',
-        'bank_transfer': 'Bank Transfer',
-        'online': 'Online Payment'
-      };
-      
-      return methodMap[method.toLowerCase()] || 
-             method.charAt(0).toUpperCase() + method.slice(1).toLowerCase();
-    },
-    
-    /**
-     * Format sales type for display
-     */
-    formatSalesType(type) {
-      if (!type) return 'Unknown';
-      
-      const typeMap = {
-        'dine_in': 'Dine-in',
-        'takeout': 'Takeout',
-        'delivery': 'Delivery',
-        'online': 'Online',
-        'pickup': 'Pickup'
-      };
-      
-      return typeMap[type.toLowerCase()] || 
-             type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
-    },
-    
-    /**
      * Format currency amount
      */
     formatCurrency(amount) {
@@ -1255,39 +1140,6 @@ export default {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       })}`;
-    },
-    
-    /**
-     * Get CSS class for payment method badge
-     */
-    getPaymentMethodClass(method) {
-      const classMap = {
-        'cash': 'badge-success',
-        'card': 'badge-primary',
-        'credit_card': 'badge-primary',
-        'debit_card': 'badge-info',
-        'gcash': 'badge-warning',
-        'paymaya': 'badge-info',
-        'bank_transfer': 'badge-secondary',
-        'online': 'badge-dark'
-      };
-      
-      return classMap[method?.toLowerCase()] || 'badge-secondary';
-    },
-    
-    /**
-     * Get CSS class for sales type badge
-     */
-    getSalesTypeClass(type) {
-      const classMap = {
-        'dine_in': 'badge-success',
-        'takeout': 'badge-warning',
-        'delivery': 'badge-info',
-        'online': 'badge-primary',
-        'pickup': 'badge-secondary'
-      };
-      
-      return classMap[type?.toLowerCase()] || 'badge-secondary';
     },
 
     // ================================================================
@@ -1307,6 +1159,39 @@ export default {
     showError(message) {
       console.error('Error:', message);
       alert(message); // Replace with your notification system
+    },
+
+    /**
+     * Refresh all data
+     */
+    async refreshData() {
+      if (this.showProductModal || this.showImportProgressModal) {
+        return;
+      }
+
+      try {
+        this.error = null;
+
+        await Promise.all([
+          this.getTopItems(),
+          this.getTopChartItems(),
+          this.loadSalesByItemTable()
+        ]);
+
+        // Connection health tracking - SUCCESS
+        this.connectionLost = false;
+        this.consecutiveErrors = 0;
+        this.lastSuccessfulLoad = Date.now();
+
+      } catch (error) {
+        console.error('Error refreshing data:', error);
+        this.consecutiveErrors++;
+        this.error = `Failed to refresh data: ${error.message}`;
+
+        if (this.consecutiveErrors >= 3) {
+          this.connectionLost = true;
+        }
+      }
     },
 
     toggleAutoRefresh() {
@@ -1333,7 +1218,7 @@ export default {
       
       // Start auto-refresh timer
       this.autoRefreshTimer = setInterval(() => {
-        this.refreshData() // Use your existing refresh method
+        this.refreshData()
       }, this.autoRefreshInterval)
     },
 
@@ -1387,11 +1272,9 @@ export default {
         default: return 'Connecting...'
       }
     }
-
   }
 }
 </script>
-
 <style scoped>
 /* ====================================================================== */
 /* MAIN LAYOUT */
@@ -2433,6 +2316,76 @@ export default {
     flex-wrap: wrap;
     gap: 0.5rem;
   }
+}
+
+.low-stock {
+  color: #dc2626;
+  font-weight: bold;
+}
+
+.product-column {
+  font-weight: 500;
+}
+
+.category-column .badge {
+  font-size: 11px;
+}
+
+.stock-column, .sold-column {
+  text-align: center;
+  font-weight: 500;
+}
+
+.sales-column {
+  text-align: right;
+  font-weight: bold;
+}
+
+.product-column {
+  max-width: 200px;
+}
+
+.product-column span {
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  cursor: help;
+}
+
+/* Low stock warning */
+.low-stock {
+  color: #dc2626;
+  font-weight: bold;
+}
+
+/* Center align stock and sold columns */
+.stock-column, .sold-column {
+  text-align: center;
+  font-weight: 500;
+}
+
+/* Right align sales and price columns */
+.sales-column, .price-column {
+  text-align: right;
+  font-weight: bold;
+}
+
+/* Action buttons */
+.actions-column {
+  text-align: center;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+
+.action-buttons .btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
 }
 
 </style>

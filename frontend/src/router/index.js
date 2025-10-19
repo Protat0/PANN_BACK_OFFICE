@@ -161,7 +161,7 @@ const router = createRouter({
         },
         // Reports
         {
-          path: 'sales-by-item',
+          path: 'salesbyitem',
           name: 'SalesByItem',
           component: SalesByItem,
           meta: {
