@@ -31,16 +31,17 @@
         :height="140"
         :padding="16"
         title="Total Products"
-        :value="totalProducts"
+        :value="productsLoading ? 'Loading...' : totalProducts"
         value-color="success"
-        subtitle="Updated: May 02, 2025"
+        :subtitle="productsLoading ? 'Fetching data...' : `Updated: ${lastUpdated}`"
         border-color="success"
         border-position="all"
         shadow="md"
       >
         <template #header>
           <div class="card-header-with-change">
-            <span class="change-badge positive">+24%</span>
+            <span v-if="!productsError" class="change-badge positive">Live</span>
+            <span v-else class="change-badge negative">Error</span>
           </div>
         </template>
       </CardTemplate>
@@ -94,16 +95,17 @@
         :height="140"
         :padding="16"
         title="Total Orders"
-        :value="totalOrders"
+        :value="ordersLoading ? 'Loading...' : totalOrders"
         value-color="error"
-        subtitle="Updated: May 02, 2025"
+        :subtitle="ordersLoading ? 'Fetching data...' : `From ${lastMonthPeriod}`"
         border-color="error"
         border-position="all"
         shadow="md"
       >
         <template #header>
           <div class="card-header-with-change">
-            <span class="change-badge positive">+14%</span>
+            <span v-if="!ordersError" class="change-badge positive">Live</span>
+            <span v-else class="change-badge negative">Error</span>
           </div>
         </template>
       </CardTemplate>
@@ -186,6 +188,8 @@
 import CardTemplate from '../components/common/CardTemplate.vue'
 import SalesChart from '../components/dashboard/SalesChart.vue'
 import { formatCurrency, formatNumber } from '@/helpers/currencyHelpers'
+import { useProducts } from '@/composables/api/useProducts.js'
+import salesAPIService from '@/services/apiReports.js'
 
 export default {
   name: 'Dashboard',
@@ -193,16 +197,39 @@ export default {
     CardTemplate,
     SalesChart
   },
+  setup() {
+    const { 
+      products, 
+      productStats, 
+      fetchProducts, 
+      loading: productsLoading, 
+      error: productsError 
+    } = useProducts()
+
+    return {
+      products,
+      productStats,
+      fetchProducts,
+      productsLoading,
+      productsError
+    }
+  },
   data() {
     return {
       targetProgress: 78,
+      selectedFrequency: 'monthly',
+      chart: null,
+      // Orders data
+      ordersData: {
+        totalOrders: 0
+      },
+      ordersLoading: false,
+      ordersError: null,
       // Raw data values
       rawData: {
         totalProfit: 78452.23,
-        totalProducts: 56,
         monthlyIncome: 120042,
         totalSold: 12490,
-        totalOrders: 123,
         targetSales: 50000
       }
     }
@@ -213,7 +240,24 @@ export default {
       return formatCurrency(this.rawData.totalProfit)
     },
     totalProducts() {
-      return formatNumber(this.rawData.totalProducts)
+      // Use dynamic data from products API, fallback to productStats if available, otherwise show loading/0
+      const count = this.productStats?.total || 0
+      return formatNumber(count)
+    },
+    lastUpdated() {
+      return new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      })
+    },
+    lastMonthPeriod() {
+      const now = new Date()
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      return lastMonth.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long'
+      })
     },
     monthlyIncome() {
       return formatCurrency(this.rawData.monthlyIncome)
@@ -222,10 +266,45 @@ export default {
       return formatNumber(this.rawData.totalSold)
     },
     totalOrders() {
-      return formatNumber(this.rawData.totalOrders)
+      return formatNumber(this.ordersData.totalOrders)
     },
     targetSales() {
       return formatCurrency(this.rawData.targetSales)
+    },
+    chartData() {
+      return {
+        labels: ['JAN', 'FEB', 'MAR', 'APR'],
+        datasets: [
+          {
+            label: 'Noodles',
+            data: [300, 280, 250, 350],
+            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+            borderColor: 'rgba(59, 130, 246, 1)',
+            borderWidth: 1
+          },
+          {
+            label: 'Toppings',
+            data: [220, 200, 180, 240],
+            backgroundColor: 'rgba(16, 185, 129, 0.8)',
+            borderColor: 'rgba(16, 185, 129, 1)',
+            borderWidth: 1
+          },
+          {
+            label: 'Snacks',
+            data: [170, 160, 150, 190],
+            backgroundColor: 'rgba(245, 158, 11, 0.8)',
+            borderColor: 'rgba(245, 158, 11, 1)',
+            borderWidth: 1
+          },
+          {
+            label: 'Drinks',
+            data: [130, 120, 110, 140],
+            backgroundColor: 'rgba(239, 68, 68, 0.8)',
+            borderColor: 'rgba(239, 68, 68, 1)',
+            borderWidth: 1
+          }
+        ]
+      }
     }
   },
   methods: {
@@ -364,7 +443,96 @@ export default {
         `
         this.$refs.chartCanvas.parentNode.appendChild(fallback)
       }
+    },
+    async loadProductsData() {
+      try {
+        await this.fetchProducts()
+        console.log('Products data loaded successfully:', this.productStats)
+      } catch (error) {
+        console.error('Failed to load products data:', error)
+        // The error is already handled by the useProducts composable
+        // and will be reflected in the productsError reactive variable
+      }
+    },
+    async loadOrdersData() {
+      this.ordersLoading = true
+      this.ordersError = null
+      
+      try {
+        // Calculate last month's date range
+        const now = new Date()
+        const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0) // Last day of previous month
+        
+        // Format dates for API (YYYY-MM-DD format)
+        const startDate = startOfLastMonth.toISOString().split('T')[0]
+        const endDate = endOfLastMonth.toISOString().split('T')[0]
+        
+        console.log('Loading orders for last month:', { startDate, endDate })
+        
+        let totalCount = 0
+        
+        // Try to get total count from sales statistics first with date filter
+        try {
+          const statsResponse = await salesAPIService.getSalesStatistics({
+            start_date: startDate,
+            end_date: endDate
+          })
+          if (statsResponse?.total_transactions) {
+            totalCount = statsResponse.total_transactions
+          }
+        } catch (statsError) {
+          console.warn('Failed to get orders count from stats API, trying alternative method:', statsError)
+        }
+        
+        // If stats API didn't work, try getting from invoices list with date filter
+        if (totalCount === 0) {
+          try {
+            const response = await salesAPIService.getAllInvoices({ 
+              start_date: startDate,
+              end_date: endDate,
+              limit: 1000 // Get a large number to count all orders
+            })
+            
+            // Handle different response structures
+            if (response?.data && Array.isArray(response.data)) {
+              totalCount = response.data.length
+            } else if (response?.results && Array.isArray(response.results)) {
+              totalCount = response.results.length
+            } else if (response?.pagination?.total) {
+              totalCount = response.pagination.total
+            } else if (Array.isArray(response)) {
+              totalCount = response.length
+            }
+          } catch (invoicesError) {
+            console.warn('Failed to get orders count from invoices API:', invoicesError)
+          }
+        }
+        
+        this.ordersData.totalOrders = totalCount
+        console.log('Orders data loaded successfully for last month:', { totalOrders: totalCount, period: `${startDate} to ${endDate}` })
+      } catch (error) {
+        console.error('Failed to load orders data:', error)
+        this.ordersError = error.message || 'Failed to load orders data'
+      } finally {
+        this.ordersLoading = false
+      }
     }
+  },
+  async mounted() {
+    // Load products and orders data when component mounts
+    await Promise.all([
+      this.loadProductsData(),
+      this.loadOrdersData()
+    ])
+    
+    // Initialize chart after a short delay to ensure DOM is ready
+    this.$nextTick(() => {
+      setTimeout(() => {
+        this.initChart()
+      }, 100)
+    })
   }
 }
 </script>
