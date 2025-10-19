@@ -35,6 +35,8 @@ class BatchService:
             titles = {
                 'created': "New Batch Added",
                 'stock_received': "Stock Received",
+                'stock_ordered': "Purchase Order Created",  # ✅ NEW
+                'activated': "Stock Activated",  # ✅ NEW
                 'expiry_warning': "Expiry Warning",
                 'batch_expired': "Batch Expired",
                 'batch_depleted': "Batch Depleted"
@@ -43,6 +45,8 @@ class BatchService:
             messages = {
                 'created': f"New batch created for '{product_name}'",
                 'stock_received': f"Stock received for '{product_name}'",
+                'stock_ordered': f"Purchase order created for '{product_name}'",  # ✅ NEW
+                'activated': f"Stock activated for '{product_name}'",  # ✅ NEW
                 'expiry_warning': f"Batch expiring soon for '{product_name}'",
                 'batch_expired': f"Batch expired for '{product_name}'",
                 'batch_depleted': f"Batch depleted for '{product_name}'"
@@ -55,6 +59,9 @@ class BatchService:
             elif action_type == 'batch_depleted':
                 priority = "medium"
                 notification_type = "alert"
+            elif action_type in ['stock_ordered', 'activated']:
+                priority = "low"
+                notification_type = "info"
             else:
                 priority = "low"
                 notification_type = "system"
@@ -78,19 +85,54 @@ class BatchService:
             logger.error(f"Failed to send batch notification: {e}")
 
     def generate_batch_id(self, product_id):
-        """Generate sequential batch ID for a product"""
+        """Generate unique batch ID for a product"""
         try:
-            # Count existing batches for this product
-            count = self.batch_collection.count_documents({'product_id': product_id}) + 1
-            
             # Format: BATCH-PROD00001-001
             product_suffix = product_id.replace('PROD-', '')
-            return f"BATCH-{product_suffix}-{count:03d}"
+            base_pattern = f"BATCH-{product_suffix}-"
+            
+            # Find all existing batch IDs for this product
+            existing_batches = self.batch_collection.find(
+                {'product_id': product_id},
+                {'_id': 1}
+            )
+            
+            # Extract sequence numbers from existing batch IDs
+            max_sequence = 0
+            for batch in existing_batches:
+                batch_id = batch.get('_id', '')
+                if batch_id.startswith(base_pattern):
+                    try:
+                        # Extract the sequence number (last part after final dash)
+                        sequence_str = batch_id.split('-')[-1]
+                        sequence_num = int(sequence_str)
+                        max_sequence = max(max_sequence, sequence_num)
+                    except (ValueError, IndexError):
+                        continue
+            
+            # Generate next sequence number
+            next_sequence = max_sequence + 1
+            batch_id = f"{base_pattern}{next_sequence:03d}"
+            
+            # Double-check uniqueness (safety check)
+            counter = 0
+            while self.batch_collection.find_one({'_id': batch_id}) and counter < 1000:
+                next_sequence += 1
+                batch_id = f"{base_pattern}{next_sequence:03d}"
+                counter += 1
+            
+            if counter >= 1000:
+                # If somehow we can't find a unique ID after 1000 tries, use timestamp
+                raise Exception("Could not generate unique batch ID")
+            
+            return batch_id
         
-        except Exception:
-            # Fallback
+        except Exception as e:
+            # Fallback to timestamp-based ID
+            logger.warning(f"Failed to generate sequential batch ID: {e}, using timestamp fallback")
             timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
-            return f"BATCH-{product_id}-{timestamp}"
+            random_suffix = datetime.utcnow().microsecond % 1000
+            return f"BATCH-{product_id}-{timestamp}-{random_suffix:03d}"
 
     def add_sync_log(self, source='cloud', status='synced', details=None):
         """Helper method to create sync log entries"""
@@ -116,22 +158,84 @@ class BatchService:
             # Generate batch ID
             batch_id = self.generate_batch_id(batch_data['product_id'])
             
-            current_time = datetime.utcnow()
+            # Use timezone-aware current time for consistency
+            from datetime import timezone
+            current_time = datetime.now(timezone.utc)
             
-            # Handle expiry_date conversion
+            # Handle expiry_date conversion (with timezone awareness)
             expiry_date = batch_data.get('expiry_date')
             if expiry_date:
                 if isinstance(expiry_date, str):
                     try:
-                        # Try parsing different date formats
+                        # Try parsing different date formats and ensure timezone aware
                         from dateutil import parser
-                        expiry_date = parser.parse(expiry_date)
+                        from datetime import timezone
+                        parsed_date = parser.parse(expiry_date)
+                        # If no timezone info, assume UTC
+                        if parsed_date.tzinfo is None:
+                            parsed_date = parsed_date.replace(tzinfo=timezone.utc)
+                        expiry_date = parsed_date
                     except Exception as e:
                         logger.warning(f"Could not parse expiry_date '{expiry_date}': {e}")
                         expiry_date = None
                 elif not isinstance(expiry_date, datetime):
                     logger.warning(f"Invalid expiry_date type: {type(expiry_date)}")
                     expiry_date = None
+            
+            # Handle expected_delivery_date conversion (same format as expiry_date and date_received)
+            expected_delivery_date = batch_data.get('expected_delivery_date')
+            if expected_delivery_date:
+                if isinstance(expected_delivery_date, str):
+                    try:
+                        # Try parsing different date formats and ensure timezone aware
+                        from dateutil import parser
+                        from datetime import timezone
+                        parsed_date = parser.parse(expected_delivery_date)
+                        # If no timezone info, assume UTC
+                        if parsed_date.tzinfo is None:
+                            parsed_date = parsed_date.replace(tzinfo=timezone.utc)
+                        expected_delivery_date = parsed_date
+                    except Exception as e:
+                        logger.warning(f"Could not parse expected_delivery_date '{expected_delivery_date}': {e}")
+                        expected_delivery_date = None
+                elif not isinstance(expected_delivery_date, datetime):
+                    logger.warning(f"Invalid expected_delivery_date type: {type(expected_delivery_date)}")
+                    expected_delivery_date = None
+            
+            # Handle date_received conversion (only set when stock is actually received)
+            # For pending batches, this should be None until activation
+            date_received = batch_data.get('date_received')
+            batch_status = batch_data.get('status', 'active')
+            
+            if date_received:
+                if isinstance(date_received, str):
+                    try:
+                        # Try parsing different date formats and ensure timezone aware
+                        from dateutil import parser
+                        from datetime import timezone
+                        parsed_date = parser.parse(date_received)
+                        # If no timezone info, assume UTC
+                        if parsed_date.tzinfo is None:
+                            parsed_date = parsed_date.replace(tzinfo=timezone.utc)
+                        date_received = parsed_date
+                    except Exception as e:
+                        logger.warning(f"Could not parse date_received '{date_received}': {e}")
+                        date_received = None
+                elif not isinstance(date_received, datetime):
+                    logger.warning(f"Invalid date_received type: {type(date_received)}")
+                    date_received = None
+            else:
+                # If status is active and no date_received provided, use current time (UTC)
+                # If status is pending, leave date_received as None
+                if batch_status == 'active':
+                    from datetime import timezone
+                    date_received = datetime.now(timezone.utc)
+                else:
+                    date_received = None
+            
+            # Get product info for category and subcategory
+            product = self.product_collection.find_one({'_id': batch_data['product_id']})
+            product_name = product.get('product_name', 'Unknown Product') if product else 'Unknown Product'
             
             # Create batch document
             batch_document = {
@@ -142,31 +246,37 @@ class BatchService:
                 'quantity_remaining': int(batch_data.get('quantity_received', 0)),
                 'cost_price': float(batch_data.get('cost_price', 0)),
                 'expiry_date': expiry_date,
-                'date_received': batch_data.get('date_received', current_time),
+                'expected_delivery_date': expected_delivery_date,
+                'date_received': date_received,
                 'supplier_id': batch_data.get('supplier_id'),
-                'status': 'active',
+                'status': batch_status,  # ✅ Use status from request, default to 'active' for backwards compatibility
                 'created_at': current_time,
                 'updated_at': current_time,
+                'notes': batch_data.get('notes', ''),  # ✅ Add notes field
+                # Note: category info is NOT stored in batch - fetch from product when needed
                 'sync_logs': [self.add_sync_log(source='cloud', status='pending', details={'action': 'created'})]
             }
             
             # Insert batch
             self.batch_collection.insert_one(batch_document)
             
-            # Update product's simplified expiry tracking
+            # Update product's simplified expiry tracking (only counts active batches)
             self.update_product_expiry_summary(batch_data['product_id'])
             
-            # Get product name for notification
-            product = self.product_collection.find_one({'_id': batch_data['product_id']})
-            product_name = product.get('product_name', 'Unknown Product') if product else 'Unknown Product'
+            # Send appropriate notification based on status
+            batch_status = batch_document.get('status', 'active')
+            if batch_status == 'pending':
+                notification_type = 'stock_ordered'  # For pending orders
+            else:
+                notification_type = 'stock_received'  # For active/received stock
             
-            # Send notification
             self._send_batch_notification(
-                'stock_received',
+                notification_type,
                 product_name,
                 {
                     'batch_id': batch_id,
-                    'quantity_received': batch_document['quantity_received'],
+                    'quantity': batch_document['quantity_received'],
+                    'status': batch_status,
                     'expiry_date': batch_document['expiry_date'].isoformat() if batch_document['expiry_date'] else None,
                     'supplier_id': batch_document.get('supplier_id')
                 }
@@ -498,6 +608,102 @@ class BatchService:
         except Exception as e:
             raise Exception(f"Error updating batch quantity: {str(e)}")
 
+    def update_batch(self, batch_id, update_data):
+        """Update batch details like quantity, price, expiry date, expected delivery date, notes"""
+        try:
+            from datetime import timezone
+            from dateutil import parser
+            
+            batch = self.batch_collection.find_one({'_id': batch_id})
+            if not batch:
+                raise Exception(f"Batch with ID {batch_id} not found")
+            
+            current_time = datetime.now(timezone.utc)
+            updates = {}
+            
+            # Update quantity_received if provided
+            if 'quantity_received' in update_data:
+                quantity = update_data['quantity_received']
+                if quantity <= 0:
+                    raise ValueError("Quantity must be greater than 0")
+                updates['quantity_received'] = quantity
+                # Also update quantity_remaining if batch is pending or not yet used
+                if batch['status'] == 'pending':
+                    updates['quantity_remaining'] = quantity
+                else:
+                    # For active batches, adjust proportionally or keep the remaining as is
+                    # Depending on your business logic, you might want to adjust this
+                    updates['quantity_remaining'] = quantity
+            
+            # Update cost_price if provided
+            if 'cost_price' in update_data:
+                cost = update_data['cost_price']
+                if cost < 0:
+                    raise ValueError("Cost price cannot be negative")
+                updates['cost_price'] = cost
+            
+            # Update expiry_date if provided
+            if 'expiry_date' in update_data:
+                expiry_date = update_data['expiry_date']
+                if expiry_date:
+                    if isinstance(expiry_date, str):
+                        try:
+                            parsed_date = parser.parse(expiry_date)
+                            if parsed_date.tzinfo is None:
+                                parsed_date = parsed_date.replace(tzinfo=timezone.utc)
+                            expiry_date = parsed_date
+                        except Exception as e:
+                            logger.warning(f"Could not parse expiry_date '{expiry_date}': {e}")
+                            expiry_date = None
+                    elif not isinstance(expiry_date, datetime):
+                        logger.warning(f"Invalid expiry_date type: {type(expiry_date)}")
+                        expiry_date = None
+                updates['expiry_date'] = expiry_date
+            
+            # Update expected_delivery_date if provided
+            if 'expected_delivery_date' in update_data:
+                expected_delivery_date = update_data['expected_delivery_date']
+                if expected_delivery_date:
+                    if isinstance(expected_delivery_date, str):
+                        try:
+                            parsed_date = parser.parse(expected_delivery_date)
+                            if parsed_date.tzinfo is None:
+                                parsed_date = parsed_date.replace(tzinfo=timezone.utc)
+                            expected_delivery_date = parsed_date
+                        except Exception as e:
+                            logger.warning(f"Could not parse expected_delivery_date '{expected_delivery_date}': {e}")
+                            expected_delivery_date = None
+                    elif not isinstance(expected_delivery_date, datetime):
+                        logger.warning(f"Invalid expected_delivery_date type: {type(expected_delivery_date)}")
+                        expected_delivery_date = None
+                updates['expected_delivery_date'] = expected_delivery_date
+            
+            # Update notes if provided
+            if 'notes' in update_data:
+                updates['notes'] = update_data['notes']
+            
+            # Always update the updated_at timestamp
+            updates['updated_at'] = current_time
+            
+            # Perform the update
+            result = self.batch_collection.update_one(
+                {'_id': batch_id},
+                {'$set': updates}
+            )
+            
+            if result.modified_count > 0:
+                # Update product expiry summary if expiry date changed
+                if 'expiry_date' in updates:
+                    self.update_product_expiry_summary(batch['product_id'])
+                
+                return self.batch_collection.find_one({'_id': batch_id})
+            
+            return batch  # Return existing batch if nothing changed
+        
+        except Exception as e:
+            logger.error(f"Error updating batch: {str(e)}")
+            raise Exception(f"Error updating batch: {str(e)}")
+
     # ================================================================
     # INTEGRATION WITH SALES
     # ================================================================
@@ -649,4 +855,115 @@ class BatchService:
         
         except Exception as e:
             raise Exception(f"Error marking expired batches: {str(e)}")
+    
+    def activate_batch(self, batch_number, product_id, supplier_id, quantity_received=None, cost_price=None, expiry_date=None, date_received=None, notes=None):
+        """Activate a pending batch by updating it to active status"""
+        try:
+            # Find the pending batch
+            query = {
+                'batch_number': batch_number,
+                'product_id': product_id,
+                'supplier_id': supplier_id,
+                'status': 'pending'
+            }
+            
+            batch = self.batch_collection.find_one(query)
+            if not batch:
+                raise Exception(f"Pending batch with number {batch_number} not found for product {product_id}")
+            
+            # Prepare update data
+            from datetime import timezone
+            current_time = datetime.now(timezone.utc)
+            update_data = {
+                'status': 'active',
+                'updated_at': current_time
+            }
+            
+            # Update fields if provided
+            if quantity_received is not None:
+                update_data['quantity_received'] = quantity_received
+                update_data['quantity_remaining'] = quantity_received
+            
+            if cost_price is not None:
+                update_data['cost_price'] = cost_price
+            
+            if expiry_date:
+                if isinstance(expiry_date, str):
+                    try:
+                        from dateutil import parser
+                        parsed_date = parser.parse(expiry_date)
+                        # If no timezone info, assume UTC
+                        if parsed_date.tzinfo is None:
+                            parsed_date = parsed_date.replace(tzinfo=timezone.utc)
+                        update_data['expiry_date'] = parsed_date
+                    except Exception as e:
+                        logger.warning(f"Could not parse expiry_date '{expiry_date}': {e}")
+                else:
+                    update_data['expiry_date'] = expiry_date
+            
+            # Set date_received - if not provided, use current time (when stock was received)
+            if date_received:
+                if isinstance(date_received, str):
+                    try:
+                        from dateutil import parser
+                        parsed_date = parser.parse(date_received)
+                        # If no timezone info, assume UTC
+                        if parsed_date.tzinfo is None:
+                            parsed_date = parsed_date.replace(tzinfo=timezone.utc)
+                        update_data['date_received'] = parsed_date
+                    except Exception as e:
+                        logger.warning(f"Could not parse date_received '{date_received}': {e}")
+                        update_data['date_received'] = current_time
+                else:
+                    update_data['date_received'] = date_received
+            else:
+                # Always set date_received when activating (marking as received)
+                update_data['date_received'] = current_time
+            
+            if notes:
+                existing_notes = batch.get('notes', '')
+                update_data['notes'] = f"{existing_notes} | {notes}" if existing_notes else notes
+            
+            # Update the batch
+            result = self.batch_collection.update_one(
+                {'_id': batch['_id']},
+                {'$set': update_data}
+            )
+            
+            if result.modified_count > 0:
+                # Update product stock
+                product = self.product_collection.find_one({'_id': product_id})
+                if product:
+                    # Recalculate total stock from all active batches
+                    active_batches = list(self.batch_collection.find({
+                        'product_id': product_id,
+                        'status': 'active'
+                    }))
+                    new_stock = sum(b.get('quantity_remaining', 0) for b in active_batches)
+                    
+                    self.product_collection.update_one(
+                        {'_id': product_id},
+                        {'$set': {'total_stock': new_stock, 'updated_at': datetime.utcnow()}}
+                    )
+                    
+                    # Update expiry summary
+                    self.update_product_expiry_summary(product_id)
+                    
+                    # Send notification
+                    self._send_batch_notification(
+                        'activated',
+                        product.get('product_name', 'Unknown Product'),
+                        additional_metadata={
+                            'batch_number': batch_number,
+                            'quantity': update_data.get('quantity_received', batch['quantity_received']),
+                            'supplier_id': supplier_id
+                        }
+                    )
+                
+                return self.batch_collection.find_one({'_id': batch['_id']})
+            else:
+                raise Exception("Failed to activate batch")
+        
+        except Exception as e:
+            raise Exception(f"Error activating batch: {str(e)}")
         

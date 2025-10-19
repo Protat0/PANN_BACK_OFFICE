@@ -1,24 +1,24 @@
 <template>
   <div v-if="show" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-    <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
       <div class="modal-content modern-order-modal">
         <!-- Modal Header -->
         <div class="modal-header border-0 pb-0">
           <div class="d-flex align-items-center">
-            <div class="modal-icon me-3">
+            <div class="modal-icon modal-icon-pending me-3">
               <ShoppingCart :size="24" />
             </div>
             <div>
               <h4 class="modal-title mb-1">Create Purchase Order</h4>
               <p class="text-muted mb-0 small">
-                Create a new purchase order for <strong>{{ supplier?.name }}</strong>
+                Order stock from <strong>{{ supplier?.name }}</strong> (Status: Pending)
               </p>
             </div>
           </div>
           <button 
             type="button" 
             class="btn-close" 
-            @click="$emit('close')"
+            @click="handleClose"
             aria-label="Close"
           ></button>
         </div>
@@ -59,34 +59,35 @@
                   </div>
                   
                   <div class="col-md-6">
-                    <label for="expectedDate" class="form-label">Expected Delivery</label>
+                    <label for="expectedDeliveryDate" class="form-label">Expected Delivery <span class="text-danger">*</span></label>
                     <input 
                       type="date" 
                       class="form-control" 
-                      id="expectedDate"
-                      v-model="orderData.expectedDate"
+                      id="expectedDeliveryDate"
+                      v-model="orderData.expectedDeliveryDate"
                       :min="orderData.orderDate"
                     >
                   </div>
                   
                   <div class="col-md-6">
-                    <label for="priority" class="form-label">Priority</label>
-                    <select class="form-select" id="priority" v-model="orderData.priority">
-                      <option value="low">Low</option>
-                      <option value="normal">Normal</option>
-                      <option value="high">High</option>
-                      <option value="urgent">Urgent</option>
-                    </select>
+                    <label for="referenceNumber" class="form-label">Reference #</label>
+                    <input 
+                      type="text" 
+                      class="form-control" 
+                      id="referenceNumber"
+                      v-model="orderData.referenceNumber"
+                      placeholder="Optional"
+                    >
                   </div>
                   
                   <div class="col-12">
-                    <label for="description" class="form-label">Order Description</label>
+                    <label for="orderNotes" class="form-label">Order Notes</label>
                     <textarea 
                       class="form-control" 
-                      id="description"
-                      v-model="orderData.description"
+                      id="orderNotes"
+                      v-model="orderData.notes"
                       rows="3"
-                      placeholder="Brief description of this purchase order..."
+                      placeholder="Any notes about this order..."
                     ></textarea>
                   </div>
                 </div>
@@ -134,22 +135,13 @@
                 <Package :size="18" class="me-2" />
                 Order Items
               </h5>
-              <div class="d-flex gap-2">
-                <button 
-                  class="btn btn-outline-success btn-sm"
-                  @click="addOrderItem"
-                >
-                  <Plus :size="16" class="me-1" />
-                  Add Item
-                </button>
-                <button 
-                  class="btn btn-outline-primary btn-sm"
-                  @click="loadSampleItems"
-                >
-                  <Lightbulb :size="16" class="me-1" />
-                  Load Sample
-                </button>
-              </div>
+              <button 
+                class="btn btn-outline-primary btn-sm"
+                @click="addOrderItem"
+              >
+                <Plus :size="16" class="me-1" />
+                Add Item
+              </button>
             </div>
 
             <!-- Items Table -->
@@ -158,12 +150,13 @@
                 <thead class="table-light">
                   <tr>
                     <th style="width: 40px;">#</th>
-                    <th style="width: 250px;">Item Name / Description <span class="text-danger">*</span></th>
-                    <th style="width: 80px;">Quantity <span class="text-danger">*</span></th>
-                    <th style="width: 100px;">Unit</th>
-                    <th style="width: 120px;">Unit Price</th>
-                    <th style="width: 120px;">Total Price</th>
-                    <th style="width: 100px;">Notes</th>
+                    <th style="width: 180px;">Category <span class="text-danger">*</span></th>
+                    <th style="width: 180px;">Subcategory <span class="text-danger">*</span></th>
+                    <th style="width: 200px;">Product <span class="text-danger">*</span></th>
+                    <th style="width: 100px;">Quantity <span class="text-danger">*</span></th>
+                    <th style="width: 120px;">Est. Unit Cost (₱)</th>
+                    <th style="width: 100px;">Expected Expiry</th>
+                    <th style="width: 120px;">Total Cost</th>
                     <th style="width: 60px;">Actions</th>
                   </tr>
                 </thead>
@@ -175,19 +168,75 @@
                   >
                     <td class="text-center">{{ index + 1 }}</td>
                     
-                    <!-- Item Name -->
+                    <!-- Category Dropdown -->
                     <td>
-                      <input 
-                        type="text" 
-                        class="form-control form-control-sm"
-                        :class="{ 'is-invalid': item.errors?.name }"
-                        v-model="item.name"
-                        @input="validateOrderItem(index)"
-                        placeholder="Enter item name or description"
+                      <select 
+                        class="form-select form-select-sm"
+                        :class="{ 'is-invalid': item.errors?.category }"
+                        v-model="item.categoryId"
+                        @change="onCategoryChange(index)"
                       >
-                      <div v-if="item.errors?.name" class="invalid-feedback">
-                        {{ item.errors.name }}
+                        <option value="">Select Category</option>
+                        <option 
+                          v-for="category in categories" 
+                          :key="category._id"
+                          :value="category._id"
+                        >
+                          {{ category.category_name }}
+                        </option>
+                      </select>
+                      <div v-if="item.errors?.category" class="invalid-feedback">
+                        {{ item.errors.category }}
                       </div>
+                    </td>
+                    
+                    <!-- Subcategory Dropdown -->
+                    <td>
+                      <select 
+                        class="form-select form-select-sm"
+                        :class="{ 'is-invalid': item.errors?.subcategory }"
+                        v-model="item.subcategoryName"
+                        @change="onSubcategoryChange(index)"
+                        :disabled="!item.categoryId"
+                      >
+                        <option value="">Select Subcategory</option>
+                        <option 
+                          v-for="subcategory in getSubcategoriesForItem(item)" 
+                          :key="subcategory.name"
+                          :value="subcategory.name"
+                        >
+                          {{ subcategory.name }} ({{ subcategory.product_count }})
+                        </option>
+                      </select>
+                      <div v-if="item.errors?.subcategory" class="invalid-feedback">
+                        {{ item.errors.subcategory }}
+                      </div>
+                    </td>
+                    
+                    <!-- Product Dropdown -->
+                    <td>
+                      <select 
+                        class="form-select form-select-sm"
+                        :class="{ 'is-invalid': item.errors?.product }"
+                        v-model="item.productId"
+                        @change="onProductChange(index)"
+                        :disabled="!item.subcategoryName"
+                      >
+                        <option value="">Select Product</option>
+                        <option 
+                          v-for="product in getProductsForItem(item)" 
+                          :key="product._id"
+                          :value="product._id"
+                        >
+                          {{ product.product_name }} - {{ product.SKU }}
+                        </option>
+                      </select>
+                      <div v-if="item.errors?.product" class="invalid-feedback">
+                        {{ item.errors.product }}
+                      </div>
+                      <small v-if="item.selectedProduct" class="text-muted d-block mt-1">
+                        Current stock: {{ item.selectedProduct.total_stock || 0 }}
+                      </small>
                     </td>
                     
                     <!-- Quantity -->
@@ -197,7 +246,7 @@
                         class="form-control form-control-sm"
                         :class="{ 'is-invalid': item.errors?.quantity }"
                         v-model.number="item.quantity"
-                        @input="validateOrderItem(index); calculateItemTotal(index)"
+                        @input="validateItem(index); calculateItemTotal(index)"
                         min="1"
                         step="1"
                         placeholder="0"
@@ -207,57 +256,34 @@
                       </div>
                     </td>
                     
-                    <!-- Unit -->
-                    <td>
-                      <select 
-                        class="form-select form-select-sm" 
-                        v-model="item.unit"
-                      >
-                        <option value="">Select</option>
-                        <option value="pcs">Pieces</option>
-                        <option value="kg">Kilograms</option>
-                        <option value="lbs">Pounds</option>
-                        <option value="box">Box</option>
-                        <option value="case">Case</option>
-                        <option value="liter">Liter</option>
-                        <option value="gallon">Gallon</option>
-                        <option value="pack">Pack</option>
-                        <option value="dozen">Dozen</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </td>
-                    
-                    <!-- Unit Price -->
-                    <td>
-                      <div class="input-group input-group-sm">
-                        <span class="input-group-text">₱</span>
-                        <input 
-                          type="number" 
-                          class="form-control"
-                          v-model.number="item.unitPrice"
-                          @input="calculateItemTotal(index)"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                        >
-                      </div>
-                    </td>
-                    
-                    <!-- Total Price -->
-                    <td>
-                      <div class="total-price">
-                        ₱{{ formatCurrency(item.totalPrice || 0) }}
-                      </div>
-                    </td>
-                    
-                    <!-- Notes -->
+                    <!-- Unit Cost -->
                     <td>
                       <input 
-                        type="text" 
+                        type="number" 
                         class="form-control form-control-sm"
-                        v-model="item.notes"
-                        placeholder="Notes"
+                        v-model.number="item.estimatedCost"
+                        @input="calculateItemTotal(index)"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
                       >
+                    </td>
+                    
+                    <!-- Expected Expiry Date -->
+                    <td>
+                      <input 
+                        type="date" 
+                        class="form-control form-control-sm"
+                        v-model="item.expectedExpiryDate"
+                        :min="orderData.expectedDeliveryDate"
+                      >
+                    </td>
+                    
+                    <!-- Total Cost -->
+                    <td>
+                      <div class="total-price">
+                        ₱{{ formatCurrency(item.totalCost || 0) }}
+                      </div>
                     </td>
                     
                     <!-- Actions -->
@@ -291,19 +317,10 @@
           <div class="order-summary-section mt-4">
             <div class="row">
               <div class="col-md-8">
-                <!-- Additional Notes -->
-                <div class="additional-notes">
-                  <label for="orderNotes" class="form-label">
-                    <MessageSquare :size="16" class="me-2" />
-                    Additional Notes
-                  </label>
-                  <textarea 
-                    class="form-control" 
-                    id="orderNotes"
-                    v-model="orderData.notes"
-                    rows="3"
-                    placeholder="Any special instructions, delivery requirements, or additional notes..."
-                  ></textarea>
+                <div class="alert alert-info">
+                  <Clock :size="16" class="me-2" />
+                  <strong>Purchase Order (Pending Delivery):</strong> Batches will be created with "pending" status. 
+                  Use "Receive Stock" button to activate them when delivery arrives.
                 </div>
               </div>
               
@@ -314,39 +331,23 @@
                   
                   <div class="summary-row">
                     <span>Total Items:</span>
+                    <span class="fw-bold">{{ validItemsCount }}</span>
+                  </div>
+                  
+                  <div class="summary-row">
+                    <span>Total Quantity:</span>
                     <span class="fw-bold">{{ totalQuantity }}</span>
                   </div>
                   
                   <div class="summary-row">
-                    <span>Subtotal:</span>
-                    <span>₱{{ formatCurrency(subtotal) }}</span>
-                  </div>
-                  
-                  <div class="summary-row">
-                    <span>Tax ({{ taxRate }}%):</span>
-                    <span>₱{{ formatCurrency(taxAmount) }}</span>
-                  </div>
-                  
-                  <div class="summary-row">
-                    <span>Shipping:</span>
-                    <div class="input-group input-group-sm">
-                      <span class="input-group-text">₱</span>
-                      <input 
-                        type="number" 
-                        class="form-control form-control-sm"
-                        v-model.number="orderData.shippingCost"
-                        @input="calculateTotals"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                      >
-                    </div>
+                    <span>Total Products:</span>
+                    <span class="fw-bold">{{ uniqueProductsCount }}</span>
                   </div>
                   
                   <hr>
                   
                   <div class="summary-row total-row">
-                    <span class="fw-bold">Total Amount:</span>
+                    <span class="fw-bold">Estimated Total:</span>
                     <span class="fw-bold text-primary fs-5">₱{{ formatCurrency(grandTotal) }}</span>
                   </div>
                 </div>
@@ -358,63 +359,31 @@
         <!-- Modal Footer -->
         <div class="modal-footer border-0 pt-4">
           <div class="d-flex justify-content-between align-items-center w-100">
-            <div class="d-flex align-items-center">
-              <div class="form-check">
-                <input 
-                  class="form-check-input" 
-                  type="checkbox" 
-                  id="sendToSupplier" 
-                  v-model="orderData.sendToSupplier"
-                >
-                <label class="form-check-label text-muted" for="sendToSupplier">
-                  Send order details to supplier via email
-                </label>
-              </div>
+            <div class="text-muted small">
+              <Clock :size="16" class="me-1" />
+              {{ validItemsCount }} pending batch(es) will be created
             </div>
             
             <div class="d-flex gap-3">
               <button 
                 type="button" 
                 class="btn btn-outline-secondary px-4"
-                @click="$emit('close')"
+                @click="handleClose"
+                :disabled="saving"
               >
                 Cancel
               </button>
-              <div class="btn-group">
-                <button 
-                  type="button" 
-                  class="btn btn-success px-4"
-                  @click="saveOrder('pending')"
-                  :disabled="!isOrderValid || saving"
-                  :class="{ 'btn-loading': saving }"
-                >
-                  <div v-if="saving" class="spinner-border spinner-border-sm me-2"></div>
-                  <ShoppingCart :size="16" class="me-1" />
-                  Create Order
-                </button>
-                <button 
-                  type="button" 
-                  class="btn btn-success dropdown-toggle dropdown-toggle-split"
-                  data-bs-toggle="dropdown"
-                  :disabled="!isOrderValid || saving"
-                >
-                  <span class="visually-hidden">Toggle Dropdown</span>
-                </button>
-                <ul class="dropdown-menu">
-                  <li>
-                    <a class="dropdown-item" href="#" @click.prevent="saveOrder('draft')">
-                      <FileText :size="16" class="me-2" />
-                      Save as Draft
-                    </a>
-                  </li>
-                  <li>
-                    <a class="dropdown-item" href="#" @click.prevent="saveOrder('pending')">
-                      <Clock :size="16" class="me-2" />
-                      Create & Send
-                    </a>
-                  </li>
-                </ul>
-              </div>
+              <button 
+                type="button" 
+                class="btn btn-primary px-4"
+                @click="saveOrder"
+                :disabled="!isOrderValid || saving"
+                :class="{ 'btn-loading': saving }"
+              >
+                <div v-if="saving" class="spinner-border spinner-border-sm me-2"></div>
+                <ShoppingCart :size="16" class="me-1" />
+                Create Pending Order
+              </button>
             </div>
           </div>
         </div>
@@ -424,32 +393,33 @@
 </template>
 
 <script>
+import { ref, computed, onMounted, watch } from 'vue'
 import { 
-  ShoppingCart,
+  Package,
   FileText,
   Building,
-  Package,
   Plus,
   Trash2,
-  Lightbulb,
-  MessageSquare,
+  ShoppingCart,
   Clock
 } from 'lucide-vue-next'
+import { useCategories } from '@/composables/api/useCategories'
+import { useProducts } from '@/composables/api/useProducts'
+import { useBatches } from '@/composables/api/useBatches'
+import { useToast } from '@/composables/ui/useToast'
 
 export default {
   name: 'CreateOrderModal',
   components: {
-    ShoppingCart,
+    Package,
     FileText,
     Building,
-    Package,
     Plus,
     Trash2,
-    Lightbulb,
-    MessageSquare,
+    ShoppingCart,
     Clock
   },
-  emits: ['close', 'save'],
+  emits: ['close', 'saved'],
   props: {
     show: {
       type: Boolean,
@@ -457,220 +427,60 @@ export default {
     },
     supplier: {
       type: Object,
+      required: false,
       default: null
     }
   },
-  data() {
-    return {
-      saving: false,
-      taxRate: 12, // 12% VAT in Philippines
-      
-      orderData: {
-        orderId: this.generateOrderId(),
-        orderDate: new Date().toISOString().split('T')[0],
-        expectedDate: this.getDefaultExpectedDate(),
-        priority: 'normal',
-        description: '',
-        notes: '',
-        shippingCost: 0,
-        sendToSupplier: true,
-        items: [
-          this.createEmptyItem()
-        ]
-      }
-    }
-  },
-  computed: {
-    totalQuantity() {
-      return this.orderData.items.reduce((sum, item) => sum + (item.quantity || 0), 0)
-    },
+  setup(props, { emit }) {
+    const { success: showSuccess, error: showError } = useToast()
+    const { categories, fetchCategories } = useCategories()
+    const { fetchProductsByCategory } = useProducts()
+    const { createBatch } = useBatches()
     
-    subtotal() {
-      return this.orderData.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0)
-    },
+    const saving = ref(false)
+    const productsByCategory = ref({})
     
-    taxAmount() {
-      return (this.subtotal * this.taxRate) / 100
-    },
+    const orderData = ref({
+      orderId: generateOrderId(),
+      orderDate: new Date().toISOString().split('T')[0],
+      expectedDeliveryDate: '',
+      referenceNumber: '',
+      notes: '',
+      items: [createEmptyItem()]
+    })
     
-    grandTotal() {
-      return this.subtotal + this.taxAmount + (this.orderData.shippingCost || 0)
-    },
+    // ================ HELPER FUNCTIONS ================
     
-    isOrderValid() {
-      return this.orderData.items.some(item => 
-        item.name && 
-        item.name.trim() && 
-        item.quantity && 
-        item.quantity > 0 &&
-        (!item.errors || Object.keys(item.errors).length === 0)
-      )
-    }
-  },
-  methods: {
-    generateOrderId() {
+    function generateOrderId() {
       const prefix = 'PO'
       const timestamp = Date.now().toString().slice(-6)
       const random = Math.floor(Math.random() * 100).toString().padStart(2, '0')
       return `${prefix}-${timestamp}${random}`
-    },
+    }
     
-    getDefaultExpectedDate() {
-      const date = new Date()
-      date.setDate(date.getDate() + 7) // Default to 7 days from now
-      return date.toISOString().split('T')[0]
-    },
+    function generateBatchNumber() {
+      // Generate a unique batch number in format BATCH-0001
+      // All items in the same purchase order will share this batch number
+      const timestamp = Date.now().toString().slice(-6)
+      const random = Math.floor(Math.random() * 100).toString().padStart(2, '0')
+      return `BATCH-${timestamp}${random}`
+    }
     
-    createEmptyItem() {
+    function createEmptyItem() {
       return {
-        name: '',
+        categoryId: '',
+        subcategoryName: '',
+        productId: '',
+        selectedProduct: null,
         quantity: null,
-        unit: '',
-        unitPrice: null,
-        totalPrice: 0,
-        notes: '',
+        estimatedCost: null,
+        expectedExpiryDate: '',
+        totalCost: 0,
         errors: {}
       }
-    },
+    }
     
-    addOrderItem() {
-      this.orderData.items.push(this.createEmptyItem())
-    },
-    
-    removeOrderItem(index) {
-      if (this.orderData.items.length > 1) {
-        this.orderData.items.splice(index, 1)
-      }
-    },
-    
-    loadSampleItems() {
-      this.orderData.items = [
-        {
-          name: 'Premium Rice 25kg',
-          quantity: 10,
-          unit: 'bag',
-          unitPrice: 1200.00,
-          totalPrice: 12000.00,
-          notes: 'Jasmine rice',
-          errors: {}
-        },
-        {
-          name: 'Cooking Oil 1L',
-          quantity: 24,
-          unit: 'bottle',
-          unitPrice: 85.00,
-          totalPrice: 2040.00,
-          notes: 'Palm oil',
-          errors: {}
-        },
-        {
-          name: 'All Purpose Flour 1kg',
-          quantity: 15,
-          unit: 'pack',
-          unitPrice: 45.00,
-          totalPrice: 675.00,
-          notes: 'For baking',
-          errors: {}
-        }
-      ]
-      
-      this.validateAllItems()
-      this.calculateTotals()
-    },
-    
-    validateOrderItem(index) {
-      const item = this.orderData.items[index]
-      const errors = {}
-      
-      // Name validation
-      if (!item.name || !item.name.trim()) {
-        errors.name = 'Item name is required'
-      } else if (item.name.trim().length < 2) {
-        errors.name = 'Item name must be at least 2 characters'
-      }
-      
-      // Quantity validation
-      if (!item.quantity || item.quantity <= 0) {
-        errors.quantity = 'Quantity must be greater than 0'
-      } else if (!Number.isInteger(item.quantity)) {
-        errors.quantity = 'Quantity must be a whole number'
-      }
-      
-      item.errors = errors
-    },
-    
-    validateAllItems() {
-      this.orderData.items.forEach((item, index) => {
-        this.validateOrderItem(index)
-      })
-    },
-    
-    calculateItemTotal(index) {
-      const item = this.orderData.items[index]
-      const quantity = item.quantity || 0
-      const unitPrice = item.unitPrice || 0
-      item.totalPrice = quantity * unitPrice
-      this.calculateTotals()
-    },
-    
-    calculateTotals() {
-      // Totals are computed properties, so this just triggers reactivity
-      this.$nextTick(() => {
-        this.$forceUpdate()
-      })
-    },
-    
-    async saveOrder(status = 'pending') {
-      this.saving = true
-      
-      try {
-        this.validateAllItems()
-        
-        if (!this.isOrderValid) {
-          alert('Please fix validation errors before saving')
-          return
-        }
-        
-        // Prepare order data
-        const orderToSave = {
-          ...this.orderData,
-          id: this.orderData.orderId,
-          supplierId: this.supplier?.id,
-          supplierName: this.supplier?.name,
-          status: status,
-          totalItems: this.totalQuantity,
-          subtotal: this.subtotal,
-          tax: this.taxAmount,
-          total: this.grandTotal,
-          createdAt: new Date().toISOString(),
-          items: this.orderData.items.filter(item => 
-            item.name && item.name.trim() && item.quantity > 0
-          )
-        }
-        
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1500))
-        
-        this.$emit('save', orderToSave)
-        this.$emit('close')
-        
-      } catch (error) {
-        console.error('Error saving order:', error)
-        alert('Failed to save order. Please try again.')
-      } finally {
-        this.saving = false
-      }
-    },
-    
-    emailSupplier() {
-      if (this.supplier?.email) {
-        const subject = `Purchase Order ${this.orderData.orderId}`
-        const body = `Dear ${this.supplier.contactPerson || 'Team'},\n\nWe would like to place a purchase order with your company.\n\nBest regards`
-        window.open(`mailto:${this.supplier.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`)
-      }
-    },
-    
-    getSupplierTypeLabel(type) {
+    function getSupplierTypeLabel(type) {
       const labels = {
         'food': 'Food & Beverages',
         'packaging': 'Packaging Materials',
@@ -680,40 +490,376 @@ export default {
         'other': 'Other'
       }
       return labels[type] || 'Not specified'
-    },
+    }
     
-    formatCurrency(amount) {
+    function formatCurrency(amount) {
       return new Intl.NumberFormat('en-PH', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       }).format(amount || 0)
     }
-  },
-  
-  watch: {
-    show(newVal) {
-      if (newVal) {
-        // Reset modal state when opened
-        this.orderData = {
-          orderId: this.generateOrderId(),
-          orderDate: new Date().toISOString().split('T')[0],
-          expectedDate: this.getDefaultExpectedDate(),
-          priority: 'normal',
-          description: '',
-          notes: '',
-          shippingCost: 0,
-          sendToSupplier: true,
-          items: [this.createEmptyItem()]
-        }
-        this.saving = false
+    
+    // ================ COMPUTED PROPERTIES ================
+    
+    const validItems = computed(() => {
+      return orderData.value.items.filter(item => 
+        item.productId && 
+        item.quantity && 
+        item.quantity > 0 &&
+        (!item.errors || Object.keys(item.errors).length === 0)
+      )
+    })
+    
+    const validItemsCount = computed(() => validItems.value.length)
+    
+    const totalQuantity = computed(() => {
+      return validItems.value.reduce((sum, item) => sum + (item.quantity || 0), 0)
+    })
+    
+    const uniqueProductsCount = computed(() => {
+      const uniqueProducts = new Set(validItems.value.map(item => item.productId))
+      return uniqueProducts.size
+    })
+    
+    const grandTotal = computed(() => {
+      return validItems.value.reduce((sum, item) => sum + (item.totalCost || 0), 0)
+    })
+    
+    const isOrderValid = computed(() => {
+      return validItems.value.length > 0 && 
+             orderData.value.expectedDeliveryDate
+    })
+    
+    // ================ CASCADE DROPDOWN METHODS ================
+    
+    function getSubcategoriesForItem(item) {
+      if (!item.categoryId) return []
+      
+      const category = categories.value.find(cat => cat._id === item.categoryId)
+      return category?.sub_categories || []
+    }
+    
+    function getProductsForItem(item) {
+      if (!item.categoryId || !item.subcategoryName) return []
+      
+      const key = `${item.categoryId}-${item.subcategoryName}`
+      const products = productsByCategory.value[key] || []
+      
+      // ✅ SAFETY CHECK
+      if (!Array.isArray(products)) {
+        console.error('Products for key is not an array:', key, products)
+        return []
       }
+      
+      return products
+    }
+    
+    async function onCategoryChange(index) {
+      const item = orderData.value.items[index]
+      
+      // Reset dependent fields
+      item.subcategoryName = ''
+      item.productId = ''
+      item.selectedProduct = null
+      
+      // Clear errors
+      if (item.errors?.category) {
+        delete item.errors.category
+      }
+      
+      validateItem(index)
+    }
+    
+    async function onSubcategoryChange(index) {
+      const item = orderData.value.items[index]
+      
+      // Reset product selection
+      item.productId = ''
+      item.selectedProduct = null
+      
+      // Clear errors
+      if (item.errors?.subcategory) {
+        delete item.errors.subcategory
+      }
+      
+      // Load products for this category-subcategory combination
+      if (item.categoryId && item.subcategoryName) {
+        await loadProductsForCategorySubcategory(item.categoryId, item.subcategoryName)
+      }
+      
+      validateItem(index)
+    }
+    
+    async function onProductChange(index) {
+      const item = orderData.value.items[index]
+      
+      // Find and store the selected product
+      const products = getProductsForItem(item)
+      
+      // ✅ ADD SAFETY CHECK
+      if (!Array.isArray(products)) {
+        console.error('Products is not an array:', products)
+        item.selectedProduct = null
+        return
+      }
+      
+      item.selectedProduct = products.find(p => p._id === item.productId)
+      
+      // Set default cost if available
+      if (item.selectedProduct && !item.estimatedCost) {
+        item.estimatedCost = item.selectedProduct.cost_price || item.selectedProduct.selling_price || 0
+      }
+      
+      // Clear errors
+      if (item.errors?.product) {
+        delete item.errors.product
+      }
+      
+      validateItem(index)
+      calculateItemTotal(index)
+    }
+    
+    async function loadProductsForCategorySubcategory(categoryId, subcategoryName) {
+      const key = `${categoryId}-${subcategoryName}`
+      
+      // Skip if already loaded
+      if (productsByCategory.value[key]) {
+        return
+      }
+      
+      try {
+        console.log('Loading products for:', categoryId, subcategoryName)
+        const response = await fetchProductsByCategory(categoryId, subcategoryName)
+        
+        console.log('Products response:', response)
+        
+        // ✅ HANDLE DIFFERENT RESPONSE FORMATS
+        let productsArray = []
+        
+        if (Array.isArray(response)) {
+          productsArray = response
+        } else if (response && Array.isArray(response.data)) {
+          productsArray = response.data
+        } else if (response && Array.isArray(response.products)) {
+          productsArray = response.products
+        } else {
+          console.warn('Unexpected response format:', response)
+          productsArray = []
+        }
+        
+        console.log('Parsed products array:', productsArray)
+        productsByCategory.value[key] = productsArray
+        
+      } catch (error) {
+        console.error('Error loading products:', error)
+        productsByCategory.value[key] = []
+      }
+    }
+    
+    // ================ ITEM MANAGEMENT ================
+    
+    function addOrderItem() {
+      orderData.value.items.push(createEmptyItem())
+    }
+    
+    function removeOrderItem(index) {
+      if (orderData.value.items.length > 1) {
+        orderData.value.items.splice(index, 1)
+      }
+    }
+    
+    function validateItem(index) {
+      const item = orderData.value.items[index]
+      const errors = {}
+      
+      if (!item.categoryId) {
+        errors.category = 'Category is required'
+      }
+      
+      if (!item.subcategoryName) {
+        errors.subcategory = 'Subcategory is required'
+      }
+      
+      if (!item.productId) {
+        errors.product = 'Product is required'
+      }
+      
+      if (!item.quantity || item.quantity <= 0) {
+        errors.quantity = 'Quantity must be greater than 0'
+      } else if (!Number.isInteger(item.quantity)) {
+        errors.quantity = 'Quantity must be a whole number'
+      }
+      
+      item.errors = errors
+    }
+    
+    function validateAllItems() {
+      orderData.value.items.forEach((item, index) => {
+        validateItem(index)
+      })
+    }
+    
+    function calculateItemTotal(index) {
+      const item = orderData.value.items[index]
+      const quantity = item.quantity || 0
+      const unitPrice = item.estimatedCost || 0
+      item.totalCost = quantity * unitPrice
+    }
+    
+    // ================ SAVE ORDER ================
+    
+    async function saveOrder() {
+      saving.value = true
+      
+      try {
+        validateAllItems()
+        
+        if (!isOrderValid.value) {
+          showError('Please fix validation errors before saving')
+          return
+        }
+        
+        const itemsToProcess = validItems.value
+        const results = {
+          successful: [],
+          failed: []
+        }
+        
+        // Generate a single batch number for all items in this purchase order
+        const sharedBatchNumber = generateBatchNumber()
+        console.log(`📦 Using shared batch number for all items: ${sharedBatchNumber}`)
+        
+        // Validate supplier exists
+        if (!props.supplier?.id) {
+          showError('Supplier information is required to create an order')
+          return
+        }
+
+        // Create a batch for each valid item with the same batch number
+        for (const item of itemsToProcess) {
+          try {
+            const batchData = {
+              product_id: item.productId,
+              supplier_id: props.supplier.id,
+              batch_number: sharedBatchNumber, // ✅ Same batch number for all items in this order
+              quantity_received: item.quantity,
+              cost_price: item.estimatedCost || 0,
+              expiry_date: item.expectedExpiryDate || null,
+              expected_delivery_date: orderData.value.expectedDeliveryDate, // ✅ Expected delivery date (for pending orders)
+              // date_received will be null until stock is actually received/activated
+              status: 'pending', // ✅ CREATE AS PENDING (on-going delivery)
+              notes: `Receipt: ${orderData.value.orderId}${orderData.value.referenceNumber ? ` | Ref: ${orderData.value.referenceNumber}` : ''}${orderData.value.notes ? ` | ${orderData.value.notes}` : ''}`
+            }
+            
+            const response = await createBatch(batchData)
+            
+            results.successful.push({
+              product: item.selectedProduct?.product_name,
+              batch: response
+            })
+            
+          } catch (error) {
+            console.error('Error creating batch for item:', item, error)
+            results.failed.push({
+              product: item.selectedProduct?.product_name,
+              error: error.message
+            })
+          }
+        }
+        
+        // ✅ Don't show toast here - let parent handle it to avoid duplicates
+        // Parent (SupplierDetails) will show the success/error toast
+        
+        // Emit saved event with results
+        emit('saved', {
+          orderId: orderData.value.orderId,
+          supplierId: props.supplier?.id,
+          supplierName: props.supplier?.name,
+          results
+        })
+        
+        // Close modal
+        handleClose()
+        
+      } catch (error) {
+        console.error('Error saving order:', error)
+        showError('Failed to process order. Please try again.')
+      } finally {
+        saving.value = false
+      }
+    }
+    
+    // ================ MODAL CONTROLS ================
+    
+    function handleClose() {
+      emit('close')
+      resetForm()
+    }
+    
+    function resetForm() {
+      orderData.value = {
+        orderId: generateOrderId(),
+        orderDate: new Date().toISOString().split('T')[0],
+        expectedDeliveryDate: '',
+        referenceNumber: '',
+        notes: '',
+        items: [createEmptyItem()]
+      }
+      productsByCategory.value = {}
+      saving.value = false
+    }
+    
+    // ================ LIFECYCLE ================
+    
+    onMounted(async () => {
+      try {
+        await fetchCategories()
+      } catch (error) {
+        console.error('Error loading categories:', error)
+        showError('Failed to load categories')
+      }
+    })
+    
+    watch(() => props.show, (newVal) => {
+      if (newVal) {
+        resetForm()
+      }
+    })
+    
+    return {
+      // Data
+      orderData,
+      saving,
+      categories,
+      
+      // Computed
+      validItemsCount,
+      totalQuantity,
+      uniqueProductsCount,
+      grandTotal,
+      isOrderValid,
+      
+      // Methods
+      getSupplierTypeLabel,
+      formatCurrency,
+      getSubcategoriesForItem,
+      getProductsForItem,
+      onCategoryChange,
+      onSubcategoryChange,
+      onProductChange,
+      addOrderItem,
+      removeOrderItem,
+      validateItem,
+      calculateItemTotal,
+      saveOrder,
+      handleClose
     }
   }
 }
 </script>
 
 <style scoped>
-/* Modern Modal styling */
+/* Keep all existing styles from CreateOrderModal */
 .modern-order-modal {
   border-radius: 16px;
   border: none;
@@ -721,21 +867,15 @@ export default {
   overflow: hidden;
 }
 
-.modal-icon {
+.modal-icon-pending {
   width: 48px;
   height: 48px;
-  background: linear-gradient(135deg, var(--success-light), var(--success));
+  background: linear-gradient(135deg, var(--primary-light), var(--primary));
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--success-dark);
-}
-
-.modal-title {
   color: var(--primary-dark);
-  font-weight: 600;
-  margin: 0;
 }
 
 .modal-header {
@@ -745,16 +885,10 @@ export default {
 
 .modal-body {
   padding: 1.5rem 2rem;
-  max-height: 80vh;
+  max-height: 70vh;
   overflow-y: auto;
 }
 
-.modal-footer {
-  padding: 1rem 2rem 2rem 2rem;
-  background-color: #f8f9fa;
-}
-
-/* Info Cards */
 .order-info-card,
 .supplier-info-card {
   padding: 1.5rem;
@@ -762,14 +896,6 @@ export default {
   border-radius: 12px;
   border: 1px solid var(--neutral-medium);
   height: 100%;
-}
-
-.order-info-card h5,
-.supplier-info-card h5 {
-  color: var(--tertiary-dark);
-  font-weight: 600;
-  display: flex;
-  align-items: center;
 }
 
 .supplier-details {
@@ -801,13 +927,6 @@ export default {
   flex: 1;
 }
 
-.quick-actions {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-/* Order Items Section */
 .order-items-section {
   background: white;
   border-radius: 12px;
@@ -832,21 +951,15 @@ export default {
   padding: 0.75rem 0.5rem;
 }
 
-.order-items-table .form-control,
-.order-items-table .form-select {
-  font-size: 0.875rem;
-}
-
 .total-price {
   font-weight: 600;
-  color: var(--success);
+  color: var(--primary);
   text-align: right;
   padding: 0.5rem;
-  background: var(--success-light);
+  background: var(--primary-light);
   border-radius: 4px;
 }
 
-/* Order Summary */
 .order-summary-section {
   background: var(--neutral-light);
   border-radius: 12px;
@@ -854,24 +967,11 @@ export default {
   border: 1px solid var(--neutral-medium);
 }
 
-.additional-notes .form-label {
-  color: var(--tertiary-dark);
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-}
-
 .order-totals {
   background: white;
   border-radius: 8px;
   padding: 1.5rem;
   border: 1px solid var(--neutral-medium);
-}
-
-.order-totals h6 {
-  color: var(--tertiary-dark);
-  font-weight: 600;
-  margin-bottom: 1rem;
 }
 
 .summary-row {
@@ -892,54 +992,6 @@ export default {
   border-top: 2px solid var(--neutral-medium);
 }
 
-.total-row span {
-  font-size: 1.1rem;
-}
-
-/* Form styling */
-.form-label {
-  color: var(--tertiary-dark);
-  font-weight: 500;
-  margin-bottom: 0.5rem;
-}
-
-.form-control,
-.form-select {
-  border: 2px solid var(--neutral-medium);
-  border-radius: 8px;
-  transition: all 0.2s ease;
-}
-
-.form-control:focus,
-.form-select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.15);
-}
-
-.form-control.is-invalid {
-  border-color: var(--error);
-}
-
-/* Priority styling */
-select#priority option[value="urgent"] {
-  color: var(--error);
-  font-weight: 600;
-}
-
-select#priority option[value="high"] {
-  color: #f59e0b;
-  font-weight: 600;
-}
-
-select#priority option[value="normal"] {
-  color: var(--primary);
-}
-
-select#priority option[value="low"] {
-  color: var(--tertiary-medium);
-}
-
-/* Button styling */
 .btn-primary {
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   border: none;
@@ -953,146 +1005,7 @@ select#priority option[value="low"] {
   box-shadow: 0 4px 12px rgba(115, 146, 226, 0.3);
 }
 
-.btn-success {
-  background: linear-gradient(135deg, var(--success), var(--success-dark));
-  border: none;
-  border-radius: 8px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.btn-success:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(94, 180, 136, 0.3);
-}
-
-.btn-outline-secondary {
-  border: 2px solid var(--neutral-medium);
-  color: var(--tertiary-dark);
-  border-radius: 8px;
-  font-weight: 500;
-}
-
-.btn-outline-secondary:hover {
-  background-color: var(--neutral-medium);
-  border-color: var(--neutral-dark);
-  color: white;
-}
-
-/* Color classes */
-.text-primary-dark {
-  color: var(--primary-dark) !important;
-}
-
-.text-tertiary-dark {
-  color: var(--tertiary-dark) !important;
-}
-
-.text-tertiary-medium {
-  color: var(--tertiary-medium) !important;
-}
-
-/* Form check styling */
-.form-check-label {
-  color: var(--tertiary-dark);
-  margin-left: 0.5rem;
-}
-
-.form-check-input:checked {
-  background-color: var(--primary);
-  border-color: var(--primary);
-}
-
-/* Loading state */
-.btn-loading {
-  position: relative;
-}
-
-.btn-loading .spinner-border-sm {
-  width: 1rem;
-  height: 1rem;
-}
-
-/* Input group styling */
-.input-group-text {
-  background-color: var(--neutral-light);
-  border-color: var(--neutral-medium);
-  color: var(--tertiary-dark);
-  font-weight: 500;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .modal-body {
-    padding: 1rem;
-    max-height: 85vh;
-  }
-  
-  .modal-footer {
-    padding: 1rem;
-  }
-  
-  .order-info-card,
-  .supplier-info-card {
-    padding: 1rem;
-    margin-bottom: 1rem;
-  }
-  
-  .order-items-table {
-    font-size: 0.8rem;
-  }
-  
-  .order-items-table th,
-  .order-items-table td {
-    padding: 0.5rem 0.25rem;
-  }
-  
-  .quick-actions {
-    margin-top: 1rem;
-  }
-  
-  .d-flex.justify-content-between.align-items-center.w-100 {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
-  }
-  
-  .btn-group {
-    width: 100%;
-  }
-}
-
-@media (max-width: 576px) {
-  .order-items-section {
-    padding: 1rem;
-  }
-  
-  .order-summary-section {
-    padding: 1rem;
-  }
-  
-  .order-totals {
-    padding: 1rem;
-  }
-  
-  .table-responsive {
-    font-size: 0.75rem;
-  }
-  
-  .btn-sm {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-  }
-}
-
-/* Table row error state */
 .table-danger {
   background-color: rgba(220, 53, 69, 0.1) !important;
-}
-
-/* Validation styling */
-.invalid-feedback {
-  font-size: 0.75rem;
-  margin-top: 0.25rem;
 }
 </style>

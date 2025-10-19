@@ -13,7 +13,7 @@
           border-color="warning"
           border-position="start"
           title="Active Orders"
-          :value="reportsComposable.activeOrdersCount"
+          :value="reportsComposable.activeOrdersCount.value"
           value-color="warning"
           subtitle="Pending Purchase Orders"
           clickable
@@ -26,7 +26,7 @@
           border-color="success"
           border-position="start"
           title="Top Performers"
-          :value="reportsComposable.topPerformersCount"
+          :value="reportsComposable.topPerformersCount.value"
           value-color="success"
           subtitle="High Volume Suppliers"
           clickable
@@ -79,7 +79,7 @@
                 :class="{ 'active': showAddDropdown }"
               >
                 <Plus :size="14" />
-                ADD ITEM
+                ADD SUPPLIER
               </button>
               
               <div 
@@ -260,8 +260,8 @@
     <!-- Active Orders Modal -->
      <ActiveOrdersModal
       :show="reportsComposable.showActiveOrdersModal.value"
-      :orders="reportsComposable.activeOrders.value"
-      :loading="reportsComposable.loading.value"
+      :orders="activeOrdersForModal"
+      :loading="activeOrdersLoading"
       @close="reportsComposable.closeActiveOrdersModal"
     />
 
@@ -326,7 +326,7 @@
 </template>
 
 <script>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   Plus, 
@@ -398,6 +398,11 @@ export default {
     const searchMode = ref(false)
     const addDropdownRef = ref(null)
     const searchInputRef = ref(null)
+    
+    // Active orders modal data
+    const activeOrdersForModal = ref([])
+    const activeOrdersLoading = ref(false)
+
 
     // Load suppliers on mount
     onMounted(async () => {
@@ -409,6 +414,13 @@ export default {
         document.addEventListener('click', handleClickOutside)
       } catch (error) {
         console.error('Error fetching suppliers:', error)
+      }
+    })
+
+    // Watch for modal opening to load active orders
+    watch(() => reportsComposable.showActiveOrdersModal.value, (isOpen) => {
+      if (isOpen) {
+        loadActiveOrdersForModal()
       }
     })
 
@@ -528,14 +540,20 @@ export default {
     }
 
     const handleSaveSupplier = async () => {
-      const result = await formComposable.saveSupplier(suppliersComposable.suppliers?.value || [])
-      
-      if (result.success) {
-        suppliersComposable.successMessage.value = result.message
+      try {
+        const result = await formComposable.saveSupplier(suppliersComposable)
         
-        setTimeout(() => {
-          suppliersComposable.successMessage.value = null
-        }, 3000)
+        if (result.success) {
+          // Refresh the suppliers list to ensure the new supplier is visible
+          await suppliersComposable.refreshData()
+          
+          // Update reports if available
+          if (reportsComposable && reportsComposable.refreshReports) {
+            await reportsComposable.refreshReports()
+          }
+        }
+      } catch (error) {
+        console.error('Error in handleSaveSupplier:', error)
       }
     }
 
@@ -607,6 +625,21 @@ export default {
       router.push(route)
     }
 
+    // Load active orders for modal
+    const loadActiveOrdersForModal = async () => {
+      activeOrdersLoading.value = true
+      try {
+        const orders = await suppliersComposable.getActiveOrdersForModal()
+        activeOrdersForModal.value = orders
+      } catch (error) {
+        console.error('Error loading active orders:', error)
+        activeOrdersForModal.value = []
+      } finally {
+        activeOrdersLoading.value = false
+      }
+    }
+
+
     return {
       // Composables
       suppliersComposable,
@@ -623,6 +656,8 @@ export default {
       searchMode,
       addDropdownRef,
       searchInputRef,
+      activeOrdersForModal,
+      activeOrdersLoading,
       
       // Methods
       handleSingleSupplier,

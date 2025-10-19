@@ -1,6 +1,7 @@
 // composables/ui/suppliers/useSupplierForm.js
 import { ref, reactive, computed } from 'vue'
 import axios from 'axios'
+import { useToast } from '@/composables/ui/useToast'
 
 // Configure axios
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
@@ -22,6 +23,9 @@ api.interceptors.request.use((config) => {
 })
 
 export function useSupplierForm() {
+  // Initialize toast composable
+  const { success, error: showError } = useToast()
+  
   // State
   const showAddModal = ref(false)
   const isEditMode = ref(false)
@@ -58,7 +62,7 @@ export function useSupplierForm() {
 
   const editSupplier = (supplier) => {
     isEditMode.value = true
-    selectedSupplier.value = 
+    selectedSupplier.value = supplier
     formData.name = supplier.name || ''
     formData.contactPerson = supplier.contactPerson || ''
     formData.email = supplier.email || ''
@@ -134,6 +138,7 @@ export function useSupplierForm() {
 
   const saveSupplier = async (suppliersComposable) => {
     if (!validateForm()) {
+      showError('Please correct the form errors before submitting')
       return { success: false, error: 'Please fix form errors' }
     }
 
@@ -157,7 +162,7 @@ export function useSupplierForm() {
       if (isEditMode.value && selectedSupplier.value) {
         // UPDATE existing supplier
         response = await api.put(`/suppliers/${selectedSupplier.value.id}/`, backendData)
-        message = `Supplier "${formData.name}" updated successfully`
+        message = `${formData.name} has been updated successfully`
         
         // Transform response
         const updatedSupplier = {
@@ -176,8 +181,8 @@ export function useSupplierForm() {
           raw: response.data
         }
 
-        // Update in local state - FIXED
-        if (suppliersComposable.suppliers?.value) {
+        // Update in local state - FIXED: Add null checks
+        if (suppliersComposable && suppliersComposable.suppliers && Array.isArray(suppliersComposable.suppliers.value)) {
           const index = suppliersComposable.suppliers.value.findIndex(
             s => s.id === selectedSupplier.value.id
           )
@@ -185,13 +190,11 @@ export function useSupplierForm() {
             suppliersComposable.suppliers.value[index] = updatedSupplier
           }
         }
-
-        closeAddModal()
         
       } else {
         // CREATE new supplier
         response = await api.post('/suppliers/', backendData)
-        message = `Supplier "${formData.name}" created successfully`
+        message = `${formData.name} has been added as a new supplier`
         
         // Add to local state
         const newSupplier = {
@@ -210,18 +213,29 @@ export function useSupplierForm() {
           raw: response.data
         }
         
-        suppliersComposable.suppliers.value.unshift(newSupplier)
-        
-        if (!addAnotherAfterSave.value) {
-          closeAddModal()
-        } else {
-          resetForm()
+        // FIXED: Add null checks before adding to suppliers list
+        if (suppliersComposable && suppliersComposable.suppliers && Array.isArray(suppliersComposable.suppliers.value)) {
+          suppliersComposable.suppliers.value.unshift(newSupplier)
         }
       }
 
-      // Update report data
-      if (suppliersComposable.updateReportData) {
+      // Update report data - FIXED: Add null checks
+      if (suppliersComposable && suppliersComposable.updateReportData && typeof suppliersComposable.updateReportData === 'function') {
         suppliersComposable.updateReportData()
+      }
+
+      // Show success toast
+      success(message)
+
+      // Handle modal closure - FIXED: Always close modal on success
+      if (!isEditMode.value && addAnotherAfterSave.value) {
+        // Keep modal open for another entry, just reset form
+        resetForm()
+      } else {
+        // Close modal automatically
+        setTimeout(() => {
+          closeAddModal()
+        }, 100) // Small delay to ensure state updates
       }
 
       return { success: true, message }
@@ -239,7 +253,8 @@ export function useSupplierForm() {
         errorMessage = error.message
       }
       
-      formErrors.value.general = errorMessage
+      // Show error toast
+      showError(errorMessage)
       
       return { success: false, error: errorMessage }
       
@@ -270,4 +285,4 @@ export function useSupplierForm() {
     clearFormError,
     saveSupplier
   }
-} 
+}

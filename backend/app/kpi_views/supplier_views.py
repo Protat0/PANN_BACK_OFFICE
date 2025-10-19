@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from ..services.supplier_service import SupplierService
+from ..services.batch_service import BatchService
 from ..decorators.authenticationDecorator import require_admin, require_authentication, require_permission, get_authenticated_user_from_jwt
 import logging
 
@@ -16,7 +17,8 @@ class SupplierHealthCheckView(APIView):
         return Response({
             "message": "Supplier Management API is running!",
             "status": "active",
-            "version": "1.0.0"
+            "version": "2.0.0",
+            "features": ["supplier_management", "batch_integration"]
         }, status=status.HTTP_200_OK)
 
 class SupplierListView(APIView):
@@ -44,9 +46,11 @@ class SupplierListView(APIView):
                 filters['search'] = request.query_params.get('search')
             if request.query_params.get('status'):
                 filters['status'] = request.query_params.get('status')
+            if request.query_params.get('type'):
+                filters['type'] = request.query_params.get('type')
             
             result = self.supplier_service.get_suppliers(
-                filters=filters,
+                filters=filters if filters else None,
                 include_deleted=include_deleted,
                 page=page,
                 per_page=per_page
@@ -78,6 +82,11 @@ class SupplierListView(APIView):
             new_supplier = self.supplier_service.create_supplier(request.data, user_id=user_id)
             return Response(new_supplier, status=status.HTTP_201_CREATED)
             
+        except ValueError as e:
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         except Exception as e:
             logger.error(f"Error creating supplier: {e}")
             return Response(
@@ -92,9 +101,10 @@ class SupplierDetailView(APIView):
 
     @require_authentication
     def get(self, request, supplier_id):
-        """Get supplier by ID (with optional deleted suppliers for admin)"""
+        """Get supplier by ID with batch statistics"""
         try:
             include_deleted = request.query_params.get('include_deleted', 'false').lower() == 'true'
+            include_batch_stats = request.query_params.get('include_batch_stats', 'true').lower() == 'true'
             
             # Only admins can view deleted suppliers
             if include_deleted:
@@ -105,7 +115,12 @@ class SupplierDetailView(APIView):
                         status=status.HTTP_403_FORBIDDEN
                     )
             
-            supplier = self.supplier_service.get_supplier_by_id(supplier_id, include_deleted=include_deleted)
+            supplier = self.supplier_service.get_supplier_by_id(
+                supplier_id, 
+                include_deleted=include_deleted,
+                include_batch_stats=include_batch_stats
+            )
+            
             if not supplier:
                 return Response(
                     {"error": "Supplier not found"}, 
@@ -142,6 +157,11 @@ class SupplierDetailView(APIView):
             
             return Response(updated_supplier, status=status.HTTP_200_OK)
             
+        except ValueError as e:
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         except Exception as e:
             logger.error(f"Error updating supplier {supplier_id}: {e}")
             return Response(
@@ -188,7 +208,7 @@ class SupplierRestoreView(APIView):
 
     @require_authentication
     def post(self, request, supplier_id):
-        """Restore a soft-deleted supplier - Requires admin authentication"""
+        """Restore a soft-deleted supplier - Admin only"""
         try:
             current_user = request.current_user
             if not current_user or current_user.get('role', '').lower() != 'admin':
@@ -199,7 +219,10 @@ class SupplierRestoreView(APIView):
             
             user_id = current_user.get('_id', 'system')
             
-            restored = self.supplier_service.restore_supplier(supplier_id, user_id=user_id)
+            restored = self.supplier_service.restore_supplier(
+                supplier_id,
+                user_id=user_id
+            )
             
             if not restored:
                 return Response(
@@ -262,12 +285,14 @@ class SupplierHardDeleteView(APIView):
             }, status=status.HTTP_200_OK)
 
         except Exception as e:
+            logger.error(f"Error permanently deleting supplier {supplier_id}: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 class DeletedSuppliersView(APIView):
+    """View for getting all soft-deleted suppliers"""
     def __init__(self):
         super().__init__()
         self.supplier_service = SupplierService()
@@ -298,298 +323,158 @@ class DeletedSuppliersView(APIView):
             )
 
 # ================================================================
-# PURCHASE ORDER VIEW CLASSES
+# SUPPLIER BATCH INTEGRATION VIEWS
 # ================================================================
 
-class PurchaseOrderListView(APIView):
+class SupplierBatchesView(APIView):
+    """View for getting all batches associated with a supplier"""
     def __init__(self):
         super().__init__()
         self.supplier_service = SupplierService()
 
     @require_authentication
     def get(self, request, supplier_id):
-        """Get purchase orders for a supplier"""
+        """Get all batches for a supplier with optional filters"""
         try:
-            status_filter = request.query_params.get('status')
-            include_deleted = request.query_params.get('include_deleted', 'false').lower() == 'true'
+            # Build filters from query parameters
+            filters = {}
             
-            # Only admins can view deleted orders
-            if include_deleted and request.current_user.get('role', '').lower() != 'admin':
-                return Response(
-                    {"error": "Admin permissions required to view deleted orders"}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
+            if request.query_params.get('status'):
+                filters['status'] = request.query_params.get('status')
             
-            orders = self.supplier_service.get_purchase_orders(
+            if request.query_params.get('product_id'):
+                filters['product_id'] = request.query_params.get('product_id')
+            
+            if request.query_params.get('expiring_soon', 'false').lower() == 'true':
+                filters['expiring_soon'] = True
+                filters['days_ahead'] = int(request.query_params.get('days_ahead', 30))
+            
+            batches = self.supplier_service.get_supplier_batches(
                 supplier_id, 
-                status=status_filter, 
-                include_deleted=include_deleted
+                filters=filters if filters else None
             )
             
             return Response({
-                'orders': orders,
-                'supplier_id': supplier_id,
-                'total': len(orders)
+                'data': batches,
+                'count': len(batches),
+                'supplier_id': supplier_id
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
-            logger.error(f"Error getting purchase orders for supplier {supplier_id}: {e}")
+            logger.error(f"Error getting supplier batches for {supplier_id}: {e}")
             return Response(
                 {"error": str(e)}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+class SupplierStatisticsView(APIView):
+    """View for getting comprehensive statistics for a supplier"""
+    def __init__(self):
+        super().__init__()
+        self.supplier_service = SupplierService()
+
+    @require_authentication
+    def get(self, request, supplier_id):
+        """Get comprehensive statistics for a supplier"""
+        try:
+            stats = self.supplier_service.get_supplier_statistics(supplier_id)
+            
+            return Response({
+                'data': stats,
+                'supplier_id': supplier_id
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error getting supplier statistics for {supplier_id}: {e}")
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class CreateBatchForSupplierView(APIView):
+    """Convenience view for creating a batch directly through a supplier endpoint"""
+    def __init__(self):
+        super().__init__()
+        self.batch_service = BatchService()
+        self.supplier_service = SupplierService()
+
+    @require_authentication
+    def post(self, request, supplier_id):
+        """Create a new batch for a supplier"""
+        try:
+            # Verify supplier exists
+            supplier = self.supplier_service.get_supplier_by_id(
+                supplier_id, 
+                include_deleted=False,
+                include_batch_stats=False
+            )
+            
+            if not supplier:
+                return Response(
+                    {"error": f"Supplier with ID {supplier_id} not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Validate required batch fields
+            if not request.data.get('product_id'):
+                return Response(
+                    {"error": "product_id is required"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if not request.data.get('quantity_received'):
+                return Response(
+                    {"error": "quantity_received is required"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Set supplier_id in the batch data
+            batch_data = request.data.copy()
+            batch_data['supplier_id'] = supplier_id
+            
+            # Create the batch
+            new_batch = self.batch_service.create_batch(batch_data)
+            
+            return Response({
+                "message": "Batch created successfully for supplier",
+                "data": new_batch
+            }, status=status.HTTP_201_CREATED)
+            
+        except ValueError as e:
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error creating batch for supplier {supplier_id}: {e}")
+            return Response(
+                {"error": str(e)}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+# ================================================================
+# LEGACY ENDPOINT REDIRECTS (Optional - for backwards compatibility)
+# ================================================================
+
+class LegacyPurchaseOrderRedirectView(APIView):
+    """
+    Optional: Redirect old purchase order endpoints to batch endpoints
+    This helps with backwards compatibility during migration
+    """
+    @require_authentication
+    def get(self, request, supplier_id):
+        """Redirect to batches endpoint"""
+        return Response({
+            "message": "Purchase orders have been replaced with batch management",
+            "redirect_to": f"/api/suppliers/{supplier_id}/batches/",
+            "info": "Please use the batches endpoint for stock management"
+        }, status=status.HTTP_301_MOVED_PERMANENTLY)
     
     @require_authentication
     def post(self, request, supplier_id):
-        """Add purchase order to supplier"""
-        try:
-            # Basic validation
-            if not request.data.get('order_id'):
-                return Response(
-                    {"error": "Order ID is required"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            if not request.data.get('items') or not isinstance(request.data.get('items'), list):
-                return Response(
-                    {"error": "Items array is required"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            # Get user ID from authenticated user
-            user_id = request.current_user.get('_id', 'system')
-            
-            updated_supplier = self.supplier_service.add_purchase_order(
-                supplier_id, 
-                request.data,
-                user_id=user_id
-            )
-            
-            if not updated_supplier:
-                return Response(
-                    {"error": "Failed to add purchase order"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            return Response({
-                "message": "Purchase order added successfully",
-                "supplier": updated_supplier
-            }, status=status.HTTP_201_CREATED)
-            
-        except Exception as e:
-            logger.error(f"Error adding purchase order to supplier {supplier_id}: {e}")
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-class PurchaseOrderDetailView(APIView):
-    def __init__(self):
-        super().__init__()
-        self.supplier_service = SupplierService()
-
-    @require_authentication
-    def get(self, request, supplier_id, order_id):
-        """Get specific purchase order"""
-        try:
-            order = self.supplier_service.get_purchase_order_by_id(supplier_id, order_id)
-            
-            if not order:
-                return Response(
-                    {"error": "Purchase order not found"}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
-            return Response(order, status=status.HTTP_200_OK)
-            
-        except Exception as e:
-            logger.error(f"Error getting purchase order {order_id} for supplier {supplier_id}: {e}")
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-    
-    @require_authentication
-    def put(self, request, supplier_id, order_id):
-        """Update purchase order"""
-        try:
-            # Get user ID from authenticated user
-            user_id = request.current_user.get('_id', 'system')
-            
-            updated_supplier = self.supplier_service.update_purchase_order(
-                supplier_id, 
-                order_id, 
-                request.data,
-                user_id=user_id
-            )
-            
-            if not updated_supplier:
-                return Response(
-                    {"error": "Purchase order not found"}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            
-            return Response({
-                "message": "Purchase order updated successfully",
-                "supplier": updated_supplier
-            }, status=status.HTTP_200_OK)
-            
-        except Exception as e:
-            logger.error(f"Error updating purchase order {order_id} for supplier {supplier_id}: {e}")
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-    
-    @require_authentication
-    def delete(self, request, supplier_id, order_id):
-        """Soft delete purchase order"""
-        try:
-            # Get user ID from authenticated user
-            user_id = request.current_user.get('_id', 'system')
-            
-            deleted = self.supplier_service.delete_purchase_order(
-                supplier_id, 
-                order_id, 
-                hard_delete=False,
-                user_id=user_id
-            )
-            
-            if not deleted:
-                return Response(
-                    {"error": "Purchase order not found or already deleted"},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-
-            return Response(
-                {"message": "Purchase order deleted successfully"},
-                status=status.HTTP_200_OK
-            )
-
-        except Exception as e:
-            logger.error(f"Error deleting purchase order {order_id} for supplier {supplier_id}: {e}")
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-class PurchaseOrderRestoreView(APIView):
-    def __init__(self):
-        super().__init__()
-        self.supplier_service = SupplierService()
-
-    @require_authentication
-    def post(self, request, supplier_id, order_id):
-        """Restore soft-deleted purchase order - Admin only"""
-        try:
-            current_user = request.current_user
-            if not current_user or current_user.get('role', '').lower() != 'admin':
-                return Response(
-                    {"error": "Admin permissions required"}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            user_id = current_user.get('_id', 'system')
-            
-            restored = self.supplier_service.restore_purchase_order(
-                supplier_id, 
-                order_id,
-                user_id=user_id
-            )
-            
-            if not restored:
-                return Response(
-                    {"error": "Purchase order not found or not deleted"},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-
-            return Response(
-                {"message": "Purchase order restored successfully"},
-                status=status.HTTP_200_OK
-            )
-
-        except Exception as e:
-            logger.error(f"Error restoring purchase order {order_id} for supplier {supplier_id}: {e}")
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-class PurchaseOrderHardDeleteView(APIView):
-    def __init__(self):
-        super().__init__()
-        self.supplier_service = SupplierService()
-
-    @require_authentication
-    def delete(self, request, supplier_id, order_id):
-        """PERMANENTLY delete purchase order - Admin only"""
-        try:
-            current_user = request.current_user
-            if not current_user or current_user.get('role', '').lower() != 'admin':
-                return Response(
-                    {"error": "Admin permissions required"}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            confirm = request.query_params.get('confirm', '').lower()
-            if confirm != 'yes':
-                return Response({
-                    "error": "Permanent deletion requires confirmation", 
-                    "message": "Add ?confirm=yes to permanently delete this purchase order"
-                }, status=status.HTTP_400_BAD_REQUEST)
-            
-            user_id = current_user.get('_id', 'system')
-            
-            deleted = self.supplier_service.delete_purchase_order(
-                supplier_id, 
-                order_id, 
-                hard_delete=True,
-                user_id=user_id
-            )
-            
-            if not deleted:
-                return Response(
-                    {"error": "Purchase order not found"}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
-
-            return Response({
-                "message": "Purchase order permanently deleted"
-            }, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-class DeletedPurchaseOrdersView(APIView):
-    def __init__(self):
-        super().__init__()
-        self.supplier_service = SupplierService()
-
-    @require_authentication
-    def get(self, request, supplier_id):
-        """Get soft-deleted purchase orders for a supplier - Admin only"""
-        try:
-            current_user = request.current_user
-            if not current_user or current_user.get('role', '').lower() != 'admin':
-                return Response(
-                    {"error": "Admin permissions required"}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            deleted_orders = self.supplier_service.get_deleted_purchase_orders(supplier_id)
-            
-            return Response({
-                'orders': deleted_orders,
-                'supplier_id': supplier_id,
-                'total': len(deleted_orders)
-            }, status=status.HTTP_200_OK)
-            
-        except Exception as e:
-            logger.error(f"Error getting deleted purchase orders for supplier {supplier_id}: {e}")
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        """Redirect to batch creation endpoint"""
+        return Response({
+            "message": "Purchase orders have been replaced with batch management",
+            "redirect_to": f"/api/suppliers/{supplier_id}/batches/create/",
+            "info": "Please use the batch creation endpoint for receiving new stock"
+        }, status=status.HTTP_301_MOVED_PERMANENTLY)

@@ -2,7 +2,7 @@
 import { ref, computed, reactive } from 'vue'
 import axios from 'axios'
 
-// Configure axios base URL - adjust to your backend URL
+// Configure axios base URL
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
 // Create axios instance with auth token
@@ -25,6 +25,7 @@ api.interceptors.request.use((config) => {
 export function useSuppliers() {
   // Reactive state
   const suppliers = ref([])
+  const allBatches = ref([])
   const loading = ref(false)
   const error = ref(null)
   const successMessage = ref(null)
@@ -50,21 +51,292 @@ export function useSuppliers() {
     topSuppliersCount: 0
   })
 
+  // Calculate purchase orders count by grouping batches (same logic as SupplierDetails.vue)
+  const calculatePurchaseOrdersCount = (batches) => {
+    if (!batches || !Array.isArray(batches) || batches.length === 0) {
+      return 0
+    }
+    
+    // Group batches by date
+    const batchesByDate = {}
+    batches.forEach(batch => {
+      let dateKey
+      if (batch.date_received) {
+        dateKey = typeof batch.date_received === 'string' ? batch.date_received.split('T')[0] : new Date(batch.date_received).toISOString().split('T')[0]
+      } else if (batch.expected_delivery_date) {
+        dateKey = typeof batch.expected_delivery_date === 'string' ? batch.expected_delivery_date.split('T')[0] : new Date(batch.expected_delivery_date).toISOString().split('T')[0]
+      } else {
+        dateKey = batch.created_at.split('T')[0]
+      }
+      
+      if (!batchesByDate[dateKey]) {
+        batchesByDate[dateKey] = []
+      }
+      batchesByDate[dateKey].push(batch)
+    })
+    
+    return Object.keys(batchesByDate).length
+  }
+
+  // Helper functions for supplier stats
+  const getReceiptStatus = (batches) => {
+    if (!batches || batches.length === 0) return 'Unknown'
+    
+    const allPending = batches.every(b => b.status === 'pending')
+    const allActive = batches.every(b => b.status === 'active')
+    const allInactive = batches.every(b => b.status === 'inactive')
+    const hasPending = batches.some(b => b.status === 'pending')
+    
+    if (allPending) return 'Pending Delivery'
+    if (allActive) return 'Received'
+    if (allInactive) return 'Depleted'
+    if (hasPending) return 'Partially Received'
+    
+    return 'Mixed Status'
+  }
+
+  const getActiveOrdersCount = (batches) => {
+    if (!batches || batches.length === 0) return 0
+    
+    // Group batches by date to create orders
+    const batchesByDate = {}
+    batches.forEach(batch => {
+      let dateKey
+      if (batch.date_received) {
+        dateKey = typeof batch.date_received === 'string' ? batch.date_received.split('T')[0] : new Date(batch.date_received).toISOString().split('T')[0]
+      } else if (batch.expected_delivery_date) {
+        dateKey = typeof batch.expected_delivery_date === 'string' ? batch.expected_delivery_date.split('T')[0] : new Date(batch.expected_delivery_date).toISOString().split('T')[0]
+      } else {
+        dateKey = batch.created_at.split('T')[0]
+      }
+      
+      if (!batchesByDate[dateKey]) {
+        batchesByDate[dateKey] = []
+      }
+      batchesByDate[dateKey].push(batch)
+    })
+    
+    // Convert to orders and count active ones
+    const orders = Object.entries(batchesByDate).map(([date, batches]) => ({
+      status: getReceiptStatus(batches)
+    }))
+    
+    // Count orders that are currently pending
+    return orders.filter(order => 
+      order.status === 'Pending Delivery' || order.status === 'Partially Received'
+    ).length
+  }
+
+  const getTotalSpent = (batches) => {
+    if (!batches || batches.length === 0) return 0
+    
+    // Group batches by date to create orders
+    const batchesByDate = {}
+    batches.forEach(batch => {
+      let dateKey
+      if (batch.date_received) {
+        dateKey = typeof batch.date_received === 'string' ? batch.date_received.split('T')[0] : new Date(batch.date_received).toISOString().split('T')[0]
+      } else if (batch.expected_delivery_date) {
+        dateKey = typeof batch.expected_delivery_date === 'string' ? batch.expected_delivery_date.split('T')[0] : new Date(batch.expected_delivery_date).toISOString().split('T')[0]
+      } else {
+        dateKey = batch.created_at.split('T')[0]
+      }
+      
+      if (!batchesByDate[dateKey]) {
+        batchesByDate[dateKey] = []
+      }
+      batchesByDate[dateKey].push(batch)
+    })
+    
+    // Convert to orders and calculate total spent on received orders
+    const orders = Object.entries(batchesByDate).map(([date, batches]) => {
+      const totalCost = batches.reduce((sum, b) => sum + ((b.cost_price || 0) * (b.quantity_received || 0)), 0)
+      return {
+        status: getReceiptStatus(batches),
+        total: totalCost
+      }
+    })
+    
+    return orders
+      .filter(order => order.status === 'Received')
+      .reduce((total, order) => total + order.total, 0)
+  }
+
+  const getDaysActive = (createdAt) => {
+    if (!createdAt) return 0
+    const createdDate = new Date(createdAt)
+    const today = new Date()
+    const diffTime = Math.abs(today - createdDate)
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  }
+
+  // Get active orders for modal with product enrichment
+  const getActiveOrdersForModal = async () => {
+    const allActiveOrders = []
+    
+    for (let i = 0; i < suppliers.value.length; i++) {
+      const supplier = suppliers.value[i]
+      const supplierBatches = allBatches.value.filter(batch => batch.supplier_id === supplier.id)
+      
+      if (supplierBatches.length > 0) {
+        // Group batches by date
+        const batchesByDate = {}
+        supplierBatches.forEach(batch => {
+          let dateKey
+          if (batch.date_received) {
+            dateKey = typeof batch.date_received === 'string' ? batch.date_received.split('T')[0] : new Date(batch.date_received).toISOString().split('T')[0]
+          } else if (batch.expected_delivery_date) {
+            dateKey = typeof batch.expected_delivery_date === 'string' ? batch.expected_delivery_date.split('T')[0] : new Date(batch.expected_delivery_date).toISOString().split('T')[0]
+          } else {
+            dateKey = batch.created_at.split('T')[0]
+          }
+          
+          if (!batchesByDate[dateKey]) {
+            batchesByDate[dateKey] = []
+          }
+          batchesByDate[dateKey].push(batch)
+        })
+        
+        // Enrich batches with product details
+        const enrichedBatchesByDate = {}
+        for (const [dateKey, batches] of Object.entries(batchesByDate)) {
+          enrichedBatchesByDate[dateKey] = await Promise.all(
+            batches.map(async (batch) => {
+              try {
+                if (batch.product_id) {
+                  console.log(`🔍 Fetching product details for batch ${batch._id}, product_id: ${batch.product_id}`)
+                  const productResponse = await api.get(`/products/${batch.product_id}/`)
+                  console.log(`📡 Product API response:`, productResponse.data)
+                  
+                  const product = productResponse.data.data
+                  console.log(`✅ Product fetched for ${batch.product_id}:`, product)
+                  
+                  if (product) {
+                    const enrichedBatch = {
+                      ...batch,
+                      product_name: product.product_name || product.name || batch.product_id || 'Unknown Product',
+                      category_id: product.category_id || '',
+                      category_name: product.category_name || '',
+                      subcategory_name: product.subcategory_name || ''
+                    }
+                    console.log(`📦 Enriched batch:`, enrichedBatch)
+                    console.log(`📦 Product name set to:`, enrichedBatch.product_name)
+                    return enrichedBatch
+                  } else {
+                    console.warn(`⚠️ No product data returned for ${batch.product_id}`)
+                  }
+                } else {
+                  console.warn(`⚠️ No product_id found in batch:`, batch)
+                }
+                return batch
+              } catch (err) {
+                console.error(`❌ Failed to fetch product details for batch ${batch._id}:`, err)
+                console.error(`❌ Error details:`, err.response?.data || err.message)
+                return batch
+              }
+            })
+          )
+        }
+        
+        // Convert grouped batches to orders using enriched data
+        Object.entries(enrichedBatchesByDate).forEach(([date, enrichedBatches]) => {
+          const totalCost = enrichedBatches.reduce((sum, b) => sum + ((b.cost_price || 0) * (b.quantity_received || 0)), 0)
+          
+          let receiptId = `SR-${date.replace(/-/g, '')}`
+          const firstBatchNotes = enrichedBatches[0].notes || ''
+          const receiptMatch = firstBatchNotes.match(/Receipt:\s*([^\|]+)/)
+          if (receiptMatch) {
+            receiptId = receiptMatch[1].trim()
+          }
+          
+          const firstBatch = enrichedBatches[0]
+          const expectedDate = firstBatch.expected_delivery_date ? 
+            (typeof firstBatch.expected_delivery_date === 'string' ? firstBatch.expected_delivery_date.split('T')[0] : new Date(firstBatch.expected_delivery_date).toISOString().split('T')[0]) : 
+            date
+          const receivedDate = firstBatch.date_received ? 
+            (typeof firstBatch.date_received === 'string' ? firstBatch.date_received.split('T')[0] : new Date(firstBatch.date_received).toISOString().split('T')[0]) : 
+            null
+          
+          // Determine order status
+          const allPending = enrichedBatches.every(b => b.status === 'pending')
+          const allActive = enrichedBatches.every(b => b.status === 'active')
+          const allInactive = enrichedBatches.every(b => b.status === 'inactive')
+          const hasPending = enrichedBatches.some(b => b.status === 'pending')
+          
+          let orderStatus
+          if (allPending) orderStatus = 'Pending Delivery'
+          else if (allActive) orderStatus = 'Received'
+          else if (allInactive) orderStatus = 'Depleted'
+          else if (hasPending) orderStatus = 'Partially Received'
+          else orderStatus = 'Mixed Status'
+          
+          // Only include active orders
+          if (orderStatus === 'Pending Delivery' || orderStatus === 'Partially Received') {
+            allActiveOrders.push({
+              id: receiptId,
+              supplier: supplier.name,
+              supplierId: supplier.id,
+              supplierEmail: supplier.email || 'N/A',
+              orderDate: firstBatch.created_at ? firstBatch.created_at.split('T')[0] : date,
+              expectedDelivery: expectedDate,
+              deliveredDate: receivedDate,
+              totalAmount: totalCost,
+              status: orderStatus,
+              items: enrichedBatches.map(batch => {
+                const item = {
+                  name: batch.product_name || batch.name || batch.product_id || 'Unknown Product',
+                  product_name: batch.product_name || batch.name || 'Unknown Product',
+                  product_id: batch.product_id,
+                  quantity: batch.quantity_received,
+                  unitPrice: batch.cost_price || 0,
+                  totalPrice: (batch.cost_price || 0) * (batch.quantity_received || 0),
+                  batchNumber: batch.batch_number,
+                  batchId: batch._id,
+                  expiryDate: batch.expiry_date,
+                  quantityRemaining: batch.quantity_remaining
+                }
+                console.log(`🔍 Creating item for batch ${batch._id}:`, {
+                  batch_product_name: batch.product_name,
+                  batch_name: batch.name,
+                  batch_product_id: batch.product_id,
+                  item_name: item.name,
+                  item_product_name: item.product_name
+                })
+                return item
+              }),
+              description: `Stock receipt with ${enrichedBatches.length} item(s)`,
+              notes: firstBatchNotes
+            })
+          }
+        })
+      }
+    }
+    
+    return allActiveOrders.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate))
+  }
+
   // Transform backend data to frontend format
-  const transformSupplier = (backendSupplier) => {
+  const transformSupplier = (backendSupplier, batchesCount = 0, supplierBatches = []) => {
+    const activeOrders = getActiveOrdersCount(supplierBatches)
+    const totalSpent = getTotalSpent(supplierBatches)
+    const daysActive = getDaysActive(backendSupplier.created_at)
+    
     return {
-      id: backendSupplier._id, // Use _id from backend
+      id: backendSupplier._id,
       name: backendSupplier.supplier_name,
       email: backendSupplier.email || '',
       phone: backendSupplier.phone_number || '',
       address: backendSupplier.address || '',
       contactPerson: backendSupplier.contact_person || '',
-      purchaseOrders: backendSupplier.purchase_orders?.length || 0,
+      purchaseOrders: batchesCount,
+      activeOrders: activeOrders,
+      totalSpent: totalSpent,
+      daysActive: daysActive,
       status: backendSupplier.isDeleted ? 'inactive' : 'active',
-      type: backendSupplier.type || 'food', // You may need to add this field to backend
+      type: backendSupplier.type || 'food',
       createdAt: backendSupplier.created_at,
       updatedAt: backendSupplier.updated_at,
-      raw: backendSupplier // Keep original data for updates
+      raw: backendSupplier
     }
   }
 
@@ -116,32 +388,62 @@ export function useSuppliers() {
         per_page: pagination.value.per_page
       }
 
-      // Add search filter if exists
       if (filters.search.trim()) {
         params.search = filters.search.trim()
       }
 
       const response = await api.get('/suppliers/', { params })
-
-      // Transform the backend data
-      const transformedSuppliers = response.data.suppliers.map(transformSupplier)
-
+      const backendSuppliers = response.data.suppliers
+      
+      // Fetch all batches for purchase orders calculation
+      let fetchedBatches = []
+      try {
+        const batchesResponse = await api.get('/batches/', { params: { per_page: 1000 } })
+        
+        if (batchesResponse.data && batchesResponse.data.success && Array.isArray(batchesResponse.data.data)) {
+          fetchedBatches = batchesResponse.data.data
+        } else if (batchesResponse.data && Array.isArray(batchesResponse.data)) {
+          fetchedBatches = batchesResponse.data
+        } else if (batchesResponse.data && Array.isArray(batchesResponse.data.batches)) {
+          fetchedBatches = batchesResponse.data.batches
+        }
+      } catch (batchesError) {
+        console.warn('Failed to fetch batches:', batchesError)
+      }
+      
+      allBatches.value = fetchedBatches
+      
+      // Group batches by supplier_id for efficient lookup
+      const batchesBySupplier = {}
+      fetchedBatches.forEach(batch => {
+        const supplierId = batch.supplier_id
+        if (supplierId) {
+          if (!batchesBySupplier[supplierId]) {
+            batchesBySupplier[supplierId] = []
+          }
+          batchesBySupplier[supplierId].push(batch)
+        }
+      })
+      
+      // Transform suppliers with calculated stats
+      const transformedSuppliers = backendSuppliers.map(backendSupplier => {
+        const supplierBatches = batchesBySupplier[backendSupplier._id] || []
+        const purchaseOrdersCount = calculatePurchaseOrdersCount(supplierBatches)
+        return transformSupplier(backendSupplier, purchaseOrdersCount, supplierBatches)
+      })
+      
       suppliers.value = transformedSuppliers
       pagination.value = response.data.pagination
-
       updateReportData()
       
     } catch (err) {
       console.error('Error fetching suppliers:', err)
       
       if (err.response) {
-        // Server responded with error
         error.value = err.response.data.error || `Failed to load suppliers: ${err.response.statusText}`
       } else if (err.request) {
-        // Request made but no response
         error.value = 'Cannot connect to server. Please check your connection.'
       } else {
-        // Something else happened
         error.value = `Failed to load suppliers: ${err.message}`
       }
     } finally {
@@ -154,7 +456,6 @@ export function useSuppliers() {
     error.value = null
     
     try {
-      // Transform frontend data to backend format
       const backendData = {
         supplier_name: supplierData.name,
         email: supplierData.email,
@@ -165,31 +466,19 @@ export function useSuppliers() {
       }
 
       const response = await api.post('/suppliers/', backendData)
-      
-      // Transform and add to local state
       const newSupplier = transformSupplier(response.data)
       suppliers.value.unshift(newSupplier)
       
       successMessage.value = `Supplier "${newSupplier.name}" added successfully`
-      
-      setTimeout(() => {
-        successMessage.value = null
-      }, 3000)
+      setTimeout(() => { successMessage.value = null }, 3000)
       
       return { success: true, supplier: newSupplier }
       
     } catch (err) {
       console.error('Error adding supplier:', err)
-      
-      let errorMessage = 'Failed to add supplier'
-      if (err.response?.data?.error) {
-        errorMessage = err.response.data.error
-      }
-      
+      const errorMessage = err.response?.data?.error || 'Failed to add supplier'
       error.value = errorMessage
-      
       return { success: false, error: errorMessage }
-      
     } finally {
       loading.value = false
     }
@@ -200,7 +489,6 @@ export function useSuppliers() {
     error.value = null
     
     try {
-      // Transform frontend data to backend format
       const backendData = {
         supplier_name: supplierData.name,
         email: supplierData.email,
@@ -211,8 +499,6 @@ export function useSuppliers() {
       }
 
       const response = await api.put(`/suppliers/${supplierId}/`, backendData)
-      
-      // Transform and update local state
       const updatedSupplier = transformSupplier(response.data)
       const index = suppliers.value.findIndex(s => s.id === supplierId)
       
@@ -221,25 +507,15 @@ export function useSuppliers() {
       }
       
       successMessage.value = `Supplier "${updatedSupplier.name}" updated successfully`
-      
-      setTimeout(() => {
-        successMessage.value = null
-      }, 3000)
+      setTimeout(() => { successMessage.value = null }, 3000)
       
       return { success: true, supplier: updatedSupplier }
       
     } catch (err) {
       console.error('Error updating supplier:', err)
-      
-      let errorMessage = 'Failed to update supplier'
-      if (err.response?.data?.error) {
-        errorMessage = err.response.data.error
-      }
-      
+      const errorMessage = err.response?.data?.error || 'Failed to update supplier'
       error.value = errorMessage
-      
       return { success: false, error: errorMessage }
-      
     } finally {
       loading.value = false
     }
@@ -254,30 +530,18 @@ export function useSuppliers() {
     
     try {
       await api.delete(`/suppliers/${supplier.id}/`)
-      
-      // Remove from local state
       suppliers.value = suppliers.value.filter(s => s.id !== supplier.id)
       
       successMessage.value = `Supplier "${supplier.name}" deleted successfully`
-      
-      setTimeout(() => {
-        successMessage.value = null
-      }, 3000)
+      setTimeout(() => { successMessage.value = null }, 3000)
       
       return { success: true }
       
     } catch (err) {
       console.error('Error deleting supplier:', err)
-      
-      let errorMessage = 'Failed to delete supplier'
-      if (err.response?.data?.error) {
-        errorMessage = err.response.data.error
-      }
-      
+      const errorMessage = err.response?.data?.error || 'Failed to delete supplier'
       error.value = errorMessage
-      
       return { success: false, error: errorMessage }
-      
     } finally {
       loading.value = false
     }
@@ -293,39 +557,26 @@ export function useSuppliers() {
     error.value = null
     
     try {
-      // Delete each selected supplier
       const deletePromises = selectedSuppliers.value.map(id => 
         api.delete(`/suppliers/${id}/`)
       )
       
       await Promise.all(deletePromises)
-      
-      // Remove from local state
-      suppliers.value = suppliers.value.filter(s => !selectedSuppliers.value.includes(s.id))
+      suppliers.value = suppliers.value.filter(s => !selectedSuppliers.value.includes(s))
       
       const count = selectedSuppliers.value.length
       selectedSuppliers.value = []
       
       successMessage.value = `Successfully deleted ${count} supplier(s)`
-      
-      setTimeout(() => {
-        successMessage.value = null
-      }, 3000)
+      setTimeout(() => { successMessage.value = null }, 3000)
       
       return { success: true }
       
     } catch (err) {
       console.error('Error deleting suppliers:', err)
-      
-      let errorMessage = 'Failed to delete some suppliers'
-      if (err.response?.data?.error) {
-        errorMessage = err.response.data.error
-      }
-      
+      const errorMessage = err.response?.data?.error || 'Failed to delete some suppliers'
       error.value = errorMessage
-      
       return { success: false, error: errorMessage }
-      
     } finally {
       loading.value = false
     }
@@ -349,14 +600,18 @@ export function useSuppliers() {
   }
 
   const applyFilters = () => {
-    // Client-side filtering is handled by computed property
-    // But you could also call fetchSuppliers() to do server-side filtering
     updateReportData()
   }
 
   const refreshData = async () => {
-    successMessage.value = null
-    await fetchSuppliers(pagination.value.current_page)
+    try {
+      successMessage.value = null
+      error.value = null
+      await fetchSuppliers(pagination.value?.current_page || 1)
+    } catch (err) {
+      console.error('Error refreshing data:', err)
+      error.value = err.message || 'Failed to refresh data'
+    }
   }
 
   // Utility functions
@@ -401,6 +656,7 @@ export function useSuppliers() {
     clearFilters,
     applyFilters,
     refreshData,
+    getActiveOrdersForModal,
     
     // Utilities
     getStatusBadgeClass,

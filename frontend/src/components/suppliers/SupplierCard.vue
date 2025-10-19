@@ -70,12 +70,28 @@
 
       <!-- Purchase Orders Info -->
       <div class="mb-3 mt-auto">
-        <p class="text-muted mb-1 purchase-orders-label">Purchase Orders</p>
-        <div class="d-flex justify-content-between align-items-center">
+        <p class="text-muted mb-2 purchase-orders-label">Purchase Orders</p>
+        <div class="d-flex justify-content-between align-items-center mb-2">
           <span class="purchase-orders-count">{{ supplier.purchaseOrders }}</span>
           <span :class="['badge', 'rounded-pill', getStatusBadgeClass(supplier.status)]">
             {{ formatStatus(supplier.status) }}
           </span>
+        </div>
+        
+        <!-- Additional Stats -->
+        <div class="supplier-stats">
+          <div class="stat-row">
+            <span class="stat-label">Active Orders:</span>
+            <span class="stat-value text-warning">{{ supplier.activeOrders || 0 }}</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Total Spent:</span>
+            <span class="stat-value text-success">₱{{ formatCurrency(supplier.totalSpent || 0) }}</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Days Active:</span>
+            <span class="stat-value text-info">{{ supplier.daysActive || 0 }}</span>
+          </div>
         </div>
       </div>
 
@@ -114,6 +130,15 @@ export default {
       default: false
     }
   },
+  mounted() {
+    console.log('SupplierCard received supplier data:', {
+      name: this.supplier.name,
+      purchaseOrders: this.supplier.purchaseOrders,
+      activeOrders: this.supplier.activeOrders,
+      totalSpent: this.supplier.totalSpent,
+      daysActive: this.supplier.daysActive
+    })
+  },
   methods: {
     getStatusBadgeClass(status) {
       const classes = {
@@ -131,6 +156,13 @@ export default {
     getShortAddress(address) {
       if (!address) return 'No address'
       return address.length > 50 ? address.substring(0, 50) + '...' : address
+    },
+
+    formatCurrency(amount) {
+      return new Intl.NumberFormat('en-PH', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }).format(amount || 0)
     }
   }
 }
@@ -188,5 +220,35 @@ export default {
   font-size: 2rem;
   font-weight: 700;
   color: var(--primary);
+}
+
+/* Supplier Stats Styling */
+.supplier-stats {
+  background-color: var(--neutral-light);
+  border-radius: 8px;
+  padding: 0.75rem;
+  border: 1px solid var(--neutral-medium);
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.stat-row:last-child {
+  margin-bottom: 0;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--tertiary-medium);
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 </style>

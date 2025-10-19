@@ -46,11 +46,12 @@ from .kpi_views.supplier_views import (
     SupplierRestoreView,
     SupplierHardDeleteView,
     DeletedSuppliersView,
-    PurchaseOrderListView,
-    PurchaseOrderDetailView,
-    PurchaseOrderRestoreView,
-    PurchaseOrderHardDeleteView,
-    DeletedPurchaseOrdersView
+    # NEW: Batch integration endpoints
+    SupplierBatchesView,
+    SupplierStatisticsView,
+    CreateBatchForSupplierView,
+    # OPTIONAL: Legacy redirects for backwards compatibility
+    # LegacyPurchaseOrderRedirectView,
 )
 
 from .kpi_views.authentication_views import (
@@ -93,7 +94,7 @@ from .kpi_views.product_views import (
     TestTemplateView,
 )
 
-# BATCH VIEWS - ADD THIS IMPORT
+# BATCH VIEWS
 from .kpi_views.batch_views import (
     # Batch CRUD
     BatchListView,
@@ -103,6 +104,7 @@ from .kpi_views.batch_views import (
     
     # Batch queries
     ProductBatchesView,
+    SupplierBatchesView,  # NEW: Get batches by supplier
     ExpiringBatchesView,
     ProductsWithExpirySummaryView,
     
@@ -111,6 +113,7 @@ from .kpi_views.batch_views import (
     CheckExpiryAlertsView,
     MarkExpiredBatchesView,
     ProcessBatchAdjustmentView,
+    ActivateBatchView,  # NEW: Activate pending batches
     
     # Integration
     ProductWithBatchSummaryView,
@@ -259,7 +262,7 @@ urlpatterns = [
     path('customers/<str:customer_id>/loyalty/', CustomerLoyaltyView.as_view(), name='customer-loyalty'),
     
     # ========== SUPPLIER MANAGEMENT ==========
-    path('suppliers/health/', SupplierHealthCheckView.as_view(), name='health-check'),
+    path('suppliers/health/', SupplierHealthCheckView.as_view(), name='supplier-health-check'),
 
     # === SPECIFIC PATHS FIRST (no parameters) ===
     path('suppliers/deleted/', DeletedSuppliersView.as_view(), name='deleted-suppliers'),
@@ -272,20 +275,19 @@ urlpatterns = [
     path('suppliers/<str:supplier_id>/restore/', SupplierRestoreView.as_view(), name='supplier-restore'),
     path('suppliers/<str:supplier_id>/hard-delete/', SupplierHardDeleteView.as_view(), name='supplier-hard-delete'),
 
-    # === PURCHASE ORDER - SPECIFIC PATHS FIRST ===
-    path('suppliers/<str:supplier_id>/orders/deleted/', DeletedPurchaseOrdersView.as_view(), name='deleted-purchase-orders'),
+    # === SUPPLIER-BATCH INTEGRATION (NEW) ===
+    path('suppliers/<str:supplier_id>/batches/', SupplierBatchesView.as_view(), name='supplier-batches'),
+    path('suppliers/<str:supplier_id>/batches/create/', CreateBatchForSupplierView.as_view(), name='create-batch-for-supplier'),
+    path('suppliers/<str:supplier_id>/statistics/', SupplierStatisticsView.as_view(), name='supplier-statistics'),
 
-    # === PURCHASE ORDER CRUD ===
-    path('suppliers/<str:supplier_id>/orders/', PurchaseOrderListView.as_view(), name='purchase-order-list'),
-    path('suppliers/<str:supplier_id>/orders/<str:order_id>/', PurchaseOrderDetailView.as_view(), name='purchase-order-detail'),
-
-    # === PURCHASE ORDER MANAGEMENT ===
-    path('suppliers/<str:supplier_id>/orders/<str:order_id>/restore/', PurchaseOrderRestoreView.as_view(), name='purchase-order-restore'),
-    path('suppliers/<str:supplier_id>/orders/<str:order_id>/hard-delete/', PurchaseOrderHardDeleteView.as_view(), name='purchase-order-hard-delete'),
+    # === OPTIONAL: LEGACY PURCHASE ORDER REDIRECTS (for backwards compatibility) ===
+    # Uncomment these if you want to provide migration guidance for old endpoints
+    # path('suppliers/<str:supplier_id>/orders/', LegacyPurchaseOrderRedirectView.as_view(), name='legacy-purchase-orders'),
+    # path('suppliers/<str:supplier_id>/orders/<str:order_id>/', LegacyPurchaseOrderRedirectView.as_view(), name='legacy-purchase-order-detail'),
         
     # ========== SESSION MANAGEMENT ==========
     path('session-logs/', SessionLogsView.as_view(), name='session-logs'),
-    path('session-logs/display/', SessionDisplayView.as_view(), name='session-logs-display'),  # Move this BEFORE the parameterized one
+    path('session-logs/display/', SessionDisplayView.as_view(), name='session-logs-display'),
     path('session-logs/combined/', CombinedLogsView.as_view(), name='combined-logs'),
     path('session-logs/<str:session_id>/', SessionDetailView.as_view(), name='session-detail'),
     # Session management
@@ -294,69 +296,73 @@ urlpatterns = [
     path('sessions/statistics/', SessionStatisticsView.as_view(), name='session-statistics'),
     # Cleanup and maintenance (Admin only)
     path('sessions/cleanup/', SessionCleanupView.as_view(), name='session-cleanup'),
-    path('sessions/cleanup/status/', CleanupStatusView.as_view(), name='cleanup-status'),  
-    path('sessions/cleanup/auto/', AutoCleanupControlView.as_view(), name='auto-cleanup-control'),  
+    path('sessions/cleanup/status/', CleanupStatusView.as_view(), name='cleanup-status'),
+    path('sessions/cleanup/auto/', AutoCleanupControlView.as_view(), name='auto-cleanup-control'),
     # Export functionality (Admin only)
-    path('sessions/export/', SessionExportView.as_view(), name='session-export'), 
+    path('sessions/export/', SessionExportView.as_view(), name='session-export'),
     # Admin control endpoints
     path('sessions/force-logout/<str:user_id>/', ForceLogoutView.as_view(), name='force-logout'),
-    path('sessions/bulk-control/', BulkSessionControlView.as_view(), name='bulk-session-control'),  
+    path('sessions/bulk-control/', BulkSessionControlView.as_view(), name='bulk-session-control'),
     
     # ========== PRODUCT MANAGEMENT ==========
     # Product CRUD (static paths first)
-    path('products/', ProductListView.as_view(), name='product-list'),  # GET (list), POST (create)
-    path('products/sku/<str:sku>/', ProductBySkuView.as_view(), name='product-by-sku'),  # GET by SKU
-    path('products/deleted/', DeletedProductsView.as_view(), name='deleted-products'),  # GET deleted products
-    path('products/bulk-delete/', BulkDeleteProductsView.as_view(), name='bulk-delete-products'),  # POST
+    path('products/', ProductListView.as_view(), name='product-list'),
+    path('products/sku/<str:sku>/', ProductBySkuView.as_view(), name='product-by-sku'),
+    path('products/deleted/', DeletedProductsView.as_view(), name='deleted-products'),
+    path('products/bulk-delete/', BulkDeleteProductsView.as_view(), name='bulk-delete-products'),
     
     # Product import/export
-    path('products/import/', ProductImportView.as_view(), name='product-import'),  # POST
+    path('products/import/', ProductImportView.as_view(), name='product-import'),
     path('products/test-template/', TestTemplateView.as_view(), name='test-template'),
-    path('products/import/template/', ImportTemplateView.as_view(), name='import-template'),  # GET
-    path('products/export/', ProductExportView.as_view(), name='product-export'),  # GET
-    path('products/bulk-create/', BulkCreateProductsView.as_view(), name='bulk-create-products'),  # POST
+    path('products/import/template/', ImportTemplateView.as_view(), name='import-template'),
+    path('products/export/', ProductExportView.as_view(), name='product-export'),
+    path('products/bulk-create/', BulkCreateProductsView.as_view(), name='bulk-create-products'),
     
     # Product reports
-    path('products/reports/low-stock/', LowStockProductsView.as_view(), name='low-stock-products'),  # GET
-    path('products/reports/expiring/', ExpiringProductsView.as_view(), name='expiring-products'),  # GET
-    path('products/reports/by-category/<str:category_id>/', ProductsByCategoryView.as_view(), name='products-by-category'),  # GET
+    path('products/reports/low-stock/', LowStockProductsView.as_view(), name='low-stock-products'),
+    path('products/reports/expiring/', ExpiringProductsView.as_view(), name='expiring-products'),
+    path('products/reports/by-category/<str:category_id>/', ProductsByCategoryView.as_view(), name='products-by-category'),
     
     # Product synchronization
-    path('products/sync/', ProductSyncView.as_view(), name='product-sync'),  # POST
+    path('products/sync/', ProductSyncView.as_view(), name='product-sync'),
     
     # Bulk stock management
-    path('products/stock/bulk-update/', BulkStockUpdateView.as_view(), name='bulk-stock-update'),  # POST
+    path('products/stock/bulk-update/', BulkStockUpdateView.as_view(), name='bulk-stock-update'),
     
     # Product detail operations (parameterized paths last)
-    path('products/<str:product_id>/', ProductDetailView.as_view(), name='product-detail'),  # GET, PUT, DELETE
-    path('products/<str:product_id>/restore/', ProductRestoreView.as_view(), name='product-restore'),  # POST
-    path('products/<str:product_id>/stock/', ProductStockUpdateView.as_view(), name='product-stock-update'),  # PUT/PATCH
-    path('products/<str:product_id>/stock/adjust/', StockAdjustmentView.as_view(), name='stock-adjustment'),  # POST
-    path('products/<str:product_id>/stock/history/', StockHistoryView.as_view(), name='stock-history'),  # GET
-    path('products/<str:product_id>/restock/', RestockProductView.as_view(), name='restock-product'),  # POST
+    path('products/<str:product_id>/', ProductDetailView.as_view(), name='product-detail'),
+    path('products/<str:product_id>/restore/', ProductRestoreView.as_view(), name='product-restore'),
+    path('products/<str:product_id>/stock/', ProductStockUpdateView.as_view(), name='product-stock-update'),
+    path('products/<str:product_id>/stock/adjust/', StockAdjustmentView.as_view(), name='stock-adjustment'),
+    path('products/<str:product_id>/stock/history/', StockHistoryView.as_view(), name='stock-history'),
+    path('products/<str:product_id>/restock/', RestockProductView.as_view(), name='restock-product'),
 
     # ========== BATCH MANAGEMENT ==========
     # Batch CRUD (static paths first)
-    path('batches/', BatchListView.as_view(), name='batch-list'),  # GET (list with filters)
-    path('batches/create/', CreateBatchView.as_view(), name='batch-create'),  # POST
-    path('batches/expiring/', ExpiringBatchesView.as_view(), name='expiring-batches'),  # GET
-    path('batches/statistics/', BatchStatisticsView.as_view(), name='batch-statistics'),  # GET
+    path('batches/', BatchListView.as_view(), name='batch-list'),
+    path('batches/create/', CreateBatchView.as_view(), name='batch-create'),
+    path('batches/expiring/', ExpiringBatchesView.as_view(), name='expiring-batches'),
+    path('batches/statistics/', BatchStatisticsView.as_view(), name='batch-statistics'),
 
     # Batch operations
-    path('batches/process-sale/', ProcessSaleFIFOView.as_view(), name='process-sale-fifo'),  # POST
-    path('batches/check-expiry-alerts/', CheckExpiryAlertsView.as_view(), name='check-expiry-alerts'),  # POST
-    path('batches/mark-expired/', MarkExpiredBatchesView.as_view(), name='mark-expired-batches'),  # POST
-    path('batches/adjust/', ProcessBatchAdjustmentView.as_view(), name='process-batch-adjustment'),  # POST ✅ ADD HERE
+    path('batches/process-sale/', ProcessSaleFIFOView.as_view(), name='process-sale-fifo'),
+    path('batches/check-expiry-alerts/', CheckExpiryAlertsView.as_view(), name='check-expiry-alerts'),
+    path('batches/mark-expired/', MarkExpiredBatchesView.as_view(), name='mark-expired-batches'),
+    path('batches/adjust/', ProcessBatchAdjustmentView.as_view(), name='process-batch-adjustment'),
+    path('batches/activate/', ActivateBatchView.as_view(), name='activate-batch'),
 
     # Batch detail operations (parameterized paths last)
-    path('batches/<str:batch_id>/', BatchDetailView.as_view(), name='batch-detail'),  # GET
-    path('batches/<str:batch_id>/update-quantity/', UpdateBatchQuantityView.as_view(), name='batch-update-quantity'),  # PUT
+    path('batches/<str:batch_id>/', BatchDetailView.as_view(), name='batch-detail'),
+    path('batches/<str:batch_id>/update-quantity/', UpdateBatchQuantityView.as_view(), name='batch-update-quantity'),
     
     # Product-batch integration
-    path('products/<str:product_id>/batches/', ProductBatchesView.as_view(), name='product-batches'),  # GET
-    path('products/<str:product_id>/with-batches/', ProductWithBatchSummaryView.as_view(), name='product-with-batches'),  # GET
-    path('products/<str:product_id>/restock-batch/', RestockWithBatchView.as_view(), name='restock-with-batch'),  # POST
-    path('products/expiry-summary/', ProductsWithExpirySummaryView.as_view(), name='products-expiry-summary'),  # GET
+    path('products/<str:product_id>/batches/', ProductBatchesView.as_view(), name='product-batches'),
+    path('products/<str:product_id>/with-batches/', ProductWithBatchSummaryView.as_view(), name='product-with-batches'),
+    path('products/<str:product_id>/restock-batch/', RestockWithBatchView.as_view(), name='restock-with-batch'),
+    path('products/expiry-summary/', ProductsWithExpirySummaryView.as_view(), name='products-expiry-summary'),
+    
+    # Supplier-batch integration (NEW)
+    path('batches/by-supplier/<str:supplier_id>/', SupplierBatchesView.as_view(), name='batches-by-supplier'),
     
     # ========== CATEGORY MANAGEMENT ==========
     # Core Category Operations
@@ -391,11 +397,11 @@ urlpatterns = [
     
     # ========== SALES & INVOICES ==========
     # Sales log operations
-    path('invoices/', SalesLogView.as_view(), name='invoice-list-create'),  # GET (list), POST (create)
-    path('invoices/bulk-import/', SalesLogBulkImportView.as_view(), name='invoice-bulk-import'),  # POST
-    path('invoices/export/', SalesLogExportView.as_view(), name='invoice-export'),  # GET
-    path('invoices/stats/', SalesLogStatsView.as_view(), name='invoice-stats'),  # GET
-    path('invoices/<str:invoice_id>/', SalesLogView.as_view(), name='invoice-detail'),  # GET, PUT, DELETE
+    path('invoices/', SalesLogView.as_view(), name='invoice-list-create'),
+    path('invoices/bulk-import/', SalesLogBulkImportView.as_view(), name='invoice-bulk-import'),
+    path('invoices/export/', SalesLogExportView.as_view(), name='invoice-export'),
+    path('invoices/stats/', SalesLogStatsView.as_view(), name='invoice-stats'),
+    path('invoices/<str:invoice_id>/', SalesLogView.as_view(), name='invoice-detail'),
     
     # Sales reports
     path('reports/top-item/', SalesTopItemView.as_view(), name='top-items'),
@@ -417,34 +423,33 @@ urlpatterns = [
     path('sales/get/<str:sale_id>/', GetSaleID.as_view(), name='get_sale_by_id'),
     
     # ========== PROMOTIONS ==========
-    path('promotions/', PromotionListView.as_view(), name='promotion-list'),  # GET (list), POST (create)
-    path('promotions/health/', PromotionHealthCheckView.as_view(), name='promotion-health'),  # GET
-    path('promotions/active/', ActivePromotionsView.as_view(), name='active-promotions'),  # GET
-    path('promotions/deleted/', DeletedPromotionsView.as_view(), name='promotion-deleted-list'),  # GET - Admin only
-    path('promotions/search/', PromotionSearchView.as_view(), name='promotion-search'),  # GET
-    path('promotions/statistics/', PromotionStatisticsView.as_view(), name='promotion-statistics'),  # GET - Admin only
-    path('promotions/apply/', PromotionApplicationView.as_view(), name='promotion-apply'),  # POST
-    path('promotions/by-name/<str:promotion_name>/', PromotionByNameView.as_view(), name='promotion-by-name'),  # GET
-    path('promotions/<str:promotion_id>/', PromotionDetailView.as_view(), name='promotion-detail'),  # GET, PUT, DELETE
-    path('promotions/<str:promotion_id>/activate/', PromotionActivationView.as_view(), name='promotion-activate'),  # POST - Admin only
-    path('promotions/<str:promotion_id>/deactivate/', PromotionDeactivationView.as_view(), name='promotion-deactivate'),  # POST - Admin only
-    path('promotions/<str:promotion_id>/expire/', PromotionExpirationView.as_view(), name='promotion-expire'),  # POST - Admin only
-    path('promotions/<str:promotion_id>/restore/', PromotionRestoreView.as_view(), name='promotion-restore'),  # POST - Admin only
-    path('promotions/<str:promotion_id>/hard-delete/', PromotionHardDeleteView.as_view(), name='promotion-hard-delete'),  # DELETE - Admin only
-    path('promotions/<str:promotion_id>/audit/', PromotionAuditView.as_view(), name='promotion-audit'),  # GET - Admin only
-    path('promotions/<str:promotion_id>/report/', PromotionReportView.as_view(), name='promotion-report'),  # GET - Admin only
+    path('promotions/', PromotionListView.as_view(), name='promotion-list'),
+    path('promotions/health/', PromotionHealthCheckView.as_view(), name='promotion-health'),
+    path('promotions/active/', ActivePromotionsView.as_view(), name='active-promotions'),
+    path('promotions/deleted/', DeletedPromotionsView.as_view(), name='promotion-deleted-list'),
+    path('promotions/search/', PromotionSearchView.as_view(), name='promotion-search'),
+    path('promotions/statistics/', PromotionStatisticsView.as_view(), name='promotion-statistics'),
+    path('promotions/apply/', PromotionApplicationView.as_view(), name='promotion-apply'),
+    path('promotions/by-name/<str:promotion_name>/', PromotionByNameView.as_view(), name='promotion-by-name'),
+    path('promotions/<str:promotion_id>/', PromotionDetailView.as_view(), name='promotion-detail'),
+    path('promotions/<str:promotion_id>/activate/', PromotionActivationView.as_view(), name='promotion-activate'),
+    path('promotions/<str:promotion_id>/deactivate/', PromotionDeactivationView.as_view(), name='promotion-deactivate'),
+    path('promotions/<str:promotion_id>/expire/', PromotionExpirationView.as_view(), name='promotion-expire'),
+    path('promotions/<str:promotion_id>/restore/', PromotionRestoreView.as_view(), name='promotion-restore'),
+    path('promotions/<str:promotion_id>/hard-delete/', PromotionHardDeleteView.as_view(), name='promotion-hard-delete'),
+    path('promotions/<str:promotion_id>/audit/', PromotionAuditView.as_view(), name='promotion-audit'),
+    path('promotions/<str:promotion_id>/report/', PromotionReportView.as_view(), name='promotion-report'),
 
-
-    # ========== POS OPERATIONS ==========
+    # ========== POS OPERATIONS (Additional) ==========
     # POS health and core functionality
-    path('pos/health/', POSHealthCheckView.as_view(), name='pos_health_check'),  # GET
-    path('pos/catalog/', POSCatalogView.as_view(), name='pos_catalog'),  # GET category catalog
-    path('pos/products/batch/', POSProductBatchView.as_view(), name='pos_product_batch'),  # POST batch fetch
-    path('pos/search/', POSSearchView.as_view(), name='pos_search'),  # GET product search
-    path('pos/stock-check/', POSStockCheckView.as_view(), name='pos_stock_check'),  # POST stock validation
-    path('pos/low-stock/', POSLowStockView.as_view(), name='pos_low_stock'),  # GET low stock alerts
-    path('pos/barcode/<str:barcode>/', POSBarcodeView.as_view(), name='pos_barcode'),  # GET barcode lookup
-    path('pos/subcategory/<str:category_id>/<str:subcategory_name>/', POSSubcategoryProductsView.as_view(), name='pos_subcategory_products'),  # GET subcategory products
+    path('pos/health/', POSHealthCheckView.as_view(), name='pos_health_check'),
+    path('pos/catalog/', POSCatalogView.as_view(), name='pos_catalog'),
+    path('pos/products/batch/', POSProductBatchView.as_view(), name='pos_product_batch'),
+    path('pos/search/', POSSearchView.as_view(), name='pos_search'),
+    path('pos/stock-check/', POSStockCheckView.as_view(), name='pos_stock_check'),
+    path('pos/low-stock/', POSLowStockView.as_view(), name='pos_low_stock'),
+    path('pos/barcode/<str:barcode>/', POSBarcodeView.as_view(), name='pos_barcode'),
+    path('pos/subcategory/<str:category_id>/<str:subcategory_name>/', POSSubcategoryProductsView.as_view(), name='pos_subcategory_products'),
     
     # POS transactions and operations
     path('pos/transaction/', POSTransactionView.as_view(), name='pos_transaction'),

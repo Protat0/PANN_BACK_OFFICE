@@ -118,6 +118,25 @@ class BatchService {
     }
   }
 
+  async getBatchesBySupplier(supplierId, filters = {}) {
+    try {
+      console.log('📦 Getting batches for supplier:', { supplierId, filters });
+      const params = {};
+      
+      if (filters.status) params.status = filters.status;
+      if (filters.product_id) params.product_id = filters.product_id;
+      if (filters.expiring_soon) {
+        params.expiring_soon = 'true';
+        params.days_ahead = filters.days_ahead || 30;
+      }
+
+      const response = await api.get(`${this.baseEndpoint}/by-supplier/${supplierId}/`, { params });
+      return this.handleResponse(response);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
   async getExpiringBatches(daysAhead = 30) {
     try {
       const response = await api.get(`${this.baseEndpoint}/expiring/`, {
