@@ -436,36 +436,79 @@ class CategoryService:
             raise Exception(f"Error creating category: {str(e)}")
         
     def get_all_categories(self, include_deleted=False, limit=None, skip=None):
-        """Get all categories - no longer checks uncategorized every time"""
+        """Get all categories with product counts added to subcategories"""
         try:
             query = {}
             if not include_deleted:
                 query['isDeleted'] = {'$ne': True}
-            
+
             cursor = self.collection.find(query)
-            
+
             if skip:
                 cursor = cursor.skip(skip)
             if limit:
                 cursor = cursor.limit(limit)
-            
+
             categories = list(cursor)
+
+            # Add product counts for each category's subcategories
+            for category in categories:
+                for subcategory in category.get('sub_categories', []):
+                    subcategory['product_count'] = self.get_subcategory_product_count(
+                        category['_id'],
+                        subcategory['name']
+                    )
+
             return categories
         except Exception as e:
             logger.error(f"Error getting categories: {e}")
             raise Exception(f"Error getting categories: {str(e)}")
+
+    def get_category_product_count(self, category_id):
+        """Get total number of products in a category"""
+        try:
+            count = self.product_collection.count_documents({
+                'category_id': category_id,
+                'isDeleted': {'$ne': True}
+            })
+            return count
+        except Exception as e:
+            logger.error(f"Error getting category product count: {e}")
+            return 0
+
+    def get_subcategory_product_count(self, category_id, subcategory_name):
+        """Get number of products in a specific subcategory"""
+        try:
+            count = self.product_collection.count_documents({
+                'category_id': category_id,
+                'subcategory_name': subcategory_name,
+                'isDeleted': {'$ne': True}
+            })
+            return count
+        except Exception as e:
+            logger.error(f"Error getting subcategory product count: {e}")
+            return 0
     
     def get_category_by_id(self, category_id, include_deleted=False):
-        """Get category by string ID"""
+        """Get category by string ID with product counts added to subcategories"""
         try:
             if not category_id or not category_id.startswith('CTGY-'):
                 return None
-            
+
             query = {'_id': category_id}  # Use _id instead of category_id
             if not include_deleted:
                 query['isDeleted'] = {'$ne': True}
 
             category = self.collection.find_one(query)
+
+            # Add product counts for subcategories
+            if category:
+                for subcategory in category.get('sub_categories', []):
+                    subcategory['product_count'] = self.get_subcategory_product_count(
+                        category['_id'],
+                        subcategory['name']
+                    )
+
             return category
         except Exception as e:
             logger.error(f"Error getting category by ID {category_id}: {e}")
@@ -723,9 +766,18 @@ class CategoryService:
             raise Exception(f"Error permanently deleting category: {str(e)}")
 
     def get_deleted_categories(self):
-        """Get all soft-deleted categories"""
+        """Get all soft-deleted categories with product counts"""
         try:
             categories = list(self.collection.find({'isDeleted': True}))
+
+            # Add product counts for each category's subcategories
+            for category in categories:
+                for subcategory in category.get('sub_categories', []):
+                    subcategory['product_count'] = self.get_subcategory_product_count(
+                        category['_id'],
+                        subcategory['name']
+                    )
+
             return categories
         except Exception as e:
             logger.error(f"Error getting deleted categories: {e}")
@@ -970,38 +1022,56 @@ class CategoryService:
             raise Exception(f"Error removing product from subcategory: {str(e)}")
     
     def get_active_categories(self, include_deleted=False):
-        """Get only active categories"""
+        """Get only active categories with product counts"""
         try:
             query = {'status': 'active'}
             if not include_deleted:
                 query['isDeleted'] = {'$ne': True}
-            
+
             categories = list(self.collection.find(query))
+
+            # Add product counts for each category's subcategories
+            for category in categories:
+                for subcategory in category.get('sub_categories', []):
+                    subcategory['product_count'] = self.get_subcategory_product_count(
+                        category['_id'],
+                        subcategory['name']
+                    )
+
             return categories
         except Exception as e:
             logger.error(f"Error getting active categories: {e}")
             raise Exception(f"Error getting active categories: {str(e)}")
 
     def search_categories(self, search_term, include_deleted=False, limit=20):
-        """Search categories by name or description"""
+        """Search categories by name or description with product counts"""
         try:
             if not search_term or not search_term.strip():
                 return []
-            
+
             search_term = search_term.strip()
             regex_pattern = {'$regex': search_term, '$options': 'i'}
-            
+
             query = {
                 '$or': [
                     {'category_name': regex_pattern},
                     {'description': regex_pattern}
                 ]
             }
-            
+
             if not include_deleted:
                 query['isDeleted'] = {'$ne': True}
-            
+
             categories = list(self.collection.find(query).limit(limit))
+
+            # Add product counts for each category's subcategories
+            for category in categories:
+                for subcategory in category.get('sub_categories', []):
+                    subcategory['product_count'] = self.get_subcategory_product_count(
+                        category['_id'],
+                        subcategory['name']
+                    )
+
             return categories
         except Exception as e:
             logger.error(f"Error searching categories: {e}")
