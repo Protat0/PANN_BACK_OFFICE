@@ -427,8 +427,13 @@ class GetOrderSummaryView(OnlineTransactionServiceView):
 # UTILITY VIEWS
 # ================================================================
 
-class ValidateOrderStockView(OnlineTransactionServiceView):
-    """Validate stock availability for order items"""
+class ValidateOrderStockView(APIView):
+    """Validate stock availability for order items - Public access for customers"""
+    permission_classes = []  # Allow public access for stock validation
+    
+    def __init__(self):
+        super().__init__()
+        self.service = OnlineTransactionService()
     
     def post(self, request):
         try:
@@ -451,8 +456,13 @@ class ValidateOrderStockView(OnlineTransactionServiceView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-class ValidatePointsRedemptionView(OnlineTransactionServiceView):
-    """Validate loyalty points redemption"""
+class ValidatePointsRedemptionView(APIView):
+    """Validate loyalty points redemption - Public access for customers"""
+    permission_classes = []  # Allow public access for points validation
+    
+    def __init__(self):
+        super().__init__()
+        self.service = OnlineTransactionService()
     
     def post(self, request):
         try:
@@ -505,8 +515,13 @@ class CalculateServiceFeeView(OnlineTransactionServiceView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-class CalculateLoyaltyPointsView(OnlineTransactionServiceView):
-    """Calculate loyalty points earned"""
+class CalculateLoyaltyPointsView(APIView):
+    """Calculate loyalty points earned - Public access for customers"""
+    permission_classes = []  # Allow public access for points calculation
+    
+    def __init__(self):
+        super().__init__()
+        self.service = OnlineTransactionService()
     
     def post(self, request):
         try:

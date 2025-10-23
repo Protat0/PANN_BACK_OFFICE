@@ -265,6 +265,15 @@ from .views import (
     APIDocumentationView,
 )
 
+from .kpi_views.customer_auth_views import (
+    CustomerLoginView,
+    CustomerRegisterView,
+    CustomerLogoutView,
+    CustomerProfileView,
+    CustomerUpdateProfileView,
+    CustomerChangePasswordView,
+)
+
 urlpatterns = [
     # ========== SYSTEM & HEALTH ==========
     path('', SystemStatusView.as_view(), name='system-status'),  # Root endpoint
@@ -277,6 +286,14 @@ urlpatterns = [
     path('auth/refresh/', RefreshTokenView.as_view(), name='refresh-token'),
     path('auth/me/', CurrentUserView.as_view(), name='current-user'),
     path('auth/verify-token/', VerifyTokenView.as_view(), name='verify-token'),
+    
+    # ========== CUSTOMER AUTHENTICATION ==========
+    path('auth/customer/login/', CustomerLoginView.as_view(), name='customer-login'),
+    path('auth/customer/register/', CustomerRegisterView.as_view(), name='customer-register'),
+    path('auth/customer/logout/', CustomerLogoutView.as_view(), name='customer-logout'),
+    path('auth/customer/profile/', CustomerProfileView.as_view(), name='customer-profile'),
+    path('auth/customer/profile/update/', CustomerUpdateProfileView.as_view(), name='customer-update-profile'),
+    path('auth/customer/change-password/', CustomerChangePasswordView.as_view(), name='customer-change-password'),
     
     # ========== USER MANAGEMENT ==========
     path('users/', UserListView.as_view(), name='user-list'),
