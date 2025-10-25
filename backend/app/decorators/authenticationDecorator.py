@@ -1,37 +1,50 @@
 from rest_framework.response import Response
 from rest_framework import status
 from ..services.auth_services import AuthService
+from ..database import db_manager
 import logging
 from functools import wraps
 
 logger = logging.getLogger(__name__)
 
 def get_authenticated_user_from_jwt(request):
-    """Unified JWT authentication helper for all systems"""
+    """Unified JWT authentication helper for all systems (users and customers)."""
     try:
         if not hasattr(request, 'headers'):
             logger.error(f"Request object missing headers attribute: {type(request)}")
             return None
-            
+
         authorization = request.headers.get("Authorization", "")
         if not authorization.startswith("Bearer "):
             return None
-        
+
         token = authorization.split(" ", 1)[1]
-        
+
         auth_service = AuthService()
-        user_data = auth_service.get_current_user(token)
-        
-        if not user_data or not user_data.get('user_id'):
+        payload = auth_service.verify_token(token)
+        if not payload:
             return None
-        
-        user_id = user_data.get('user_id')
-        user_doc = auth_service.user_collection.find_one({"_id": user_id})
-        
+
+        user_id = payload.get('sub')
+        role = (payload.get('role') or '').lower()
+
+        # Try admin/user collection first
+        user_doc = auth_service.user_collection.find_one({"_id": user_id}) if user_id else None
+
+        if not user_doc:
+            # Fallback to customers collection for customer tokens
+            try:
+                db = db_manager.get_database()
+                customers = db.customers
+                user_doc = customers.find_one({"_id": user_id}) if user_id else None
+            except Exception as e:
+                logger.error(f"Customer lookup failed: {e}")
+                user_doc = None
+
         if not user_doc:
             return None
-        
-        username = user_doc.get('username', '').strip()
+
+        username = (user_doc.get('username') or '').strip()
         display_username = username or user_doc.get('email', 'unknown')
 
         return {
@@ -39,7 +52,7 @@ def get_authenticated_user_from_jwt(request):
             "username": display_username,
             "email": user_doc.get('email'),
             "branch_id": user_doc.get('branch_id', 1),
-            "role": user_doc.get('role', 'admin')
+            "role": user_doc.get('role', role or 'customer')
         }
 
     except Exception as e:

@@ -37,6 +37,8 @@ from .kpi_views.customer_views import (
     CustomerByEmailView,
     CustomerStatisticsView,
     CustomerLoyaltyView,
+    CustomerLoginView,
+    CustomerCurrentUserView,
 )
 
 from .kpi_views.supplier_views import (
@@ -225,6 +227,11 @@ from .kpi_views.sales_display_views import (
     SalesDisplaySummaryView 
 )
 
+# Online orders
+from .kpi_views.online_transaction_views import (
+    CreateOnlineOrderView,
+)
+
 from .views import (
     APIDocumentationView,
 )
@@ -241,6 +248,8 @@ urlpatterns = [
     path('auth/refresh/', RefreshTokenView.as_view(), name='refresh-token'),
     path('auth/me/', CurrentUserView.as_view(), name='current-user'),
     path('auth/verify-token/', VerifyTokenView.as_view(), name='verify-token'),
+    path('auth/customer/login/', CustomerLoginView.as_view(), name='customer-login'),
+    path('auth/customer/me/', CustomerCurrentUserView.as_view(), name='customer-current-user'),
     
     # ========== USER MANAGEMENT ==========
     path('users/', UserListView.as_view(), name='user-list'),
@@ -421,6 +430,9 @@ urlpatterns = [
     path('sales/log/create/', CreateSalesLog.as_view(), name='create_sales_log'),
     path('sales/recent/', FetchRecentSales.as_view(), name='recent_sales'),
     path('sales/get/<str:sale_id>/', GetSaleID.as_view(), name='get_sale_by_id'),
+
+    # ========== ONLINE ORDERS (Customer Website) ==========
+    path('online/orders/create/', CreateOnlineOrderView.as_view(), name='create_online_order'),
     
     # ========== PROMOTIONS ==========
     path('promotions/', PromotionListView.as_view(), name='promotion-list'),

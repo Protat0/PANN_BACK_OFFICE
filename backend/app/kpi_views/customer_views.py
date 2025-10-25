@@ -2,10 +2,83 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from ..services.customer_service import CustomerService
+from ..services.auth_services import AuthService
 from ..decorators.authenticationDecorator import require_admin, require_authentication, get_authenticated_user_from_jwt
 import logging
 
 logger = logging.getLogger(__name__)
+
+class CustomerLoginView(APIView):
+    """Customer login using email/password; returns JWT compatible with auth decorator."""
+    def __init__(self):
+        self.customer_service = CustomerService()
+        self.auth_service = AuthService()
+
+    def post(self, request):
+        try:
+            email = request.data.get('email')
+            password = request.data.get('password')
+
+            if not email or not password:
+                return Response({"error": "Email and password are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+            customer = self.customer_service.authenticate_customer(email, password)
+            if not customer:
+                return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
+
+            customer_id = str(customer.get('_id'))
+            token_data = {"sub": customer_id, "email": customer.get('email'), "role": "customer"}
+            access_token = self.auth_service.create_access_token(token_data)
+            refresh_token = self.auth_service.create_refresh_token(token_data)
+
+            sanitized = {
+                "id": customer_id,
+                "email": customer.get('email'),
+                "username": customer.get('username'),
+                "full_name": customer.get('full_name'),
+                "loyalty_points": customer.get('loyalty_points', 0),
+                "role": "customer",
+            }
+
+            return Response({
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "token_type": "bearer",
+                "user": sanitized
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Customer login error: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class CustomerCurrentUserView(APIView):
+    """Return current authenticated customer profile using JWT"""
+    def __init__(self):
+        self.customer_service = CustomerService()
+
+    @require_authentication
+    def get(self, request):
+        try:
+            user_ctx = getattr(request, 'current_user', None) or {}
+            customer_id = user_ctx.get('user_id')
+            if not customer_id:
+                return Response({"error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
+
+            customer = self.customer_service.get_customer_by_id(customer_id)
+            if not customer:
+                return Response({"error": "Customer not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            # Sanitize
+            customer_data = dict(customer)
+            customer_data.pop('password', None)
+
+            return Response({
+                "success": True,
+                "customer": customer_data
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Customer me error: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class CustomerListView(APIView):
     def __init__(self):
