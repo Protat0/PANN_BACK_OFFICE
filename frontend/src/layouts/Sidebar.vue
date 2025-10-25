@@ -308,7 +308,6 @@ export default {
         
         try {
           await this.callLogoutAPI()
-          console.log('Logout API call successful')
         } catch (error) {
           console.error('Logout API error:', error)
           // Continue with local logout even if API fails
@@ -320,18 +319,15 @@ export default {
     
     async callLogoutAPI() {
       const token = this.getStoredToken()
-      
+
       if (!token) {
         console.warn('No token found for logout')
         return
       }
-      
-      console.log('Calling logout API using apiService...')
-      
+
       try {
         // ✅ Use the API service (same pattern as login)
         const result = await apiService.logout()
-        console.log('Logout successful via apiService:', result)
         return result
       } catch (error) {
         console.error('API service logout error:', error)
@@ -340,41 +336,31 @@ export default {
     },
     
     getStoredToken() {
-      // Debug: Log all localStorage keys to see what's actually stored
-      console.log('All localStorage keys:', Object.keys(localStorage))
-      console.log('All sessionStorage keys:', Object.keys(sessionStorage))
-      
       // Try different possible token storage keys (reordered to match login)
       const possibleKeys = [
         'authToken',        // Login.vue uses this
         'access_token',
-        'auth_token', 
+        'auth_token',
         'token',
         'accessToken',
         'jwt_token',
         'bearer_token',
         'user_token'
       ]
-      
+
       for (const key of possibleKeys) {
         const token = localStorage.getItem(key) || sessionStorage.getItem(key)
         if (token) {
-          console.log(`Found token with key: ${key}`, token.substring(0, 20) + '...')
           return token
         }
       }
-      
-      console.log('No token found in any storage location')
+
       return null
     },
     
     performLocalLogout() {
-      console.log('Performing local logout...')
-      
       // Clear ALL localStorage and sessionStorage to be absolutely sure
-      console.log('Before clearing - localStorage length:', localStorage.length)
-      console.log('Before clearing - sessionStorage length:', sessionStorage.length)
-      
+
       // Method 1: Clear specific auth keys
       const authKeys = [
         'access_token', 'refresh_token', 'auth_token', 'token',
@@ -383,46 +369,33 @@ export default {
         'user_data', 'user_info', 'user', 'userData', 'userInfo',
         'isAuthenticated', 'isLoggedIn', 'authState'
       ]
-      
+
       authKeys.forEach(key => {
-        const hadLocal = localStorage.getItem(key) !== null
-        const hadSession = sessionStorage.getItem(key) !== null
-        
         localStorage.removeItem(key)
         sessionStorage.removeItem(key)
-        
-        if (hadLocal || hadSession) {
-          console.log(`Cleared key: ${key}`)
-        }
       })
-      
+
       // Method 2: Nuclear option - clear everything (comment out if too aggressive)
       // localStorage.clear()
       // sessionStorage.clear()
-      
-      console.log('After clearing - localStorage length:', localStorage.length)
-      console.log('After clearing - sessionStorage length:', sessionStorage.length)
-      
+
       // Clear any global state if using Vuex/Pinia
       if (this.$store && this.$store.dispatch) {
         try {
           this.$store.dispatch('auth/logout')
           this.$store.dispatch('auth/clearAuth')
           this.$store.dispatch('user/logout')
-          console.log('Cleared store state')
         } catch (e) {
-          console.log('No auth store found or dispatch failed:', e.message)
+          // No auth store found or dispatch failed
         }
       }
-      
+
       // Reset component state
       this.isLoggingOut = false
-      
+
       // Use Vue router for smooth navigation
-      console.log('Redirecting to login...')
       this.$router.push('/login').catch(err => {
         // Handle navigation failures (e.g., already on login page)
-        console.log('Navigation to login:', err.message)
       })
     },
     

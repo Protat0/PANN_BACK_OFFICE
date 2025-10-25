@@ -230,25 +230,20 @@ export default {
   // LIFECYCLE HOOKS
   // ====================================================================
   async mounted() {
-    console.log("=== SalesByCategory Component Mounted ===");
-    
     try {
       await this.loadAllCategoryData();
-      
+
       // Start auto-refresh
       if (this.autoRefreshEnabled) {
         this.startAutoRefresh();
       }
-      
-      console.log("✅ All category data loaded");
     } catch (error) {
-      console.error("❌ Category data loading failed:", error);
+      console.error("Category data loading failed:", error);
     }
   },
 
 beforeUnmount() {
   this.stopAutoRefresh();
-  console.log('🧹 Component cleanup complete');
 },
   
   // ====================================================================
@@ -264,16 +259,13 @@ beforeUnmount() {
      */
     async loadAllCategoryData() {
       try {
-        console.log("=== Loading All Category Data (Initial/Refresh) ===");
         this.loading = true;
         this.loadingTopItems = true;
         this.loadingChart = true;
-            
+
         if (!CategoryService?.CategoryData) {
           throw new Error("CategoryData method not found in CategoryService");
         }
-        
-        console.log("Calling CategoryService.CategoryData()...");
         
         // Call basic API (no date filtering for initial load)
         let response;
@@ -284,9 +276,6 @@ beforeUnmount() {
           throw error;
         }
         
-        console.log("=== CATEGORY API RESPONSE DEBUG ===");
-        console.log("Raw API Response:", response);
-        
         // Extract categories from response
         let categoryData = this.extractCategoryData(response);
         
@@ -296,10 +285,7 @@ beforeUnmount() {
           
           // Separately update chart with period-specific data
           await this.updateChartWithCurrentFrequency();
-          
-          console.log("✅ All category data processed successfully");
         } else {
-          console.warn("No category data found, using fallback data");
           this.setFallbackData();
         }
         
@@ -313,12 +299,11 @@ beforeUnmount() {
         
         // Handle connection errors
         this.consecutiveErrors++;
-        
+
         if (this.consecutiveErrors >= 3) {
           this.connectionLost = true;
-          console.log('Connection marked as lost after 3 consecutive errors');
         }
-        
+
         this.setFallbackData();
       } finally {
         this.loading = false;
@@ -357,19 +342,17 @@ beforeUnmount() {
           if (!response?.date_filter_applied) {
             chartData = this.filterCategoriesByDate(chartData, dateRange);
           }
-          
+
           // Update ONLY the chart
           this.updateChartData(chartData.slice(0, 6));
-          console.log("✅ Chart updated with frequency data");
         } else {
           // Update chart label at minimum
           if (this.chartData.datasets[0]) {
             this.chartData.datasets[0].label = `Category Sales (${this.selectedFrequency})`;
           }
         }
-        
+
       } catch (error) {
-        console.warn("Could not get period-specific chart data, using general data");
         // Chart will use the default data
       }
     },
@@ -379,20 +362,16 @@ beforeUnmount() {
      */
     extractCategoryData(response) {
       let categoryData = [];
-      
+
       // Try different response structures
       if (response?.data?.data && Array.isArray(response.data.data)) {
         categoryData = response.data.data;
-        console.log("Found categories in response.data.data");
       } else if (response?.data?.items && Array.isArray(response.data.items)) {
         categoryData = response.data.items;
-        console.log("Found categories in response.data.items");
       } else if (Array.isArray(response?.data)) {
         categoryData = response.data;
-        console.log("Found categories in response.data (array)");
       } else if (Array.isArray(response)) {
         categoryData = response;
-        console.log("Found categories directly in response (array)");
       } else if (response?.success && response?.data) {
         // Handle success wrapper
         if (Array.isArray(response.data)) {
@@ -400,11 +379,8 @@ beforeUnmount() {
         } else if (response.data.categories && Array.isArray(response.data.categories)) {
           categoryData = response.data.categories;
         }
-        console.log("Found categories in success response");
       }
-      
-      console.log("Extracted category data:", categoryData);
-      console.log("Category data length:", categoryData.length);
+
       return categoryData;
     },
 
@@ -412,9 +388,6 @@ beforeUnmount() {
      * Client-side filtering by date range (fallback)
      */
     filterCategoriesByDate(categories, dateRange) {
-      console.log("=== Client-side Date Filtering ===");
-      console.log("Original categories:", categories.length);
-      console.log("Date range:", dateRange);
       
       const startDate = new Date(dateRange.start_date);
       const endDate = new Date(dateRange.end_date);
@@ -427,31 +400,23 @@ beforeUnmount() {
           category.created_at ||
           category.updated_at
         );
-        
+
         if (isNaN(categoryDate.getTime())) {
           // If no valid date, include in results (don't exclude due to missing dates)
-          console.warn("Invalid date for category:", category.category_name, "- including in results");
           return true;
         }
-        
+
         const isInRange = categoryDate >= startDate && categoryDate <= endDate;
-        
-        if (!isInRange) {
-          console.log(`Filtering out ${category.category_name} - date ${categoryDate.toISOString()} outside range`);
-        }
-        
+
         return isInRange;
       });
-      
-      console.log("Filtered categories:", filteredCategories.length);
-      
+
       // If filtering results in empty data, show message but keep some data for display
       if (filteredCategories.length === 0) {
-        console.warn("No categories found in date range, showing recent data");
         // Return the most recent categories instead of empty results
         return categories.slice(0, 10);
       }
-      
+
       return filteredCategories;
     },
 
@@ -459,8 +424,6 @@ beforeUnmount() {
      * Process category data for all components
      */
     async processCategoryData(categoryData) {
-      console.log("=== Processing Category Data ===");
-      console.log("Processing", categoryData.length, "categories");
       
      // 1. Process for Top Categories List (top 5) - SORTED BY HIGHEST SALES
     this.topItems = categoryData
@@ -484,8 +447,6 @@ beforeUnmount() {
       })
       .slice(0, 5) // Take top 5 after sorting
       .map((category, index) => {
-        console.log(`Processing top category ${index}:`, category);
-        
         return {
           name: category.category_name || 
                 category.name || 
@@ -501,16 +462,12 @@ beforeUnmount() {
           )
         };
       });
-      
-      console.log("✅ Top categories processed:", this.topItems);
-      
+
       // 2. Process for Chart Data (top 6 for better visualization)
       this.updateChartData(categoryData.slice(0, 6));
-      console.log("✅ Chart data processed");
-      
+
       // 3. Process for Category Table (all categories)
       this.categories = categoryData.map((category, index) => {
-        console.log(`Processing table category ${index}:`, category);
         
         // Calculate product count from subcategories
         const productCount = category.subcategories ? category.subcategories.reduce((total, sub) => total + (sub.product_count || 0), 0) : 0;
@@ -533,20 +490,12 @@ beforeUnmount() {
             product_count: productCount // Now correctly sums subcategory product counts
           };
         });
-      console.log("✅ Category table processed:", this.categories.length, "categories");
-      
-      // Log a sample category for debugging
-      if (this.categories.length > 0) {
-        console.log("Sample category for table:", this.categories[0]);
-      }
     },
 
     /**
      * Set fallback data when API fails
      */
     setFallbackData() {
-      console.log("Setting fallback data...");
-      
       // Fallback top items
       this.topItems = [
         { name: 'Noodles', price: '₱15,234.21' },
@@ -597,15 +546,12 @@ beforeUnmount() {
           product_count: 6
         }
       ];
-      
-      console.log("✅ Fallback data set");
     },
 
     /**
      * Legacy method for retry button
      */
     async getTopItems() {
-      console.log("Retrying category data load...");
       await this.loadAllCategoryData();
     },
 
@@ -617,8 +563,6 @@ beforeUnmount() {
      * Update chart data with category response
      */
     updateChartData(categories) {
-      console.log("Updating chart with categories:", categories);
-      
       if (!categories || categories.length === 0) {
         this.setDefaultChartData();
         return;
@@ -640,8 +584,6 @@ beforeUnmount() {
           borderWidth: 1
         }]
       };
-      
-      console.log("Updated chartData:", this.chartData);
     },
 
     /**
@@ -734,17 +676,13 @@ beforeUnmount() {
      * Handle frequency change - UPDATED: Only affects chart
      */
     async onFrequencyChange() {
-      console.log("Frequency changed to:", this.selectedFrequency);
-      
       // Show loading state for chart only
       this.loadingChart = true;
-      
+
       try {
         // Calculate new date range
         const dateRange = this.calculateDateRange(this.selectedFrequency);
         this.currentDateRange = dateRange;
-        
-        console.log("Updating chart only for frequency:", this.selectedFrequency);
         
         // Call API with date parameters for chart data only
         const requestParams = {
@@ -757,7 +695,6 @@ beforeUnmount() {
         try {
           response = await CategoryService.CategoryData(requestParams);
         } catch (apiError) {
-          console.warn("API doesn't support date filtering, using base call");
           response = await CategoryService.CategoryData();
         }
         
@@ -769,11 +706,9 @@ beforeUnmount() {
           if (!response?.date_filter_applied) {
             categoryData = this.filterCategoriesByDate(categoryData, dateRange);
           }
-          
+
           // Update ONLY the chart (NOT top items or table)
           this.updateChartData(categoryData.slice(0, 6));
-          
-          console.log("✅ Chart updated for frequency:", this.selectedFrequency);
         } else {
           // Update chart label at minimum
           if (this.chartData.datasets[0]) {
@@ -796,8 +731,6 @@ beforeUnmount() {
      * Update only top items and chart (separate from table)
      */
     updateTopItemsAndChart(categoryData) {
-      console.log("=== Updating Top Items and Chart Only ===");
-      
       // 1. Update Top Categories List (top 5) with period data
       this.topItems = categoryData.slice(0, 5).map((category, index) => ({
         name: category.category_name || 
@@ -813,13 +746,10 @@ beforeUnmount() {
           0
         )
       }));
-      
-      console.log("✅ Top items updated for period:", this.topItems);
-      
+
       // 2. Update Chart Data with period data
       this.updateChartData(categoryData.slice(0, 6));
-      console.log("✅ Chart updated for period");
-      
+
       // Note: Table data remains unchanged - shows all categories
     },
 
@@ -827,7 +757,6 @@ beforeUnmount() {
      * Refresh all data
      */
     async refreshData() {
-      console.log("Refreshing all category data...");
       await this.loadAllCategoryData();
     },
 
@@ -904,11 +833,9 @@ beforeUnmount() {
       if (this.autoRefreshEnabled) {
         this.autoRefreshEnabled = false
         this.stopAutoRefresh()
-        console.log('Auto-refresh disabled by user')
       } else {
         this.autoRefreshEnabled = true
         this.startAutoRefresh()
-        console.log('Auto-refresh enabled by user')
       }
     },
   
@@ -928,31 +855,26 @@ beforeUnmount() {
       this.autoRefreshTimer = setInterval(() => {
         this.loadAllCategoryData() // Use your existing refresh method
       }, this.autoRefreshInterval)
-      
-      console.log(`Auto-refresh started (${this.autoRefreshInterval / 1000}s interval)`)
     },
-  
+
     stopAutoRefresh() {
       if (this.autoRefreshTimer) {
         clearInterval(this.autoRefreshTimer)
         this.autoRefreshTimer = null
       }
-      
+
       if (this.countdownTimer) {
         clearInterval(this.countdownTimer)
         this.countdownTimer = null
       }
-      
-      console.log('Auto-refresh stopped')
     },
 
     // Emergency reconnect method
     async emergencyReconnect() {
-      console.log('Emergency reconnect initiated')
       this.consecutiveErrors = 0
       this.connectionLost = false
       await this.loadAllCategoryData()
-      
+
       if (!this.autoRefreshEnabled) {
         this.autoRefreshEnabled = true
         this.startAutoRefresh()

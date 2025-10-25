@@ -10,6 +10,10 @@ export function useReportsModal() {
   const title = ref('')
   const error = ref(null)
 
+  const categoryStats = ref(null)
+  const categoryStatsLoading = ref(false)
+  const categoryStatsError = ref(null)
+
   // Filters
   const filters = ref({
     category: '',
@@ -25,6 +29,75 @@ export function useReportsModal() {
   const currentPage = ref(1)
   const itemsPerPage = ref(20)
 
+
+  // Category Stats API Method
+  const fetchCategoryStats = async () => {
+    try {
+      categoryStatsLoading.value = true
+      categoryStatsError.value = null
+      
+      const response = await fetch('/api/v1/category/stats/')
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        categoryStats.value = result.stats
+        return result.stats
+      } else {
+        throw new Error(result.error || 'Failed to fetch category stats')
+      }
+    } catch (err) {
+      categoryStatsError.value = err.message || 'Failed to fetch category statistics'
+      console.error('Error fetching category stats:', err)
+      throw err
+    } finally {
+      categoryStatsLoading.value = false
+    }
+  }
+
+  
+  const refreshCategoryStats = async () => {
+    try {
+      await fetchCategoryStats()
+    } catch (err) {
+      console.error('Error refreshing category stats:', err)
+    }
+  }
+
+
+  const clearCategoryStatsError = () => {
+    categoryStatsError.value = null
+  }
+
+  // NEW: Computed properties for easy access to stats
+  const totalCategories = computed(() => {
+    return categoryStats.value?.category_overview?.total_categories || 0
+  })
+
+  const activeCategories = computed(() => {
+    return categoryStats.value?.category_overview?.active_categories || 0
+  })
+
+  const totalSubcategories = computed(() => {
+    return categoryStats.value?.structure_stats?.total_subcategories || 0
+  })
+
+  const totalProducts = computed(() => {
+    return categoryStats.value?.structure_stats?.total_products || 0
+  })
+
+  const avgSubcategoriesPerCategory = computed(() => {
+    return categoryStats.value?.structure_stats?.avg_subcategories_per_category || 0
+  })
+
+  const avgProductsPerCategory = computed(() => {
+    return categoryStats.value?.structure_stats?.avg_products_per_category || 0
+  })
+
   // API Methods
   const fetchLowStockItems = async (params = {}) => {
     try {
@@ -33,8 +106,7 @@ export function useReportsModal() {
       
       const response = await productsApiService.getLowStockProducts(params)
       updateData(response || [])
-      
-      console.log('Low stock items fetched:', response)
+
       return response
     } catch (err) {
       error.value = err.message || 'Failed to fetch low stock items'
@@ -58,8 +130,7 @@ export function useReportsModal() {
       
       const response = await productsApiService.getExpiringProducts(queryParams)
       updateData(response || [])
-      
-      console.log('Expiring items fetched:', response)
+
       return response
     } catch (err) {
       error.value = err.message || 'Failed to fetch expiring items'
@@ -477,11 +548,29 @@ export function useReportsModal() {
     processedData,
     totalPages,
     paginatedData,
+    
+    //Category Stats Computed
+    totalCategories,
+    activeCategories,
+    totalSubcategories,
+    totalProducts,
+    avgSubcategoriesPerCategory,
+    avgProductsPerCategory,
+
+    //Category Stats State
+    categoryStats,
+    categoryStatsLoading,
+    categoryStatsError,
 
     // API Actions
     fetchLowStockItems,
     fetchExpiringItems,
     refreshReportData,
+
+    //Category Stats Actions
+    fetchCategoryStats,
+    refreshCategoryStats,
+    clearCategoryStatsError,
 
     // Modal Actions
     showModal,

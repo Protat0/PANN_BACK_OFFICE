@@ -33,7 +33,27 @@
             </h6>
             <div class="alert alert-info border-0" style="background-color: var(--info-light); color: var(--info-dark);">
               <AlertTriangle :size="16" class="me-2" />
-              Download the template file to see the required format and column headers.
+              <div>
+                <strong>Important Guidelines:</strong>
+                <ul class="mb-0 mt-2" style="font-size: 0.875rem;">
+                  <li><strong>Required columns:</strong> product_name, selling_price, category_id</li>
+                  <li><strong>Optional columns:</strong> subcategory_name, SKU, supplier_id, stock, cost_price, low_stock_threshold, unit, status, barcode, description, </li>
+                  <li><strong>Stock is optional</strong> - Leave blank or set to 0 if not adding initial inventory</li>
+                  <li><strong>When adding stock (stock > 0):</strong>
+                    <ul>
+                      <li><code>cost_price</code> is <strong>REQUIRED</strong></li>
+                      <li><code>expiry_date</code> is <strong>REQUIRED</strong></li>
+                      <li>Initial batch will be created automatically by the system</li>
+                    </ul>
+                  </li>
+                  <li><strong>When stock is 0 or empty:</strong>
+                    <ul>
+                      <li><code>cost_price</code> is optional</li>
+                      <li>No batch will be created (add stock later via restock)</li>
+                    </ul>
+                  </li>
+                </ul>
+              </div>
             </div>
             
             <div class="d-flex gap-2 flex-wrap">
@@ -96,6 +116,19 @@
               <AlertTriangle :size="16" class="me-2" />
               {{ fileValidationError }}
             </div>
+
+            <!-- Stock/Cost Price Validation Warning -->
+            <div v-if="selectedFile && !fileValidationError" class="alert alert-warning border-0" style="background-color: var(--warning-light); color: var(--warning-dark);">
+              <AlertTriangle :size="16" class="me-2" />
+              <div>
+                <strong>Before importing, make sure:</strong>
+                <ul class="mb-0 mt-2" style="font-size: 0.875rem;">
+                  <li>Products with <code>stock > 0</code> must have <code>cost_price</code> and <code>expiry_date</code></li>
+                  <li>Products without stock (or stock = 0) don't need cost_price</li>
+                  <li>Use "Validate only" first to check for errors without importing</li>
+                </ul>
+              </div>
+            </div>
           </div>
 
           <!-- Import Options -->
@@ -104,7 +137,7 @@
               Step 3: Import Options
             </h6>
             
-            <div class="form-check mb-2">
+            <div class="form-check mb-3">
               <input 
                 class="form-check-input" 
                 type="checkbox" 
@@ -113,14 +146,20 @@
                 :disabled="loading"
               >
               <label class="form-check-label" for="validateOnly" style="color: var(--tertiary-medium);">
-                Validate only (don't import, just check for errors)
+                <strong>Validate only</strong> (recommended first step)
               </label>
               <small class="form-text d-block mt-1" style="color: var(--tertiary-medium);">
-                Use this option to check your file for errors before doing the actual import
+                Check your file for errors before doing the actual import. This will verify:
+                <ul class="mb-0 mt-1" style="font-size: 0.8125rem;">
+                  <li>Required fields are present</li>
+                  <li>Stock/cost_price validation rules</li>
+                  <li>Duplicate SKUs</li>
+                  <li>Data format issues</li>
+                </ul>
               </small>
             </div>
             
-            <div class="form-check mb-2">
+            <div class="form-check mb-3">
               <input 
                 class="form-check-input" 
                 type="checkbox" 
@@ -153,12 +192,18 @@
             </div>
           </div>
 
-          <!-- Category Validation Info -->
-          <div v-if="categories.length > 0" class="mb-4">
+          <!-- Batch Creation Info -->
+          <div v-if="!validateOnly && selectedFile" class="mb-4">
             <div class="alert alert-info border-0" style="background-color: var(--info-light); color: var(--info-dark);">
-              <AlertTriangle :size="16" class="me-2" />
-              <strong>Available Categories:</strong> 
-              <span class="ms-2">{{ categories.map(c => c.category_name).join(', ') }}</span>
+              <Package :size="16" class="me-2" />
+              <div>
+                <strong>Automatic Batch Creation:</strong>
+                <ul class="mb-0 mt-2" style="font-size: 0.875rem;">
+                  <li>Products with initial stock will automatically get their first batch created</li>
+                  <li>Batch will include: quantity, cost price, and expiry date from your file</li>
+                  <li>You can add more batches later when restocking</li>
+                </ul>
+              </div>
             </div>
           </div>
 
@@ -184,77 +229,131 @@
             </div>
           </div>
 
-          <!-- Error Messages from useProducts -->
+          <!-- Error Messages -->
           <div v-if="error" class="alert alert-danger border-0" style="background-color: var(--error-light); color: var(--error-dark);">
             <AlertTriangle :size="16" class="me-2" />
             <strong>Error:</strong> {{ error }}
           </div>
 
-          <!-- Success Message from useProducts -->
-          <div v-if="successMessage && !importResults" class="alert alert-success border-0" style="background-color: var(--success-light); color: var(--success-dark);">
-            <CheckCircle :size="16" class="me-2" />
-            {{ successMessage }}
-          </div>
-
           <!-- Results Section -->
           <div v-if="importResults" class="mt-4">
             <h6 class="mb-3" style="color: var(--tertiary-dark);">
-              Import Results
+              {{ validateOnly ? 'Validation Results' : 'Import Results' }}
             </h6>
             
             <!-- Success Results -->
-            <div v-if="importResults.success" class="alert alert-success border-0" style="background-color: var(--success-light); color: var(--success-dark);">
+            <div v-if="importResults.success && importResults.validationErrors.length === 0" class="alert alert-success border-0" style="background-color: var(--success-light); color: var(--success-dark);">
               <CheckCircle :size="16" class="me-2" />
-              <strong>{{ validateOnly ? 'Validation completed!' : 'Import completed successfully!' }}</strong>
-              <ul class="mb-0 mt-2">
-                <li>Total processed: {{ importResults.totalProcessed || 0 }}</li>
-                <li v-if="!validateOnly">Successfully imported: {{ importResults.totalSuccessful || 0 }}</li>
-                <li v-if="!validateOnly && importResults.totalSkipped > 0">Skipped (duplicates): {{ importResults.totalSkipped }}</li>
-                <li v-if="importResults.totalFailed && importResults.totalFailed > 0">Failed: {{ importResults.totalFailed }}</li>
-              </ul>
+              <div>
+                <strong>{{ validateOnly ? 'Validation completed successfully!' : 'Import completed successfully!' }}</strong>
+                <ul class="mb-0 mt-2">
+                  <li>Total rows processed: {{ importResults.totalProcessed || 0 }}</li>
+                  <li v-if="validateOnly">
+                    ✅ {{ importResults.totalProcessed }} valid products found
+                  </li>
+                  <li v-if="!validateOnly">
+                    Successfully imported: {{ importResults.totalSuccessful || 0 }}
+                    <span v-if="importResults.batchesCreated > 0" class="ms-2">
+                      <Package :size="14" style="display: inline;" />
+                      {{ importResults.batchesCreated }} batches created
+                    </span>
+                  </li>
+                  <li v-if="!validateOnly && importResults.totalSkipped > 0">
+                    Skipped (duplicates): {{ importResults.totalSkipped }}
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Partial Success with Warnings -->
+            <div v-if="importResults.hasWarnings" class="alert alert-warning border-0 mt-2" style="background-color: var(--warning-light); color: var(--warning-dark);">
+              <AlertTriangle :size="16" class="me-2" />
+              <div>
+                <strong>Import completed with warnings:</strong>
+                <ul class="mb-0 mt-2" style="font-size: 0.875rem;">
+                  <li v-if="importResults.productsWithoutBatches > 0">
+                    {{ importResults.productsWithoutBatches }} products created without initial stock
+                  </li>
+                  <li v-if="importResults.batchCreationErrors > 0">
+                    {{ importResults.batchCreationErrors }} products created but batch creation failed
+                    <small class="d-block text-muted">Products were created successfully, but you'll need to add stock manually</small>
+                  </li>
+                </ul>
+              </div>
             </div>
 
             <!-- Error Results -->
             <div v-if="!importResults.success" class="alert alert-danger border-0" style="background-color: var(--error-light); color: var(--error-dark);">
               <AlertTriangle :size="16" class="me-2" />
-              <strong>{{ validateOnly ? 'Validation failed:' : 'Import failed:' }}</strong> {{ importResults.error }}
-              <ul v-if="importResults.totalProcessed > 0" class="mb-0 mt-2">
-                <li>Total processed: {{ importResults.totalProcessed || 0 }}</li>
-                <li v-if="!validateOnly">Successfully imported: {{ importResults.totalSuccessful || 0 }}</li>
-                <li>Failed: {{ importResults.totalFailed || 0 }}</li>
-              </ul>
+              <strong>{{ validateOnly ? 'Validation failed' : 'Import failed' }}</strong>
+              <div class="mt-2">
+                <span class="badge bg-danger me-2">
+                  {{ importResults.validationErrors.length }} {{ importResults.validationErrors.length === 1 ? 'error' : 'errors' }} found
+                </span>
+                <span v-if="importResults.totalProcessed > 0" class="badge bg-secondary">
+                  {{ importResults.totalProcessed }} rows processed
+                </span>
+              </div>
             </div>
 
-            <!-- Validation Results -->
+            <!-- Detailed Validation Errors -->
             <div v-if="importResults.validationErrors && importResults.validationErrors.length > 0" class="mt-3">
-              <div class="alert alert-warning border-0" style="background-color: var(--neutral-light); color: var(--tertiary-dark);">
-                <AlertTriangle :size="16" class="me-2" />
-                <strong>{{ validateOnly ? 'Validation Issues Found:' : 'Issues Found During Import:' }}</strong>
-                <div class="mt-2" style="max-height: 200px; overflow-y: auto;">
-                  <ul class="mb-0">
-                    <li v-for="(error, index) in importResults.validationErrors.slice(0, 20)" :key="index">
-                      Row {{ (error.row || error.index || index) + 1 }}: {{ error.error || error.message }}
-                      <small v-if="error.field" class="text-muted d-block">Field: {{ error.field }}</small>
-                    </li>
-                    <li v-if="importResults.validationErrors.length > 20" class="text-muted">
-                      ... and {{ importResults.validationErrors.length - 20 }} more issues
-                    </li>
-                  </ul>
+              <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center" style="background-color: var(--error-light); color: var(--error-dark);">
+                  <strong>
+                    <AlertTriangle :size="16" class="me-2" />
+                    {{ importResults.validationErrors.length }} {{ importResults.validationErrors.length === 1 ? 'Error' : 'Errors' }} Found
+                  </strong>
+                  <small>Fix these issues and try again</small>
                 </div>
-                <div v-if="!validateOnly && importResults.validationErrors.length > 0" class="mt-2">
-                  <small class="text-muted">
-                    💡 Try running validation first to see all issues before importing
+                <div class="card-body p-0">
+                  <div class="error-list" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-sm table-hover mb-0">
+                      <tbody>
+                        <tr 
+                          v-for="(error, index) in importResults.validationErrors.slice(0, 50)" 
+                          :key="index"
+                          class="error-row"
+                        >
+                          <td style="width: 40px; text-align: center; color: var(--error);">
+                            <XCircle :size="16" />
+                          </td>
+                          <td>
+                            <div class="d-flex flex-column">
+                              <span class="text-danger fw-bold" style="font-size: 0.875rem;">
+                                {{ error }}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                        <tr v-if="importResults.validationErrors.length > 50">
+                          <td colspan="2" class="text-center text-muted py-3">
+                            <Info :size="16" class="me-2" />
+                            ... and {{ importResults.validationErrors.length - 50 }} more errors
+                            <div class="mt-2">
+                              <small>Showing first 50 errors. Fix these and validate again to see remaining issues.</small>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="card-footer" style="background-color: var(--info-light); color: var(--info-dark);">
+                  <small>
+                    <Info :size="14" class="me-1" />
+                    <strong>Tips:</strong> Each error shows the row number and what needs to be fixed. Update your file and validate again.
                   </small>
                 </div>
               </div>
             </div>
 
             <!-- Success Actions -->
-            <div v-if="importResults.success && !validateOnly" class="mt-3">
+            <div v-if="importResults.success && !validateOnly && importResults.validationErrors.length === 0" class="mt-3">
               <div class="d-flex gap-2 flex-wrap">
                 <button 
                   type="button" 
-                  class="btn btn-export btn-sm"
+                  class="btn btn-export btn-sm btn-with-icon-sm"
                   @click="refreshProductList"
                   :disabled="loading"
                 >
@@ -264,13 +363,24 @@
                 
                 <button 
                   type="button" 
-                  class="btn btn-view btn-sm"
+                  class="btn btn-view btn-sm btn-with-icon-sm"
                   @click="viewImportedProducts"
                   :disabled="loading"
                 >
                   <Eye :size="14" />
                   View Imported Products
                 </button>
+              </div>
+            </div>
+
+            <!-- Validation Success Next Steps -->
+            <div v-if="importResults.success && validateOnly && importResults.validationErrors.length === 0" class="mt-3">
+              <div class="alert alert-success border-0" style="background-color: var(--success-light); color: var(--success-dark);">
+                <CheckCircle :size="16" class="me-2" />
+                <div>
+                  <strong>✨ Your file is ready to import!</strong>
+                  <p class="mb-0 mt-2">Uncheck "Validate only" and click "Import Products" to proceed with the actual import.</p>
+                </div>
               </div>
             </div>
           </div>
@@ -284,11 +394,11 @@
             data-bs-dismiss="modal"
             :disabled="isUploading || loading"
           >
-            {{ (importResults?.success && !validateOnly) ? 'Close' : 'Cancel' }}
+            {{ (importResults?.success && !validateOnly && importResults?.validationErrors?.length === 0) ? 'Close' : 'Cancel' }}
           </button>
           
           <button 
-            v-if="!importResults?.success || validateOnly"
+            v-if="!importResults?.success || validateOnly || importResults?.validationErrors?.length > 0"
             type="button" 
             class="btn btn-submit btn-sm btn-with-icon-sm"
             @click="handleImport"
@@ -300,7 +410,7 @@
           </button>
 
           <button 
-            v-if="importResults?.success && !validateOnly"
+            v-if="importResults?.success && !validateOnly && importResults?.validationErrors?.length === 0"
             type="button" 
             class="btn btn-add btn-sm btn-with-icon-sm"
             @click="startNewImport"
@@ -316,29 +426,30 @@
 
 <script>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useProducts } from '@/composables/ui/products/useProducts'
-import productsApiService from '@/services/apiProducts.js'
+import { 
+  Upload, FileSpreadsheet, AlertTriangle, Check, CheckCircle, 
+  RefreshCw, Eye, Plus, Package, XCircle, Info
+} from 'lucide-vue-next'
+import { useProducts } from '@/composables/api/useProducts'
+import apiProductsService from '@/services/apiProducts.js'
 
 export default {
   name: 'ImportModal',
-  emits: ['import-completed', 'import-failed', 'refresh-products'],
+  components: {
+    Upload, FileSpreadsheet, AlertTriangle, Check, CheckCircle,
+    RefreshCw, Eye, Plus, Package, XCircle, Info
+  },
+  emits: ['import-completed', 'import-failed', 'refresh-products', 'view-imported-products'],
   
   setup(props, { emit }) {
-    // Use the products composable for consistency
     const {
-      categories,
       loading,
       error,
-      successMessage,
-      fetchCategories,
-      handleImportSuccess,
-      handleImportError,
-      refreshData
+      fetchProducts
     } = useProducts()
 
-    // Local reactive state
     const selectedFile = ref(null)
-    const validateOnly = ref(false)
+    const validateOnly = ref(true)
     const skipDuplicates = ref(true)
     const updateExisting = ref(false)
     const isDownloading = ref(false)
@@ -350,7 +461,6 @@ export default {
     const lastImportWasSuccessful = ref(false)
     const fileValidationError = ref(null)
 
-    // Computed properties
     const canImport = computed(() => {
       return selectedFile.value && 
              !isUploading.value && 
@@ -365,14 +475,12 @@ export default {
       return validateOnly.value ? 'Validate File' : 'Import Products'
     })
 
-    // Methods
     const downloadTemplate = async (fileType) => {
       try {
         isDownloading.value = true
         uploadStatus.value = `Downloading ${fileType.toUpperCase()} template...`
         
-        // Use the updated API service method
-        await productsApiService.downloadImportTemplateClient(fileType)
+        await apiProductsService.downloadImportTemplate(fileType)
         
         uploadStatus.value = 'Template downloaded successfully!'
         setTimeout(() => {
@@ -391,17 +499,14 @@ export default {
     }
 
     const validateFile = (file) => {
-      // Reset validation error
       fileValidationError.value = null
 
-      // Check file size (10MB limit)
-      const maxSize = 10 * 1024 * 1024 // 10MB
+      const maxSize = 10 * 1024 * 1024
       if (file.size > maxSize) {
         fileValidationError.value = `File size (${formatFileSize(file.size)}) exceeds the 10MB limit`
         return false
       }
 
-      // Check file type
       const allowedTypes = [
         'text/csv',
         'application/vnd.ms-excel',
@@ -423,10 +528,10 @@ export default {
       const file = event.target.files[0]
       if (file && validateFile(file)) {
         selectedFile.value = file
-        importResults.value = null // Clear previous results
+        importResults.value = null
+        validateOnly.value = true
       } else if (file) {
         selectedFile.value = null
-        // fileValidationError.value is already set by validateFile
       }
     }
 
@@ -440,7 +545,7 @@ export default {
 
     const resetForm = () => {
       selectedFile.value = null
-      validateOnly.value = false
+      validateOnly.value = true
       skipDuplicates.value = true
       updateExisting.value = false
       importResults.value = null
@@ -468,16 +573,6 @@ export default {
         uploadProgress.value = 0
         uploadStatus.value = 'Preparing file...'
 
-        // UPDATED: Enhanced options based on new API capabilities
-        const options = {
-          validate_only: validateOnly.value,
-          skip_duplicates: skipDuplicates.value,
-          update_existing: updateExisting.value,
-          create_history: true, // CRITICAL: Ensure product history is created
-          batch_size: 50 // Process in batches for better performance
-        }
-
-        // Enhanced progress simulation
         const progressInterval = setInterval(() => {
           if (uploadProgress.value < 85) {
             uploadProgress.value += Math.random() * 15
@@ -485,27 +580,25 @@ export default {
           }
         }, 300)
 
-        console.log('Starting import with options:', options)
-        
-        const result = await productsApiService.importProducts(selectedFile.value, options)
+        const result = await apiProductsService.importProducts(selectedFile.value, validateOnly.value)
         
         clearInterval(progressInterval)
         uploadProgress.value = 100
 
-        console.log('Import API response:', result)
-
-        // UPDATED: Enhanced result parsing based on new API response format
         const processedResult = parseImportResult(result)
 
-        if (processedResult.success) {
+        if (processedResult.success && processedResult.validationErrors.length === 0) {
           uploadStatus.value = validateOnly.value ? 'Validation completed!' : 'Import completed!'
           importResults.value = processedResult
           lastImportWasSuccessful.value = !validateOnly.value
 
-          // Use useProducts success handler for consistency
           if (!validateOnly.value) {
-            handleImportSuccess(result)
-            emit('import-completed', result)
+            await fetchProducts()
+            emit('import-completed', {
+              totalSuccessful: processedResult.totalSuccessful,
+              totalFailed: processedResult.totalFailed,
+              batchesCreated: processedResult.batchesCreated
+            })
           }
         } else {
           uploadStatus.value = validateOnly.value ? 'Validation failed' : 'Import completed with issues'
@@ -513,9 +606,10 @@ export default {
           importResults.value = processedResult
           lastImportWasSuccessful.value = false
 
-          // Use useProducts error handler for consistency
-          handleImportError({ message: processedResult.error, details: result })
-          emit('import-failed', { message: processedResult.error, details: result })
+          emit('import-failed', { 
+            message: processedResult.error, 
+            details: result 
+          })
         }
 
       } catch (error) {
@@ -534,20 +628,18 @@ export default {
           totalProcessed: 0,
           totalSuccessful: 0,
           totalFailed: 0,
-          validationErrors: []
+          batchesCreated: 0,
+          validationErrors: [errorMessage]
         }
 
         lastImportWasSuccessful.value = false
-        
-        // Use useProducts error handler
-        handleImportError(error)
         emit('import-failed', error)
       } finally {
         isUploading.value = false
       }
     }
 
-    // UPDATED: Enhanced result parsing for different API response formats
+    // ✅ ONLY THIS FUNCTION WAS CHANGED
     const parseImportResult = (result) => {
       if (!result) {
         return {
@@ -556,32 +648,58 @@ export default {
           totalProcessed: 0,
           totalSuccessful: 0,
           totalFailed: 0,
-          validationErrors: []
+          batchesCreated: 0,
+          validationErrors: ['No response from server']
         }
       }
 
-      // Handle different response structures
       const data = result.results || result
 
-      const totalProcessed = data.total_processed || data.totalProcessed || 0
-      const totalSuccessful = data.total_successful || data.totalSuccessful || 0
-      const totalFailed = data.total_failed || data.totalFailed || 0
-      const totalSkipped = data.total_skipped || data.totalSkipped || 0
-      const validationErrors = data.validation_errors || data.validationErrors || []
+      // ✅ FIXED: Handle both validation mode and import mode
+      let errors = []
+      let totalProcessed = 0
+      let totalSuccessful = 0
+      let totalFailed = 0
 
-      // Determine success based on multiple criteria
+      if (validateOnly.value) {
+        // Validation mode
+        errors = data.errors || []
+        totalProcessed = data.total_rows || 0
+        totalSuccessful = data.valid_products || 0
+        totalFailed = errors.length
+      } else {
+        // Import mode
+        totalProcessed = data.total_rows || 0
+        totalSuccessful = data.successful || 0
+        totalFailed = data.failed || 0
+        
+        // Extract error messages from failed_details
+        const failedDetails = data.failed_details || []
+        errors = failedDetails.map(f => `${f.product}: ${f.error}`)
+      }
+      
+      const batchesCreated = data.batches_created || 0
+      const batchCreationErrors = data.batch_creation_errors?.length || 0
+      const productsWithoutBatches = totalSuccessful - batchesCreated
+      
       const isSuccess = validateOnly.value ? 
-        (totalProcessed > 0 && validationErrors.length === 0) :
-        (totalSuccessful > 0 && (totalFailed === 0 || totalSuccessful > totalFailed))
+        (errors.length === 0) :
+        (totalSuccessful > 0)
+
+      const hasWarnings = !validateOnly.value && (batchCreationErrors > 0 || productsWithoutBatches > 0)
 
       return {
         success: isSuccess,
-        error: data.error || data.message || (isSuccess ? '' : 'Import validation failed'),
+        error: data.message || (isSuccess ? '' : 'Validation failed'),
         totalProcessed,
         totalSuccessful,
         totalFailed,
-        totalSkipped,
-        validationErrors
+        totalSkipped: data.skipped || 0,
+        batchesCreated,
+        batchCreationErrors,
+        productsWithoutBatches,
+        hasWarnings,
+        validationErrors: errors
       }
     }
 
@@ -592,9 +710,9 @@ export default {
       } else if (progress < 40) {
         uploadStatus.value = 'Processing data...'
       } else if (progress < 60) {
-        uploadStatus.value = 'Validating categories...'
+        uploadStatus.value = 'Validating products...'
       } else if (progress < 80) {
-        uploadStatus.value = validateOnly.value ? 'Validating products...' : 'Creating products...'
+        uploadStatus.value = validateOnly.value ? 'Checking for errors...' : 'Creating products and batches...'
       } else {
         uploadStatus.value = 'Finalizing...'
       }
@@ -602,7 +720,7 @@ export default {
 
     const refreshProductList = async () => {
       try {
-        await refreshData()
+        await fetchProducts()
         emit('refresh-products')
         uploadStatus.value = 'Product list refreshed!'
         setTimeout(() => {
@@ -615,35 +733,24 @@ export default {
     }
 
     const viewImportedProducts = () => {
-      // Close modal and emit event to navigate to products with filter
       const modal = bootstrap.Modal.getInstance(document.getElementById('importModal'))
       if (modal) {
         modal.hide()
       }
       
-      // You could emit an event to filter products by recent imports
       emit('view-imported-products', importResults.value)
     }
 
-    // Modal event handlers
     const onModalShown = () => {
-      // Fetch categories when modal opens for validation
-      if (categories.value.length === 0) {
-        fetchCategories()
-      }
-
-      // Reset form when modal is opened if last import was successful
       if (lastImportWasSuccessful.value) {
         resetForm()
       }
     }
 
     const onModalHidden = () => {
-      // Optional: Clear any temporary states
       uploadStatus.value = ''
     }
 
-    // Bootstrap modal event listeners setup
     let modalElement = null
 
     onMounted(() => {
@@ -651,11 +758,6 @@ export default {
       if (modalElement) {
         modalElement.addEventListener('shown.bs.modal', onModalShown)
         modalElement.addEventListener('hidden.bs.modal', onModalHidden)
-      }
-
-      // Fetch categories on component mount
-      if (categories.value.length === 0) {
-        fetchCategories()
       }
     })
 
@@ -667,13 +769,8 @@ export default {
     })
 
     return {
-      // From useProducts
-      categories,
       loading,
       error,
-      successMessage,
-
-      // Local state
       selectedFile,
       validateOnly,
       skipDuplicates,
@@ -685,12 +782,8 @@ export default {
       importResults,
       fileInput,
       fileValidationError,
-
-      // Computed
       canImport,
       getImportButtonText,
-
-      // Methods
       downloadTemplate,
       onFileSelected,
       formatFileSize,
@@ -707,7 +800,6 @@ export default {
 </script>
 
 <style scoped>
-/* Custom styles for better visual hierarchy */
 .modal-header {
   border-bottom: 1px solid var(--neutral-medium);
 }
@@ -753,12 +845,22 @@ export default {
   }
 }
 
-/* Alert customizations */
 .alert {
   border-radius: 8px;
 }
 
-/* File input styling */
+.alert ul {
+  margin-left: 1.25rem;
+  font-size: 0.875rem;
+}
+
+.alert code {
+  background-color: rgba(0, 0, 0, 0.1);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+}
+
 .form-control[type="file"] {
   padding: 0.5rem;
 }
@@ -767,28 +869,15 @@ export default {
   box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
 }
 
-/* Scrollable validation errors */
-.alert ul {
-  margin-bottom: 0;
-}
-
-.alert li {
-  font-size: 0.875rem;
-  margin-bottom: 0.25rem;
-}
-
-/* Enhanced button states */
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-/* Form text styling */
 .form-text {
   font-size: 0.8125rem;
 }
 
-/* Checkbox and label improvements */
 .form-check {
   padding-left: 1.5em;
 }
@@ -801,7 +890,6 @@ export default {
   line-height: 1.4;
 }
 
-/* Loading state for buttons */
 .btn-loading {
   position: relative;
   color: transparent !important;
@@ -827,7 +915,52 @@ export default {
   }
 }
 
-/* Responsive adjustments */
+.error-list {
+  background-color: var(--neutral-light);
+}
+
+.error-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.error-list::-webkit-scrollbar-track {
+  background: var(--neutral-light);
+}
+
+.error-list::-webkit-scrollbar-thumb {
+  background: var(--neutral-medium);
+  border-radius: 4px;
+}
+
+.error-list::-webkit-scrollbar-thumb:hover {
+  background: var(--neutral-dark);
+}
+
+.error-row:hover {
+  background-color: var(--neutral-light);
+}
+
+.card {
+  border: 1px solid var(--neutral-medium);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+}
+
+.card-footer {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+}
+
+:root {
+  --warning-light: #FFF3CD;
+  --warning-dark: #856404;
+}
+
 @media (max-width: 768px) {
   .modal-lg {
     max-width: 95%;

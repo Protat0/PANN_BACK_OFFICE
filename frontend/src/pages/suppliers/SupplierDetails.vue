@@ -70,10 +70,16 @@
           <Edit :size="16" class="me-1" />
           Edit
         </button>
-        <button class="btn btn-success" @click="createOrder">
-          <Plus :size="16" class="me-1" />
-          New Order
-        </button>
+        <div class="d-flex gap-2">
+          <button class="btn btn-primary" @click="createOrder">
+            <ShoppingCart :size="16" class="me-1" />
+            Create Purchase Order
+          </button>
+          <button class="btn btn-success" @click="openReceiveStockModal">
+            <Package :size="16" class="me-1" />
+            Receive Stock
+          </button>
+        </div>
         <div class="dropdown">
           <button class="btn btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown">
             <Download :size="16" class="me-1" />
@@ -96,18 +102,6 @@
       <p class="mt-3 text-tertiary-medium">Loading supplier details...</p>
     </div>
 
-    <!-- Error State -->
-    <div v-if="error" class="alert alert-danger text-center" role="alert">
-      <p class="mb-3">{{ error }}</p>
-      <button class="btn btn-primary" @click="fetchSupplierDetails">Try Again</button>
-    </div>
-
-    <!-- Success Message -->
-    <div v-if="successMessage" class="alert alert-success alert-dismissible fade show" role="alert">
-      {{ successMessage }}
-      <button type="button" class="btn-close" @click="successMessage = null"></button>
-    </div>
-
     <!-- Quick Stats Card - Moved to Top -->
     <div v-if="!loading && !error && supplier" class="card stats-card mb-4">
       <div class="card-header">
@@ -122,7 +116,7 @@
             <div class="stat-number text-primary">{{ supplier.purchaseOrders || 0 }}</div>
             <div class="stat-label">Total Orders</div>
           </div>
-          <div class="stat-item">
+          <div class="stat-item clickable-stat" @click="openActiveOrdersModal">
             <div class="stat-number text-warning">{{ getActiveOrders() }}</div>
             <div class="stat-label">Active Orders</div>
           </div>
@@ -318,16 +312,17 @@
           <div class="card-header">
             <div class="d-flex justify-content-between align-items-center">
               <h5 class="card-title mb-0">
-                <ShoppingCart :size="18" class="me-2" />
-                Purchase Orders
+                <Package :size="18" class="me-2" />
+                Stock Receipt History
                 <span class="badge bg-secondary ms-2">{{ filteredOrders.length }}</span>
               </h5>
               <div class="d-flex gap-2 align-items-center" v-if="orders.length > 0">
-                <select class="form-select form-select-sm" v-model="orderStatusFilter" @change="filterOrders" style="width: auto;">
-                  <option value="all">All Orders</option>
-                  <option value="pending">Pending</option>
+                <select class="form-select form-select-sm" v-model="orderStatusFilter" @change="filterOrders">
+                  <option value="all">All Receipts</option>
+                  <option value="pending delivery">Pending Delivery</option>
                   <option value="received">Received</option>
-                  <option value="cancelled">Cancelled</option>
+                  <option value="partially received">Partially Received</option>
+                  <option value="depleted">Depleted</option>
                 </select>
                 <div class="dropdown">
                   <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
@@ -373,7 +368,9 @@
                     <td>{{ formatDate(order.date) }}</td>
                     <td>
                       <div>
-                        {{ order.quantity }} items
+                        {{ order.items?.length || 0 }} item(s)
+                        <br>
+                        <small class="text-muted">{{ order.quantity }} total quantity</small>
                         <br>
                         <small class="text-muted">{{ order.description || 'Various items' }}</small>
                       </div>
@@ -397,15 +394,16 @@
                       <div class="action-buttons">
                         <button 
                           class="btn btn-outline-primary btn-sm" 
-                          @click="viewOrder(order)" 
-                          title="View Order"
+                          @click="viewReceipt(order)" 
+                          title="View Receipt Details"
                         >
                           <Eye :size="14" />
                         </button>
                         <button 
-                          class="btn btn-outline-info btn-sm" 
-                          @click="editOrder(order)" 
-                          title="Edit Order"
+                          class="btn btn-outline-warning btn-sm" 
+                          @click="editBatchDetails(order)" 
+                          title="Edit Order Details"
+                          :disabled="order.status === 'Received' || order.status === 'Depleted'"
                         >
                           <Edit :size="14" />
                         </button>
@@ -431,11 +429,11 @@
             <div v-if="orders.length === 0" class="text-center text-muted py-5">
               <Package :size="48" class="text-muted mb-3" />
               <div>
-                <h6 class="text-muted">No purchase orders found</h6>
-                <p class="mb-3">This supplier has no purchase orders yet.</p>
-                <button class="btn btn-primary btn-sm" @click="createOrder">
+                <h6 class="text-muted">No stock receipts found</h6>
+                <p class="mb-3">No stock has been received from this supplier yet.</p>
+                <button class="btn btn-primary btn-sm" @click="openReceiveStockModal">
                   <Plus :size="16" class="me-1" />
-                  Create First Order
+                  Receive First Stock
                 </button>
               </div>
             </div>
@@ -494,20 +492,58 @@
       <button class="btn btn-primary" @click="goBack">Go Back to Suppliers</button>
     </div>
 
-    <!-- Create Order Modal - Fixed for Options API -->
+    <!-- Create Order Modal -->
     <CreateOrderModal
-      v-if="showCreateOrderModal"
+      v-if="showCreateOrderModal && supplier"
       :show="showCreateOrderModal"
-      :supplier="selectedSupplier"
+      :supplier="supplier"
       @close="closeCreateOrderModal"
-      @save="handleOrderSave"
+      @saved="handleOrderSave"
+    />
+
+    <!-- Receive Stock Modal (Shows ALL pending batches for bulk receiving) -->
+    <ReceiveStockModal
+      v-if="showReceiveStockModal && supplier"
+      :show="showReceiveStockModal"
+      :supplier="supplier"
+      @close="closeReceiveStockModal"
+      @received="handleStockReceived"
+    />
+
+    <!-- Batch Details Modal (View only) -->
+    <BatchDetailsModal
+      v-if="showBatchDetailsModal"
+      :show="showBatchDetailsModal"
+      :receipt="selectedReceiptForView"
+      @close="closeBatchDetailsModal"
+    />
+
+    <!-- Edit Batch Details Modal -->
+    <EditBatchDetailsModal
+      v-if="showEditBatchDetailsModal && supplier"
+      :show="showEditBatchDetailsModal"
+      :receipt="selectedReceiptForEdit"
+      :supplier="supplier"
+      @close="closeEditBatchDetailsModal"
+      @saved="handleBatchDetailsUpdated"
+    />
+
+    <!-- Active Orders Modal -->
+    <ActiveOrdersModal
+      v-if="showActiveOrdersModal && supplier"
+      :show="showActiveOrdersModal"
+      :orders="getActiveOrdersForModal()"
+      :supplier="supplier"
+      :loading="false"
+      @close="closeActiveOrdersModal"
     />
 
     <!-- Order Details Modal -->
     <OrderDetailsModal
+      v-if="selectedOrderForView"
       :show="showOrderDetailsModal"
       :order="selectedOrderForView"
-      :can-edit="selectedOrderForView && selectedOrderForView.status !== 'Received' && selectedOrderForView.status !== 'Cancelled'"
+      :can-edit="selectedOrderForView.status !== 'Received' && selectedOrderForView.status !== 'Cancelled'"
       :initial-mode="orderModalMode"
       @close="closeOrderDetailsModal"
       @save="handleOrderUpdate"
@@ -685,7 +721,17 @@ import {
   Activity
 } from 'lucide-vue-next'
 import CreateOrderModal from '@/components/suppliers/CreateOrderModal.vue'
+import ReceiveStockModal from '@/components/suppliers/ReceiveStockModal.vue'
+import BatchDetailsModal from '@/components/suppliers/BatchDetailsModal.vue'
+import EditBatchDetailsModal from '@/components/suppliers/EditBatchDetailsModal.vue'
 import OrderDetailsModal from '@/components/suppliers/OrderDetailsModal.vue'
+import ActiveOrdersModal from '@/components/suppliers/ActiveOrdersModal.vue'
+import { useToast } from '@/composables/ui/useToast'
+import { useAuth } from '@/composables/auth/useAuth'
+import { useProducts } from '@/composables/api/useProducts'
+import axios from 'axios'
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 
 export default {
   name: 'SupplierDetails',
@@ -720,12 +766,28 @@ export default {
     AlertTriangle,
     Activity,
     CreateOrderModal,
-    OrderDetailsModal
+    ReceiveStockModal,
+    BatchDetailsModal,
+    EditBatchDetailsModal,
+    OrderDetailsModal,
+    ActiveOrdersModal
   },
   props: {
     supplierId: {
       type: [String, Number],
       required: true
+    }
+  },
+  setup() {
+    const { user } = useAuth()
+    const { success, error: showError } = useToast()
+    const { fetchProductById } = useProducts()
+    
+    return {
+      user,
+      success,
+      showError,
+      fetchProductById
     }
   },
   data() {
@@ -736,23 +798,23 @@ export default {
       recentActivity: [],
       loading: false,
       error: null,
-      successMessage: null,
       saving: false,
       deleting: false,
       orderStatusFilter: 'all',
       selectedOrders: [],
       selectAllOrders: false,
-      
-      // Create Order Modal state - Options API style
-      showCreateOrderModal: false,
-      selectedSupplier: null,
 
-      // Order details modal state
+      showCreateOrderModal: false,
+      showReceiveStockModal: false,
+      showBatchDetailsModal: false,
+      showEditBatchDetailsModal: false,
+      showActiveOrdersModal: false,
+      selectedReceiptForView: null,
+      selectedReceiptForEdit: null,
       showOrderDetailsModal: false,
       selectedOrderForView: null,
       orderModalMode: 'view',
       
-      // Edit modal state
       showEditModal: false,
       showDeleteModal: false,
       editForm: {
@@ -766,20 +828,16 @@ export default {
         notes: ''
       },
       
-      // Notes editing
       editingNotes: false,
       editableNotes: ''
     }
   },
   async mounted() {
-    console.log('SupplierDetails mounted with ID:', this.supplierId)
-    console.log('Route params:', this.$route.params)
     await this.fetchSupplierDetails()
   },
   watch: {
     supplierId: {
       handler(newId, oldId) {
-        console.log('Supplier ID changed from', oldId, 'to', newId)
         this.fetchSupplierDetails()
       },
       immediate: false
@@ -787,251 +845,421 @@ export default {
   },
   methods: {
     async fetchSupplierDetails() {
-      console.log('fetchSupplierDetails called with ID:', this.supplierId)
       this.loading = true
       this.error = null
       
       try {
-        const mockSuppliers = [
+        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+        
+        // ===== STEP 1: Fetch Supplier Info =====
+        const supplierResponse = await axios.get(
+          `${API_BASE_URL}/suppliers/${this.supplierId}/`,
           {
-            id: 1,
-            name: 'John Doe Supplies',
-            contactPerson: 'John Doe',
-            email: 'john@johndoesupplies.com',
-            phone: '+63 912 345 6789',
-            address: '123 Supply Street, Business District, Manila, Philippines',
-            purchaseOrders: 4,
-            status: 'active',
-            type: 'food',
-            rating: 4.5,
-            isFavorite: false,
-            notes: 'Reliable supplier with consistent quality.',
-            createdAt: '2024-01-15',
-            updatedAt: '2024-12-10'
-          },
-          {
-            id: 2,
-            name: 'Bravo Warehouse',
-            contactPerson: 'Maria Santos',
-            email: 'contact@bravowarehouse.com',
-            phone: '+63 917 888 9999',
-            address: '456 Warehouse Ave, Industrial Park, Quezon City, Philippines',
-            purchaseOrders: 5,
-            status: 'active',
-            type: 'packaging',
-            rating: 4.2,
-            isFavorite: true,
-            notes: 'Good packaging supplier. Fast delivery times.',
-            createdAt: '2024-02-01',
-            updatedAt: '2024-12-08'
-          },
-          {
-            id: 3,
-            name: 'San Juan Groups',
-            contactPerson: 'Carlos Rivera',
-            email: 'info@sanjuangroups.ph',
-            phone: '+63 922 111 2222',
-            address: '789 Corporate Blvd, Makati City, Philippines',
-            purchaseOrders: 12,
-            status: 'active',
-            type: 'equipment',
-            rating: 4.8,
-            isFavorite: false,
-            notes: 'Premium equipment supplier.',
-            createdAt: '2024-01-10',
-            updatedAt: '2024-12-05'
-          },
-          {
-            id: 4,
-            name: 'Bagatayam Inc.',
-            contactPerson: 'Ana Lopez',
-            email: 'sales@bagatayam.com',
-            phone: '+63 933 444 5555',
-            address: '321 Trading St, Pasig City, Philippines',
-            purchaseOrders: 8,
-            status: 'active',
-            type: 'services',
-            rating: 4.0,
-            isFavorite: false,
-            notes: 'Service provider for maintenance.',
-            createdAt: '2024-03-05',
-            updatedAt: '2024-12-01'
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
           }
-        ]
+        )
         
-        const currentSupplierId = this.supplierId || this.$route.params.supplierId
-        console.log('Looking for supplier with ID:', currentSupplierId, 'Type:', typeof currentSupplierId)
+        const backendSupplier = supplierResponse.data
+        console.log('✅ Supplier loaded:', backendSupplier.supplier_name)
         
-        const foundSupplier = mockSuppliers.find(s => {
-          console.log('Comparing supplier ID', s.id, 'with', currentSupplierId)
-          return s.id === parseInt(currentSupplierId) || s.id.toString() === currentSupplierId.toString()
-        })
-        
-        console.log('Found supplier:', foundSupplier)
-        
-        if (!foundSupplier) {
-          throw new Error(`Supplier with ID ${currentSupplierId} not found`)
+        // ===== STEP 2: Fetch Batches for this Supplier =====
+        let batchesList = []
+        try {
+          const batchesResponse = await axios.get(
+            `${API_BASE_URL}/batches/by-supplier/${this.supplierId}/`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          )
+          
+          console.log('=== BATCHES RESPONSE DEBUG ===')
+          console.log('Response data:', batchesResponse.data)
+          console.log('Type:', typeof batchesResponse.data)
+          console.log('Is array?', Array.isArray(batchesResponse.data))
+          console.log('==============================')
+          
+          // Handle different response formats
+          const rawBatches = batchesResponse.data.batches || batchesResponse.data || []
+          
+          // Ensure it's always an array
+          if (Array.isArray(rawBatches)) {
+            batchesList = rawBatches
+          } else if (rawBatches.data && Array.isArray(rawBatches.data)) {
+            batchesList = rawBatches.data
+          } else {
+            console.warn('⚠️ Batches response is not an array:', rawBatches)
+            batchesList = []
+          }
+          
+          console.log(`📦 Found ${batchesList.length} batches`)
+          
+        } catch (batchesError) {
+          console.error('❌ Error fetching batches:', batchesError)
+          if (batchesError.response?.status === 404) {
+            console.warn('⚠️ Batches endpoint returned 404 - batches will be empty')
+          }
+          batchesList = []
         }
         
-        // Detailed mock data only for first supplier (ID: 1)
-        let mockOrders = []
-        let mockActivity = []
+        // ===== STEP 3: Map Supplier Data =====
+        this.supplier = {
+          id: backendSupplier._id,
+          name: backendSupplier.supplier_name,
+          contactPerson: backendSupplier.contact_person || '',
+          email: backendSupplier.email || '',
+          phone: backendSupplier.phone_number || '',
+          address: backendSupplier.address || '',
+          purchaseOrders: 0, // Will be set after grouping batches into orders
+          status: backendSupplier.isDeleted ? 'inactive' : 'active',
+          type: backendSupplier.type || 'food',
+          rating: 4.5,
+          isFavorite: false,
+          notes: backendSupplier.notes || '',
+          createdAt: backendSupplier.created_at,
+          updatedAt: backendSupplier.updated_at
+        }
         
-        if (foundSupplier.id === 1) {
-          // Detailed orders data for John Doe Supplies
-          mockOrders = [
-            {
-              id: 'PO-001',
-              date: '2024-12-10',
-              quantity: 12,
-              total: 3600.00,
-              expectedDate: '2024-12-25',
-              status: 'Received',
-              description: 'Rice and cooking oil'
-            },
-            {
-              id: 'PO-002',
-              date: '2024-11-15',
-              quantity: 25,
-              total: 7500.00,
-              expectedDate: '2024-12-01',
-              status: 'Pending',
-              description: 'Fresh vegetables and fruits'
-            },
-            {
-              id: 'PO-003',
-              date: '2024-10-05',
-              quantity: 13,
-              total: 3900.00,
-              expectedDate: '2024-10-20',
-              status: 'Cancelled',
-              description: 'Meat products'
-            },
-            {
-              id: 'PO-004',
-              date: '2024-09-11',
-              quantity: 30,
-              total: 9000.00,
-              expectedDate: '2024-09-27',
-              status: 'Received',
-              description: 'Dairy products and beverages'
-            }
-          ]
-
-          // Detailed activity data for John Doe Supplies
-          mockActivity = [
+        // ===== STEP 4: Group Batches by Date to Create "Receipts" =====
+        // Safety check
+        if (!Array.isArray(batchesList)) {
+          console.error('❌ batchesList is not an array:', batchesList)
+          batchesList = []
+        }
+        
+        // If no batches, set empty orders
+        if (batchesList.length === 0) {
+          console.log('ℹ️ No batches found for this supplier')
+          this.orders = []
+          this.filteredOrders = []
+          this.editableNotes = this.supplier.notes
+          this.recentActivity = [
             {
               id: 1,
-              type: 'order_created',
-              title: 'New Purchase Order Created',
-              description: 'PO-002 created for ₱7,500.00',
-              user: 'Admin User',
-              date: '2024-11-15T10:30:00Z'
-            },
-            {
-              id: 2,
-              type: 'order_received',
-              title: 'Order Received',
-              description: 'PO-001 marked as received',
-              user: 'Warehouse Manager',
-              date: '2024-12-10T14:20:00Z'
-            },
-            {
-              id: 3,
               type: 'supplier_updated',
               title: 'Supplier Information Updated',
               description: 'Contact details updated',
               user: 'Admin User',
-              date: '2024-12-10T09:15:00Z'
-            },
-            {
-              id: 4,
-              type: 'payment_processed',
-              title: 'Payment Processed',
-              description: 'Payment of ₱3,600.00 processed for PO-001',
-              user: 'Finance Team',
-              date: '2024-12-11T11:45:00Z'
+              date: backendSupplier.updated_at
             }
           ]
-        } else {
-          // Empty arrays for other suppliers (no detailed data)
-          mockOrders = []
-          mockActivity = []
+          
+          console.log('=== SUMMARY (No Batches) ===')
+          console.log('Supplier:', this.supplier.name)
+          console.log('Stock Receipts: 0')
+          console.log('============================')
+          return
         }
         
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 500))
+        // Group batches by receipt (either date_received for completed or expected_delivery_date for pending)
+        const batchesByDate = {}
+        batchesList.forEach(batch => {
+          // For pending orders, group by expected_delivery_date
+          // For received orders, group by date_received
+          let dateKey
+          if (batch.date_received) {
+            dateKey = typeof batch.date_received === 'string' ? batch.date_received.split('T')[0] : new Date(batch.date_received).toISOString().split('T')[0]
+          } else if (batch.expected_delivery_date) {
+            dateKey = typeof batch.expected_delivery_date === 'string' ? batch.expected_delivery_date.split('T')[0] : new Date(batch.expected_delivery_date).toISOString().split('T')[0]
+          } else {
+            dateKey = batch.created_at.split('T')[0]
+          }
+          
+          if (!batchesByDate[dateKey]) {
+            batchesByDate[dateKey] = []
+          }
+          batchesByDate[dateKey].push(batch)
+        })
         
-        this.supplier = foundSupplier
-        this.orders = mockOrders
-        this.recentActivity = mockActivity
-        this.editableNotes = foundSupplier.notes
-        this.filteredOrders = [...mockOrders]
+        // ===== STEP 4.5: Enrich batches with product details for complete category info =====
+        const enrichedBatchesByDate = {}
+        for (const [dateKey, batches] of Object.entries(batchesByDate)) {
+          enrichedBatchesByDate[dateKey] = await Promise.all(
+            batches.map(async (batch) => {
+              try {
+                // Always fetch product details to get category info (don't rely on batch fields)
+                if (batch.product_id) {
+                  const productResponse = await this.fetchProductById(batch.product_id)
+                  const product = productResponse.data
+                  
+                  if (product) {
+                    return {
+                      ...batch,
+                      // Get product name and category info from product, not from batch
+                      product_name: product.product_name || product.name || batch.product_id || 'Unknown Product',
+                      category_id: product.category_id || '',
+                      category_name: product.category_name || '',
+                      subcategory_name: product.subcategory_name || ''
+                    }
+                  }
+                }
+                
+                return batch
+              } catch (err) {
+                console.warn(`Failed to fetch product details for batch ${batch._id}:`, err)
+                return batch
+              }
+            })
+          )
+        }
         
-        console.log('Supplier loaded successfully:', this.supplier.name)
-        console.log('Orders loaded:', this.orders.length)
-        console.log('Activities loaded:', this.recentActivity.length)
+        // Convert grouped batches to "orders" format
+        this.orders = Object.entries(enrichedBatchesByDate).map(([date, batches]) => {
+          const totalCost = batches.reduce((sum, b) => sum + ((b.cost_price || 0) * (b.quantity_received || 0)), 0)
+          const totalQuantity = batches.reduce((sum, b) => sum + (b.quantity_received || 0), 0)
+          
+          let receiptId = `SR-${date.replace(/-/g, '')}`
+          const firstBatchNotes = batches[0].notes || ''
+          const receiptMatch = firstBatchNotes.match(/Receipt:\s*([^\|]+)/)
+          if (receiptMatch) {
+            receiptId = receiptMatch[1].trim()
+          }
+          
+          // Get expected_delivery_date and date_received from first batch
+          const firstBatch = batches[0]
+          const expectedDate = firstBatch.expected_delivery_date ? 
+            (typeof firstBatch.expected_delivery_date === 'string' ? firstBatch.expected_delivery_date.split('T')[0] : new Date(firstBatch.expected_delivery_date).toISOString().split('T')[0]) : 
+            date
+          const receivedDate = firstBatch.date_received ? 
+            (typeof firstBatch.date_received === 'string' ? firstBatch.date_received.split('T')[0] : new Date(firstBatch.date_received).toISOString().split('T')[0]) : 
+            null
+          
+          return {
+            id: receiptId,
+            date: firstBatch.created_at ? firstBatch.created_at.split('T')[0] : date, // Order date (when PO was created)
+            quantity: totalQuantity,
+            total: totalCost,
+            expectedDate: expectedDate, // Expected delivery date
+            receivedDate: receivedDate, // Actual received date (null for pending)
+            status: this.getReceiptStatus(batches),
+            description: `Stock receipt with ${batches.length} item(s)`,
+            notes: firstBatchNotes,
+            priority: 'normal',
+            subtotal: totalCost,
+            tax: 0,
+            shippingCost: 0,
+            taxRate: 0,
+            items: batches.map(batch => ({
+              name: batch.product_name || batch.product_id || 'Unknown Product',
+              quantity: batch.quantity_received,
+              unit: 'pcs',
+              unitPrice: batch.cost_price || 0,
+              totalPrice: (batch.cost_price || 0) * (batch.quantity_received || 0),
+              notes: batch.notes || '',
+              productId: batch.product_id,
+              product_name: batch.product_name || 'Unknown Product', // Add product_name for ActiveOrdersModal
+              batchNumber: batch.batch_number,  // ✅ Pass batch number for activation
+              batchId: batch._id,  // ✅ Pass batch ID 
+              expiryDate: batch.expiry_date,
+              quantityRemaining: batch.quantity_remaining,
+              // ✅ Enhanced category info from product details
+              categoryId: batch.category_id || '',
+              categoryName: batch.category_name || '',
+              subcategoryName: batch.subcategory_name || ''
+            })),
+            orderHistory: [{
+              id: batches[0].created_at,
+              type: 'stock_received',
+              title: 'Stock Received',
+              description: `Received ${batches.length} batch(es) containing ${totalQuantity} units`,
+              user: 'System',
+              date: batches[0].created_at
+            }]
+          }
+        }).sort((a, b) => new Date(b.date) - new Date(a.date))
+        
+        // Update total orders count after grouping
+        this.supplier.purchaseOrders = this.orders.length
+        
+        this.filteredOrders = [...this.orders]
+        this.editableNotes = this.supplier.notes
+        
+        this.recentActivity = [
+          {
+            id: 1,
+            type: 'supplier_updated',
+            title: 'Supplier Information Updated',
+            description: 'Contact details updated',
+            user: 'Admin User',
+            date: backendSupplier.updated_at
+          }
+        ]
+        
+        console.log('=== SUMMARY ===')
+        console.log('Supplier:', this.supplier.name)
+        console.log('Stock Receipts:', this.orders.length)
+        console.log('Total Batches:', batchesList.length)
+        console.log('First Receipt:', this.orders[0])
+        console.log('===============')
         
       } catch (error) {
         console.error('Error fetching supplier details:', error)
-        this.error = `Failed to load supplier details: ${error.message}`
+        
+        if (error.response?.status === 404) {
+          this.error = `Supplier with ID ${this.supplierId} not found`
+          this.showError(`Supplier with ID ${this.supplierId} not found`)
+        } else {
+          this.error = error.response?.data?.error || `Failed to load supplier details: ${error.message}`
+          this.showError(this.error)
+        }
       } finally {
         this.loading = false
       }
     },
 
-    // Create Order Modal methods - Options API style
-    openCreateOrderModal(supplier) {
-      this.selectedSupplier = supplier
+    getReceiptStatus(batches) {
+      if (!batches || batches.length === 0) return 'Unknown'
+      
+      const allPending = batches.every(b => b.status === 'pending')
+      const allActive = batches.every(b => b.status === 'active')
+      const allInactive = batches.every(b => b.status === 'inactive')
+      const hasPending = batches.some(b => b.status === 'pending')
+      
+      if (allPending) return 'Pending Delivery'
+      if (allActive) return 'Received'
+      if (allInactive) return 'Depleted'
+      if (hasPending) return 'Partially Received'
+      
+      return 'Mixed Status'
+    },
+
+    openReceiveStockModal() {
+      // Open the "Receive Stock" modal that shows ALL pending batches
+      this.showReceiveStockModal = true
+    },
+
+    closeReceiveStockModal() {
+      this.showReceiveStockModal = false
+    },
+
+    openActiveOrdersModal() {
+      // Open the "Active Orders" modal that shows pending orders for this supplier
+      this.showActiveOrdersModal = true
+    },
+
+    closeActiveOrdersModal() {
+      this.showActiveOrdersModal = false
+    },
+    
+    async handleStockReceived(results) {
+      console.log('✅ Stock received:', results)
+      
+      if (results.successful?.length > 0) {
+        this.success(`Successfully received ${results.successful.length} batch(es)`)
+      }
+      
+      if (results.failed?.length > 0) {
+        this.showError(`Failed to receive ${results.failed.length} batch(es)`)
+      }
+      
+      // Refresh supplier details to show updated batches
+      await this.fetchSupplierDetails()
+    },
+
+
+    createOrder() {
+      this.openCreateOrderModal()
+    },
+
+    openCreateOrderModal() {
       this.showCreateOrderModal = true
     },
 
     closeCreateOrderModal() {
       this.showCreateOrderModal = false
-      this.selectedSupplier = null
     },
 
-    handleOrderSave(orderData) {
-      // Handle order save logic here
-      console.log('Order saved:', orderData)
-      this.closeCreateOrderModal()
-      this.successMessage = 'Order created successfully!'
+    async handleOrderSave(result) {
+      console.log('✅ Order created:', result)
       
-      setTimeout(() => {
-        this.successMessage = null
-      }, 3000)
+      const { successful, failed } = result.results
+      
+      if (successful.length > 0) {
+        this.success(`Successfully created ${successful.length} pending order(s)`)
+      }
+      
+      if (failed.length > 0) {
+        this.showError(`Failed to create ${failed.length} order(s)`)
+      }
+      
+      // Refresh supplier details to show new batches
+      await this.fetchSupplierDetails()
+    },
+
+    canReceiveOrder(order) {
+      return order.status === 'Pending' || order.status === 'Active'
+    },
+
+
+    viewReceipt(receipt) {
+      console.log('Viewing receipt:', receipt)
+      this.selectedReceiptForView = receipt
+      this.showBatchDetailsModal = true
+    },
+    
+    closeBatchDetailsModal() {
+      this.showBatchDetailsModal = false
+      this.selectedReceiptForView = null
+    },
+
+    editBatchDetails(receipt) {
+      console.log('📝 Editing batch details for receipt:', receipt)
+      console.log('Receipt has', receipt.items?.length || 0, 'items')
+      console.log('Order Date (created_at):', receipt.date)
+      console.log('Expected Delivery:', receipt.expectedDate)
+      this.selectedReceiptForEdit = receipt
+      this.showEditBatchDetailsModal = true
+    },
+    
+    closeEditBatchDetailsModal() {
+      this.showEditBatchDetailsModal = false
+      this.selectedReceiptForEdit = null
+    },
+
+    async handleBatchDetailsUpdated(updatedReceipt) {
+      console.log('✅ Batch details updated:', updatedReceipt)
+      this.success('Purchase order updated successfully')
+      
+      // Refresh supplier details to show updated batches
+      await this.fetchSupplierDetails()
     },
 
     goBack() {
       this.$router.push({ name: 'Suppliers' })
     },
 
-    // Quick action methods
-    createOrder() {
-      this.openCreateOrderModal(this.supplier)
-    },
-
     viewPaymentHistory() {
-      alert('Payment history - Coming soon!')
+      this.showError('Payment history feature coming soon!')
     },
 
     viewDocuments() {
-      alert('View documents - Coming soon!')
+      this.showError('View documents feature coming soon!')
     },
 
     scheduleVisit() {
-      alert('Schedule visit - Coming soon!')
+      this.showError('Schedule visit feature coming soon!')
     },
 
     callSupplier() {
       if (this.supplier?.phone) {
         window.open(`tel:${this.supplier.phone}`)
+        this.success(`Calling ${this.supplier.name}...`)
+      } else {
+        this.showError('No phone number available for this supplier')
       }
     },
 
     emailSupplier() {
       if (this.supplier?.email) {
         window.open(`mailto:${this.supplier.email}`)
+        this.success(`Opening email to ${this.supplier.name}...`)
+      } else {
+        this.showError('No email address available for this supplier')
       }
     },
 
@@ -1039,6 +1267,9 @@ export default {
       if (this.supplier?.address) {
         const encodedAddress = encodeURIComponent(this.supplier.address)
         window.open(`https://maps.google.com/maps?q=${encodedAddress}`, '_blank')
+        this.success('Opening location in Google Maps...')
+      } else {
+        this.showError('No address available for this supplier')
       }
     },
 
@@ -1074,49 +1305,81 @@ export default {
       this.saving = true
       
       try {
-        // Mock save - replace with actual API call
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
         
-        // Update local supplier data
+        const backendData = {
+          supplier_name: this.editForm.name,
+          contact_person: this.editForm.contactPerson,
+          email: this.editForm.email,
+          phone_number: this.editForm.phone,
+          address: this.editForm.address,
+          type: this.editForm.type,
+          notes: this.editForm.notes
+        }
+        
+        const response = await axios.put(
+          `${API_BASE_URL}/suppliers/${this.supplier.id}/`,
+          backendData,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        )
+        
+        const updated = response.data
         this.supplier = {
-          ...this.supplier,
-          ...this.editForm,
-          updatedAt: new Date().toISOString()
+          id: updated._id,
+          name: updated.supplier_name,
+          contactPerson: updated.contact_person || '',
+          email: updated.email || '',
+          phone: updated.phone_number || '',
+          address: updated.address || '',
+          purchaseOrders: updated.purchase_orders?.length || 0,
+          status: updated.isDeleted ? 'inactive' : 'active',
+          type: updated.type || 'food',
+          rating: this.supplier.rating,
+          isFavorite: this.supplier.isFavorite,
+          notes: updated.notes || '',
+          createdAt: updated.created_at,
+          updatedAt: updated.updated_at
         }
         
         this.closeEditModal()
-        this.successMessage = 'Supplier updated successfully!'
         
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
+        // Show success toast instead of setting successMessage
+        this.success(`${this.supplier.name} has been updated successfully!`)
         
       } catch (error) {
         console.error('Error updating supplier:', error)
-        this.error = `Failed to update supplier: ${error.message}`
+        const errorMessage = error.response?.data?.error || `Failed to update supplier: ${error.message}`
+        
+        // Show error toast instead of setting error
+        this.showError(errorMessage)
+        
       } finally {
         this.saving = false
       }
     },
 
     exportSupplierData(format) {
-      alert(`Export as ${format} - Coming soon!`)
+      this.showError(`Export as ${format} feature coming soon!`)
     },
 
     exportSupplierReport() {
-      alert('Export full report - Coming soon!')
+      this.showError('Export full report feature coming soon!')
     },
 
     toggleFavorite() {
       this.supplier.isFavorite = !this.supplier.isFavorite
-      this.successMessage = `Supplier ${this.supplier.isFavorite ? 'added to' : 'removed from'} favorites`
-      setTimeout(() => {
-        this.successMessage = null
-      }, 2000)
+      
+      // Show toast instead of setting successMessage
+      this.success(`${this.supplier.name} ${this.supplier.isFavorite ? 'added to' : 'removed from'} favorites`)
     },
 
     duplicateSupplier() {
-      alert('Duplicate supplier functionality - Coming soon!')
+      this.showError('Duplicate supplier functionality coming soon!')
     },
 
     deleteSupplier() {
@@ -1127,11 +1390,22 @@ export default {
       this.deleting = true
       
       try {
-        // Mock delete - replace with actual API call
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+        
+        await axios.delete(
+          `${API_BASE_URL}/suppliers/${this.supplier.id}/`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        )
         
         this.showDeleteModal = false
-        this.successMessage = 'Supplier deleted successfully'
+        
+        // Show success toast
+        this.success(`${this.supplier.name} has been deleted successfully`)
         
         setTimeout(() => {
           this.goBack()
@@ -1139,13 +1413,16 @@ export default {
         
       } catch (error) {
         console.error('Error deleting supplier:', error)
-        this.error = `Failed to delete supplier: ${error.message}`
+        const errorMessage = error.response?.data?.error || `Failed to delete supplier: ${error.message}`
+        
+        // Show error toast instead of setting error
+        this.showError(errorMessage)
+        
       } finally {
         this.deleting = false
       }
     },
 
-    // Order management methods
     filterOrders() {
       if (this.orderStatusFilter === 'all') {
         this.filteredOrders = [...this.orders]
@@ -1169,6 +1446,9 @@ export default {
             return 0
         }
       })
+      
+      // Show toast for feedback
+      this.success(`Orders sorted by ${criteria}`)
     },
 
     toggleSelectAllOrders() {
@@ -1241,8 +1521,14 @@ export default {
       return classes[type] || 'bg-secondary'
     },
 
-    // Order action methods
     viewOrder(order) {
+      console.log('=== VIEWING ORDER ===')
+      console.log('Order being passed to modal:', order)
+      console.log('Order items:', order.items)
+      console.log('Items length:', order.items?.length)
+      console.log('Items structure:', order.items?.[0])
+      console.log('===================')
+      
       this.selectedOrderForView = order
       this.orderModalMode = 'view'
       this.showOrderDetailsModal = true
@@ -1264,50 +1550,43 @@ export default {
       if (confirm(`Are you sure you want to delete order ${order.id}?`)) {
         this.orders = this.orders.filter(o => o.id !== order.id)
         this.filterOrders()
-        this.successMessage = `Order ${order.id} deleted successfully`
         
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
+        // Show success toast instead of setting successMessage
+        this.success(`Order ${order.id} deleted successfully`)
       }
     },
 
     duplicateOrder(order) {
-      alert(`Duplicate order ${order.id} - Coming soon!`)
+      this.showError(`Duplicate order ${order.id} feature coming soon!`)
     },
 
     trackOrder(order) {
-      alert(`Track order ${order.id} - Coming soon!`)
+      this.showError(`Track order ${order.id} feature coming soon!`)
     },
 
     handleOrderUpdate(updatedOrder) {
-      // Find and update the order in the orders array
       const index = this.orders.findIndex(o => o.id === updatedOrder.id)
       if (index !== -1) {
         this.orders[index] = updatedOrder
-        this.filterOrders() // Refresh filtered orders
+        this.filterOrders()
         
-        this.successMessage = `Order ${updatedOrder.id} updated successfully`
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
+        // Show success toast instead of setting successMessage
+        this.success(`Order ${updatedOrder.id} updated successfully`)
       }
       
       this.closeOrderDetailsModal()
     },
 
     handleOrderEditModeChanged(isEditMode) {
-      // Optional: You can track edit mode state if needed
-      console.log('Order edit mode changed:', isEditMode)
+      // Edit mode changed
     },
 
-    // Bulk operations
     bulkExportOrders() {
-      alert(`Export ${this.selectedOrders.length} selected orders - Coming soon!`)
+      this.showError(`Export ${this.selectedOrders.length} selected orders feature coming soon!`)
     },
 
     bulkUpdateStatus() {
-      alert(`Update status for ${this.selectedOrders.length} selected orders - Coming soon!`)
+      this.showError(`Update status for ${this.selectedOrders.length} selected orders feature coming soon!`)
     },
 
     bulkDeleteOrders() {
@@ -1316,15 +1595,12 @@ export default {
         this.selectedOrders = []
         this.selectAllOrders = false
         this.filterOrders()
-        this.successMessage = 'Selected orders deleted successfully'
         
-        setTimeout(() => {
-          this.successMessage = null
-        }, 3000)
+        // Show success toast instead of setting successMessage
+        this.success('Selected orders deleted successfully')
       }
     },
 
-    // Notes management
     toggleNotesEdit() {
       if (this.editingNotes) {
         this.saveNotes()
@@ -1336,11 +1612,9 @@ export default {
     saveNotes() {
       this.supplier.notes = this.editableNotes
       this.editingNotes = false
-      this.successMessage = 'Notes updated successfully'
       
-      setTimeout(() => {
-        this.successMessage = null
-      }, 2000)
+      // Show success toast instead of setting successMessage
+      this.success('Notes updated successfully')
     },
 
     cancelNotesEdit() {
@@ -1351,14 +1625,17 @@ export default {
     getOrderStatusClass(status) {
       const classes = {
         'Received': 'bg-success',
+        'Pending Delivery': 'bg-warning',
+        'Partially Received': 'bg-info',
         'Pending': 'bg-warning',
+        'Partial': 'bg-info',
         'Cancelled': 'bg-danger',
-        'Active': 'bg-primary'
+        'Active': 'bg-primary',
+        'Depleted': 'bg-secondary'
       }
       return classes[status] || 'bg-secondary'
     },
 
-    // Utility methods
     getSupplierTypeLabel(type) {
       const labels = {
         'food': 'Food & Beverages',
@@ -1372,9 +1649,62 @@ export default {
     },
 
     getActiveOrders() {
+      // Count orders that are currently pending (not yet received)
       return this.orders.filter(order => 
-        order.status === 'Active' || order.status === 'Pending'
+        order.status === 'Pending Delivery' || order.status === 'Partially Received'
       ).length
+    },
+
+    getActiveOrdersForModal() {
+      console.log('🔍 Getting active orders for modal...')
+      console.log('All orders:', this.orders.length)
+      console.log('Orders with statuses:', this.orders.map(o => ({ id: o.id, status: o.status })))
+      
+      // Filter for pending orders (both Pending Delivery and Partially Received)
+      const activeOrders = this.orders.filter(order => {
+        const isActive = order.status === 'Pending Delivery' || order.status === 'Partially Received'
+        console.log(`Order ${order.id}: status=${order.status}, isActive=${isActive}`)
+        return isActive
+      })
+      
+      console.log('Active orders found:', activeOrders.length)
+      
+      // Transform the orders to match the format expected by ActiveOrdersModal
+      const transformedOrders = activeOrders.map(order => {
+        console.log(`Transforming order ${order.id} with ${order.items?.length || 0} items`)
+        
+        return {
+          id: order.id,
+          supplier: this.supplier.name,
+          supplierId: this.supplier.id,
+          supplierEmail: this.supplier.email || 'N/A',
+          orderDate: order.date, // Map date to orderDate
+          expectedDelivery: order.expectedDate, // Map expectedDate to expectedDelivery
+          deliveredDate: order.receivedDate, // Map receivedDate to deliveredDate
+          totalAmount: order.total, // Map total to totalAmount
+          status: order.status,
+          items: order.items.map(item => {
+            console.log(`Item: name="${item.name}", product_name="${item.product_name}", productId="${item.productId}"`)
+            return {
+              name: item.name || item.product_name || item.productId || 'Unknown Product',
+              product_name: item.name || item.product_name || 'Unknown Product',
+              product_id: item.productId,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
+              batchNumber: item.batchNumber,
+              batchId: item.batchId,
+              expiryDate: item.expiryDate,
+              quantityRemaining: item.quantityRemaining
+            }
+          }),
+          description: order.description,
+          notes: order.notes
+        }
+      })
+      
+      console.log('Transformed orders:', transformedOrders.length)
+      return transformedOrders
     },
 
     getTotalSpent() {
@@ -1695,6 +2025,17 @@ export default {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.clickable-stat {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clickable-stat:hover {
+  background-color: var(--primary-light);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .text-primary-dark {

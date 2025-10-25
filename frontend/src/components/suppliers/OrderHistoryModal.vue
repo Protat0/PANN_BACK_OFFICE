@@ -108,11 +108,10 @@
                   @change="applyFilters"
                 >
                   <option value="all">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="in_transit">In Transit</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="cancelled">Cancelled</option>
+                  <option value="pending">Pending Delivery</option>
+                  <option value="confirmed">Partially Received</option>
+                  <option value="delivered">Received</option>
+                  <option value="cancelled">Depleted</option>
                 </select>
               </div>
 
@@ -257,7 +256,7 @@
                 @click="editOrder(order)"
                 data-bs-toggle="tooltip"
                 title="Edit Order"
-                :disabled="order.status === 'delivered' || order.status === 'cancelled'"
+                :disabled="order.status === 'Received' || order.status === 'Depleted'"
               >
                 <Edit :size="12" />
               </button>
@@ -453,22 +452,18 @@ export default {
     }
 
     const editOrder = (order) => {
-      console.log('Edit order:', order.id)
       // Navigate to edit page or open edit modal
     }
 
     const downloadOrder = (order) => {
-      console.log('Download order:', order.id)
       // Generate and download PDF
     }
 
     const createNewOrder = () => {
-      console.log('Create new order')
       // Navigate to create order page or open modal
     }
 
     const exportOrders = () => {
-      console.log('Export orders')
       // Export filtered orders to CSV/Excel
     }
 
@@ -501,8 +496,8 @@ export default {
       const expectedDate = new Date(order.expectedDelivery)
       const now = new Date()
       
-      if (order.status === 'delivered') return 'Delivered'
-      if (order.status === 'cancelled') return 'Cancelled'
+      if (order.status === 'Received') return 'Delivered'
+      if (order.status === 'Depleted') return 'Depleted'
       
       const diffTime = expectedDate - now
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
@@ -518,8 +513,8 @@ export default {
       const now = new Date()
       const diffDays = Math.ceil((expectedDate - now) / (1000 * 60 * 60 * 24))
       
-      if (order.status === 'delivered') return 'text-success'
-      if (order.status === 'cancelled') return 'text-muted'
+      if (order.status === 'Received') return 'text-success'
+      if (order.status === 'Depleted') return 'text-muted'
       if (diffDays < 0) return 'text-danger'
       if (diffDays <= 2) return 'text-warning'
       return 'text-muted'
@@ -527,24 +522,17 @@ export default {
 
     const getStatusBadgeClass = (status) => {
       const statusClasses = {
-        'pending': 'bg-warning text-dark',
-        'confirmed': 'bg-info text-white',
-        'in_transit': 'bg-primary text-white',
-        'delivered': 'bg-success text-white',
-        'cancelled': 'bg-danger text-white'
+        'Pending Delivery': 'bg-warning text-dark',
+        'Partially Received': 'bg-info text-white',
+        'Received': 'bg-success text-white',
+        'Depleted': 'bg-secondary text-white',
+        'Mixed Status': 'bg-primary text-white'
       }
       return statusClasses[status] || 'bg-secondary text-white'
     }
 
     const getStatusText = (status) => {
-      const statusTexts = {
-        'pending': 'Pending',
-        'confirmed': 'Confirmed',
-        'in_transit': 'In Transit',
-        'delivered': 'Delivered',
-        'cancelled': 'Cancelled'
-      }
-      return statusTexts[status] || status
+      return status // Status is already in the correct format
     }
 
     const getRowClass = (order) => {
@@ -554,7 +542,7 @@ export default {
         classes.push('table-primary')
       }
       
-      if (order.status === 'cancelled') {
+      if (order.status === 'Depleted') {
         classes.push('text-muted')
       }
       

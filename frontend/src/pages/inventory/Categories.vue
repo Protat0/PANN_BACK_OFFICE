@@ -45,7 +45,7 @@
           <div class="d-flex align-items-center gap-2">
             <button 
               class="btn btn-filter btn-sm"
-              @click="toggleSearchMode"
+              @click="handleToggleSearchMode"
               :class="{ 'state-active': searchMode }"
               style="height: calc(1.5em + 0.75rem + 2px); display: flex; align-items: center; justify-content: center; padding: 0 0.75rem;"
             >
@@ -58,13 +58,12 @@
                 <label class="filter-label text-tertiary-medium">Status</label>
                 <select 
                   class="form-select form-select-sm input-theme" 
-                  v-model="statusFilter" 
+                  v-model="filters.status" 
                   @change="applyFilters"
                 >
-                  <option value="all">All categories</option>
+                  <option value="">All categories</option>
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
-                  <option value="deleted">Deleted</option>
                 </select>
               </div>
             </template>
@@ -74,8 +73,8 @@
               <div class="position-relative">
                 <input 
                   ref="searchInput"
-                  v-model="searchFilter" 
-                  @input="applyFilters"
+                  v-model="filters.search" 
+                  @input="handleSearchInput"
                   type="text" 
                   class="form-control form-control-sm search-input input-theme"
                   placeholder="Search categories..."
@@ -105,20 +104,15 @@
     <!-- Error State -->
     <div v-if="error" class="status-error" role="alert">
       <strong>Error:</strong> {{ error }}
-      <button @click="refreshData" class="btn btn-sm btn-export ms-2">
+      <button @click="refreshCategories" class="btn btn-sm btn-export ms-2">
         Retry
       </button>
-    </div>
-
-    <!-- Success Message -->
-    <div v-if="successMessage" class="status-success">
-      {{ successMessage }}
     </div>
 
     <!-- Category Cards Section -->
     <div v-if="!loading && !error" class="row g-3 mb-4">
       <div 
-        v-for="category in filteredCategories" 
+        v-for="category in displayedCategories" 
         :key="category._id"
         class="col-6 col-md-3"
       >
@@ -149,6 +143,7 @@
               <button 
                 class="btn btn-view btn-sm"
                 @click.stop="viewCategory(category._id)"
+                :disabled="loading"
               >
                 <Eye :size="14" />
                 View
@@ -156,6 +151,7 @@
               <button 
                 class="btn btn-delete btn-sm"
                 @click.stop="handleDeleteCategory(category)"
+                :disabled="loading || deleteLoading"
               >
                 <Trash2 :size="14" />
                 Delete
@@ -167,14 +163,14 @@
     </div>
 
     <!-- Empty State -->
-    <div v-if="!loading && !error && filteredCategories.length === 0" class="text-center py-5">
+    <div v-if="!loading && !error && displayedCategories.length === 0" class="text-center py-5">
       <Package :size="64" class="text-tertiary-medium mb-3" />
       <h5 class="text-tertiary-dark">No categories found</h5>
       <p class="text-tertiary-medium mb-3">
-        {{ categories.length === 0 ? 'Get started by creating your first category.' : 'No categories match your current filters.' }}
+        {{ hasCategories ? 'No categories match your current filters.' : 'Get started by creating your first category.' }}
       </p>
       <button 
-        v-if="categories.length === 0"
+        v-if="!hasCategories"
         class="btn btn-add"
         @click="handleAddCategory"
       >
@@ -196,167 +192,217 @@
 </template>
 
 <script>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, computed } from 'vue'
 import CardTemplate from '@/components/common/CardTemplate.vue'
 import AddCategoryModal from '@/components/categories/AddCategoryModal.vue'
-import { useCategories } from '@/composables/ui/categories/useCategories'
+import { useCategories } from '@/composables/api/useCategories'
 
 export default {
   name: 'Categories',
   components: {
     CardTemplate,
-    AddCategoryModal,
+    AddCategoryModal
   },
 
   setup() {
     const searchInput = ref(null)
+    const searchMode = ref(false)
+    const uncategorizedCount = ref(0)
     
     // Use the categories composable
     const {
       // State
       categories,
       filteredCategories,
+      filters,
       loading,
+      deleteLoading,
       error,
-      successMessage,
-      uncategorizedCount,
+      hasCategories,
+      categoriesWithProductCounts,
       
-      // UI State
-      searchMode,
-      
-      // Filters
-      statusFilter,
-      searchFilter,
-      
-      // Core Methods
-      refreshData,
-      getProductCount,
-      getCategorySubtitle,
-      fetchUncategorizedCount,
+      // Methods
+      fetchCategories,
       softDeleteCategory,
       exportCategories,
-      
-      // Filter and Search
-      applyFilters,
-      clearFilters,
-      toggleSearchMode,
-      clearSearch,
-      
-      // Success/Error handlers
-      handleCategorySuccess,
-      handleCategoryError,
-      
-      // Lifecycle
-      initializeCategories,
-      cleanupCategories
+      setFilters,
+      resetFilters,
+      clearError,
+      initializeCategories
     } = useCategories()
 
-    // Watch search mode to focus input
+    // Filter out uncategorized category from display
+    const displayedCategories = computed(() => {
+      return filteredCategories.value.filter(category => {
+        // Filter out categories with names like "Uncategorized" or IDs starting with "UNCTGRY-"
+        return !(
+          category._id?.startsWith('UNCTGRY-') ||
+          category.category_name?.toLowerCase() === 'uncategorized'
+        )
+      })
+    })
+
+    // Count uncategorized products
+    const getUncategorizedCount = () => {
+      const uncategorizedCategory = categories.value.find(category => 
+        category._id?.startsWith('UNCTGRY-') || 
+        category.category_name?.toLowerCase() === 'uncategorized'
+      )
+      
+      if (uncategorizedCategory) {
+        return uncategorizedCategory.sub_categories?.reduce((total, sub) => 
+          total + (sub.product_count || 0), 0
+        ) || 0
+      }
+      
+      return 0
+    }
+
+    // Computed properties
+    const getCategorySubtitle = (category) => {
+      const subcategoryCount = category.sub_categories?.length || 0
+      return `${subcategoryCount} subcategories`
+    }
+
+    const getProductCount = (category) => {
+      return category.sub_categories?.reduce((total, sub) => 
+        total + (sub.product_count || 0), 0
+      ) || 0
+    }
+
+    // Search mode handling
     const handleToggleSearchMode = async () => {
-      toggleSearchMode()
+      searchMode.value = !searchMode.value
+      
       if (searchMode.value) {
         await nextTick()
         if (searchInput.value) {
           searchInput.value.focus()
         }
+      } else {
+        // Clear search when exiting search mode
+        setFilters({ search: '' })
+      }
+    }
+
+    const handleSearchInput = () => {
+      // Filters are reactive, so this will automatically trigger filtering
+    }
+
+    const clearSearch = () => {
+      setFilters({ search: '' })
+      searchMode.value = false
+    }
+
+    const applyFilters = () => {
+      // Filters are reactive in the composable
+    }
+
+    const handleClearFilters = () => {
+      resetFilters()
+      searchMode.value = false
+    }
+
+    const refreshCategories = async () => {
+      try {
+        clearError()
+        await fetchCategories()
+        // Update uncategorized count after refresh
+        uncategorizedCount.value = getUncategorizedCount()
+      } catch (error) {
+        console.error('Error refreshing categories:', error)
+      }
+    }
+
+    const fetchUncategorizedCount = async () => {
+      try {
+        // Update the count from current categories
+        uncategorizedCount.value = getUncategorizedCount()
+      } catch (error) {
+        console.error('Error fetching uncategorized count:', error)
+        uncategorizedCount.value = 0
       }
     }
 
     return {
       // Refs
       searchInput,
+      searchMode,
+      uncategorizedCount,
       
       // State from composable
       categories,
       filteredCategories,
+      displayedCategories, // Use this instead of filteredCategories
+      filters,
       loading,
+      deleteLoading,
       error,
-      successMessage,
-      uncategorizedCount,
-      searchMode,
-      statusFilter,
-      searchFilter,
+      hasCategories,
+      categoriesWithProductCounts,
       
       // Methods from composable
-      refreshData,
-      getProductCount,
-      getCategorySubtitle,
-      fetchUncategorizedCount,
+      fetchCategories,
       softDeleteCategory,
       exportCategories,
-      applyFilters,
-      clearFilters,
-      clearSearch,
-      handleCategorySuccess,
-      handleCategoryError,
+      setFilters,
+      resetFilters,
+      clearError,
       initializeCategories,
-      cleanupCategories,
+      
+      // Local computed
+      getCategorySubtitle,
+      getProductCount,
+      getUncategorizedCount,
       
       // Local methods
-      toggleSearchMode: handleToggleSearchMode
+      handleToggleSearchMode,
+      handleSearchInput,
+      clearSearch,
+      applyFilters,
+      handleClearFilters,
+      refreshCategories,
+      fetchUncategorizedCount
     }
   },
 
   async mounted() {
     try {
-      // Initialize categories using composable
       await this.initializeCategories()
       await this.fetchUncategorizedCount()
     } catch (error) {
       console.error('Error initializing categories page:', error)
-      this.handleCategoryError(error)
     }
   },
 
-  beforeUnmount() {
-    // Cleanup using composable
-    this.cleanupCategories()
-  },
-
   methods: {
-    // Modal handlers
+    // Modal handlers - keeping these untouched as requested
     async handleAddCategory() {
-      console.log('Add Category button clicked')
-      
       if (this.$refs.addCategoryModal) {
         this.$refs.addCategoryModal.openAddMode()
       } else {
         console.error('AddCategoryModal ref not found')
-        this.handleCategoryError({ message: 'Modal component not available' })
       }
     },
 
     async onCategoryAdded(newCategory) {
       try {
-        console.log('New category added:', newCategory)
-        
-        // Use composable's refresh method
-        await this.refreshData()
-        await this.fetchUncategorizedCount()
-        
-        // Use composable's success handler
-        this.handleCategorySuccess({
-          message: `Category "${newCategory.category_name}" added successfully!`
-        })
+        await this.refreshCategories()
       } catch (error) {
         console.error('Error refreshing categories after add:', error)
-        this.handleCategoryError(error)
       }
     },
 
     // Navigation
     viewCategory(categoryId) {
-      console.log('View category:', categoryId)
-      
-      if (!categoryId) {
-        console.error('No valid category ID provided')
-        this.handleCategoryError({ message: 'Invalid category ID' })
+      if (!categoryId || !categoryId.startsWith('CTGY-')) {
+        console.error('Invalid category ID format:', categoryId)
+        alert(`Invalid category ID format: ${categoryId}. Expected CTGY-XXX format.`)
         return
       }
       
-      console.log('Navigating with ID:', categoryId)
       this.$router.push({
-        name: 'Category Details',
+        name: 'Category Details', 
         params: { id: categoryId }
       })
     },
@@ -370,8 +416,7 @@ export default {
         )
         
         if (!confirmed) return
-        
-        console.log('Deleting category:', category._id)
+
         await this.softDeleteCategory(category._id)
         
         // Refresh uncategorized count since products might be moved there
@@ -379,32 +424,18 @@ export default {
         
       } catch (error) {
         console.error('Error deleting category:', error)
-        this.handleCategoryError(error)
       }
     },
 
     // Export handler
     async handleExport() {
       try {
-        console.log('Exporting categories...')
-        
-        await this.exportCategories({
-          format: 'csv',
-          include_sales_data: true,
-          include_deleted: this.statusFilter === 'deleted'
-        })
-        
-        console.log('Export completed successfully')
-        
+        // Export only the displayed categories (excluding uncategorized)
+        await this.exportCategories(this.displayedCategories)
       } catch (error) {
         console.error('Export failed:', error)
-        this.handleCategoryError({ message: `Export failed: ${error.message}` })
+        alert('Export failed. Please try again.')
       }
-    },
-
-    // Filter helper
-    handleClearFilters() {
-      this.clearFilters()
     }
   }
 }

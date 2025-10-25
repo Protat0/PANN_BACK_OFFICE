@@ -1,28 +1,73 @@
 # ========================================
-# NEW FILE: audit_service.py
-# Add this as a separate file alongside your existing session_service.py
+# ENHANCED AUDIT SERVICE with String _id Format
+# audit_service.py - Using generated AUD-###### as MongoDB _id
 # ========================================
 
 from datetime import datetime
 from bson import ObjectId
 from ..database import db_manager
+import logging
 
 class AuditLogService:
     def __init__(self):
         self.db = db_manager.get_database()
-        self.collection = self.db.audit_logs  # NEW collection for audit logs
+        self.collection = self.db.audit_logs
+    
+    def generate_audit_id(self):
+        """Generate sequential AUD-###### ID (6 digits - high volume system logs)"""
+        try:
+            # Use aggregation to find highest existing number
+            pipeline = [
+                {
+                    '$match': {
+                        '_id': {'$regex': '^AUD-\\d{6}$'}  # Changed from audit_id to _id
+                    }
+                },
+                {
+                    '$addFields': {
+                        'numeric_part': {
+                            '$toInt': {'$substr': ['$_id', 4, 6]}  # Changed from audit_id to _id
+                        }
+                    }
+                },
+                {
+                    '$group': {
+                        '_id': None,
+                        'max_number': {'$max': '$numeric_part'}
+                    }
+                }
+            ]
+            
+            result = list(self.collection.aggregate(pipeline))
+            
+            if result and result[0]['max_number'] is not None:
+                next_number = result[0]['max_number'] + 1
+            else:
+                # Fallback to count-based approach
+                next_number = self.collection.count_documents({}) + 1
+            
+            return f"AUD-{next_number:06d}"
+            
+        except Exception as e:
+            logging.error(f"Error generating audit ID: {e}")
+            # Emergency fallback using timestamp
+            import time
+            fallback_number = int(time.time()) % 1000000  # Last 6 digits of timestamp
+            return f"AUD-{fallback_number:06d}"
     
     def convert_object_id(self, document):
-        if document and '_id' in document:
-            document['_id'] = str(document['_id'])
+        # No conversion needed since _id is already a string
         return document
     
     def _create_audit_log(self, event_type, user_data, target_data=None, old_values=None, new_values=None, metadata=None):
-        """Create a standardized audit log entry"""
+        """Create a standardized audit log entry with sequential AUD-###### as _id"""
         try:
+            audit_id = self.generate_audit_id()
+            
             audit_data = {
+                "_id": audit_id,  # AUD-###### as the MongoDB _id field
                 "event_type": event_type,
-                "user_id": ObjectId(user_data["user_id"]) if isinstance(user_data.get("user_id"), str) else user_data.get("user_id"),
+                "user_id": user_data.get("user_id", user_data.get("username", "system")),  # USER-#### format
                 "username": user_data.get("username", user_data.get("email", "system")),
                 "branch_id": user_data.get("branch_id", 1),
                 "ip_address": user_data.get("ip_address"),
@@ -37,7 +82,7 @@ class AuditLogService:
             if target_data:
                 audit_data.update({
                     "target_type": target_data.get("type"),
-                    "target_id": target_data.get("id"),
+                    "target_id": target_data.get("id"),  # Will be proper format (PROD-#####, CUST-#####, etc.)
                     "target_name": target_data.get("name")
                 })
             
@@ -54,553 +99,605 @@ class AuditLogService:
                 audit_data["metadata"] = metadata
             
             result = self.collection.insert_one(audit_data)
-            return {"audit_id": str(result.inserted_id)}
+            return {"_id": audit_id}  # Return the generated AUD-###### ID
             
         except Exception as e:
             raise Exception(f"Error creating audit log: {str(e)}")
-    
+
     # ========================================
-    # CUSTOMER AUDIT METHODS
+    # CORE BUSINESS ENTITIES - HIGH FREQUENCY
     # ========================================
     
-    def log_customer_create(self, user_data, customer_data):
-        """Log customer creation"""
+    # SALE-###### (6 digits - highest transaction volume)
+    def log_sale_create(self, user_data, sale_data):
+        """Log sale transaction - SALE-###### format"""
         return self._create_audit_log(
-            event_type="customer_create",
+            event_type="sale_create",
             user_data=user_data,
             target_data={
-                "type": "customer",
-                "id": str(customer_data.get("_id", customer_data.get("customer_id", ""))),
-                "name": customer_data.get("full_name", customer_data.get("username", "Unknown"))
+                "type": "sale",
+                "id": sale_data.get("sale_id", "Unknown"),  # SALE-######
+                "name": f"Sale #{sale_data.get('sale_id', 'Unknown')}"
             },
             new_values={
-                "username": customer_data.get("username"),
-                "full_name": customer_data.get("full_name"),
-                "email": customer_data.get("email"),
-                "phone": customer_data.get("phone"),
-                "loyalty_points": customer_data.get("loyalty_points", 0)
-            },
-            metadata={"action": "create"}
-        )
-    
-    def log_customer_update(self, user_data, customer_id, old_values, new_values):
-        """Log customer update"""
-        return self._create_audit_log(
-            event_type="customer_update",
-            user_data=user_data,
-            target_data={
-                "type": "customer",
-                "id": str(customer_id),
-                "name": old_values.get("full_name", old_values.get("username", "Unknown"))
-            },
-            old_values=old_values,
-            new_values=new_values,
-            metadata={"action": "update"}
-        )
-    
-    def log_customer_delete(self, user_data, customer_data):
-        """Log customer deletion"""
-        return self._create_audit_log(
-            event_type="customer_delete",
-            user_data=user_data,
-            target_data={
-                "type": "customer",
-                "id": str(customer_data.get("_id", customer_data.get("customer_id", ""))),
-                "name": customer_data.get("full_name", customer_data.get("username", "Unknown"))
-            },
-            old_values=customer_data,
-            metadata={"action": "delete"}
-        )
-    
-    def log_customer_bulk_delete(self, user_data, deleted_count, deleted_ids):
-        """Log bulk customer deletion"""
-        return self._create_audit_log(
-            event_type="customer_bulk_delete",
-            user_data=user_data,
-            target_data={
-                "type": "customer",
-                "id": "bulk_operation",
-                "name": f"{deleted_count} customers"
+                "sale_id": sale_data.get("sale_id"),  # SALE-######
+                "customer_id": sale_data.get("customer_id"),  # CUST-#####
+                "user_id": sale_data.get("user_id"),  # USER-####
+                "total_amount": sale_data.get("total_amount", 0),
+                "payment_method": sale_data.get("payment_method"),
+                "items_count": len(sale_data.get("items", [])),
+                "discount_applied": sale_data.get("discount_applied", 0),
+                "promotion_id": sale_data.get("promotion_id")  # PROM-####
             },
             metadata={
-                "action": "bulk_delete",
-                "count": deleted_count,
-                "deleted_ids": deleted_ids
+                "action": "create",
+                "module": "sales",
+                "item_count": len(sale_data.get("items", [])),
+                "net_amount": sale_data.get("total_amount", 0) - sale_data.get("discount_applied", 0)
             }
         )
     
-    # ========================================
-    # CATEGORY AUDIT METHODS
-    # ========================================
-    
-    def log_category_create(self, user_data, category_data):
-        """Log category creation"""
+    # ORDR-###### (6 digits - online + POS orders)
+    def log_order_create(self, user_data, order_data):
+        """Log order creation - ORDR-###### format"""
         return self._create_audit_log(
-            event_type="category_create",
+            event_type="order_create",
             user_data=user_data,
             target_data={
-                "type": "category",
-                "id": str(category_data.get("_id", category_data.get("category_id", ""))),
-                "name": category_data.get("category_name", category_data.get("name", "Unknown"))
+                "type": "order",
+                "id": order_data.get("order_id", "Unknown"),  # ORDR-######
+                "name": f"Order #{order_data.get('order_id', 'Unknown')}"
             },
             new_values={
-                "name": category_data.get("category_name", category_data.get("name")),
-                "description": category_data.get("description"),
-                "subcategories": category_data.get("subcategories", [])
+                "order_id": order_data.get("order_id"),  # ORDR-######
+                "customer_id": order_data.get("customer_id"),  # CUST-#####
+                "order_type": order_data.get("order_type", "POS"),  # POS or Online
+                "status": order_data.get("status", "pending"),
+                "total_amount": order_data.get("total_amount", 0),
+                "items_count": len(order_data.get("items", [])),
+                "promotion_id": order_data.get("promotion_id")  # PROM-####
             },
-            metadata={"action": "create"}
+            metadata={
+                "action": "create",
+                "module": "orders",
+                "order_type": order_data.get("order_type", "POS")
+            }
         )
     
-    def log_category_update(self, user_data, category_id, old_values, new_values):
-        """Log category update"""
+    def log_order_status_change(self, user_data, order_data, old_status, new_status):
+        """Log order status change"""
         return self._create_audit_log(
-            event_type="category_update",
+            event_type="order_status_change",
             user_data=user_data,
             target_data={
-                "type": "category",
-                "id": str(category_id),
-                "name": old_values.get("category_name", old_values.get("name", "Unknown"))
+                "type": "order",
+                "id": order_data.get("order_id", "Unknown"),  # ORDR-######
+                "name": f"Order #{order_data.get('order_id', 'Unknown')}"
             },
-            old_values=old_values,
-            new_values=new_values,
-            metadata={"action": "update"}
+            old_values={"status": old_status},
+            new_values={"status": new_status},
+            metadata={
+                "action": "status_change",
+                "module": "orders",
+                "status_flow": f"{old_status} → {new_status}"
+            }
         )
     
-    def log_category_delete(self, user_data, category_data):
-        """Log category deletion"""
+    # INVT-##### (5 digits - inventory movements)
+    def log_inventory_movement(self, user_data, inventory_data, movement_type="adjustment"):
+        """Log inventory movement - INVT-##### format"""
         return self._create_audit_log(
-            event_type="category_delete",
+            event_type="inventory_movement",
             user_data=user_data,
             target_data={
-                "type": "category",
-                "id": str(category_data.get("_id", category_data.get("category_id", ""))),
-                "name": category_data.get("category_name", category_data.get("name", "Unknown"))
+                "type": "inventory",
+                "id": inventory_data.get("inventory_id", "Unknown"),  # INVT-#####
+                "name": f"Inventory #{inventory_data.get('inventory_id', 'Unknown')}"
             },
-            old_values=category_data,
-            metadata={"action": "delete"}
+            new_values={
+                "inventory_id": inventory_data.get("inventory_id"),  # INVT-#####
+                "product_id": inventory_data.get("product_id"),  # PROD-#####
+                "movement_type": movement_type,  # in, out, adjustment, damaged
+                "quantity": inventory_data.get("quantity", 0),
+                "reason": inventory_data.get("reason", "manual"),
+                "reference_id": inventory_data.get("reference_id")  # SALE-###### or ORDR-######
+            },
+            metadata={
+                "action": "movement",
+                "module": "inventory",
+                "movement_type": movement_type,
+                "value_impact": inventory_data.get("quantity", 0) * inventory_data.get("unit_cost", 0)
+            }
         )
-    
+
     # ========================================
-    # PRODUCT AUDIT METHODS
+    # PRODUCT & CATALOG MANAGEMENT
     # ========================================
     
+    # PROD-##### (5 digits - product catalog)
     def log_product_create(self, user_data, product_data):
-        """Log product creation"""
+        """Log product creation - PROD-##### format"""
         return self._create_audit_log(
             event_type="product_create",
             user_data=user_data,
             target_data={
                 "type": "product",
-                "id": str(product_data.get("_id", product_data.get("product_id", ""))),
+                "id": product_data.get("product_id", "Unknown"),  # PROD-#####
                 "name": product_data.get("product_name", product_data.get("name", "Unknown"))
             },
             new_values={
+                "product_id": product_data.get("product_id"),  # PROD-#####
                 "name": product_data.get("product_name", product_data.get("name")),
-                "category": product_data.get("category"),
+                "category_id": product_data.get("category_id"),  # CTGY-###
+                "supplier_id": product_data.get("supplier_id"),  # SUPP-###
                 "price": product_data.get("price"),
+                "cost": product_data.get("cost"),
                 "stock_quantity": product_data.get("stock_quantity", 0),
+                "sku": product_data.get("sku"),
                 "description": product_data.get("description")
             },
-            metadata={"action": "create"}
-        )
-    
-    def log_product_update(self, user_data, product_id, old_values, new_values):
-        """Log product update"""
-        return self._create_audit_log(
-            event_type="product_update",
-            user_data=user_data,
-            target_data={
-                "type": "product",
-                "id": str(product_id),
-                "name": old_values.get("product_name", old_values.get("name", "Unknown"))
-            },
-            old_values=old_values,
-            new_values=new_values,
-            metadata={"action": "update"}
-        )
-    
-    def log_product_delete(self, user_data, product_data):
-        """Log product deletion"""
-        return self._create_audit_log(
-            event_type="product_delete",
-            user_data=user_data,
-            target_data={
-                "type": "product",
-                "id": str(product_data.get("_id", product_data.get("product_id", ""))),
-                "name": product_data.get("product_name", product_data.get("name", "Unknown"))
-            },
-            old_values=product_data,
-            metadata={"action": "delete"}
-        )
-    
-    def log_product_stock_update(self, user_data, product_id, product_name, old_stock, new_stock, reason="manual"):
-        """Log product stock update"""
-        return self._create_audit_log(
-            event_type="product_stock_update",
-            user_data=user_data,
-            target_data={
-                "type": "product",
-                "id": str(product_id),
-                "name": product_name
-            },
-            old_values={"stock_quantity": old_stock},
-            new_values={"stock_quantity": new_stock},
             metadata={
-                "action": "stock_update",
-                "difference": new_stock - old_stock,
-                "reason": reason
+                "action": "create",
+                "module": "products",
+                "profit_margin": product_data.get("price", 0) - product_data.get("cost", 0)
             }
         )
     
+    # CTGY-### (3 digits - fewer categories)
+    def log_category_create(self, user_data, category_data):
+        """Log category creation - CTGY-### format"""
+        return self._create_audit_log(
+            event_type="category_create",
+            user_data=user_data,
+            target_data={
+                "type": "category",
+                "id": category_data.get("category_id", "Unknown"),  # CTGY-###
+                "name": category_data.get("category_name", category_data.get("name", "Unknown"))
+            },
+            new_values={
+                "category_id": category_data.get("category_id"),  # CTGY-###
+                "name": category_data.get("category_name", category_data.get("name")),
+                "description": category_data.get("description"),
+                "parent_category": category_data.get("parent_category"),  # CTGY-###
+                "subcategories": category_data.get("subcategories", [])
+            },
+            metadata={
+                "action": "create",
+                "module": "categories",
+                "subcategory_count": len(category_data.get("subcategories", []))
+            }
+        )
+    
+    # SUPP-### (3 digits - limited suppliers)
+    def log_supplier_create(self, user_data, supplier_data):
+        """Log supplier creation - SUPP-### format"""
+        return self._create_audit_log(
+            event_type="supplier_create",
+            user_data=user_data,
+            target_data={
+                "type": "supplier",
+                "id": supplier_data.get("supplier_id", "Unknown"),  # SUPP-###
+                "name": supplier_data.get("supplier_name", supplier_data.get("name", "Unknown"))
+            },
+            new_values={
+                "supplier_id": supplier_data.get("supplier_id"),  # SUPP-###
+                "name": supplier_data.get("supplier_name", supplier_data.get("name")),
+                "contact_person": supplier_data.get("contact_person"),
+                "email": supplier_data.get("email"),
+                "phone": supplier_data.get("phone"),
+                "address": supplier_data.get("address"),
+                "payment_terms": supplier_data.get("payment_terms")
+            },
+            metadata={"action": "create", "module": "suppliers"}
+        )
+
     # ========================================
-    # USER AUDIT METHODS
+    # PROMOTIONS & DISCOUNTS
     # ========================================
     
+    # PROM-#### (4 digits - covers all promotional activities)
+    def log_promotion_create(self, user_data, promotion_data):
+        """Log promotion creation - PROM-#### format"""
+        return self._create_audit_log(
+            event_type="promotion_create",
+            user_data=user_data,
+            target_data={
+                "type": "promotion",
+                "id": promotion_data.get("promotion_id", "Unknown"),  # PROM-####
+                "name": promotion_data.get("name", "Unknown Promotion")
+            },
+            new_values={
+                "promotion_id": promotion_data.get("promotion_id"),  # PROM-####
+                "name": promotion_data.get("name"),
+                "type": promotion_data.get("type"),  # percentage, fixed_amount, buy_x_get_y
+                "discount_value": promotion_data.get("discount_value"),
+                "target_type": promotion_data.get("target_type"),  # products, categories, all
+                "target_ids": promotion_data.get("target_ids", []),  # PROD-##### or CTGY-###
+                "start_date": str(promotion_data.get("start_date", "")),
+                "end_date": str(promotion_data.get("end_date", "")),
+                "usage_limit": promotion_data.get("usage_limit")
+            },
+            metadata={"action": "create", "module": "promotions"}
+        )
+    
+    def log_promotion_application(self, user_data, promotion_data, order_data, discount_amount):
+        """Log promotion application to order/sale"""
+        return self._create_audit_log(
+            event_type="promotion_application",
+            user_data=user_data,
+            target_data={
+                "type": "promotion",
+                "id": promotion_data.get("promotion_id", "Unknown"),  # PROM-####
+                "name": promotion_data.get("name", "Unknown Promotion")
+            },
+            metadata={
+                "action": "apply",
+                "module": "promotions",
+                "order_id": order_data.get("order_id"),  # ORDR-###### or SALE-######
+                "customer_id": order_data.get("customer_id"),  # CUST-#####
+                "discount_amount": discount_amount,
+                "order_total": order_data.get("total_amount", 0)
+            }
+        )
+
+    # ========================================
+    # USER MANAGEMENT
+    # ========================================
+    
+    # USER-#### (4 digits - staff accounts)
     def log_user_create(self, admin_user, new_user_data):
-        """Log user creation"""
+        """Log user creation - USER-#### format"""
         return self._create_audit_log(
             event_type="user_create",
             user_data=admin_user,
             target_data={
                 "type": "user",
-                "id": str(new_user_data.get("_id", new_user_data.get("user_id", ""))),
+                "id": new_user_data.get("user_id", "Unknown"),  # USER-####
                 "name": new_user_data.get("username", new_user_data.get("email", "Unknown"))
             },
             new_values={
+                "user_id": new_user_data.get("user_id"),  # USER-####
                 "username": new_user_data.get("username"),
                 "email": new_user_data.get("email"),
                 "role": new_user_data.get("role"),
-                "status": new_user_data.get("status", "active")
+                "status": new_user_data.get("status", "active"),
+                "branch_id": new_user_data.get("branch_id")
             },
-            metadata={"action": "create"}
+            metadata={"action": "create", "module": "users"}
         )
     
-    def log_user_update(self, admin_user, user_id, old_values, new_values):
-        """Log user update"""
+    def log_user_restore(self, admin_user, restored_user_data):
         return self._create_audit_log(
-            event_type="user_update",
+            event_type="user_restore",
             user_data=admin_user,
             target_data={
                 "type": "user",
-                "id": str(user_id),
-                "name": old_values.get("username", old_values.get("email", "Unknown"))
+                "id": restored_user_data.get("_id", "Unknown"),  # USER-####
+                "name": restored_user_data.get("username", restored_user_data.get("email", "Unknown"))
             },
-            old_values=old_values,
-            new_values=new_values,
-            metadata={"action": "update"}
-        )
-    
-    def log_user_delete(self, admin_user, deleted_user_data):
-        """Log user deletion"""
-        return self._create_audit_log(
-            event_type="user_delete",
-            user_data=admin_user,
-            target_data={
-                "type": "user",
-                "id": str(deleted_user_data.get("_id", deleted_user_data.get("user_id", ""))),
-                "name": deleted_user_data.get("username", deleted_user_data.get("email", "Unknown"))
+            old_values={
+                "isDeleted": True,
+                "status": "deleted"
             },
-            old_values=deleted_user_data,
-            metadata={"action": "delete"}
-        )
-    
-    # ========================================
-    # SYSTEM AUDIT METHODS
-    # ========================================
-    
-    def log_data_export(self, user_data, export_type, record_count=0, filename=None):
-        """Log data export"""
-        return self._create_audit_log(
-            event_type="data_export",
-            user_data=user_data,
-            target_data={
-                "type": "system",
-                "id": f"export_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
-                "name": f"{export_type.title()} Export"
+            new_values={
+                "isDeleted": False,
+                "status": restored_user_data.get("status", "active"),
+                "restoredAt": str(datetime.utcnow()),
+                "restoredBy": admin_user.get("username", admin_user.get("user_id", "system"))
             },
             metadata={
-                "action": "export",
-                "export_type": export_type,
-                "record_count": record_count,
-                "filename": filename,
-                "format": "CSV"
+                "action": "restore",
+                "module": "users",
+                "user_id": restored_user_data.get("_id"),
+                "restored_by": admin_user.get("username", admin_user.get("user_id", "system"))
             }
         )
     
-    def log_data_import(self, user_data, import_type, success_count=0, failure_count=0, filename=None):
-        """Log data import"""
+    def log_user_delete(self, admin_user, deleted_user_data, deletion_type="soft_delete"):
+        """Log user deletion (soft or hard) - USER-#### format"""
         return self._create_audit_log(
-            event_type="data_import",
-            user_data=user_data,
+            event_type=f"user_{deletion_type}",
+            user_data=admin_user,
             target_data={
-                "type": "system",
-                "id": f"import_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
-                "name": f"{import_type.title()} Import"
+                "type": "user",
+                "id": deleted_user_data.get("_id", "Unknown"),  # USER-####
+                "name": deleted_user_data.get("username", deleted_user_data.get("email", "Unknown"))
+            },
+            old_values={
+                "isDeleted": False,
+                "status": deleted_user_data.get("status", "active")
+            },
+            new_values={
+                "isDeleted": True,
+                "deletedAt": str(datetime.utcnow()),
+                "deletedBy": admin_user.get("username", admin_user.get("user_id", "system"))
             },
             metadata={
-                "action": "import",
-                "import_type": import_type,
+                "action": "delete",
+                "module": "users",
+                "deletion_type": deletion_type,
+                "user_id": deleted_user_data.get("_id")
+            }
+        )
+    
+    def log_user_hard_delete(self, admin_user, deleted_user_data):
+        """Log permanent user deletion - USER-#### format"""
+        return self._create_audit_log(
+            event_type="user_hard_delete",
+            user_data=admin_user,
+            target_data={
+                "type": "user",
+                "id": deleted_user_data.get("_id", "Unknown"),  # USER-####
+                "name": deleted_user_data.get("username", deleted_user_data.get("email", "Unknown"))
+            },
+            old_values={
+                "existed": True,
+                "user_data": {
+                    "username": deleted_user_data.get("username"),
+                    "email": deleted_user_data.get("email"),
+                    "role": deleted_user_data.get("role")
+                }
+            },
+            new_values={
+                "existed": False,
+                "permanently_deleted": True,
+                "deleted_at": str(datetime.utcnow())
+            },
+            metadata={
+                "action": "hard_delete",
+                "module": "users",
+                "warning": "PERMANENT_DELETION",
+                "user_id": deleted_user_data.get("_id"),
+                "deleted_by": admin_user.get("username", admin_user.get("user_id", "system"))
+            }
+        )
+
+    # CUST-##### (5 digits - customer base)
+    def log_customer_create(self, user_data, customer_data):
+        """Log customer creation - CUST-##### format"""
+        return self._create_audit_log(
+            event_type="customer_create",
+            user_data=user_data,
+            target_data={
+                "type": "customer",
+                "id": customer_data.get("customer_id", "Unknown"),  # CUST-#####
+                "name": customer_data.get("full_name", customer_data.get("username", "Unknown"))
+            },
+            new_values={
+                "customer_id": customer_data.get("customer_id"),  # CUST-#####
+                "username": customer_data.get("username"),
+                "full_name": customer_data.get("full_name"),
+                "email": customer_data.get("email"),
+                "phone": customer_data.get("phone"),
+                "loyalty_points": customer_data.get("loyalty_points", 0),
+                "membership_level": customer_data.get("membership_level", "standard")
+            },
+            metadata={"action": "create", "module": "customers"}
+        )
+
+    # ========================================
+    # SYSTEM & SESSIONS
+    # ========================================
+    
+    # SESS-##### (5 digits - user sessions)
+    def log_session_create(self, user_data, session_data):
+        """Log session creation - SESS-##### format"""
+        return self._create_audit_log(
+            event_type="session_create",
+            user_data=user_data,
+            target_data={
+                "type": "session",
+                "id": session_data.get("session_id", "Unknown"),  # SESS-#####
+                "name": f"Session #{session_data.get('session_id', 'Unknown')}"
+            },
+            new_values={
+                "session_id": session_data.get("session_id"),  # SESS-#####
+                "user_id": session_data.get("user_id"),  # USER-####
+                "login_time": str(session_data.get("login_time", "")),
+                "ip_address": session_data.get("ip_address"),
+                "user_agent": session_data.get("user_agent"),
+                "branch_id": session_data.get("branch_id")
+            },
+            metadata={"action": "create", "module": "sessions"}
+        )
+    
+    def log_session_end(self, user_data, session_data, session_duration):
+        """Log session termination"""
+        return self._create_audit_log(
+            event_type="session_end",
+            user_data=user_data,
+            target_data={
+                "type": "session",
+                "id": session_data.get("session_id", "Unknown"),  # SESS-#####
+                "name": f"Session #{session_data.get('session_id', 'Unknown')}"
+            },
+            old_values={
+                "status": "active",
+                "logout_time": None
+            },
+            new_values={
+                "status": "ended",
+                "logout_time": str(datetime.utcnow()),
+                "session_duration": session_duration
+            },
+            metadata={
+                "action": "end",
+                "module": "sessions",
+                "duration_minutes": round(session_duration / 60, 2)
+            }
+        )
+
+    # ========================================
+    # BULK OPERATIONS & SYSTEM EVENTS
+    # ========================================
+    
+    def log_bulk_operation(self, user_data, operation_type, target_type, success_count, failure_count, target_ids=None):
+        """Log bulk operations across any entity type"""
+        return self._create_audit_log(
+            event_type="bulk_operation",
+            user_data=user_data,
+            target_data={
+                "type": target_type,
+                "id": "bulk_operation",
+                "name": f"Bulk {operation_type.title()} - {target_type.title()}"
+            },
+            metadata={
+                "action": "bulk_operation",
+                "module": target_type,
+                "operation_type": operation_type,  # delete, update, import
                 "success_count": success_count,
                 "failure_count": failure_count,
                 "total_count": success_count + failure_count,
-                "filename": filename,
-                "success_rate": round((success_count / (success_count + failure_count)) * 100, 2) if (success_count + failure_count) > 0 else 0
-            }
-        )
-    
-    def log_login_failed(self, username, ip_address=None, reason="invalid_credentials"):
-        """Log failed login attempts"""
-        return self._create_audit_log(
-            event_type="login_failed",
-            user_data={
-                "username": username,
-                "ip_address": ip_address,
-                "user_id": None,
-                "branch_id": None
-            },
-            target_data={
-                "type": "authentication",
-                "id": "login_attempt",
-                "name": f"Failed login for {username}"
-            },
-            metadata={
-                "action": "login_failed",
-                "reason": reason,
-                "attempted_username": username
+                "success_rate": round((success_count / (success_count + failure_count)) * 100, 2) if (success_count + failure_count) > 0 else 0,
+                "target_ids": target_ids or []
             }
         )
 
-# ========================================
-# ENHANCED DISPLAY SERVICE
-# ========================================
-
-class AuditLogDisplay:
-    def __init__(self):
-        self.db = db_manager.get_database()
-        self.audit_collection = self.db.audit_logs
-        self.session_collection = self.db.session_logs  # Your existing collection
+    # ========================================
+    # QUERY & REPORTING METHODS
+    # ========================================
     
-    def convert_object_id(self, document):
-        if document and '_id' in document:
-            document['_id'] = str(document['_id'])
-        return document
-    
-    def get_audit_logs(self, limit=100, event_type=None):
-        """Get comprehensive audit logs"""
+    def get_audit_logs_by_target(self, target_type, target_id, limit=50):
+        """Get audit logs for specific entity"""
         try:
-            filter_query = {}
-            if event_type:
-                filter_query["event_type"] = event_type
-            
-            audit_logs = list(
-                self.audit_collection.find(filter_query)
+            logs = list(
+                self.collection.find({
+                    "target_type": target_type,
+                    "target_id": target_id
+                })
                 .sort("timestamp", -1)
                 .limit(limit)
             )
             
-            formatted_logs = []
-            for i, log in enumerate(audit_logs):
-                log = self.convert_object_id(log)
-                print(f"🔍 Audit log {i}: raw_username='{log.get('username')}', raw_user_id='{log.get('user_id')}'")
-                
-                formatted_log = {
-                    "log_id": f"AUD-{i+1:04d}",
-                    "user_id": log.get('username', 'Unknown'),  # ✅ Same as session logs
-                    "ref_id": log.get('_id', '')[:12],
-                    "event_type": log.get('event_type', 'Unknown').replace('_', ' ').title(),
-                    "amount_qty": self._format_audit_amount(log),
-                    "status": log.get('status', 'Unknown').title(),
-                    "timestamp": str(log.get('timestamp', '')),
-                    "remarks": self._format_audit_remarks(log),
-                    "log_source": "audit"
-                }
-                formatted_logs.append(formatted_log)
-            
             return {
                 'success': True,
-                'data': formatted_logs,
-                'total_count': len(formatted_logs)
+                'data': [self.convert_object_id(log) for log in logs],
+                'count': len(logs)
             }
-            
         except Exception as e:
-            return {
-                'success': False,
-                'error': str(e),
-                'data': []
-            }
+            return {'success': False, 'error': str(e), 'data': []}
     
-    def get_combined_logs(self, limit=100):
-        """Get logs with continuous numbering by type (never resets)"""
+    def get_audit_logs_by_user(self, user_id, limit=100):
+        """Get audit logs for specific user"""
         try:
-            # ✅ STEP 1: Fetch session logs
-            session_cursor = self.collection.find().sort("login_time", -1)
-            session_logs = list(session_cursor)
-            
-            # ✅ STEP 2: Fetch audit logs
-            audit_logs = []
-            try:
-                audit_collection = self.db.audit_logs
-                audit_cursor = audit_collection.find().sort("timestamp", -1)
-                audit_logs = list(audit_cursor)
-                print(f"✅ Fetched {len(audit_logs)} audit logs")
-            except Exception as e:
-                print(f"⚠️ No audit logs available: {e}")
-                audit_logs = []
-            
-            # ✅ STEP 3: Create all logs with sorting keys
-            all_logs = []
-            
-            # Add session logs
-            for log in session_logs:
-                log = self.convert_object_id(log)
-                formatted_log = {
-                    "user_id": log.get('username', 'Unknown'),
-                    "ref_id": log.get('_id', '')[:12],
-                    "event_type": "Session",
-                    "amount_qty": f"{log.get('session_duration', 0)}s",
-                    "status": log.get('status', 'Unknown').title(),
-                    "timestamp": str(log.get('login_time', '')),
-                    "remarks": f"Branch {log.get('branch_id', 'N/A')}",
-                    "log_source": "session",
-                    "sort_time": self._parse_timestamp(str(log.get('login_time', '')))
-                }
-                all_logs.append(formatted_log)
-            
-            # Add audit logs
-            for log in audit_logs:
-                log = self.convert_object_id(log)
-                formatted_log = {
-                    "user_id": log.get('username', 'Unknown'),
-                    "ref_id": log.get('_id', '')[:12],
-                    "event_type": log.get('event_type', 'Unknown').replace('_', ' ').title(),
-                    "amount_qty": self._format_audit_amount(log),
-                    "status": log.get('status', 'Unknown').title(),
-                    "timestamp": str(log.get('timestamp', '')),
-                    "remarks": self._format_audit_remarks(log),
-                    "log_source": "audit",
-                    "sort_time": self._parse_timestamp(str(log.get('timestamp', '')))
-                }
-                all_logs.append(formatted_log)
-            
-            # ✅ STEP 4: Sort all logs by timestamp (newest first)
-            all_logs.sort(key=lambda x: x.get('sort_time', datetime.min), reverse=True)
-            
-            # ✅ STEP 5: Count totals first, then number backwards
-            session_count = sum(1 for log in all_logs if log['log_source'] == 'session')
-            audit_count = sum(1 for log in all_logs if log['log_source'] == 'audit')
-            
-            session_counter = session_count
-            audit_counter = audit_count
-            
-            formatted_logs = []
-            for log in all_logs[:limit]:
-                log.pop('sort_time', None)
-                
-                if log['log_source'] == 'session':
-                    log['log_id'] = f"SES-{session_counter:04d}"
-                    session_counter -= 1
-                else:
-                    log['log_id'] = f"AUD-{audit_counter:04d}"
-                    audit_counter -= 1
-                
-                formatted_logs.append(log)
-            
-            return {
-                'success': True,
-                'data': formatted_logs,
-                'total_count': len(all_logs),
-                'session_count': len(session_logs),
-                'audit_count': len(audit_logs)
-            }
-            
-        except Exception as e:
-            return {
-                'success': False,
-                'error': str(e),
-                'data': []
-            }
-    
-    def _format_amount_qty(self, log):
-        """Format amount/quantity based on event type"""
-        event_type = log.get('event_type', '')
-        
-        if 'stock_update' in event_type:
-            diff = log.get('metadata', {}).get('difference', 0)
-            return f"{'+' if diff > 0 else ''}{diff} units"
-        elif 'delete' in event_type:
-            if log.get('metadata', {}).get('count'):
-                count = log['metadata']['count']
-                return f"{count} records"
-            return "1 record"
-        elif 'create' in event_type:
-            return "1 record"
-        elif 'export' in event_type:
-            count = log.get('metadata', {}).get('record_count', 0)
-            return f"{count} records"
-        elif 'import' in event_type:
-            success = log.get('metadata', {}).get('success_count', 0)
-            total = log.get('metadata', {}).get('total_count', 0)
-            return f"{success}/{total} records"
-        
-        return "N/A"
-    
-    def _format_remarks(self, log):
-        """Format remarks based on event type"""
-        target_type = log.get('target_type', 'System')
-        target_name = log.get('target_name', 'N/A')
-        
-        if target_type and target_name and target_name != 'N/A':
-            return f"{target_type.title()}: {target_name}"
-        
-        if log.get('event_type') == 'login_failed':
-            reason = log.get('metadata', {}).get('reason', 'Unknown')
-            return f"Failed: {reason}"
-        
-        return f"Branch {log.get('branch_id', 'N/A')}"
-
-# ========================================
-# HOW TO USE IN YOUR EXISTING SERVICES
-# ========================================
-
-"""
-# In your existing customer service file, just add these imports and calls:
-
-from .audit_service import AuditLogService
-
-class CustomerService:
-    def __init__(self):
-        self.audit_service = AuditLogService()  # ADD THIS LINE
-        # ... your existing init code
-    
-    def create_customer(self, customer_data, current_user):
-        try:
-            # Your existing customer creation code
-            result = self.collection.insert_one(customer_data)
-            customer_id = str(result.inserted_id)
-            
-            # ADD THESE 2 LINES
-            customer_data["customer_id"] = customer_id
-            self.audit_service.log_customer_create(current_user, customer_data)
-            
-            return {"success": True, "customer_id": customer_id}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-    
-    def update_customer(self, customer_id, new_data, current_user):
-        try:
-            # ADD THIS LINE - get old data first
-            old_customer = self.collection.find_one({"_id": ObjectId(customer_id)})
-            
-            # Your existing update code
-            result = self.collection.update_one(
-                {"_id": ObjectId(customer_id)},
-                {"$set": new_data}
+            logs = list(
+                self.collection.find({"user_id": user_id})
+                .sort("timestamp", -1)
+                .limit(limit)
             )
             
-            # ADD THIS LINE
-            self.audit_service.log_customer_update(current_user, customer_id, old_customer, new_data)
-            
-            return {"success": True}
+            return {
+                'success': True,
+                'data': [self.convert_object_id(log) for log in logs],
+                'count': len(logs)
+            }
         except Exception as e:
-            return {"success": False, "error": str(e)}
-"""
+            return {'success': False, 'error': str(e), 'data': []}
+    
+    def get_audit_statistics(self):
+        """Get audit log statistics"""
+        try:
+            pipeline = [
+                {
+                    '$group': {
+                        '_id': '$event_type',
+                        'count': {'$sum': 1},
+                        'latest': {'$max': '$timestamp'}
+                    }
+                },
+                {
+                    '$sort': {'count': -1}
+                }
+            ]
+            
+            stats = list(self.collection.aggregate(pipeline))
+            total_logs = sum(stat['count'] for stat in stats)
+            
+            return {
+                'success': True,
+                'total_logs': total_logs,
+                'by_event_type': stats,
+                'total_audit_id': self.generate_audit_id()  # Shows next ID
+            }
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+        
+    def log_customer_update(self, user_data, customer_id, old_customer_data, new_customer_data):
+        """Log customer update - CUST-##### format"""
+        
+        # Find what fields actually changed
+        changed_fields = {}
+        old_values = {}
+        new_values = {}
+        
+        for key, new_value in new_customer_data.items():
+            if key in old_customer_data:
+                old_value = old_customer_data[key]
+                if old_value != new_value:
+                    old_values[key] = old_value
+                    new_values[key] = new_value
+                    changed_fields[key] = {"old": old_value, "new": new_value}
+        
+        return self._create_audit_log(
+            event_type="customer_update",
+            user_data=user_data,
+            target_data={
+                "type": "customer",
+                "id": customer_id,  # CUST-#####
+                "name": old_customer_data.get("full_name", old_customer_data.get("username", "Unknown"))
+            },
+            old_values=old_values,
+            new_values=new_values,
+            metadata={
+                "action": "update",
+                "module": "customers",
+                "fields_changed": list(changed_fields.keys()),
+                "change_count": len(changed_fields)
+            }
+        )
+    
+    def log_action(self, action, resource_type, resource_id, user_id=None, changes=None, metadata=None):
+        """Generic audit logging method for backward compatibility"""
+        user_data = {'user_id': user_id or 'system'}
+        target_data = {
+            'type': resource_type,
+            'id': resource_id,
+            'name': f"{resource_type.title()} {resource_id}"
+        }
+        
+        return self._create_audit_log(
+            event_type=action,
+            user_data=user_data,
+            target_data=target_data,
+            new_values=changes or {},
+            metadata=metadata or {}
+        )
+    
+
+    def get_audit_statistics(self):
+        """Get audit log statistics"""
+        try:
+            pipeline = [
+                {
+                    '$group': {
+                        '_id': '$event_type',
+                        'count': {'$sum': 1},
+                        'latest': {'$max': '$timestamp'}
+                    }
+                },
+                {
+                    '$sort': {'count': -1}
+                }
+            ]
+            
+            stats = list(self.collection.aggregate(pipeline))
+            total_logs = sum(stat['count'] for stat in stats)
+            
+            return {
+                'success': True,
+                'total_logs': total_logs,
+                'by_event_type': stats,
+                'next_audit_id': self.generate_audit_id()  # Shows what the next ID would be
+            }
+        except Exception as e:
+            return {'success': False, 'error': str(e)}

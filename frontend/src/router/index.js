@@ -26,25 +26,19 @@ import OrdersHistory from '@/pages/suppliers/OrdersHistory.vue'
 // Debug components (only for development)
 import ToastDebug from '@/pages/ToastDebug.vue'
 
-// Auth guard function
-function requireAuth(to, from, next) {
-  const token = localStorage.getItem('authToken')
-  if (token) {
-    next() // User is authenticated, proceed
-  } else {
-    console.log('Auth required, redirecting to login')
-    next('/login') // Redirect to login
-  }
+// Simple token check for immediate evaluation
+function hasValidToken() {
+  const token = localStorage.getItem('access_token')
+  return !!token
 }
 
-// Guest guard function (redirect authenticated users away from login)
-function requireGuest(to, from, next) {
-  const token = localStorage.getItem('authToken')
-  if (!token) {
-    next() // User is not authenticated, proceed to login
+// Auth guard function
+function requireAuth(to, from, next) {
+  const token = localStorage.getItem('access_token')
+  if (token) {
+    next()
   } else {
-    console.log('Already authenticated, redirecting to dashboard')
-    next('/dashboard') // Redirect to dashboard if already logged in
+    next('/login')
   }
 }
 
@@ -52,14 +46,9 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
-      path: '/',
-      redirect: '/login' // Make Login the default page
-    },
-    {
       path: '/login',
       name: 'Login',
       component: Login,
-      beforeEnter: requireGuest // Only allow access if not logged in
     },
     // Protected routes that use the main layout
     {
@@ -70,51 +59,78 @@ const router = createRouter({
         {
           path: 'dashboard',
           name: 'Dashboard',
-          component: Dashboard
+          component: Dashboard,
+          meta: {
+            title: 'Dashboard'
+          }
         },
         {
           path: 'accounts',
           name: 'Accounts',
-          component: Accounts
+          component: Accounts,
+          meta: {
+            title: 'User Accounts'
+          }
         },
         {
           path: 'customers',
           name: 'Customers',
-          component: Customers
+          component: Customers,
+          meta: {
+            title: 'Customers'
+          }
         },
         // Inventory routes
         {
           path: 'products',
           name: 'Products',
-          component: Products
+          component: Products,
+          meta: {
+            title: 'Products'
+          }
         },
         {
           path: 'products/bulk',
           name: 'ProductBulkEntry',
-          component: ProductBulkEntry
+          component: ProductBulkEntry,
+          meta: {
+            title: 'Bulk Product Entry'
+          }
         },
         {
           path: 'products/:id',
           name: 'ProductDetails',
           component: ProductDetails,
-          props: true
+          props: true,
+          meta: {
+            title: 'Product Details'
+          }
         },
         {
           path: 'categories',
           name: 'Categories',
-          component: Categories
+          component: Categories,
+          meta: {
+            title: 'Categories'
+          }
         },
         {
           path: 'category/:id',
           name: 'Category Details',
           component: CategoryDetails,
-          props: true
+          props: true,
+          meta: {
+            title: 'Category Details'
+          }
         },
         // Suppliers routes
         {
           path: 'suppliers',
           name: 'Suppliers',
-          component: Suppliers
+          component: Suppliers,
+          meta: {
+            title: 'Suppliers'
+          }
         },
         {
           path: 'suppliers/orders',
@@ -133,7 +149,7 @@ const router = createRouter({
           path: 'suppliers/:supplierId',
           name: 'SupplierDetails',
           component: SupplierDetails,
-          props: true, // This passes the route params as props to the component
+          props: true,
           meta: {
             title: 'Supplier Details',
             breadcrumb: [
@@ -143,7 +159,82 @@ const router = createRouter({
             ]
           }
         },
-        // Debug routes (development only)
+        // Reports
+        {
+          path: 'salesbyitem',
+          name: 'SalesByItem',
+          component: SalesByItem,
+          meta: {
+            title: 'Sales by Item'
+          }
+        },
+        {
+          path: 'salesbycategory',
+          name: 'SalesByCategory',
+          component: SalesByCategory,
+          meta: {
+            title: 'Sales by Category'
+          }
+        },
+        // Other routes
+        {
+          path: 'promotions',
+          name: 'Promotions',
+          component: Promotions,
+          meta: {
+            title: 'Promotions'
+          }
+        },
+        {
+          path: 'logs',
+          name: 'Logs',
+          component: Logs,
+          meta: {
+            title: 'System Logs'
+          }
+        },
+        {
+          path: 'uncategorized',
+          name: 'UncategorizedProducts',
+          component: UncategorizedProducts,
+          meta: {
+            title: 'Uncategorized Products'
+          }
+        },
+        {
+          path: 'allNotifications',
+          name: 'AllNotifications',
+          component: AllNotifications,
+          meta: {
+            title: 'All Notifications'
+          }
+        },
+        {
+          path: 'home',
+          name: 'home',
+          component: HomeView,
+          meta: {
+            title: 'Home'
+          }
+        },
+        {
+          path: 'about',
+          name: 'about',
+          component: () => import('../views/AboutView.vue'),
+          meta: {
+            title: 'About'
+          }
+        },
+        // Development/Testing routes (protected)
+        {
+          path: 'tester',
+          name: 'TesterPage',
+          component: TesterPage,
+          meta: {
+            title: 'Customer CRUD Tester',
+            isDevelopmentOnly: true
+          }
+        },
         {
           path: 'debug/toast',
           name: 'ToastDebug',
@@ -152,52 +243,6 @@ const router = createRouter({
             title: 'Toast Debug',
             isDevelopmentOnly: true
           }
-        },
-        // Other routes
-        {
-          path: 'home',
-          name: 'home',
-          component: HomeView
-        },
-        {
-          path: 'promotions',
-          name: 'Promotions',
-          component: Promotions
-        },
-        {
-          path: 'sales-by-item',
-          name: 'SalesByItem',
-          component: SalesByItem
-        },
-        {
-          path: 'salesbycategory',
-          name: 'SalesByCategory',
-          component: SalesByCategory
-        },
-        {
-          path: 'about',
-          name: 'about',
-          component: () => import('../views/AboutView.vue')
-        },
-        {
-          path: 'logs',
-          name: 'Logs',
-          component: Logs
-        },
-        {
-          path: 'uncategorized',
-          name: 'UncategorizedProducts',
-          component: UncategorizedProducts
-        },
-        {
-          path: 'allNotifications',
-          name: 'AllNotifications',
-          component: AllNotifications
-        },
-        {
-          path: 'tester',
-          name: 'TesterPage',
-          component: TesterPage
         }
       ]
     },
@@ -206,19 +251,30 @@ const router = createRouter({
       path: '/:pathMatch(.*)*',
       redirect: '/login'
     }
-  ],
+  ]
 })
 
-// Global navigation guard for debugging
+// Global navigation guard
 router.beforeEach((to, from, next) => {
-  console.log(`Navigating from ${from.path} to ${to.path}`)
-  
-  // Optional: Set page title based on route meta
-  if (to.meta && to.meta.title) {
-    document.title = `${to.meta.title} - Your App Name`
+  // Set page title
+  if (to.meta?.title) {
+    document.title = `${to.meta.title} - PANN POS`
+  } else {
+    document.title = 'PANN POS'
   }
-  
+
+  // Handle development-only routes in production
+  if (to.meta?.isDevelopmentOnly && import.meta.env.PROD) {
+    next('/dashboard')
+    return
+  }
+
   next()
+})
+
+// Handle navigation errors
+router.onError((error) => {
+  console.error('Router error:', error)
 })
 
 export default router

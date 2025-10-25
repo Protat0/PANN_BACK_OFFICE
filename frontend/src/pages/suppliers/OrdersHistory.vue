@@ -547,58 +547,11 @@ export default {
     const router = useRouter()
     const ordersComposable = useOrdersHistory()
     
-    // Mock data for demonstration
-    const mockOrders = ref([
-      {
-        id: 'PO-2025-001',
-        supplier: 'Bravo Warehouse',
-        supplierEmail: 'orders@bravowarehouse.com',
-        status: 'in_transit',
-        orderDate: '2025-01-10',
-        expectedDelivery: '2025-01-15',
-        totalAmount: 25750.00,
-        items: [
-          { name: 'Shin Ramyun (Pack of 20)', quantity: 10, unitPrice: 950.00 },
-          { name: 'Samyang Hot Chicken (Pack of 5)', quantity: 15, unitPrice: 425.00 },
-          { name: 'Kimchi 500g', quantity: 20, unitPrice: 180.00 },
-          { name: 'Korean Seaweed Snacks (Box)', quantity: 8, unitPrice: 320.00 }
-        ]
-      },
-      {
-        id: 'PO-2025-002',
-        supplier: 'John Doe Supplies',
-        supplierEmail: 'contact@johndoesupplies.ph',
-        status: 'delivered',
-        orderDate: '2025-01-05',
-        expectedDelivery: '2025-01-12',
-        totalAmount: 18900.00,
-        items: [
-          { name: 'Nongshim Bowl Noodles (Pack of 12)', quantity: 12, unitPrice: 680.00 },
-          { name: 'Korean Rice Cakes 1kg', quantity: 8, unitPrice: 350.00 },
-          { name: 'Gochujang Sauce 500g', quantity: 15, unitPrice: 250.00 },
-          { name: 'Korean Corn Tea (Pack of 30)', quantity: 6, unitPrice: 485.00 }
-        ]
-      },
-      {
-        id: 'PO-2025-003',
-        supplier: 'San Juan Groups',
-        supplierEmail: 'procurement@sanjuangroups.com',
-        status: 'pending',
-        orderDate: '2025-01-12',
-        expectedDelivery: '2025-01-18',
-        totalAmount: 32400.00,
-        items: [
-          { name: 'Korean Instant Noodles Variety Pack', quantity: 25, unitPrice: 750.00 },
-          { name: 'Korean BBQ Sauce 750ml', quantity: 12, unitPrice: 280.00 },
-          { name: 'Kimchi Premium 1kg', quantity: 18, unitPrice: 320.00 },
-          { name: 'Korean Green Tea (Premium Box)', quantity: 10, unitPrice: 540.00 }
-        ]
-      }
-    ])
+    // Use composable's loading and error states
+    const loading = computed(() => ordersComposable.loading.value)
+    const error = computed(() => ordersComposable.error.value)
     
-    // Local state
-    const loading = ref(false)
-    const error = ref(null)
+    // Local state for UI
     const currentPage = ref(1)
     const itemsPerPage = ref(15)
     const statusFilter = ref('all')
@@ -610,13 +563,9 @@ export default {
     const showEditModal = ref(false)
     const editingOrder = ref(null)
 
-    // Computed
+    // Use composable's filtered orders directly
     const displayOrders = computed(() => {
-      // Use mock data if composable data is not available or empty
-      if (!ordersComposable?.filteredOrders?.length) {
-        return applyLocalFilters(mockOrders.value)
-      }
-      return ordersComposable.filteredOrders
+      return ordersComposable.filteredOrders.value || []
     })
 
     const paginatedOrders = computed(() => {
@@ -683,86 +632,15 @@ export default {
     }
 
     const refreshData = async () => {
-      loading.value = true
-      error.value = null
-      try {
-        if (ordersComposable?.fetchOrders) {
-          await ordersComposable.fetchOrders()
-        }
-      } catch (err) {
-        error.value = err.message
-      } finally {
-        loading.value = false
-      }
-    }
-
-    const applyLocalFilters = (orders) => {
-      let filtered = [...orders]
-      
-      // Status filter
-      if (statusFilter.value !== 'all') {
-        filtered = filtered.filter(order => order.status === statusFilter.value)
-      }
-      
-      // Supplier filter
-      if (supplierFilter.value !== 'all') {
-        const supplierMap = {
-          'bravo_warehouse': 'Bravo Warehouse',
-          'john_doe_supplies': 'John Doe Supplies',
-          'san_juan_groups': 'San Juan Groups',
-          'bagatayam_inc': 'Bagatayam Inc.'
-        }
-        const supplierName = supplierMap[supplierFilter.value]
-        if (supplierName) {
-          filtered = filtered.filter(order => order.supplier === supplierName)
-        }
-      }
-      
-      // Date filter
-      if (dateFilter.value !== 'all') {
-        const now = new Date()
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        
-        filtered = filtered.filter(order => {
-          const orderDate = new Date(order.orderDate)
-          
-          switch (dateFilter.value) {
-            case 'today':
-              return orderDate >= today
-            case 'week':
-              const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
-              return orderDate >= weekAgo
-            case 'month':
-              const monthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
-              return orderDate >= monthAgo
-            case 'quarter':
-              const quarterAgo = new Date(today.getFullYear(), today.getMonth() - 3, today.getDate())
-              return orderDate >= quarterAgo
-            default:
-              return true
-          }
-        })
-      }
-      
-      // Search filter
-      if (searchFilter.value.trim()) {
-        const searchTerm = searchFilter.value.toLowerCase().trim()
-        filtered = filtered.filter(order => 
-          order.id.toLowerCase().includes(searchTerm) ||
-          order.supplier.toLowerCase().includes(searchTerm) ||
-          order.supplierEmail.toLowerCase().includes(searchTerm)
-        )
-      }
-      
-      return filtered
+      await ordersComposable.fetchOrders()
     }
 
     const applyFilters = () => {
-      if (ordersComposable?.filters) {
-        ordersComposable.filters.status = statusFilter.value
-        ordersComposable.filters.supplier = supplierFilter.value
-        ordersComposable.filters.dateRange = dateFilter.value
-        ordersComposable.filters.search = searchFilter.value
+      if (ordersComposable?.filters?.value) {
+        ordersComposable.filters.value.status = statusFilter.value
+        ordersComposable.filters.value.supplier = supplierFilter.value
+        ordersComposable.filters.value.dateRange = dateFilter.value
+        ordersComposable.filters.value.search = searchFilter.value
         if (ordersComposable.applyFilters) {
           ordersComposable.applyFilters()
         }
@@ -808,18 +686,16 @@ export default {
       closeModal()
       
       if (canEditOrder(order)) {
-        // Open full edit modal for pending orders
-        editingOrder.value = { ...order } // Create a copy for editing
+        editingOrder.value = JSON.parse(JSON.stringify(order))
         showEditModal.value = true
       } else if (canEditLimited(order)) {
-        alert(`Limited edit for order ${order.id} - This would open an edit modal with only delivery date and contact details editable`)
+        alert(`Limited edit for order ${order.id} - Only delivery date and contact details can be edited`)
       } else {
         alert(`Order ${order.id} cannot be edited due to its current status: ${order.status}`)
       }
     }
 
     const saveOrderChanges = () => {
-      // In a real app, this would save to the backend
       alert(`Order ${editingOrder.value.id} saved successfully!`)
       closeEditModal()
     }
@@ -854,19 +730,18 @@ export default {
     const exportOrders = () => {
       if (ordersComposable?.exportOrdersData) {
         ordersComposable.exportOrdersData('csv')
+        alert('Orders exported to CSV successfully!')
       } else {
-        alert('Export functionality - This would export the filtered orders to CSV')
+        alert('Export functionality not available')
       }
     }
 
     // Utility methods for order editing
     const canEditOrder = (order) => {
-      // Only pending orders can be fully edited
       return order.status === 'pending'
     }
 
     const canEditLimited = (order) => {
-      // Confirmed orders can have limited edits (like delivery dates)
       return order.status === 'confirmed'
     }
 
@@ -995,19 +870,13 @@ export default {
       return ''
     }
 
-    // Initialize
+    // Initialize - fetch from backend
     onMounted(async () => {
       await refreshData()
     })
 
     return {
-      // Composables
       ordersComposable,
-      
-      // Mock data
-      mockOrders,
-      
-      // Local state
       loading,
       error,
       currentPage,
@@ -1020,8 +889,6 @@ export default {
       selectedOrder,
       showEditModal,
       editingOrder,
-      
-      // Computed
       displayOrders,
       paginatedOrders,
       totalPages,
@@ -1029,15 +896,10 @@ export default {
       endItem,
       visiblePages,
       hasFilters,
-      
-      // Order editing utilities
       canEditOrder,
       canEditLimited,
       getEditTooltip,
       getEditButtonClass,
-      
-      // Methods
-      applyLocalFilters,
       goBack,
       refreshData,
       applyFilters,
@@ -1066,7 +928,6 @@ export default {
   }
 }
 </script>
-
 <style scoped>
 @import '@/assets/styles/colors.css';
 

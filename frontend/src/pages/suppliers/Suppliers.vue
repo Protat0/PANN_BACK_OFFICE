@@ -13,7 +13,7 @@
           border-color="warning"
           border-position="start"
           title="Active Orders"
-          :value="reportsComposable.activeOrdersCount"
+          :value="reportsComposable.activeOrdersCount.value"
           value-color="warning"
           subtitle="Pending Purchase Orders"
           clickable
@@ -26,7 +26,7 @@
           border-color="success"
           border-position="start"
           title="Top Performers"
-          :value="reportsComposable.topPerformersCount"
+          :value="reportsComposable.topPerformersCount.value"
           value-color="success"
           subtitle="High Volume Suppliers"
           clickable
@@ -79,7 +79,7 @@
                 :class="{ 'active': showAddDropdown }"
               >
                 <Plus :size="14" />
-                ADD ITEM
+                ADD SUPPLIER
               </button>
               
               <div 
@@ -258,12 +258,11 @@
     </div>
 
     <!-- Active Orders Modal -->
-    <ActiveOrdersModal
+     <ActiveOrdersModal
       :show="reportsComposable.showActiveOrdersModal.value"
-      :orders="reportsComposable.activeOrders.value"
-      :loading="reportsComposable.loading.value"
+      :orders="activeOrdersForModal"
+      :loading="activeOrdersLoading"
       @close="reportsComposable.closeActiveOrdersModal"
-      @view-all="handleViewAllOrders"
     />
 
     <!-- Top Performers Modal -->
@@ -327,7 +326,7 @@
 </template>
 
 <script>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   Plus, 
@@ -399,22 +398,29 @@ export default {
     const searchMode = ref(false)
     const addDropdownRef = ref(null)
     const searchInputRef = ref(null)
+    
+    // Active orders modal data
+    const activeOrdersForModal = ref([])
+    const activeOrdersLoading = ref(false)
 
-    // Debug log to check if composables are working
-    console.log('Suppliers composable:', suppliersComposable)
-    console.log('Loading state:', suppliersComposable.loading?.value)
 
     // Load suppliers on mount
     onMounted(async () => {
-      console.log('Suppliers component mounted')
       try {
         await suppliersComposable.fetchSuppliers()
         await reportsComposable.refreshReports()
-        
+
         // Add click outside listener
         document.addEventListener('click', handleClickOutside)
       } catch (error) {
         console.error('Error fetching suppliers:', error)
+      }
+    })
+
+    // Watch for modal opening to load active orders
+    watch(() => reportsComposable.showActiveOrdersModal.value, (isOpen) => {
+      if (isOpen) {
+        loadActiveOrdersForModal()
       }
     })
 
@@ -534,31 +540,46 @@ export default {
     }
 
     const handleSaveSupplier = async () => {
-      const result = await formComposable.saveSupplier(suppliersComposable.suppliers?.value || [])
+      try {
+        const result = await formComposable.saveSupplier(suppliersComposable)
+        
+        if (result.success) {
+          // Refresh the suppliers list to ensure the new supplier is visible
+          await suppliersComposable.refreshData()
+          
+          // Update reports if available
+          if (reportsComposable && reportsComposable.refreshReports) {
+            await reportsComposable.refreshReports()
+          }
+        }
+      } catch (error) {
+        console.error('Error in handleSaveSupplier:', error)
+      }
+    }
+
+    const handleOrderSave = async (orderData) => {
+      const result = await createOrderComposable.handleOrderSave(orderData)
       
       if (result.success) {
         suppliersComposable.successMessage.value = result.message
         
-        setTimeout(() => {
-          suppliersComposable.successMessage.value = null
-        }, 3000)
-      }
-    }
-
-    const handleOrderSave = (orderData) => {
-      const result = createOrderComposable.handleOrderSave(
-        orderData, 
-        suppliersComposable.suppliers?.value || []
-      )
-      
-      if (result.success) {
-        suppliersComposable.successMessage.value = result.message
+        // Refresh supplier data to update purchase order count
+        await suppliersComposable.fetchSuppliers()
+        
+        // Refresh reports
+        if (reportsComposable.refreshReports) {
+          await reportsComposable.refreshReports()
+        }
         
         setTimeout(() => {
           suppliersComposable.successMessage.value = null
         }, 3000)
       } else {
         suppliersComposable.error.value = result.error
+        
+        setTimeout(() => {
+          suppliersComposable.error.value = null
+        }, 5000)
       }
     }
 
@@ -592,12 +613,10 @@ export default {
     }
 
     const showActiveOrdersReport = () => {
-      console.log('Active Orders Report clicked')
       reportsComposable.openActiveOrdersModal()
     }
 
     const showTopSuppliersReport = () => {
-      console.log('Top Suppliers Report clicked')
       reportsComposable.openTopPerformersModal()
     }
 
@@ -605,6 +624,21 @@ export default {
       const route = reportsComposable.handleViewAllOrders()
       router.push(route)
     }
+
+    // Load active orders for modal
+    const loadActiveOrdersForModal = async () => {
+      activeOrdersLoading.value = true
+      try {
+        const orders = await suppliersComposable.getActiveOrdersForModal()
+        activeOrdersForModal.value = orders
+      } catch (error) {
+        console.error('Error loading active orders:', error)
+        activeOrdersForModal.value = []
+      } finally {
+        activeOrdersLoading.value = false
+      }
+    }
+
 
     return {
       // Composables
@@ -622,6 +656,8 @@ export default {
       searchMode,
       addDropdownRef,
       searchInputRef,
+      activeOrdersForModal,
+      activeOrdersLoading,
       
       // Methods
       handleSingleSupplier,

@@ -308,8 +308,7 @@ export default {
       try {
           // Fetch ALL notifications (including archived) for accurate total count
           const response = await apiNotif.DisplayNotifs();
-          console.log('API Response:', response);
-          
+
           // Set all notifications (this will include archived ones)
           this.allNotifications = response.data || [];
           
@@ -322,10 +321,7 @@ export default {
               has_next: false,
               has_previous: false
           };
-          
-          console.log('All notifications loaded:', this.allNotifications.length);
-          console.log('Pagination info:', this.pagination);
-          
+
           // Apply filters to show the data
           this.applyModalFilters();
           
@@ -574,7 +570,6 @@ export default {
     // ================================================================
     
     applyModalFilters() {
-      console.log('Applying filters:', this.modalFilter, this.priorityFilter, this.typeFilter, this.archiveFilter);
       let filtered = [...this.allNotifications];
 
       // Apply archive filter first
@@ -614,7 +609,6 @@ export default {
       }
 
       this.filteredModalNotifications = filtered;
-      console.log('Filtered notifications:', this.filteredModalNotifications.length);
     },
 
     // ================================================================

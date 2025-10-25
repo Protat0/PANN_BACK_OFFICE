@@ -1,7 +1,31 @@
-// composables/useSupplierForm.js
+// composables/ui/suppliers/useSupplierForm.js
 import { ref, reactive, computed } from 'vue'
+import axios from 'axios'
+import { useToast } from '@/composables/ui/useToast'
+
+// Configure axios
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+// Add auth token interceptor
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
 
 export function useSupplierForm() {
+  // Initialize toast composable
+  const { success, error: showError } = useToast()
+  
   // State
   const showAddModal = ref(false)
   const isEditMode = ref(false)
@@ -112,44 +136,128 @@ export function useSupplierForm() {
     }
   }
 
-  const saveSupplier = async (suppliers) => {
-    if (!validateForm()) return
+  const saveSupplier = async (suppliersComposable) => {
+    if (!validateForm()) {
+      showError('Please correct the form errors before submitting')
+      return { success: false, error: 'Please fix form errors' }
+    }
 
     formLoading.value = true
 
     try {
-      if (isEditMode.value) {
-        // Mock update - replace with actual API call
-        const index = suppliers.findIndex(s => s.id === selectedSupplier.value.id)
-        if (index !== -1) {
-          suppliers[index] = {
-            ...suppliers[index],
-            ...formData
+      // Prepare data for backend
+      const backendData = {
+        supplier_name: formData.name,
+        contact_person: formData.contactPerson,
+        email: formData.email,
+        phone_number: formData.phone,
+        address: formData.address,
+        type: formData.type,
+        notes: formData.notes
+      }
+
+      let response
+      let message
+
+      if (isEditMode.value && selectedSupplier.value) {
+        // UPDATE existing supplier
+        response = await api.put(`/suppliers/${selectedSupplier.value.id}/`, backendData)
+        message = `${formData.name} has been updated successfully`
+        
+        // Transform response
+        const updatedSupplier = {
+          id: response.data._id,
+          name: response.data.supplier_name,
+          email: response.data.email || '',
+          phone: response.data.phone_number || '',
+          address: response.data.address || '',
+          contactPerson: response.data.contact_person || '',
+          purchaseOrders: response.data.purchase_orders?.length || 0,
+          status: response.data.isDeleted ? 'inactive' : 'active',
+          type: response.data.type || 'food',
+          createdAt: response.data.created_at,
+          updatedAt: response.data.updated_at,
+          notes: response.data.notes || '',
+          raw: response.data
+        }
+
+        // Update in local state - FIXED: Add null checks
+        if (suppliersComposable && suppliersComposable.suppliers && Array.isArray(suppliersComposable.suppliers.value)) {
+          const index = suppliersComposable.suppliers.value.findIndex(
+            s => s.id === selectedSupplier.value.id
+          )
+          if (index !== -1) {
+            suppliersComposable.suppliers.value[index] = updatedSupplier
           }
         }
-        return { success: true, message: `Supplier "${formData.name}" updated successfully` }
+        
       } else {
-        // Mock create - replace with actual API call
+        // CREATE new supplier
+        response = await api.post('/suppliers/', backendData)
+        message = `${formData.name} has been added as a new supplier`
+        
+        // Add to local state
         const newSupplier = {
-          id: Date.now(),
-          ...formData,
+          id: response.data._id,
+          name: response.data.supplier_name,
+          email: response.data.email || '',
+          phone: response.data.phone_number || '',
+          address: response.data.address || '',
+          contactPerson: response.data.contact_person || '',
           purchaseOrders: 0,
-          createdAt: new Date().toISOString().split('T')[0]
-        }
-        suppliers.push(newSupplier)
-        
-        if (!addAnotherAfterSave.value) {
-          closeAddModal()
-        } else {
-          resetForm()
+          status: 'active',
+          type: response.data.type || 'food',
+          createdAt: response.data.created_at,
+          updatedAt: response.data.updated_at,
+          notes: response.data.notes || '',
+          raw: response.data
         }
         
-        return { success: true, message: `Supplier "${formData.name}" created successfully` }
+        // FIXED: Add null checks before adding to suppliers list
+        if (suppliersComposable && suppliersComposable.suppliers && Array.isArray(suppliersComposable.suppliers.value)) {
+          suppliersComposable.suppliers.value.unshift(newSupplier)
+        }
       }
+
+      // Update report data - FIXED: Add null checks
+      if (suppliersComposable && suppliersComposable.updateReportData && typeof suppliersComposable.updateReportData === 'function') {
+        suppliersComposable.updateReportData()
+      }
+
+      // Show success toast
+      success(message)
+
+      // Handle modal closure - FIXED: Always close modal on success
+      if (!isEditMode.value && addAnotherAfterSave.value) {
+        // Keep modal open for another entry, just reset form
+        resetForm()
+      } else {
+        // Close modal automatically
+        setTimeout(() => {
+          closeAddModal()
+        }, 100) // Small delay to ensure state updates
+      }
+
+      return { success: true, message }
+      
     } catch (error) {
       console.error('Error saving supplier:', error)
-      formErrors.value.general = error.message
-      return { success: false, error: error.message }
+      
+      let errorMessage = 'Failed to save supplier'
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error
+      } else if (error.response?.statusText) {
+        errorMessage = `Failed to save supplier: ${error.response.statusText}`
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      // Show error toast
+      showError(errorMessage)
+      
+      return { success: false, error: errorMessage }
+      
     } finally {
       formLoading.value = false
     }

@@ -9,9 +9,9 @@
         :min-height="300"
         :padding="20"
         title="Total Profit"
-        :value="totalProfit"
+        :value="profitLoading ? 'Loading...' : formattedTotalProfit"
         value-color="primary"
-        subtitle="From the last month"
+        :subtitle="profitSubtitle"
         border-color="primary"
         border-position="all"
         shadow="md"
@@ -19,7 +19,8 @@
       >
         <template #header>
           <div class="card-header-with-change">
-            <span class="change-badge positive">+24%</span>
+            <span v-if="!profitError" class="change-badge positive">Live</span>
+            <span v-else class="change-badge negative">Error</span>
           </div>
         </template>
       </CardTemplate>
@@ -31,37 +32,39 @@
         :height="140"
         :padding="16"
         title="Total Products"
-        :value="totalProducts"
+        :value="productsLoading ? 'Loading...' : totalProducts"
         value-color="success"
-        subtitle="Updated: May 02, 2025"
+        :subtitle="productsLoading ? 'Fetching data...' : `Updated: ${lastUpdated}`"
         border-color="success"
         border-position="all"
         shadow="md"
       >
         <template #header>
           <div class="card-header-with-change">
-            <span class="change-badge positive">+24%</span>
+            <span v-if="!productsError" class="change-badge positive">Live</span>
+            <span v-else class="change-badge negative">Error</span>
           </div>
         </template>
       </CardTemplate>
       
-      <!-- Monthly Income Card -->
+      <!-- Monthly Revenue Card -->
       <CardTemplate
         size="custom"
         width="100%"
         :height="140"
         :padding="16"
-        title="Monthly Income"
-        :value="monthlyIncome"
+        title="Monthly Revenue"
+        :value="monthlyIncomeLoading ? 'Loading...' : formattedMonthlyRevenue"
         value-color="secondary"
-        subtitle="Updated: May 02, 2025"
+        :subtitle="monthlyRevenueSubtitle"
         border-color="secondary"
         border-position="all"
         shadow="md"
       >
         <template #header>
           <div class="card-header-with-change">
-            <span class="change-badge positive">+15%</span>
+            <span v-if="!monthlyIncomeError" class="change-badge positive">Live</span>
+            <span v-else class="change-badge negative">Error</span>
           </div>
         </template>
       </CardTemplate>
@@ -87,23 +90,24 @@
         </template>
       </CardTemplate>
       
-      <!-- Total Orders Card -->
+      <!-- Total Items Sold Card -->
       <CardTemplate
         size="custom"
         width="100%"
         :height="140"
         :padding="16"
-        title="Total Orders"
-        :value="totalOrders"
+        title="Total Items Sold"
+        :value="salesStatsLoading ? 'Loading...' : totalOrders"
         value-color="error"
-        subtitle="Updated: May 02, 2025"
+        :subtitle="salesDataSubtitle"
         border-color="error"
         border-position="all"
         shadow="md"
       >
         <template #header>
           <div class="card-header-with-change">
-            <span class="change-badge positive">+14%</span>
+            <span v-if="!salesStatsError" class="change-badge positive">Live</span>
+            <span v-else class="change-badge negative">Error</span>
           </div>
         </template>
       </CardTemplate>
@@ -117,15 +121,15 @@
           width="100%"
           :min-height="400"
           :padding="20"
-          title="Product Sale"
-          subtitle="Sales performance by category"
+          title="Sales Trend"
+          subtitle="Sales over time"
           border-color="neutral"
           border-position="all"
           shadow="md"
         >
           <template #header>
             <div class="chart-header-controls">
-              <select v-model="selectedFrequency" @change="updateChart" class="frequency-select">
+              <select v-model="salesSelectedFrequency" @change="onFrequencyChangeHandler" class="frequency-select">
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
@@ -186,6 +190,9 @@
 import CardTemplate from '../components/common/CardTemplate.vue'
 import SalesChart from '../components/dashboard/SalesChart.vue'
 import { formatCurrency, formatNumber } from '@/helpers/currencyHelpers'
+import { useProducts } from '@/composables/api/useProducts.js'
+import { useSales } from '@/composables/api/useSales.js'
+import salesAPIService from '@/services/apiReports.js'
 
 export default {
   name: 'Dashboard',
@@ -193,94 +200,589 @@ export default {
     CardTemplate,
     SalesChart
   },
+  setup() {
+    const { 
+      products, 
+      productStats, 
+      fetchProducts, 
+      initializeProducts,
+      loading: productsLoading, 
+      error: productsError 
+    } = useProducts()
+
+    const {
+      totalSalesCount,
+      salesStatsLoading,
+      salesStatsError,
+      loadTotalSalesCount,
+      loadTotalSalesCountAllTime,
+      totalProfit,
+      profitLoading,
+      profitError,
+      loadTotalProfit,
+      loadTotalProfitAllTime,
+      monthlyIncome,
+      monthlyIncomeLoading,
+      monthlyIncomeError,
+      loadMonthlyIncome,
+      loadCurrentMonthIncome,
+      chartData: salesChartData,
+      selectedFrequency: salesSelectedFrequency,
+      getTopChartItems,
+      onFrequencyChange,
+      calculateDateRange
+    } = useSales()
+
+    return {
+      products,
+      productStats,
+      fetchProducts,
+      initializeProducts,
+      productsLoading,
+      productsError,
+      totalSalesCount,
+      salesStatsLoading,
+      salesStatsError,
+      loadTotalSalesCount,
+      loadTotalSalesCountAllTime,
+      totalProfit,
+      profitLoading,
+      profitError,
+      loadTotalProfit,
+      loadTotalProfitAllTime,
+      monthlyIncome,
+      monthlyIncomeLoading,
+      monthlyIncomeError,
+      loadMonthlyIncome,
+      loadCurrentMonthIncome,
+      salesChartData,
+      salesSelectedFrequency,
+      getTopChartItems,
+      onFrequencyChange,
+      calculateDateRange
+    }
+  },
   data() {
     return {
       targetProgress: 78,
+      chart: null,
+      isUpdatingChart: false, // Prevent recursion in chart updates
+      isShowingAllTimeSales: false, // Track if we're showing all-time data due to no last month sales
+      isShowingAllTimeProfit: false, // Track if we're showing all-time profit due to no last month profit
+      currentMonthPeriod: null, // Track current month period for monthly income
       // Raw data values
       rawData: {
         totalProfit: 78452.23,
-        totalProducts: 56,
         monthlyIncome: 120042,
         totalSold: 12490,
-        totalOrders: 123,
         targetSales: 50000
       }
     }
   },
   computed: {
     // Formatted values for display
-    totalProfit() {
-      return formatCurrency(this.rawData.totalProfit)
+    formattedTotalProfit() {
+      return formatCurrency(this.totalProfit || 0)
+    },
+    profitSubtitle() {
+      if (this.profitLoading) {
+        return 'Fetching data...'
+      }
+      return this.isShowingAllTimeProfit ? 'All time' : `From ${this.lastMonthPeriod}`
     },
     totalProducts() {
-      return formatNumber(this.rawData.totalProducts)
+      // Use dynamic data from products API - check multiple sources for total count
+      let count = 0
+      
+      // First try productStats.total (computed from products array)
+      if (this.productStats?.total !== undefined) {
+        count = this.productStats.total
+      }
+      // Fallback to direct products array length if productStats not available yet
+      else if (this.products && Array.isArray(this.products)) {
+        count = this.products.length
+      }
+      
+      return formatNumber(count)
     },
-    monthlyIncome() {
-      return formatCurrency(this.rawData.monthlyIncome)
+    lastUpdated() {
+      return new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      })
+    },
+    lastMonthPeriod() {
+      const now = new Date()
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      return lastMonth.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long'
+      })
+    },
+    salesDataSubtitle() {
+      if (this.salesStatsLoading) {
+        return 'Fetching data...'
+      }
+      return this.isShowingAllTimeSales ? 'All time' : `From ${this.lastMonthPeriod}`
+    },
+    formattedMonthlyRevenue() {
+      return formatCurrency(this.monthlyIncome || 0)
+    },
+    monthlyRevenueSubtitle() {
+      if (this.monthlyIncomeLoading) {
+        return 'Fetching data...'
+      }
+      return this.currentMonthPeriod || 'Current month'
     },
     totalSold() {
       return formatNumber(this.rawData.totalSold)
     },
     totalOrders() {
-      return formatNumber(this.rawData.totalOrders)
+      return formatNumber(this.totalSalesCount)
     },
     targetSales() {
       return formatCurrency(this.rawData.targetSales)
+    },
+    chartData() {
+      // Return a default chart structure to prevent issues during initialization
+      return {
+        labels: ['Initializing...'],
+        datasets: [{
+          label: 'Sales',
+          data: [0],
+          borderColor: 'rgba(59, 130, 246, 1)',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.4
+        }]
+      }
     }
   },
+  // Removed watcher to prevent recursion issues - chart updates are now handled manually
   methods: {
     handleTargetSalesClick() {
       // Target sales button clicked
     },
-    updateChart() {
-      // Update chart data based on frequency
-      if (this.chart) {
-        // Sample data changes based on frequency
-        let newData = []
-        switch(this.selectedFrequency) {
+    /**
+     * Generate time-based chart data starting from September
+     */
+    getTimeBasedChartData() {
+      const currentDate = new Date()
+      const currentYear = currentDate.getFullYear()
+      
+      // Get labels based on selected frequency, starting from October
+      let labels = []
+      
+      switch(this.salesSelectedFrequency) {
           case 'daily':
-            this.chart.data.labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
-            newData = [
-              [45, 42, 38, 50, 48],
-              [35, 32, 28, 40, 38], 
-              [25, 22, 18, 30, 28],
-              [15, 12, 8, 20, 18]
-            ]
+          // Last 7 days
+          labels = []
+          for (let i = 6; i >= 0; i--) {
+            const date = new Date()
+            date.setDate(date.getDate() - i)
+            labels.push(date.toLocaleDateString('en-US', { weekday: 'short' }))
+          }
             break
           case 'weekly':
-            this.chart.data.labels = ['Week 1', 'Week 2', 'Week 3', 'Week 4']
-            newData = [
-              [180, 170, 160, 200],
-              [140, 130, 120, 160],
-              [100, 90, 80, 120],
-              [60, 50, 40, 80]
-            ]
+          // Last 12 weeks starting from October
+          labels = []
+          for (let i = 11; i >= 0; i--) {
+            const weekStart = new Date(currentYear, 9, 1) // October is month 9 (0-indexed)
+            weekStart.setDate(weekStart.getDate() - (i * 7))
+            const weekNum = Math.ceil((weekStart.getDate()) / 7)
+            labels.push(`W${weekNum}`)
+          }
             break
           case 'yearly':
-            this.chart.data.labels = ['2021', '2022', '2023', '2024']
-            newData = [
-              [1200, 1400, 1600, 1800],
-              [900, 1100, 1300, 1500],
-              [600, 800, 1000, 1200],
-              [300, 500, 700, 900]
-            ]
+          // From 2024 onwards (assuming we start from current year)
+          labels = []
+          const startYear = currentYear - 2 // Show last 3 years
+          for (let year = startYear; year <= currentYear; year++) {
+            labels.push(year.toString())
+          }
             break
           default: // monthly
-            this.chart.data.labels = ['JAN', 'FEB', 'MAR', 'APR']
-            newData = [
-              [300, 280, 250, 350],
-              [220, 200, 180, 240],
-              [170, 160, 150, 190],
-              [130, 120, 110, 140]
-            ]
+          // From October of current year
+          labels = []
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+          const startMonth = 9 // October (0-indexed)
+          
+          // Add months from October to current month, or next year if needed
+          for (let i = 0; i < 12; i++) {
+            const monthIndex = (startMonth + i) % 12
+            const yearOffset = Math.floor((startMonth + i) / 12)
+            const displayYear = currentYear + yearOffset
+            labels.push(`${months[monthIndex]} ${displayYear}`)
+            
+            // Break if we've reached current month and it's not a full year cycle
+            if (monthIndex === currentDate.getMonth() && yearOffset === 0 && i < 11) {
+              break
+            }
+          }
+      }
+      
+      // For now, return empty data - will be populated by real API data
+      return {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Sales',
+            data: new Array(labels.length).fill(0), // Placeholder data
+            borderColor: 'rgba(59, 130, 246, 1)',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 8
+          }
+        ]
+      }
+    },
+    /**
+     * Aggregate sales data by time period for chart display
+     */
+    aggregateSalesDataByTime(salesChartData, expectedLabelCount = null) {
+      if (!salesChartData || !salesChartData.datasets || !salesChartData.datasets[0]) {
+        // Avoid recursion by not calling getTimeBasedChartData()
+        const defaultLength = expectedLabelCount || 12 // Default to 12 months
+        return new Array(defaultLength).fill(0)
+      }
+      
+      // For now, return the sales data as-is since useSales already handles aggregation
+      // In the future, we could implement further aggregation here if needed
+      const salesValues = salesChartData.datasets[0].data || []
+      const expectedLength = expectedLabelCount || salesValues.length
+      
+      // If we have fewer data points than expected labels, pad with zeros
+      if (salesValues.length < expectedLength) {
+        return [...salesValues, ...new Array(expectedLength - salesValues.length).fill(0)]
+      }
+      
+      // If we have more data points than expected labels, take the first N points
+      return salesValues.slice(0, expectedLength)
+    },
+    /**
+     * Load time-based sales data for the chart
+     */
+    async loadTimeBasedSalesData() {
+      try {
+        // Use the calculateDateRange from useSales composable
+        const dateRange = this.calculateDateRange ? this.calculateDateRange(this.salesSelectedFrequency) : null
+        
+        if (dateRange) {
+          // Use the same service that's available in useSales
+          // For now, let's use the monthly income data we already have
+          if (this.salesSelectedFrequency === 'monthly' && this.monthlyIncome) {
+            return this.getMonthlyChartData()
+          }
+          
+          // For other frequencies, we can fall back to the existing method
+          return null
+        }
+      } catch (error) {
+        console.error('Failed to load time-based sales data:', error)
+        return null
+      }
+    },
+    /**
+     * Aggregate sales data by time periods for chart display
+     */
+    aggregateSalesByTimePeriod(salesData, frequency) {
+      if (!salesData || salesData.length === 0) {
+        return { labels: [], data: [] }
+      }
+      
+      const currentDate = new Date()
+      let labels = []
+      let aggregatedData = []
+      
+      switch (frequency) {
+        case 'daily':
+          // Last 7 days
+          labels = []
+          for (let i = 6; i >= 0; i--) {
+            const date = new Date()
+            date.setDate(date.getDate() - i)
+            labels.push(date.toLocaleDateString('en-US', { weekday: 'short' }))
+          }
+          // For daily, sum all sales for each day (simplified aggregation)
+          aggregatedData = new Array(7).fill(0)
+          const totalDaily = salesData.reduce((sum, item) => sum + (parseFloat(item.total_sales) || 0), 0)
+          aggregatedData.fill(totalDaily / 7) // Distribute evenly for now
+          break
+          
+        case 'weekly':
+          // Last 12 weeks
+          labels = []
+          for (let i = 11; i >= 0; i--) {
+            labels.push(`W${12 - i}`)
+          }
+          aggregatedData = new Array(12).fill(0)
+          const totalWeekly = salesData.reduce((sum, item) => sum + (parseFloat(item.total_sales) || 0), 0)
+          aggregatedData.fill(totalWeekly / 12) // Distribute evenly for now
+          break
+          
+        case 'monthly':
+          // From October to current month
+          labels = []
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+          const currentYear = currentDate.getFullYear()
+          const startMonth = 9 // October
+          
+          for (let i = 0; i < 12; i++) {
+            const monthIndex = (startMonth + i) % 12
+            const yearOffset = Math.floor((startMonth + i) / 12)
+            const displayYear = currentYear + yearOffset
+            labels.push(`${months[monthIndex]} ${displayYear}`)
+            
+            if (monthIndex === currentDate.getMonth() && yearOffset === 0) {
+              break
+            }
+          }
+          
+          // For monthly, use actual monthly revenue if available
+          aggregatedData = new Array(labels.length).fill(0)
+          const totalMonthly = salesData.reduce((sum, item) => sum + (parseFloat(item.total_sales) || 0), 0)
+          
+          // If we have current month data, use it; otherwise distribute evenly
+          if (this.monthlyIncome && this.monthlyIncome > 0) {
+            aggregatedData[aggregatedData.length - 1] = this.monthlyIncome // Last month (current)
+            const remainingTotal = Math.max(0, totalMonthly - this.monthlyIncome)
+            const remainingMonths = Math.max(1, aggregatedData.length - 1)
+            for (let i = 0; i < aggregatedData.length - 1; i++) {
+              aggregatedData[i] = remainingTotal / remainingMonths
+            }
+          } else {
+            aggregatedData.fill(totalMonthly / aggregatedData.length)
+          }
+          break
+          
+        case 'yearly':
+          labels = []
+          const startYear = currentDate.getFullYear() - 2
+          for (let year = startYear; year <= currentDate.getFullYear(); year++) {
+            labels.push(year.toString())
+          }
+          aggregatedData = new Array(labels.length).fill(0)
+          const totalYearly = salesData.reduce((sum, item) => sum + (parseFloat(item.total_sales) || 0), 0)
+          aggregatedData.fill(totalYearly / labels.length) // Distribute evenly for now
+          break
+          
+        default:
+          labels = ['No Data']
+          aggregatedData = [0]
+      }
+      
+      return { labels, data: aggregatedData }
+    },
+    /**
+     * Get monthly chart data using the actual monthly revenue
+     */
+    getMonthlyChartData() {
+      const currentDate = new Date()
+      const currentYear = currentDate.getFullYear()
+      const currentMonth = currentDate.getMonth() // 0-indexed
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      
+      console.log('📅 Current date info:', { currentYear, currentMonth, currentMonthName: months[currentMonth] })
+      
+      // Generate labels from October to current month
+      let labels = []
+      const startMonth = 9 // October (0-indexed)
+      
+      // Always start with October of current year
+      if (currentMonth >= startMonth) {
+        // We're in October or later - show from October to current month
+        console.log(`🏷️ Adding months from ${startMonth} to ${currentMonth}`)
+        for (let monthIndex = startMonth; monthIndex <= currentMonth; monthIndex++) {
+          const label = `${months[monthIndex]} ${currentYear}`
+          labels.push(label)
+          console.log(`🏷️ Added label: ${label}`)
+        }
+      } else {
+        // We're before October - show from October of previous year to current month
+        console.log(`🏷️ Adding months from previous year October to current month`)
+        // First, add remaining months from previous year (Oct, Nov, Dec)
+        for (let monthIndex = startMonth; monthIndex < 12; monthIndex++) {
+          const label = `${months[monthIndex]} ${currentYear - 1}`
+          labels.push(label)
+          console.log(`🏷️ Added previous year label: ${label}`)
+        }
+        // Then add months from current year up to current month
+        for (let monthIndex = 0; monthIndex <= currentMonth; monthIndex++) {
+          const label = `${months[monthIndex]} ${currentYear}`
+          labels.push(label)
+          console.log(`🏷️ Added current year label: ${label}`)
+        }
+      }
+      
+      console.log(`🏷️ Total labels generated: ${labels.length}`, labels)
+      
+      // Ensure we always have at least one label (fallback)
+      if (labels.length === 0) {
+        console.log(`🏷️ No labels generated, using fallback`)
+        labels = [`Oct ${currentYear}`]
+      }
+      
+      // Create data array with the monthly income
+      const data = new Array(labels.length).fill(0)
+      
+      // Put the monthly income in the appropriate position
+      if (this.monthlyIncome && this.monthlyIncome > 0) {
+        // If we're in the current month, find its position
+        const currentMonthLabel = `${months[currentMonth]} ${currentYear}`
+        const currentIndex = labels.indexOf(currentMonthLabel)
+        
+        if (currentIndex >= 0) {
+          data[currentIndex] = this.monthlyIncome
+        } else {
+          // Fallback: put it in the last position
+          data[data.length - 1] = this.monthlyIncome
+        }
+      }
+      
+      console.log('📊 Monthly chart data generated:', { 
+        labels: labels, 
+        data: data, 
+        monthlyIncome: this.monthlyIncome,
+        labelsLength: labels.length,
+        dataLength: data.length
+      })
+      
+      return { labels, data }
+    },
+    /**
+     * Simple method to update chart with monthly data - bypasses reactivity issues
+     */
+    updateChartWithMonthlyData() {
+      if (!this.chart || !this.monthlyIncome) {
+        console.log('📊 Chart or monthly income not available')
+        return
+      }
+      
+      try {
+        // Create simple, static data for October 2025
+        const currentYear = 2025
+        const labels = ['Oct 2025']
+        const data = [this.monthlyIncome]
+        
+        console.log('📊 Updating chart with simple data:', { labels, data, monthlyIncome: this.monthlyIncome })
+        
+        // Direct update without reactivity
+        if (this.chart.data && this.chart.data.datasets && this.chart.data.datasets[0]) {
+          // Clear and set new data directly
+          this.chart.data.labels.length = 0
+          this.chart.data.labels.push(...labels)
+          this.chart.data.datasets[0].data.length = 0
+          this.chart.data.datasets[0].data.push(...data)
+          
+          // Update chart
+          this.chart.update('none')
+          console.log('📊 Chart updated successfully')
+        }
+      } catch (error) {
+        console.error('📊 Simple chart update failed:', error)
+      }
+    },
+    
+    /**
+     * Load chart data only - without triggering profit calculations
+     */
+    async loadChartDataOnly() {
+      // Prevent recursion - check flag first
+      if (this.isUpdatingChart) {
+        console.log('📊 Chart update already in progress, skipping')
+        return
+      }
+      
+      // Only update chart if it exists and is properly initialized
+      if (!this.chart || !this.chart.data || !this.chart.data.datasets || this.chart.data.datasets.length === 0) {
+        console.log('📊 Chart not ready yet, skipping data load')
+        return
+      }
+      
+      this.isUpdatingChart = true
+      
+      try {
+        console.log('📊 Starting chart data load for frequency:', this.salesSelectedFrequency)
+        
+        // For monthly frequency, use the simple update method
+        if (this.salesSelectedFrequency === 'monthly' && this.monthlyIncome) {
+          this.updateChartWithMonthlyData()
+          return
         }
         
-        // Update datasets
-        this.chart.data.datasets.forEach((dataset, index) => {
-          dataset.data = newData[index]
-        })
+        console.log('📊 No valid data to load for current frequency')
         
-        this.chart.update()
+      } catch (error) {
+        console.error('Failed to load chart data only:', error)
+      } finally {
+        // Always reset the flag after a delay to prevent rapid successive calls
+        setTimeout(() => {
+          this.isUpdatingChart = false
+        }, 100)
+      }
+    },
+    async updateChart() {
+      // Prevent recursion by checking if already updating
+      if (this.isUpdatingChart) {
+        return
+      }
+      
+      this.isUpdatingChart = true
+      
+      try {
+        // Use the chart-only update method to avoid triggering profit calculations
+        await this.loadChartDataOnly()
+      } catch (error) {
+        console.error('Failed to update chart:', error)
+        // Fallback: update with just the labels (avoiding recursive calls)
+        if (this.chart && !this.isUpdatingChart) {
+          try {
+            // Use monthly data directly for fallback
+            if (this.salesSelectedFrequency === 'monthly') {
+              const monthlyData = this.getMonthlyChartData()
+              if (monthlyData && monthlyData.labels) {
+                this.chart.data.labels = monthlyData.labels
+                this.chart.data.datasets[0].data = monthlyData.data
+                this.chart.update('none')
+              }
+            }
+          } catch (fallbackError) {
+            console.error('Fallback chart update also failed:', fallbackError)
+          }
+        }
+      } finally {
+        this.isUpdatingChart = false
+      }
+    },
+    /**
+     * Handle frequency change from the dropdown
+     */
+    async onFrequencyChangeHandler() {
+      console.log('🔄 Frequency changed to:', this.salesSelectedFrequency)
+      
+      // Prevent multiple rapid changes
+      if (this.isUpdatingChart) {
+        return
+      }
+      
+      try {
+        // For monthly frequency, use the simple update method
+        if (this.salesSelectedFrequency === 'monthly' && this.monthlyIncome) {
+          this.updateChartWithMonthlyData()
+        } else {
+          // For other frequencies, we could implement similar simple methods
+          console.log('📊 Frequency change handled, chart will be updated manually')
+        }
+      } catch (error) {
+        console.error('Failed to handle frequency change:', error)
       }
     },
     async initChart() {
@@ -291,9 +793,28 @@ export default {
         
         const ctx = this.$refs.chartCanvas.getContext('2d')
         
+        // Initialize chart with stable data structure to prevent Chart.js errors
+        const initialData = {
+          labels: ['Loading...'],
+          datasets: [{
+            label: 'Sales',
+            data: [0],
+            borderColor: 'rgba(59, 130, 246, 1)',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 8
+          }]
+        }
+        
         this.chart = new Chart(ctx, {
-          type: 'bar',
-          data: this.chartData,
+          type: 'line',
+          data: initialData,
           options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -313,7 +834,8 @@ export default {
             scales: {
               x: {
                 grid: {
-                  display: false
+                  display: true,
+                  color: 'rgba(0, 0, 0, 0.05)'
                 },
                 ticks: {
                   font: {
@@ -326,21 +848,29 @@ export default {
               y: {
                 beginAtZero: true,
                 grid: {
-                  color: '#f3f4f6'
+                  color: 'rgba(0, 0, 0, 0.05)'
                 },
                 ticks: {
                   font: {
                     size: 11
                   },
-                  color: '#6b7280'
+                  color: '#6b7280',
+                  callback: function(value) {
+                    return '₱' + value.toLocaleString()
+                  }
                 }
               }
             },
             elements: {
-              bar: {
-                borderRadius: 4,
-                borderSkipped: false
+              point: {
+                hoverBackgroundColor: 'rgba(59, 130, 246, 1)',
+                hoverBorderColor: '#ffffff',
+                hoverBorderWidth: 3
               }
+            },
+            interaction: {
+              intersect: false,
+              mode: 'index'
             }
           }
         })
@@ -354,17 +884,162 @@ export default {
             <code>npm install chart.js</code>
             <br><br>
             <div style="background: #f3f4f6; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-              Sample Data:<br>
-              Noodles: 300, 280, 250, 350<br>
-              Toppings: 220, 200, 180, 240<br>
-              Snacks: 170, 160, 150, 190<br>
-              Drinks: 130, 120, 110, 140
+              Sample Sales Data:<br>
+              Oct: ₱1,200 | Nov: ₱1,150<br>
+              Dec: ₱1,300 | Jan: ₱1,450
             </div>
           </div>
         `
         this.$refs.chartCanvas.parentNode.appendChild(fallback)
       }
+    },
+    async loadProductsData() {
+      try {
+        // Use initializeProducts for cleaner initial data loading
+        await this.initializeProducts()
+        console.log('Products data loaded successfully:', {
+          productsCount: this.products?.length || 0,
+          productStats: this.productStats
+        })
+      } catch (error) {
+        console.error('Failed to load products data:', error)
+        // Fallback to fetchProducts if initializeProducts fails
+        try {
+          await this.fetchProducts()
+          console.log('Products data loaded via fallback method:', {
+            productsCount: this.products?.length || 0,
+            productStats: this.productStats
+          })
+        } catch (fallbackError) {
+          console.error('Fallback fetchProducts also failed:', fallbackError)
+          // The error is already handled by the useProducts composable
+          // and will be reflected in the productsError reactive variable
+        }
+      }
+    },
+    async loadSalesData() {
+      try {
+        // Calculate last month's date range for reference
+        const now = new Date()
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0) // Last day of previous month
+        
+        // Format dates for API (YYYY-MM-DD format)
+        const startDate = startOfLastMonth.toISOString().split('T')[0]
+        const endDate = endOfLastMonth.toISOString().split('T')[0]
+        
+        console.log('Loading sales data - checking both last month and all-time:', { startDate, endDate })
+        
+        // Load the last month's sales count
+        await this.loadTotalSalesCount(startDate, endDate)
+        const lastMonthCount = this.totalSalesCount
+        
+        console.log('Last month sales count:', { 
+          totalSales: lastMonthCount, 
+          period: `${startDate} to ${endDate}` 
+        })
+        
+        // Load all-time count for comparison
+        console.log('🔍 Loading all-time sales count for comparison...')
+        await this.loadTotalSalesCountAllTime()
+        const allTimeCount = this.totalSalesCount
+        
+        console.log('🔍 COMPARISON:', {
+          lastMonth: `${lastMonthCount} items sold (${startDate} to ${endDate})`,
+          allTime: `${allTimeCount} items sold (no date filter)`,
+          difference: `${allTimeCount - lastMonthCount} items sold in other periods`
+        })
+        
+        // Use all-time count if last month shows 0, otherwise use last month
+        if (lastMonthCount > 0) {
+          console.log('✅ Using last month count:', lastMonthCount)
+          this.totalSalesCount = lastMonthCount
+          this.isShowingAllTimeSales = false
+        } else {
+          console.log('⚠️ Last month had no sales, using all-time count:', allTimeCount)
+          this.totalSalesCount = allTimeCount
+          this.isShowingAllTimeSales = true
+        }
+        
+        // Also load profit data with the same date range
+        console.log('💰 Loading profit data for same period...')
+        await this.loadTotalProfit(startDate, endDate)
+        const lastMonthProfit = this.totalProfit
+        
+        console.log('Last month profit:', lastMonthProfit)
+        
+        // Load all-time profit for comparison
+        console.log('💰 Loading all-time profit for comparison...')
+        await this.loadTotalProfitAllTime()
+        const allTimeProfit = this.totalProfit
+        
+        console.log('💰 COMPARISON:', {
+          lastMonth: `${lastMonthProfit} profit (${startDate} to ${endDate})`,
+          allTime: `${allTimeProfit} profit (no date filter)`,
+          difference: `${allTimeProfit - lastMonthProfit} profit in other periods`
+        })
+        
+        // Use all-time profit if last month shows 0, otherwise use last month
+        if (lastMonthProfit > 0) {
+          console.log('✅ Using last month profit:', lastMonthProfit)
+          // Restore the last month profit value
+          this.totalProfit = lastMonthProfit
+          this.isShowingAllTimeProfit = false
+        } else {
+          console.log('⚠️ Last month had no profit, using all-time profit:', allTimeProfit)
+          // Keep the all-time profit value (already set)
+          this.isShowingAllTimeProfit = true
+        }
+        
+        // Load current month's revenue (separate from the last month date range used for sales/profit)
+        console.log('💵 Loading current month revenue...')
+        await this.loadCurrentMonthIncome()
+        
+        // Set the current month period for the subtitle
+        const currentDate = new Date()
+        const currentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+        this.currentMonthPeriod = currentMonth.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long'
+        })
+        
+        console.log('✅ Monthly revenue loaded:', this.monthlyIncome, 'for', this.currentMonthPeriod)
+        
+      } catch (error) {
+        console.error('Failed to load sales data:', error)
+      }
     }
+  },
+  async mounted() {
+    // Load products and sales data when component mounts
+    await Promise.all([
+      this.loadProductsData(),
+      this.loadSalesData()
+    ])
+    
+    // Initialize chart after a short delay to ensure DOM is ready
+    this.$nextTick(() => {
+      setTimeout(async () => {
+        try {
+          await this.initChart()
+          console.log('📊 Chart initialized successfully')
+          
+          // Load chart data only after chart is properly initialized and monthly income is available
+          setTimeout(() => {
+            if (this.chart && this.monthlyIncome && this.salesSelectedFrequency === 'monthly') {
+              console.log('📊 Loading initial chart data with simple method...')
+              try {
+                this.updateChartWithMonthlyData()
+              } catch (error) {
+                console.error('Failed to load chart data after init:', error)
+              }
+            }
+          }, 500) // Longer delay to ensure chart is fully ready
+        } catch (error) {
+          console.error('Failed to initialize chart:', error)
+        }
+      }, 200) // Longer initial delay
+    })
   }
 }
 </script>
