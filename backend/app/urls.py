@@ -222,6 +222,12 @@ from .kpi_views.sales_display_views import (
     SalesDisplaySummaryView 
 )
 
+from .kpi_views.sales_by_category_views import (
+    SalesByCategoryView, 
+    TopCategoriesView, 
+    CategoryPerformanceDetailView
+)
+
 from .views import (
     APIDocumentationView,
 )
@@ -462,5 +468,9 @@ urlpatterns = [
     path('sales-display/pos-sales/', SalesDisplayAllSalesView.as_view(), name='sales-display-all-pos-sales'),
     path('sales-display/online-transactions/', SalesDisplayAllOnlineTransactionsView.as_view(), name='sales-display-all-online-transactions'),
     path('sales-display/by-item/', SalesDisplayByItemView.as_view(), name='sales-display-by-item'),
-    path('sales-display/summary/', SalesDisplaySummaryView.as_view(), name='sales-display-summary'),  
+    path('sales-display/summary/', SalesDisplaySummaryView.as_view(), name='sales-display-summary'),
+
+    path("sales/category/", SalesByCategoryView.as_view(), name="sales-by-category"),
+    path("sales/category/top/", TopCategoriesView.as_view(), name="top-categories"),
+    path("sales/category/<str:category_id>/", CategoryPerformanceDetailView.as_view(), name="category-performance-detail"),
 ]

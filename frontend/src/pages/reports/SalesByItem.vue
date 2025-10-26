@@ -28,7 +28,7 @@
         <!-- Empty state for top items -->
         <div v-else class="empty-state-small">
           <p>No top items data available</p>
-          <button @click="getTopItems" class="btn btn-sm btn-primary">Retry Loading</button>
+          <button @click="loadAllData" class="btn btn-sm btn-primary">Retry Loading</button>
         </div>
       </div>
       
@@ -39,14 +39,14 @@
         <div class="chart-header">
           <h1>Sales Chart</h1>
           <select v-model="selectedFrequency" @change="onFrequencyChange" class="frequency-dropdown">
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="yearly">Yearly</option>
+            <option value="daily">Daily <!--(Last 30 Days) --></option>
+            <option value="weekly">Weekly <!--(Last 12 Weeks)--></option>
+            <option value="monthly">Monthly (Last 12 Months)</option>
+            <option value="yearly">Yearly (Last 3 Years)</option>
           </select>
         </div>
         <div class="chart-container">
-          <div v-if="loadingTopItems" class="chart-loading">
+          <div v-if="loadingChart" class="chart-loading">
             <div class="spinner-border text-primary"></div>
             <p>Loading chart data...</p>
           </div>
@@ -61,7 +61,10 @@
     <div class="BottomContainer">
       <!-- Header with Action Buttons -->
       <div class="transaction-header">
-        <h1>Sales by Item</h1>
+        <div class="header-left">
+          <h1>Sales by Item</h1>
+          
+        </div>
         <div class="header-actions">
           <!-- Auto-refresh status and controls -->
           <div class="auto-refresh-status">
@@ -96,13 +99,6 @@
           >
             <i class="bi bi-arrow-clockwise" :class="{ 'spinning': salesByItemLoading }"></i>
             {{ salesByItemLoading ? 'Reconnecting...' : 'Reconnect' }}
-          </button>
-
-          <button class="btn btn-primary" @click="importData" :disabled="salesByItemLoading || importing">
-            <i class="bi bi-upload"></i> {{ importing ? 'Importing...' : 'Import' }}
-          </button>
-          <button class="btn btn-success" @click="exportData" :disabled="salesByItemLoading || exporting">
-            <i class="bi bi-download"></i> {{ exporting ? 'Exporting...' : 'Export' }}
           </button>
         </div>
       </div>
@@ -140,7 +136,7 @@
                 <span class="badge badge-secondary">{{ item.category }}</span>
               </td>
               <td class="stock-column">
-                <span :class="{'low-stock': item.stock < 10}">
+                <span :class="{'low-stock': item.stock < 10, 'critical-stock': item.stock < 5}">
                   {{ item.stock }} {{ item.unit }}
                 </span>
               </td>
@@ -160,7 +156,7 @@
                     @click="viewProductDetails(item)"
                     title="View Product Details"
                   >
-                    <Eye />
+                    <Eye/>
                   </button>
                 </div>
               </td>
@@ -172,7 +168,7 @@
         <div v-if="salesByItemRows.length === 0 && !salesByItemLoading" class="empty-state">
           <i class="bi bi-receipt" style="font-size: 3rem; color: #6b7280;"></i>
           <p>No sales data found for the selected time period</p>
-          <button class="btn btn-primary" @click="refreshData">
+          <button class="btn btn-primary" @click="loadAllData">
             <i class="bi bi-arrow-clockwise"></i> Refresh Data
           </button>
         </div>
@@ -245,71 +241,6 @@
               </li>
             </ul>
           </nav>
-        </div>
-      </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- MODALS -->
-    <!-- ========================================== -->
-    
-    <!-- Import Progress Modal -->
-    <div v-if="showImportProgressModal" class="modal-overlay" @click="closeImportProgressModal">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h3>{{ importStep === 'uploading' ? 'Uploading CSV File' : 'Processing Import' }}</h3>
-          <button class="modal-close" @click="closeImportProgressModal" :disabled="importing">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div class="progress-section">
-            <div class="progress-info">
-              <span>{{ importStatusText }}</span>
-              <span class="progress-percentage">{{ Math.round(importProgress) }}%</span>
-            </div>
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: importProgress + '%' }"></div>
-            </div>
-          </div>
-          
-          <div v-if="importResult" class="import-results">
-            <h4>Import Results</h4>
-            <div class="result-summary">
-              <div class="result-item success">
-                <span>✅ Successful:</span>
-                <span>{{ importResult.summary?.successful || 0 }}</span>
-              </div>
-              <div class="result-item error" v-if="importResult.summary?.failed > 0">
-                <span>❌ Failed:</span>
-                <span>{{ importResult.summary?.failed || 0 }}</span>
-              </div>
-              <div class="result-item">
-                <span>📊 Success Rate:</span>
-                <span>{{ importResult.summary?.success_rate || 0 }}%</span>
-              </div>
-            </div>
-            
-            <div v-if="importResult.warnings && importResult.warnings.length > 0" class="warnings-section">
-              <h5>⚠️ Warnings</h5>
-              <ul class="warnings-list">
-                <li v-for="warning in importResult.warnings" :key="warning.type">
-                  {{ warning.message }}
-                </li>
-              </ul>
-            </div>
-          </div>
-          
-          <div v-if="importError" class="error-section">
-            <h4>❌ Import Failed</h4>
-            <p class="error-message">{{ importError }}</p>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button v-if="!importing" class="btn btn-secondary" @click="closeImportProgressModal">
-            Close
-          </button>
-          <button v-if="importResult && !importing" class="btn btn-primary" @click="closeImportProgressModal">
-            Done
-          </button>
         </div>
       </div>
     </div>
@@ -388,15 +319,11 @@ export default {
     BarChart
   },
   
-  // ====================================================================
-  // COMPONENT DATA
-  // ====================================================================
   data() {
     return {
       // Loading states
       loadingTopItems: false,
-      importing: false,
-      exporting: false,
+      loadingChart: false,
       
       // Sales by Item data
       salesByItemRows: [],
@@ -418,16 +345,9 @@ export default {
       showProductModal: false,
       selectedProductData: null,
       
-      // Import modal states
-      showImportProgressModal: false,
-      importProgress: 0,
-      importStep: 'uploading',
-      importStatusText: 'Preparing upload...',
-      importResult: null,
-      importError: null,
-      
       // Chart and analytics
       selectedFrequency: 'monthly',
+      currentDateRange: null,
       topItems: [],
       chartData: {
         labels: ['Loading...'],
@@ -442,7 +362,6 @@ export default {
 
       autoRefreshEnabled: true,
       autoRefreshInterval: 30000,
-      baseRefreshInterval: 30000,
       autoRefreshTimer: null,
       countdown: 30,
       countdownTimer: null,
@@ -452,20 +371,10 @@ export default {
       consecutiveErrors: 0,
       lastSuccessfulLoad: null,
       error: null,
-      
-      // Smart refresh rate tracking
-      recentActivity: [],
     };
   },
   
-  // ====================================================================
-  // COMPUTED PROPERTIES
-  // ====================================================================
   computed: {
-    isDevelopment() {
-      return process.env.NODE_ENV === 'development';
-    },
-    
     showSalesByItemPagination() {
       return this.salesByItemPagination.total_pages > 1;
     },
@@ -495,33 +404,20 @@ export default {
       }
       
       return pages;
+    },
+
+    dateRangeDisplay() {
+      if (!this.currentDateRange) return 'Select date range';
+      const start = new Date(this.currentDateRange.start_date);
+      const end = new Date(this.currentDateRange.end_date);
+      const opts = { year: 'numeric', month: 'short', day: 'numeric' };
+      return `${start.toLocaleDateString('en-US', opts)} - ${end.toLocaleDateString('en-US', opts)}`;
     }
   },
   
-  // ====================================================================
-  // LIFECYCLE HOOKS
-  // ====================================================================
   async mounted() {
-    // Load data sequentially
-    try {
-      await this.getTopItems();
-    } catch (error) {
-      console.error("Top items list failed:", error);
-    }
-
-    try {
-      await this.getTopChartItems();
-    } catch (error) {
-      console.error("Chart data failed:", error);
-    }
-
-    try {
-      await this.loadSalesByItemTable();
-    } catch (error) {
-      console.error("Sales by item table failed:", error);
-    }
+    await this.loadAllData();
     
-    // Start auto-refresh
     if (this.autoRefreshEnabled) {
       this.startAutoRefresh();
     }
@@ -531,17 +427,23 @@ export default {
     this.stopAutoRefresh();
   },
   
-  // ====================================================================
-  // METHODS
-  // ====================================================================
   methods: {
     // ================================================================
-    // DATA LOADING METHODS
+    // CORE DATA LOADING METHODS
     // ================================================================
     
-    /**
-     * Load top items for the list display only
-     */
+    async loadAllData() {
+      try {
+        await Promise.all([
+          this.getTopItems(),
+          this.getTopChartItems(),
+          this.loadSalesByItemTable()
+        ]);
+      } catch (error) {
+        console.error('Error loading all data:', error);
+      }
+    },
+
     async getTopItems() {
       try {
         this.loadingTopItems = true;
@@ -562,7 +464,6 @@ export default {
         }
 
         if (items && items.length > 0) {
-          // Sort by total_sales and take top 5
           const sortedItems = items
             .sort((a, b) => (b.total_sales || 0) - (a.total_sales || 0))
             .slice(0, 5);
@@ -598,11 +499,9 @@ export default {
       }
     },
 
-    /**
-     * Load chart data with date filtering
-     */
     async getTopChartItems() {
       try {
+        this.loadingChart = true;
         const dateRange = this.calculateDateRange(this.selectedFrequency);
         
         const response = await salesDisplayService.getSalesByItem(
@@ -619,12 +518,10 @@ export default {
         }
 
         if (items && items.length > 0) {
-          // Sort by total_sales and take top 10 for chart
           const sortedItems = items
             .sort((a, b) => (b.total_sales || 0) - (a.total_sales || 0))
             .slice(0, 10);
 
-          // Map to chart format
           const chartItems = sortedItems.map(item => ({
             item_name: item.product_name || 'Unknown Product',
             total_amount: item.total_sales || 0
@@ -652,20 +549,19 @@ export default {
         }
 
         this.setDefaultChartData();
+      } finally {
+        this.loadingChart = false;
       }
     },
 
-    /**
-     * Load sales by item table data with improved date filtering and error handling
-     */
     async loadSalesByItemTable() {
       try {
         this.salesByItemLoading = true;
         this.salesByItemError = null;
         
         const dateRange = this.calculateDateRange(this.selectedFrequency);
+        this.currentDateRange = dateRange;
         
-        // Validate date range
         if (!this.validateDateRange(dateRange.start_date, dateRange.end_date)) {
           this.salesByItemError = 'Invalid date range: start date cannot be after end date';
           this.allSalesByItemRows = [];
@@ -676,18 +572,16 @@ export default {
         console.log('📊 Fetching sales data with date range:', dateRange);
         console.log('📅 Frequency:', this.selectedFrequency);
         
-        // Use the improved API method with proper date filtering
         const response = await salesDisplayService.getSalesByItem(
           dateRange.start_date, 
           dateRange.end_date,
-          false // exclude voided transactions by default
+          false
         );
 
         console.log('📦 Raw API response:', response);
         
         let data = [];
         
-        // Handle different response formats
         if (Array.isArray(response)) {
           data = response;
         } else if (response?.data && Array.isArray(response.data)) {
@@ -701,13 +595,12 @@ export default {
 
         console.log('📈 Processed data for table:', data);
 
-        // Store all data and update pagination
         this.allSalesByItemRows = data
-          .filter(item => item && typeof item === 'object') // Filter out invalid items
+          .filter(item => item && typeof item === 'object')
           .sort((a, b) => {
             const salesA = parseFloat(a.total_sales) || 0;
             const salesB = parseFloat(b.total_sales) || 0;
-            return salesB - salesA; // Descending order by total sales
+            return salesB - salesA;
           })
           .map(item => ({
             id: item.product_id || item.id || 'N/A',
@@ -722,14 +615,12 @@ export default {
             is_taxable: Boolean(item.is_taxable)
           }));
 
-        // Reset to first page and update displayed data
         this.salesByItemPagination.current_page = 1;
         this.updateSalesByItemPageData();
 
         console.log('🎯 Final table rows:', this.salesByItemRows);
         console.log('📄 Pagination info:', this.salesByItemPagination);
 
-        // Update connection health on success
         this.connectionLost = false;
         this.consecutiveErrors = 0;
         this.lastSuccessfulLoad = Date.now();
@@ -738,7 +629,6 @@ export default {
       } catch (error) {
         console.error('❌ loadSalesByItemTable error:', error);
         
-        // Update connection health on error
         this.consecutiveErrors++;
         this.salesByItemError = this.getErrorMessage(error);
 
@@ -746,7 +636,6 @@ export default {
           this.connectionLost = true;
         }
 
-        // Set empty data state
         this.allSalesByItemRows = [];
         this.salesByItemRows = [];
         this.salesByItemPagination.current_page = 1;
@@ -757,106 +646,10 @@ export default {
       }
     },
 
-    /**
-     * Format date for API (YYYY-MM-DD) using local timezone
-     */
-    formatDateForAPI(date) {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    },
-
-    /**
-     * Validate that start date is before end date
-     */
-    validateDateRange(startDate, endDate) {
-      if (!startDate || !endDate) return true;
-      
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      
-      if (start > end) {
-        console.error('Invalid date range: start date is after end date', { startDate, endDate });
-        return false;
-      }
-      
-      return true;
-    },
-
-    /**
-     * Get user-friendly error messages
-     */
-    getErrorMessage(error) {
-      if (error.response?.status === 400) {
-        return 'Invalid date range or parameters. Please try a different time period.';
-      } else if (error.response?.status === 404) {
-        return 'Sales data not found for the selected period.';
-      } else if (error.response?.status === 500) {
-        return 'Server error. Please try again later.';
-      } else if (error.message?.includes('Network Error') || error.message?.includes('Failed to fetch')) {
-        return 'Network connection failed. Please check your internet connection.';
-      } else if (error.message?.includes('Invalid date range')) {
-        return error.message;
-      } else {
-        return error.message || 'Failed to load sales data. Please try again.';
-      }
-    },
-
     // ================================================================
-    // PAGINATION METHODS
+    // DATE FILTERING METHODS - FIXED
     // ================================================================
     
-    /**
-     * Update sales by item pagination data
-     */
-    updateSalesByItemPageData() {
-      const startIndex = (this.salesByItemPagination.current_page - 1) * this.salesByItemPagination.page_size;
-      const endIndex = startIndex + this.salesByItemPagination.page_size;
-      
-      this.salesByItemRows = this.allSalesByItemRows.slice(startIndex, endIndex);
-      
-      // Update pagination info
-      this.salesByItemPagination.total_records = this.allSalesByItemRows.length;
-      this.salesByItemPagination.total_pages = Math.ceil(this.allSalesByItemRows.length / this.salesByItemPagination.page_size);
-      this.salesByItemPagination.has_prev = this.salesByItemPagination.current_page > 1;
-      this.salesByItemPagination.has_next = this.salesByItemPagination.current_page < this.salesByItemPagination.total_pages;
-    },
-    
-    /**
-     * Go to specific page for sales by item
-     */
-    goToSalesByItemPage(page) {
-      if (this.showProductModal) {
-        return;
-      }
-      
-      if (page >= 1 && page <= this.salesByItemPagination.total_pages) {
-        this.salesByItemPagination.current_page = page;
-        this.updateSalesByItemPageData();
-      }
-    },
-
-    /**
-     * Change page size for sales by item
-     */
-    changeSalesByItemPageSize(newPageSize) {
-      if (this.showProductModal) {
-        return;
-      }
-      
-      this.salesByItemPagination.page_size = newPageSize;
-      this.salesByItemPagination.current_page = 1;
-      this.updateSalesByItemPageData();
-    },
-
-    // ================================================================
-    // CHART METHODS
-    // ================================================================
-    
-    /**
-     * Calculate date range based on frequency
-     */
     calculateDateRange(frequency) {
       const now = new Date();
       const end_date = this.formatDateForAPI(now);
@@ -899,14 +692,51 @@ export default {
       return { start_date, end_date };
     },
 
-    /**
-     * Update chart data with API response
-     */
+    formatDateForAPI(date) {
+      if (!(date instanceof Date)) {
+        date = new Date(date);
+      }
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    },
+
+    validateDateRange(startDate, endDate) {
+      if (!startDate || !endDate) return true;
+      
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      return start <= end;
+    },
+
+    getErrorMessage(error) {
+      if (error.response?.status === 400) {
+        return 'Invalid date range or parameters. Please try a different time period.';
+      } else if (error.response?.status === 404) {
+        return 'Sales data not found for the selected period.';
+      } else if (error.response?.status === 500) {
+        return 'Server error. Please try again later.';
+      } else if (error.message?.includes('Network Error') || error.message?.includes('Failed to fetch')) {
+        return 'Network connection failed. Please check your internet connection.';
+      } else {
+        return error.message || 'Failed to load sales data. Please try again.';
+      }
+    },
+
+    // ================================================================
+    // CHART METHODS - FIXED
+    // ================================================================
+    
     updateChartData(items) {
       const colors = this.generateChartColors(items.length);
       
       this.chartData = {
-        labels: items.map(item => item.item_name || 'Unknown Item'),
+        labels: items.map(item => {
+          const name = item.item_name || 'Unknown Item';
+          return name.length > 20 ? name.substring(0, 20) + '...' : name;
+        }),
         datasets: [{
           label: `Sales Amount (${this.selectedFrequency})`,
           data: items.map(item => item.total_amount || 0),
@@ -917,9 +747,6 @@ export default {
       };
     },
 
-    /**
-     * Generate colors for chart items
-     */
     generateChartColors(count) {
       const baseColors = [
         '#ef4444', '#3b82f6', '#eab308', '#22c55e', '#8b5cf6',
@@ -942,9 +769,6 @@ export default {
       return { background, border };
     },
 
-    /**
-     * Set default chart data when no API data available
-     */
     setDefaultChartData() {
       this.chartData = {
         labels: ['No Data Available'],
@@ -958,29 +782,55 @@ export default {
       };
     },
 
-    /**
-     * Handle frequency change
-     */
     async onFrequencyChange() {
-      if (this.showProductModal || this.showImportProgressModal) {
+      if (this.showProductModal) {
         return;
       }
 
-      // Refresh all data with new time frame
-      await Promise.all([
-        this.getTopItems(),
-        this.getTopChartItems(),
-        this.loadSalesByItemTable()
-      ]);
+      await this.loadAllData();
+    },
+
+    // ================================================================
+    // PAGINATION METHODS
+    // ================================================================
+    
+    updateSalesByItemPageData() {
+      const startIndex = (this.salesByItemPagination.current_page - 1) * this.salesByItemPagination.page_size;
+      const endIndex = startIndex + this.salesByItemPagination.page_size;
+      
+      this.salesByItemRows = this.allSalesByItemRows.slice(startIndex, endIndex);
+      
+      this.salesByItemPagination.total_records = this.allSalesByItemRows.length;
+      this.salesByItemPagination.total_pages = Math.ceil(this.allSalesByItemRows.length / this.salesByItemPagination.page_size);
+      this.salesByItemPagination.has_prev = this.salesByItemPagination.current_page > 1;
+      this.salesByItemPagination.has_next = this.salesByItemPagination.current_page < this.salesByItemPagination.total_pages;
+    },
+    
+    goToSalesByItemPage(page) {
+      if (this.showProductModal) {
+        return;
+      }
+      
+      if (page >= 1 && page <= this.salesByItemPagination.total_pages) {
+        this.salesByItemPagination.current_page = page;
+        this.updateSalesByItemPageData();
+      }
+    },
+
+    changeSalesByItemPageSize(newPageSize) {
+      if (this.showProductModal) {
+        return;
+      }
+      
+      this.salesByItemPagination.page_size = newPageSize;
+      this.salesByItemPagination.current_page = 1;
+      this.updateSalesByItemPageData();
     },
 
     // ================================================================
     // MODAL METHODS
     // ================================================================
     
-    /**
-     * View product details
-     */
     viewProductDetails(product) {
       try {
         this.selectedProductData = {
@@ -1003,128 +853,15 @@ export default {
       }
     },
 
-    /**
-     * Close product details modal
-     */
     closeProductModal() {
       this.showProductModal = false;
       this.selectedProductData = null;
     },
 
     // ================================================================
-    // IMPORT/EXPORT METHODS
-    // ================================================================
-    
-    /**
-     * Import data using CSV bulk import with progress modal
-     */
-    async importData() {
-      try {
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = '.csv';
-        fileInput.style.display = 'none';
-        
-        fileInput.addEventListener('change', async (event) => {
-          const file = event.target.files[0];
-          if (!file) return;
-          
-          this.showImportProgressModal = true;
-          this.importing = true;
-          this.importProgress = 0;
-          this.importStep = 'uploading';
-          this.importStatusText = 'Preparing upload...';
-          this.importResult = null;
-          this.importError = null;
-          
-          try {
-            // Note: You'll need to implement or adjust this method based on your API
-            // const result = await salesDisplayService.bulkImportCSV(file, (progress) => {
-            //   this.importProgress = progress;
-            //   this.importStatusText = `Uploading file... ${Math.round(progress)}%`;
-              
-            //   if (progress === 100) {
-            //     this.importStep = 'processing';
-            //     this.importStatusText = 'Processing CSV data...';
-            //   }
-            // });
-            
-            // this.importResult = result;
-            this.importProgress = 100;
-            this.importStatusText = 'Import completed successfully!';
-            
-            await this.refreshData();
-            
-          } catch (error) {
-            console.error('Import failed:', error);
-            this.importError = error.message;
-            this.importProgress = 0;
-            this.importStatusText = 'Import failed';
-          } finally {
-            this.importing = false;
-            document.body.removeChild(fileInput);
-          }
-        });
-        
-        document.body.appendChild(fileInput);
-        fileInput.click();
-        
-      } catch (error) {
-        console.error('Error setting up import:', error);
-        this.showError('Failed to start import process');
-      }
-    },
-    
-    /**
-     * Export data to CSV
-     */
-    async exportData() {
-      try {
-        this.exporting = true;
-        
-        // Note: You'll need to implement or adjust this method based on your API
-        // const success = await salesDisplayService.exportTransactions({});
-        
-        // if (success) {
-        //   this.showSuccess('Export completed successfully! Check your downloads folder.');
-        // } else {
-        //   throw new Error('Export failed');
-        // }
-        
-        this.showSuccess('Export feature would be implemented here');
-        
-      } catch (error) {
-        console.error('Export failed:', error);
-        
-        if (error.message.includes('404') || error.message.includes('Not Found')) {
-          this.showError('Export feature is not yet configured on the server. Please contact support.');
-        } else {
-          this.showError(`Export failed: ${error.message}`);
-        }
-      } finally {
-        this.exporting = false;
-      }
-    },
-
-    /**
-     * Close import modal
-     */
-    closeImportProgressModal() {
-      if (!this.importing) {
-        this.showImportProgressModal = false;
-        this.importProgress = 0;
-        this.importResult = null;
-        this.importError = null;
-      }
-    },
-
-    // ================================================================
     // FORMATTING METHODS
     // ================================================================
     
-    /**
-     * Format currency amount
-     */
     formatCurrency(amount) {
       let numericAmount = amount;
       
@@ -1146,43 +883,26 @@ export default {
     // UTILITY METHODS
     // ================================================================
     
-    /**
-     * Show success message
-     */
     showSuccess(message) {
-      alert(message); // Replace with your notification system
+      alert(message);
     },
 
-    /**
-     * Show error message
-     */
     showError(message) {
       console.error('Error:', message);
-      alert(message); // Replace with your notification system
+      alert(message);
     },
 
-    /**
-     * Refresh all data
-     */
     async refreshData() {
-      if (this.showProductModal || this.showImportProgressModal) {
+      if (this.showProductModal) {
         return;
       }
 
       try {
         this.error = null;
-
-        await Promise.all([
-          this.getTopItems(),
-          this.getTopChartItems(),
-          this.loadSalesByItemTable()
-        ]);
-
-        // Connection health tracking - SUCCESS
+        await this.loadAllData();
         this.connectionLost = false;
         this.consecutiveErrors = 0;
         this.lastSuccessfulLoad = Date.now();
-
       } catch (error) {
         console.error('Error refreshing data:', error);
         this.consecutiveErrors++;
@@ -1205,9 +925,8 @@ export default {
     },
     
     startAutoRefresh() {
-      this.stopAutoRefresh() // Clear any existing timers
+      this.stopAutoRefresh()
       
-      // Start countdown
       this.countdown = this.autoRefreshInterval / 1000
       this.countdownTimer = setInterval(() => {
         this.countdown--
@@ -1216,7 +935,6 @@ export default {
         }
       }, 1000)
       
-      // Start auto-refresh timer
       this.autoRefreshTimer = setInterval(() => {
         this.refreshData()
       }, this.autoRefreshInterval)
@@ -1234,7 +952,6 @@ export default {
       }
     },
 
-    // Emergency reconnect method
     async emergencyReconnect() {
       this.consecutiveErrors = 0
       this.connectionLost = false
@@ -1247,7 +964,6 @@ export default {
       }
     },
 
-    // Connection status methods
     getConnectionStatus() {
       if (this.connectionLost) return 'connection-lost'
       if (this.consecutiveErrors > 0) return 'connection-unstable'
@@ -1275,6 +991,7 @@ export default {
   }
 }
 </script>
+
 <style scoped>
 /* ====================================================================== */
 /* MAIN LAYOUT */
@@ -2386,6 +2103,34 @@ export default {
 .action-buttons .btn-sm {
   padding: 4px 8px;
   font-size: 12px;
+}
+
+.critical-stock {
+  color: #dc2626;
+  font-weight: bold;
+  background-color: #fef2f2;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.low-stock {
+  color: #d97706;
+  font-weight: bold;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.date-range-info {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.date-range-info i {
+  margin-right: 4px;
 }
 
 </style>
