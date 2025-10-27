@@ -15,9 +15,21 @@ ALLOWED_HOSTS = [
 CUSTOM_DOMAINS = config('CUSTOM_DOMAINS', default='', cast=lambda v: [s.strip() for s in v.split(',') if s.strip()])
 ALLOWED_HOSTS.extend(CUSTOM_DOMAINS)
 
+# Optionally read ALLOWED_HOSTS from env (comma-separated). If provided, merge with above
+ENV_ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='', cast=lambda v: [s.strip() for s in v.split(',') if s.strip()])
+if ENV_ALLOWED_HOSTS:
+    ALLOWED_HOSTS = [h for h in (ALLOWED_HOSTS + ENV_ALLOWED_HOSTS) if h]
+
 # CORS settings for production
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
+    default='',
+    cast=lambda v: [s.strip() for s in v.split(',') if s.strip()]
+)
+
+# CSRF trusted origins (comma-separated) for HTTPS domains
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
     default='',
     cast=lambda v: [s.strip() for s in v.split(',') if s.strip()]
 )
