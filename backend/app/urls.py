@@ -261,6 +261,12 @@ from .kpi_views.online_transaction_views import (
     CalculateLoyaltyPointsView,
 )
 
+from .kpi_views.sales_by_category_views import (
+    SalesByCategoryView, 
+    TopCategoriesView, 
+    CategoryPerformanceDetailView
+)
+
 from .views import (
     APIDocumentationView,
 )
@@ -569,4 +575,9 @@ urlpatterns = [
     path('online-orders/validate-points/', ValidatePointsRedemptionView.as_view(), name='validate-points-redemption'),
     path('online-orders/calculate-fee/', CalculateServiceFeeView.as_view(), name='calculate-service-fee'),
     path('online-orders/calculate-points/', CalculateLoyaltyPointsView.as_view(), name='calculate-loyalty-points'),
+    path('sales-display/summary/', SalesDisplaySummaryView.as_view(), name='sales-display-summary'),
+
+    path("sales/category/", SalesByCategoryView.as_view(), name="sales-by-category"),
+    path("sales/category/top/", TopCategoriesView.as_view(), name="top-categories"),
+    path("sales/category/<str:category_id>/", CategoryPerformanceDetailView.as_view(), name="category-performance-detail"),
 ]
