@@ -287,6 +287,7 @@ export default {
 </script>
 
 <style scoped>
+@import '@/assets/styles/colors.css';
 /* Modal Overlay */
 .modal-overlay {
   position: fixed !important;
@@ -319,10 +320,10 @@ export default {
   overflow-y: auto;
   animation: slideIn 0.3s ease;
   z-index: 10000 !important;
-  background: white;
+  background-color: var(--surface-elevated);
   border-radius: 16px;
-  border: none;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-primary);
+  box-shadow: var(--shadow-2xl);
 }
 
 @keyframes slideIn {
@@ -353,13 +354,13 @@ export default {
 }
 
 .modal-title {
-  color: var(--primary-dark);
+  color: var(--text-primary);
   font-weight: 600;
   margin: 0;
 }
 
 .form-label {
-  color: var(--tertiary-dark);
+  color: var(--text-primary);
   font-weight: 500;
   margin-bottom: 0.5rem;
   display: flex;
@@ -373,28 +374,29 @@ export default {
 }
 
 .modern-input {
-  border: 2px solid var(--neutral-medium);
+  border: 2px solid var(--input-border);
   border-radius: 8px;
   padding: 12px 16px;
   font-size: 0.95rem;
   transition: all 0.2s ease;
-  background-color: #fafafa;
+  background-color: var(--input-bg);
+  color: var(--input-text);
 }
 
 .modern-input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.15);
-  background-color: white;
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 0.2rem rgba(160, 123, 227, 0.15);
+  background-color: var(--input-bg);
 }
 
 .modern-input:hover:not(:focus) {
-  border-color: var(--primary-light);
-  background-color: white;
+  border-color: var(--border-accent);
+  background-color: var(--surface-tertiary);
 }
 
 .modern-input.is-invalid {
-  border-color: var(--error);
-  background-color: #fef7f7;
+  border-color: var(--border-error);
+  background-color: var(--surface-tertiary);
 }
 
 .form-group {
@@ -403,16 +405,19 @@ export default {
 
 .modal-header {
   padding: 2rem 2rem 1rem 2rem;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background-color: var(--surface-tertiary);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .modal-body {
   padding: 1.5rem 2rem;
+  background-color: var(--surface-elevated);
 }
 
 .modal-footer {
   padding: 1rem 2rem 2rem 2rem;
-  background-color: #f8f9fa;
+  background-color: var(--surface-tertiary);
+  border-top: 1px solid var(--border-primary);
 }
 
 .btn-primary {

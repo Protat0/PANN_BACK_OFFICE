@@ -9,7 +9,7 @@
               <ShoppingCart :size="24" />
             </div>
             <div>
-              <h4 class="modal-title mb-1">Create Purchase Order</h4>
+              <h4 class="modal-title mb-1">New Order</h4>
               <p class="text-muted mb-0 small">
                 Order stock from <strong>{{ supplier?.name }}</strong> (Status: Pending)
               </p>
@@ -40,11 +40,10 @@
                     <label for="orderId" class="form-label">Order ID</label>
                     <input 
                       type="text" 
-                      class="form-control" 
+                      class="form-control order-id-input" 
                       id="orderId"
                       v-model="orderData.orderId"
                       readonly
-                      style="background-color: #f8f9fa;"
                     >
                   </div>
                   
@@ -321,7 +320,7 @@
           <div class="order-summary-section mt-4">
             <div class="row">
               <div class="col-md-8">
-                <div class="alert alert-info">
+                <div class="alert alert-warning">
                   <Clock :size="16" class="me-2" />
                   <strong>Purchase Order (Pending Delivery):</strong> Batches will be created with "pending" status. 
                   Use "Receive Stock" button to activate them when delivery arrives.
@@ -875,6 +874,7 @@ export default {
 </script>
 
 <style scoped>
+@import '@/assets/styles/colors.css';
 /* Keep all existing styles from CreateOrderModal */
 .modern-order-modal {
   border-radius: 16px;
@@ -899,8 +899,8 @@ export default {
 
 .modal-header {
   padding: 2rem 2rem 1rem 2rem;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background-color: var(--surface-tertiary);
+  border-bottom: 1px solid var(--border-primary);
   flex-shrink: 0;
 }
 
@@ -919,11 +919,11 @@ export default {
 .order-info-card,
 .supplier-info-card {
   padding: 1.5rem;
-  background: var(--neutral-light);
+  background-color: var(--surface-tertiary);
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-primary);
   height: 100%;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .supplier-details {
@@ -937,7 +937,7 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .detail-row:last-child {
@@ -945,22 +945,22 @@ export default {
 }
 
 .detail-row strong {
-  color: var(--tertiary-dark);
+  color: var(--text-primary);
   min-width: 80px;
 }
 
 .detail-row span {
-  color: var(--tertiary-medium);
+  color: var(--text-secondary);
   text-align: right;
   flex: 1;
 }
 
 .order-items-section {
-  background: white;
+  background-color: var(--surface-primary);
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-primary);
   padding: 1.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .order-items-table {
@@ -970,42 +970,43 @@ export default {
 }
 
 .order-items-table th {
-  background-color: #f8f9fa;
+  background-color: var(--surface-tertiary);
   font-weight: 600;
-  color: var(--tertiary-dark);
-  border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--border-primary);
   font-size: 0.875rem;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
-  border-left: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: 1px solid var(--border-primary);
+  border-left: 1px solid var(--border-primary);
 }
 
 .order-items-table th:first-child {
-  border-left: 1px solid rgba(0, 0, 0, 0.1);
+  border-left: 1px solid var(--border-primary);
   border-top-left-radius: 8px;
 }
 
 .order-items-table th:last-child {
-  border-right: 1px solid rgba(0, 0, 0, 0.1);
+  border-right: 1px solid var(--border-primary);
   border-top-right-radius: 8px;
 }
 
 .order-items-table td {
   vertical-align: middle;
   padding: 0.75rem 0.5rem;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border-primary);
   border-top: none;
+  color: var(--text-secondary);
 }
 
 .order-items-table tr:last-child td {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .order-items-table tr td:first-child {
-  border-left: 1px solid rgba(0, 0, 0, 0.1);
+  border-left: 1px solid var(--border-primary);
 }
 
 .order-items-table tr td:last-child {
-  border-right: 1px solid rgba(0, 0, 0, 0.1);
+  border-right: 1px solid var(--border-primary);
 }
 
 .order-items-table tr:last-child td:first-child {
@@ -1018,27 +1019,27 @@ export default {
 
 .total-price {
   font-weight: 600;
-  color: var(--primary);
+  color: var(--text-primary);
   text-align: right;
   padding: 0.5rem;
-  background: var(--primary-light);
+  background-color: var(--surface-tertiary);
   border-radius: 4px;
 }
 
 .order-summary-section {
-  background: var(--neutral-light);
+  background-color: var(--surface-tertiary);
   border-radius: 12px;
   padding: 1.5rem;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-primary);
+  box-shadow: var(--shadow-sm);
 }
 
 .order-totals {
-  background: white;
+  background-color: var(--surface-primary);
   border-radius: 8px;
   padding: 1.5rem;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--border-primary);
+  box-shadow: var(--shadow-sm);
 }
 
 .summary-row {
@@ -1046,7 +1047,8 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid var(--border-primary);
+  color: var(--text-secondary);
 }
 
 .summary-row:last-child {
@@ -1056,7 +1058,7 @@ export default {
 .total-row {
   margin-top: 0.5rem;
   padding-top: 1rem;
-  border-top: 2px solid rgba(0, 0, 0, 0.1);
+  border-top: 2px solid var(--border-primary);
 }
 
 .btn-primary {
@@ -1073,14 +1075,20 @@ export default {
 }
 
 .sticky-footer {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background-color: var(--surface-tertiary);
+  border-top: 1px solid var(--border-primary);
   flex-shrink: 0;
   position: sticky;
   bottom: 0;
   z-index: 10;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-md);
   padding: 1.5rem 2rem 2rem 2rem !important;
+}
+
+.order-id-input {
+  background-color: var(--input-bg) !important;
+  color: var(--input-text) !important;
+  border-color: var(--input-border) !important;
 }
 
 .table-danger {
@@ -1119,10 +1127,10 @@ export default {
   overflow-y: auto;
   animation: slideIn 0.3s ease;
   z-index: 10000 !important;
-  background: white;
+  background-color: var(--surface-elevated);
   border-radius: 16px;
-  border: none;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-primary);
+  box-shadow: var(--shadow-2xl);
 }
 
 @keyframes slideIn {

@@ -1,7 +1,7 @@
 <template>
-  <div v-if="show" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-      <div class="modal-content modern-modal">
+  <Teleport to="body">
+    <div v-if="show" class="modal-overlay" @click="handleOverlayClick">
+      <div class="modal-content modern-modal" @click.stop>
         <!-- Modal Header -->
         <div class="modal-header border-0 pb-0">
           <div class="d-flex align-items-center">
@@ -9,8 +9,8 @@
               <Package :size="24" />
             </div>
             <div>
-              <h4 class="modal-title mb-1">Receive Pending Stock</h4>
-              <p class="text-muted mb-0 small">
+              <h4 class="modal-title mb-1 receive-stock-title">Receive Pending Stock</h4>
+              <p class="modal-subtitle mb-0 small">
                 Select pending orders from <strong>{{ supplier?.name }}</strong> to receive
               </p>
             </div>
@@ -30,7 +30,7 @@
             <div class="spinner-border text-primary" role="status">
               <span class="visually-hidden">Loading...</span>
             </div>
-            <p class="mt-3 text-muted">Loading pending stock...</p>
+            <p class="mt-3 loading-text">Loading pending stock...</p>
           </div>
 
           <!-- Pending Stock List -->
@@ -41,8 +41,8 @@
             </div>
 
             <div class="table-responsive">
-              <table class="table table-hover">
-                <thead class="table-light">
+              <table class="table table-hover receive-stock-table">
+                <thead class="table-header-theme">
                   <tr>
                     <th style="width: 40px;">
                       <input 
@@ -77,34 +77,34 @@
                       >
                     </td>
                     <td>
-                      <code class="text-primary">{{ batch.batch_number }}</code>
+                      <code class="batch-number-text">{{ batch.batch_number }}</code>
                     </td>
                     <td>
                       <div>
-                        <strong>{{ getProductName(batch) }}</strong>
+                        <strong class="product-name-text">{{ getProductName(batch) }}</strong>
                         <br>
-                        <small class="text-muted">{{ batch.product_id }}</small>
+                        <small class="product-id-text">{{ batch.product_id }}</small>
                       </div>
                     </td>
-                    <td>{{ formatDate(batch.created_at) }}</td>
+                    <td class="table-cell-text">{{ formatDate(batch.created_at) }}</td>
                     <td>
-                      <div>
+                      <div class="table-cell-text">
                         {{ formatDate(batch.expected_delivery_date) }}
                         <br>
                         <small v-if="isOverdue(batch)" class="text-danger">
                           <AlertTriangle :size="12" class="me-1" />
                           Overdue
                         </small>
-                        <small v-else class="text-muted">
+                        <small v-else class="date-status-text">
                           {{ getDaysUntil(batch.expected_delivery_date) }}
                         </small>
                       </div>
                     </td>
                     <td class="text-center">
-                      <span class="badge bg-secondary">{{ batch.quantity_received }}</span>
+                      <span class="badge quantity-badge">{{ batch.quantity_received }}</span>
                     </td>
-                    <td>₱{{ formatCurrency(batch.cost_price || 0) }}</td>
-                    <td class="fw-bold">₱{{ formatCurrency((batch.cost_price || 0) * batch.quantity_received) }}</td>
+                    <td class="table-cell-text">₱{{ formatCurrency(batch.cost_price || 0) }}</td>
+                    <td class="fw-bold table-cell-text">₱{{ formatCurrency((batch.cost_price || 0) * batch.quantity_received) }}</td>
                     <td class="text-center">
                       <span class="badge" :class="getDaysPendingClass(batch)">
                         {{ getDaysPending(batch) }} days
@@ -118,16 +118,16 @@
 
           <!-- Empty State -->
           <div v-else class="text-center py-5">
-            <Package :size="64" class="text-muted mb-3" />
-            <h5 class="text-muted">No Pending Stock</h5>
-            <p class="text-muted">All orders from this supplier have been received.</p>
+            <Package :size="64" class="empty-state-icon mb-3" />
+            <h5 class="empty-state-text">No Pending Stock</h5>
+            <p class="empty-state-text">All orders from this supplier have been received.</p>
           </div>
         </div>
 
         <!-- Modal Footer -->
         <div class="modal-footer border-0 pt-4">
           <div class="d-flex justify-content-between align-items-center w-100">
-            <div class="text-muted small">
+            <div class="footer-info small">
               <span v-if="selectedBatches.length > 0">
                 {{ selectedBatches.length }} batch(es) selected
               </span>
@@ -156,7 +156,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <script>
@@ -391,6 +391,12 @@ export default {
       selectAll.value = false
     }
     
+    function handleOverlayClick() {
+      if (!receiving.value) {
+        handleClose()
+      }
+    }
+    
     // ================ LIFECYCLE ================
     
     watch(() => props.show, (newVal) => {
@@ -420,7 +426,8 @@ export default {
       getDaysUntil,
       getDaysPending,
       getDaysPendingClass,
-      handleClose
+      handleClose,
+      handleOverlayClick
     }
   }
 }
@@ -431,9 +438,13 @@ export default {
 
 .modern-modal {
   border-radius: 16px;
-  border: none;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-primary);
+  box-shadow: var(--shadow-2xl);
   overflow: hidden;
+  background-color: var(--surface-elevated);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
 }
 
 .modal-icon {
@@ -449,13 +460,28 @@ export default {
 
 .modal-header {
   padding: 2rem 2rem 1rem 2rem;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background-color: var(--surface-tertiary);
+  border-bottom: 1px solid var(--border-primary);
+  flex-shrink: 0;
+}
+
+.receive-stock-title {
+  color: var(--text-primary);
 }
 
 .modal-body {
   padding: 1.5rem 2rem;
-  max-height: 65vh;
   overflow-y: auto;
+  background-color: var(--surface-elevated);
+  flex: 1;
+  min-height: 0;
+}
+
+.modal-footer {
+  padding: 1.5rem 2rem;
+  background-color: var(--surface-tertiary);
+  border-top: 1px solid var(--border-primary);
+  flex-shrink: 0;
 }
 
 .table-hover tbody tr {
@@ -464,19 +490,324 @@ export default {
 }
 
 .table-hover tbody tr:hover {
-  background-color: var(--neutral-light);
+  background-color: var(--state-hover);
+}
+
+/* Table header styling */
+.table-header-theme {
+  background-color: var(--surface-tertiary) !important;
+}
+
+.table-header-theme th {
+  color: var(--text-primary) !important;
+  font-weight: 600;
+  border-bottom: 2px solid var(--border-primary);
+  border-top: 1px solid var(--border-primary);
+  border-left: 1px solid var(--border-primary);
+  border-right: 1px solid var(--border-primary);
+}
+
+.table-header-theme th:first-child {
+  border-left: 1px solid var(--border-primary);
+}
+
+.table-header-theme th:last-child {
+  border-right: 1px solid var(--border-primary);
+}
+
+/* Table row styling */
+.receive-stock-table tbody tr {
+  background-color: var(--surface-primary);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.receive-stock-table tbody td {
+  color: var(--text-secondary);
+  border-color: var(--border-primary);
+  border-left: 1px solid var(--border-primary);
+  border-right: 1px solid var(--border-primary);
+  background-color: var(--surface-primary);
+}
+
+.receive-stock-table tbody td:first-child {
+  border-left: 1px solid var(--border-primary);
+}
+
+.receive-stock-table tbody td:last-child {
+  border-right: 1px solid var(--border-primary);
+}
+
+.receive-stock-table tbody tr:last-child td {
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.receive-stock-table tbody tr:not(.table-active):not(.table-warning) {
+  background-color: var(--surface-primary);
 }
 
 .table-active {
-  background-color: rgba(115, 146, 226, 0.1) !important;
+  background-color: var(--state-selected) !important;
+}
+
+.table-active td {
+  color: var(--text-primary) !important;
 }
 
 .table-warning {
-  background-color: rgba(255, 193, 7, 0.1) !important;
+  background-color: var(--surface-tertiary) !important;
+  border-left: 3px solid #f59e0b !important;
+}
+
+.dark-theme .table-warning {
+  background-color: var(--surface-secondary) !important;
+  border-left: 3px solid #fbbf24 !important;
+}
+
+.table-warning td {
+  color: var(--text-secondary) !important;
+}
+
+/* Text colors for table cells */
+.table-cell-text {
+  color: var(--text-secondary);
+}
+
+.batch-number-text {
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 0.875rem;
+  color: var(--text-accent);
+  background-color: transparent;
+  padding: 0;
+}
+
+.product-name-text {
+  color: var(--text-primary);
+}
+
+.product-id-text {
+  color: var(--text-tertiary);
+}
+
+.date-status-text {
+  color: var(--text-tertiary);
+}
+
+.quantity-badge {
+  background-color: var(--surface-tertiary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-primary);
+}
+
+/* Alert styling */
+.alert-info {
+  background-color: var(--surface-tertiary);
+  border: 1px solid var(--border-accent);
+  color: var(--text-secondary);
+}
+
+.alert-info strong {
+  color: var(--text-primary);
 }
 
 code {
   font-family: 'Monaco', 'Menlo', monospace;
   font-size: 0.875rem;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  z-index: 9999 !important;
+  animation: fadeIn 0.3s ease;
+  backdrop-filter: blur(4px);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Modal Content */
+.modal-content {
+  position: relative !important;
+  max-width: 1200px;
+  width: 95%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideIn 0.3s ease;
+  z-index: 10000 !important;
+}
+
+@keyframes slideIn {
+  from { 
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+  .modal-content {
+    margin: 1rem;
+    max-height: calc(100vh - 2rem);
+    width: calc(100% - 2rem);
+  }
+
+  .modal-header {
+    padding: 1.5rem 1.5rem 1rem 1.5rem !important;
+  }
+
+  .modal-header h4 {
+    font-size: 1.25rem;
+  }
+
+  .modal-body {
+    padding: 1rem 1.5rem !important;
+    max-height: calc(100vh - 250px);
+  }
+
+  .modal-footer {
+    padding: 1rem 1.5rem 1.5rem 1.5rem !important;
+  }
+
+  /* Make table scrollable on mobile */
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .table {
+    font-size: 0.85rem;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.5rem 0.5rem;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-content {
+    margin: 0.5rem;
+    max-height: calc(100vh - 1rem);
+    width: calc(100% - 1rem);
+    border-radius: 8px;
+  }
+
+  .modal-header {
+    padding: 1rem 1rem 0.75rem 1rem !important;
+  }
+
+  .modal-header h4 {
+    font-size: 1.1rem;
+  }
+
+  .modal-icon {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  .modal-body {
+    padding: 0.75rem 1rem !important;
+    max-height: calc(100vh - 200px);
+  }
+
+  .modal-footer {
+    padding: 0.75rem 1rem 1rem 1rem !important;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .modal-footer .d-flex {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .modal-footer .d-flex.justify-content-between {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .btn {
+    width: 100%;
+    margin: 0 !important;
+  }
+
+  .table {
+    font-size: 0.8rem;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.375rem 0.25rem;
+    font-size: 0.75rem;
+  }
+
+  .badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+  }
+}
+
+/* Custom scrollbar for modal */
+.modal-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-content::-webkit-scrollbar-track {
+  background: var(--surface-tertiary);
+  border-radius: 4px;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+  background: var(--border-primary);
+  border-radius: 4px;
+}
+
+.modal-content::-webkit-scrollbar-thumb:hover {
+  background: var(--border-accent);
+}
+
+/* Prevent body scroll when modal is open */
+body:has(.modal-overlay) {
+  overflow: hidden !important;
+}
+
+/* Dark mode text classes */
+.modal-subtitle {
+  color: var(--text-secondary);
+}
+
+.loading-text {
+  color: var(--text-secondary);
+}
+
+.footer-info {
+  color: var(--text-secondary);
+}
+
+.empty-state-icon {
+  color: var(--text-tertiary);
+  opacity: 0.6;
+}
+
+.empty-state-text {
+  color: var(--text-secondary);
 }
 </style>

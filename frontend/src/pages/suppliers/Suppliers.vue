@@ -1,5 +1,5 @@
 <template>
-  <div class="container-fluid pt-2 pb-4 suppliers-page">
+  <div class="container-fluid pt-2 pb-4 suppliers-page surface-secondary">
     <!-- Page Title -->
     <div class="mb-3">
       <h1 class="h3 fw-semibold text-primary-dark mb-0">Supplier Management</h1>
@@ -623,7 +623,7 @@ export default {
 @import '@/assets/styles/buttons.css';
 
 .suppliers-page {
-  background-color: var(--neutral-light);
+  background-color: var(--surface-secondary);
   min-height: 100vh;
 }
 
@@ -641,17 +641,18 @@ export default {
 
 /* Action Bar Container */
 .action-bar-container {
-  background: white;
+  background-color: var(--surface-elevated);
   border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-secondary);
   overflow: visible;
   position: relative;
   z-index: 1000;
 }
 
 .action-bar-controls {
-  border-bottom: 1px solid var(--neutral);
-  background-color: white;
+  border-bottom: 1px solid var(--border-primary);
+  background-color: var(--surface-elevated);
   position: relative;
   z-index: 1001;
 }
@@ -673,7 +674,7 @@ export default {
 .filter-label {
   font-size: 0.75rem;
   font-weight: 500;
-  color: var(--tertiary-medium);
+  color: var(--text-tertiary);
   margin-bottom: 0.25rem;
   display: block;
 }
@@ -703,9 +704,10 @@ export default {
 
 .custom-dropdown-menu {
   min-width: 280px;
-  border: 1px solid var(--neutral);
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-primary);
   border-radius: 0.75rem;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-xl);
   animation: dropdownSlide 0.2s ease;
   z-index: 1200 !important;
   position: absolute !important;
@@ -732,8 +734,10 @@ export default {
 
 .custom-dropdown-item {
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--neutral-light);
+  border-bottom: 1px solid var(--border-primary);
+  background: transparent;
   transition: all 0.2s ease;
+  color: var(--text-secondary);
 }
 
 .custom-dropdown-item:last-child {
@@ -741,7 +745,8 @@ export default {
 }
 
 .custom-dropdown-item:hover {
-  background-color: var(--primary-light);
+  background-color: var(--state-hover);
+  color: var(--text-primary);
 }
 
 /* Button States */
@@ -761,8 +766,8 @@ export default {
 /* Form controls focus states */
 .form-select:focus,
 .form-control:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 0.2rem rgba(160, 123, 227, 0.25);
 }
 
 /* Responsive adjustments */

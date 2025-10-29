@@ -12,7 +12,7 @@
         </button>
         <div>
           <h1 class="h2 fw-semibold text-primary-dark mb-0">Supplier Details</h1>
-          <p class="text-muted mb-0">View and manage supplier information</p>
+          <p class="page-subtitle mb-0">View and manage supplier information</p>
         </div>
       </div>
       <div class="header-actions d-flex gap-2" v-if="!loading && supplier">
@@ -20,11 +20,11 @@
           <Edit :size="16" class="me-1" />
           Edit Supplier
         </button>
-        <button class="btn btn-primary" @click="createOrder">
+        <button class="btn btn-primary new-order-btn" @click="createOrder">
           <ShoppingCart :size="16" class="me-1" />
           New Order
         </button>
-        <button class="btn btn-success" @click="openReceiveStockModal">
+        <button class="btn btn-success receive-stock-btn" @click="openReceiveStockModal">
           <Package :size="16" class="me-1" />
           Receive Stock
         </button>
@@ -36,7 +36,7 @@
       <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Loading...</span>
       </div>
-      <p class="mt-3 text-tertiary-medium">Loading supplier details...</p>
+      <p class="mt-3 loading-text">Loading supplier details...</p>
     </div>
 
     <!-- Quick Stats Card - Moved to Top -->
@@ -50,29 +50,29 @@
       <div class="card-body">
         <div class="stats-grid">
           <div class="stat-item">
-            <div class="stat-number text-primary">{{ supplier.purchaseOrders || 0 }}</div>
+            <div class="stat-number stat-primary">{{ supplier.purchaseOrders || 0 }}</div>
             <div class="stat-label">Total Orders</div>
           </div>
           <div class="stat-item clickable-stat" @click="openActiveOrdersModal">
-            <div class="stat-number text-warning">{{ getActiveOrders() }}</div>
+            <div class="stat-number stat-warning">{{ getActiveOrders() }}</div>
             <div class="stat-label">Active Orders</div>
           </div>
           <div class="stat-item">
-            <div class="stat-number text-success">₱{{ formatCurrency(getTotalSpent()) }}</div>
+            <div class="stat-number stat-success">₱{{ formatCurrency(getTotalSpent()) }}</div>
             <div class="stat-label">Total Spent</div>
           </div>
           <div class="stat-item">
-            <div class="stat-number text-info">{{ getDaysActive() }}</div>
+            <div class="stat-number stat-info">{{ getDaysActive() }}</div>
             <div class="stat-label">Days Active</div>
           </div>
         </div>
         
         <!-- Performance Rating -->
-        <div class="mt-3 pt-3 border-top">
+        <div class="mt-3 pt-3 performance-rating-divider">
           <div class="d-flex justify-content-between align-items-center mb-2">
-            <small class="text-muted">Performance Rating</small>
+            <small class="rating-label">Performance Rating</small>
             <div class="rating-tooltip-wrapper position-relative d-inline-block">
-              <small class="text-muted rating-value" :class="{ 'cursor-help': getPerformanceRating() !== 'N/A' }">
+              <small class="rating-value" :class="{ 'cursor-help': getPerformanceRating() !== 'N/A' }">
                 {{ getPerformanceRating() }}/5.0
                 <Info v-if="getPerformanceRating() !== 'N/A'" :size="12" class="ms-1 opacity-75" />
               </small>
@@ -85,10 +85,10 @@
                   <div v-for="factor in getRatingBreakdown()" :key="factor.name" class="tooltip-factor">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                       <span class="factor-name">{{ factor.name }}</span>
-                      <span class="factor-weight text-muted">({{ factor.weight }}%)</span>
+                      <span class="factor-weight">({{ factor.weight }}%)</span>
                     </div>
                     <div class="d-flex align-items-center">
-                      <div class="factor-score-bar" style="flex: 1; height: 6px; background: var(--neutral-light); border-radius: 3px; margin-right: 0.5rem;">
+                      <div class="factor-score-bar" style="flex: 1; height: 6px; background: var(--surface-tertiary); border-radius: 3px; margin-right: 0.5rem;">
                         <div 
                           class="factor-score-fill" 
                           :style="{ 
@@ -172,7 +172,7 @@
           <div class="card-body">
             <!-- Contact Information -->
             <div class="section-header">
-              <h6 class="fw-bold text-tertiary-dark mb-3">
+              <h6 class="fw-bold section-title mb-3">
                 <User :size="16" class="me-2" />
                 Contact Information
               </h6>
@@ -225,7 +225,7 @@
             <!-- Business Information -->
             <div class="section-divider"></div>
             <div class="section-header">
-              <h6 class="fw-bold text-tertiary-dark mb-3">
+              <h6 class="fw-bold section-title mb-3">
                 <Building :size="16" class="me-2" />
                 Business Information
               </h6>
@@ -257,7 +257,7 @@
             <div class="section-divider"></div>
             <div class="section-header">
               <div class="d-flex justify-content-between align-items-center">
-                <h6 class="fw-bold text-tertiary-dark mb-0">
+                <h6 class="fw-bold section-title mb-0">
                   <FileText :size="16" class="me-2" />
                   Additional Notes
                 </h6>
@@ -297,12 +297,12 @@
             <div class="d-flex justify-content-between align-items-center">
               <h5 class="card-title mb-0">
                 <Package :size="18" class="me-2" />
-                Stock Receipt History
+                Order History
                 <span class="badge bg-secondary ms-2">{{ filteredOrders.length }}</span>
               </h5>
               <div class="d-flex gap-2 align-items-center" v-if="orders.length > 0">
                 <select class="form-select form-select-sm" v-model="orderStatusFilter" @change="filterOrders">
-                  <option value="all">All Receipts</option>
+                  <option value="all">All Orders</option>
                   <option value="pending delivery">Pending Delivery</option>
                   <option value="received">Received</option>
                   <option value="partially received">Partially Received</option>
@@ -359,9 +359,9 @@
                       <div>
                         {{ order.items?.length || 0 }} item(s)
                         <br>
-                        <small class="text-muted">{{ order.quantity }} total quantity</small>
+                        <small class="order-detail-text">{{ order.quantity }} total quantity</small>
                         <br>
-                        <small class="text-muted">{{ order.description || 'Various items' }}</small>
+                        <small class="order-detail-text">{{ order.description || 'Various items' }}</small>
                       </div>
                     </td>
                     <td class="amount fw-bold">₱{{ formatCurrency(order.total) }}</td>
@@ -369,7 +369,7 @@
                       <div>
                         {{ formatDate(order.expectedDate) }}
                         <br>
-                        <small :class="['text-muted', { 'text-danger': isOverdue(order) }]">
+                        <small :class="['order-meta-text', { 'text-danger': isOverdue(order) }]">
                           {{ getTimeRemaining(order.expectedDate) }}
                         </small>
                       </div>
@@ -384,7 +384,7 @@
                         <button 
                           class="btn btn-outline-primary btn-sm" 
                           @click="viewReceipt(order)" 
-                          title="View Receipt Details"
+                          title="View Order Details"
                         >
                           <Eye :size="14" />
                         </button>
@@ -404,11 +404,11 @@
             </div>
             
             <!-- Empty State -->
-            <div v-if="orders.length === 0" class="text-center text-muted py-5">
-              <Package :size="48" class="text-muted mb-3" />
+            <div v-if="orders.length === 0" class="text-center empty-state py-5">
+              <Package :size="48" class="empty-state-icon mb-3" />
               <div>
-                <h6 class="text-muted">No stock receipts found</h6>
-                <p class="mb-3">No stock has been received from this supplier yet.</p>
+                <h6 class="empty-state-text">No orders found</h6>
+                <p class="mb-3">No orders have been placed with this supplier yet.</p>
                 <button class="btn btn-primary btn-sm" @click="openReceiveStockModal">
                   <Plus :size="16" class="me-1" />
                   Receive First Stock
@@ -445,18 +445,18 @@
                 <div class="timeline-content">
                   <div class="timeline-header">
                     <strong>{{ activity.title }}</strong>
-                    <small class="text-muted ms-2">{{ formatTimeAgo(activity.date) }}</small>
+                    <small class="activity-time ms-2">{{ formatTimeAgo(activity.date) }}</small>
                   </div>
-                  <p class="mb-1 text-muted">{{ activity.description }}</p>
-                  <small class="text-muted">by {{ activity.user }}</small>
+                  <p class="mb-1 activity-description">{{ activity.description }}</p>
+                  <small class="activity-user">by {{ activity.user }}</small>
                 </div>
               </div>
             </div>
             
             <!-- Empty Timeline State -->
             <div v-if="recentActivity.length === 0" class="text-center py-4">
-              <Clock :size="32" class="text-muted mb-2" />
-              <p class="text-muted">No recent activity</p>
+              <Clock :size="32" class="empty-state-icon mb-2" />
+              <p class="empty-state-text">No recent activity</p>
             </div>
           </div>
         </div>
@@ -539,7 +539,7 @@
               </div>
               <div>
                 <h4 class="modal-title mb-1">Edit Supplier</h4>
-                <p class="text-muted mb-0 small">Update supplier information</p>
+                <p class="modal-subtitle mb-0 small">Update supplier information</p>
               </div>
             </div>
             <button type="button" class="btn-close btn-close-custom" @click="closeEditModal"></button>
@@ -702,7 +702,7 @@
               </div>
               <div>
                 <h4 class="modal-title mb-1 text-danger">Delete Supplier</h4>
-                <p class="text-muted mb-0 small">Confirm deletion</p>
+                <p class="modal-subtitle mb-0 small">Confirm deletion</p>
               </div>
             </div>
             <button type="button" class="btn-close btn-close-custom" @click="showDeleteModal = false"></button>
@@ -998,7 +998,7 @@ export default {
           
           console.log('=== SUMMARY (No Batches) ===')
           console.log('Supplier:', this.supplier.name)
-          console.log('Stock Receipts: 0')
+          console.log('Orders: 0')
           console.log('============================')
           return
         }
@@ -1084,7 +1084,7 @@ export default {
             expectedDate: expectedDate, // Expected delivery date
             receivedDate: receivedDate, // Actual received date (null for pending)
             status: this.getReceiptStatus(batches),
-            description: `Stock receipt with ${batches.length} item(s)`,
+            description: `Order with ${batches.length} item(s)`,
             notes: firstBatchNotes,
             priority: 'normal',
             subtotal: totalCost,
@@ -1139,9 +1139,9 @@ export default {
         
         console.log('=== SUMMARY ===')
         console.log('Supplier:', this.supplier.name)
-        console.log('Stock Receipts:', this.orders.length)
+        console.log('Orders:', this.orders.length)
         console.log('Total Batches:', batchesList.length)
-        console.log('First Receipt:', this.orders[0])
+        console.log('First Order:', this.orders[0])
         console.log('===============')
         
       } catch (error) {
@@ -2078,16 +2078,17 @@ export default {
 @import '@/assets/styles/colors.css';
 
 .supplier-details-page {
-  background-color: var(--neutral-light);
+  background-color: var(--surface-secondary);
   min-height: 100vh;
   padding: 1.5rem;
 }
 
 .page-header {
-  background: white;
+  background-color: var(--surface-elevated);
   padding: 1.5rem;
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-secondary);
   margin-bottom: 1.5rem;
 }
 
@@ -2096,10 +2097,43 @@ export default {
   gap: 0.5rem;
 }
 
+.new-order-btn,
+.receive-stock-btn {
+  background-color: var(--surface-secondary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.new-order-btn {
+  border-color: var(--primary);
+  color: var(--text-primary);
+}
+
+.new-order-btn:hover {
+  background-color: var(--state-hover);
+  border-color: var(--border-accent);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.receive-stock-btn {
+  border-color: var(--success);
+  color: var(--text-primary);
+}
+
+.receive-stock-btn:hover {
+  background-color: var(--state-hover);
+  border-color: var(--success-dark-mode);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
 .dropdown-menu-modern {
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  border: 1px solid var(--neutral-medium);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--border-primary);
+  background-color: var(--surface-elevated);
   padding: 0.75rem 0;
   min-width: 280px;
 }
@@ -2108,23 +2142,23 @@ export default {
   padding: 0.75rem 1.25rem;
   display: flex;
   align-items: center;
-  color: var(--tertiary-dark);
+  color: var(--text-secondary);
   transition: all 0.2s ease;
 }
 
 .dropdown-menu-modern .dropdown-item:hover {
-  background-color: var(--neutral-light);
-  color: var(--primary);
+  background-color: var(--state-hover);
+  color: var(--text-accent);
   transform: translateX(2px);
 }
 
 .dropdown-menu-modern .dropdown-item.disabled {
-  color: var(--neutral-medium);
+  color: var(--text-disabled);
   cursor: not-allowed;
   opacity: 0.6;
 }
 
-/* Fix for sort dropdown in Stock Receipt History */
+/* Fix for sort dropdown in Order History */
 .dropdown {
   position: relative;
 }
@@ -2139,14 +2173,14 @@ export default {
   padding: 0.5rem 0;
   margin: 0.125rem 0 0;
   font-size: 0.875rem;
-  color: #212529;
+  color: var(--text-secondary);
   text-align: left;
   list-style: none;
-  background-color: #fff;
+  background-color: var(--surface-elevated);
   background-clip: padding-box;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-primary);
   border-radius: 0.375rem;
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.175);
+  box-shadow: var(--shadow-lg);
 }
 
 .dropdown-menu.show {
@@ -2156,27 +2190,27 @@ export default {
 /* Supplier dropdown specific styling */
 .dropdown-menu-modern {
   border-radius: 12px !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
-  border: 1px solid var(--neutral-medium) !important;
+  box-shadow: var(--shadow-xl) !important;
+  border: 1px solid var(--border-primary) !important;
   padding: 0.5rem 0 !important;
   min-width: 220px !important;
   margin-top: 0.5rem !important;
-  background-color: white !important;
+  background-color: var(--surface-elevated) !important;
 }
 
 .dropdown-menu-modern .dropdown-item {
   padding: 0.75rem 1.25rem !important;
   display: flex !important;
   align-items: center !important;
-  color: var(--tertiary-dark) !important;
+  color: var(--text-secondary) !important;
   transition: all 0.2s ease !important;
   font-size: 0.9rem !important;
   text-decoration: none !important;
 }
 
 .dropdown-menu-modern .dropdown-item:hover {
-  background-color: var(--neutral-light) !important;
-  color: var(--primary) !important;
+  background-color: var(--state-hover) !important;
+  color: var(--text-accent) !important;
 }
 
 .dropdown-menu-modern .dropdown-item.text-danger {
@@ -2212,8 +2246,8 @@ export default {
 
 .dropdown-item:hover,
 .dropdown-item:focus {
-  color: #1e2125;
-  background-color: #e9ecef;
+  color: var(--text-primary);
+  background-color: var(--state-hover);
 }
 
 .btn.active {
@@ -2223,10 +2257,11 @@ export default {
 }
 
 .supplier-info-card {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border: none;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-secondary);
   border-radius: 12px;
   overflow: hidden;
+  background-color: var(--surface-primary);
 }
 
 .supplier-logo {
@@ -2253,7 +2288,7 @@ export default {
 
 .section-divider {
   height: 1px;
-  background-color: var(--neutral-medium);
+  background-color: var(--border-primary);
   margin: 1.5rem 0;
 }
 
@@ -2262,7 +2297,7 @@ export default {
   flex-direction: column;
   margin-bottom: 1rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid var(--neutral-light);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .info-item:last-child {
@@ -2273,7 +2308,7 @@ export default {
 
 .info-item label {
   font-weight: 500;
-  color: var(--tertiary-medium);
+  color: var(--text-tertiary);
   font-size: 0.875rem;
   margin-bottom: 0.25rem;
   display: flex;
@@ -2281,22 +2316,24 @@ export default {
 }
 
 .info-item span {
-  color: var(--tertiary-dark);
+  color: var(--text-secondary);
   font-weight: 500;
   display: flex;
   align-items: center;
 }
 
 .stats-card {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border: none;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-secondary);
   border-radius: 12px;
+  background-color: var(--surface-primary);
 }
 
 .orders-card, .activity-card, .notes-card {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border: none;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-secondary);
   border-radius: 12px;
+  background-color: var(--surface-primary);
 }
 
 .orders-table {
@@ -2305,13 +2342,14 @@ export default {
 
 .orders-table th {
   font-weight: 600;
-  color: var(--tertiary-dark);
-  border-bottom: 2px solid var(--neutral-light);
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--border-primary);
 }
 
 .orders-table td {
   vertical-align: middle;
-  border-top: 1px solid var(--neutral-light);
+  border-top: 1px solid var(--border-primary);
+  color: var(--text-secondary);
 }
 
 .order-id {
@@ -2385,13 +2423,13 @@ export default {
 }
 
 .notes-content {
-  color: var(--tertiary-dark);
+  color: var(--text-secondary);
   line-height: 1.6;
-  background: var(--neutral-light);
+  background-color: var(--surface-tertiary);
   padding: 0.75rem;
   border-radius: 8px;
   font-style: italic;
-  border: 1px solid var(--neutral-medium);
+  border: 1px solid var(--border-primary);
 }
 
 .modern-modal {
@@ -2404,8 +2442,8 @@ export default {
 /* Edit Supplier Modal Header */
 .edit-supplier-header {
   padding: 2rem 2rem 1.5rem 2rem !important;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background-color: var(--surface-tertiary);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .modal-icon {
@@ -2430,7 +2468,7 @@ export default {
 }
 
 .modal-title {
-  color: var(--primary-dark);
+  color: var(--text-primary);
   font-weight: 600;
   margin: 0;
   font-size: 1.5rem;
@@ -2439,7 +2477,7 @@ export default {
 /* Edit Supplier Modal Body */
 .edit-supplier-body {
   padding: 2rem 2rem 1.5rem 2rem !important;
-  background: white;
+  background-color: var(--surface-elevated);
 }
 
 .form-group {
@@ -2447,7 +2485,7 @@ export default {
 }
 
 .modern-label {
-  color: var(--tertiary-dark);
+  color: var(--text-primary);
   font-weight: 500;
   margin-bottom: 0.5rem;
   display: flex;
@@ -2457,24 +2495,25 @@ export default {
 }
 
 .modern-input {
-  border: 2px solid var(--neutral-medium);
+  border: 2px solid var(--input-border);
   border-radius: 8px;
   padding: 12px 16px;
   font-size: 0.95rem;
   transition: all 0.2s ease;
-  background-color: #fafafa;
+  background-color: var(--input-bg);
+  color: var(--input-text);
   height: auto;
 }
 
 .modern-input:hover:not(:focus) {
-  border-color: var(--primary-light);
-  background-color: white;
+  border-color: var(--border-accent);
+  background-color: var(--surface-tertiary);
 }
 
 .modern-input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.15);
-  background-color: white;
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 0.2rem rgba(160, 123, 227, 0.15);
+  background-color: var(--input-bg);
   outline: none;
 }
 
@@ -2495,35 +2534,36 @@ textarea.modern-input {
 .form-divider {
   margin: 1rem 0;
   border: none;
-  border-top: 1px solid var(--neutral-light);
+  border-top: 1px solid var(--border-primary);
   opacity: 0.5;
 }
 
 /* Edit Supplier Modal Footer */
 .edit-supplier-footer {
   padding: 1.5rem 2rem 2rem 2rem !important;
-  background-color: #f8f9fa;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background-color: var(--surface-tertiary);
+  border-top: 1px solid var(--border-primary);
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
 }
 
 .btn-cancel {
-  border: 2px solid var(--neutral-medium);
-  color: var(--tertiary-dark);
+  border: 2px solid var(--border-primary);
+  color: var(--text-secondary);
   border-radius: 8px;
   font-weight: 500;
   padding: 10px 24px;
   transition: all 0.2s ease;
+  background-color: transparent;
 }
 
 .btn-cancel:hover {
-  background-color: var(--neutral-medium);
-  border-color: var(--neutral-dark);
-  color: white;
+  background-color: var(--state-hover);
+  border-color: var(--border-primary);
+  color: var(--text-primary);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-update {
@@ -2584,9 +2624,9 @@ textarea.modern-input {
 .stat-item {
   text-align: center;
   padding: 1rem;
-  background: var(--neutral-light);
+  background-color: var(--surface-secondary);
   border-radius: 8px;
-  border: 1px solid var(--neutral-medium);
+  border: 1px solid var(--border-primary);
 }
 
 .stat-number {
@@ -2595,9 +2635,41 @@ textarea.modern-input {
   margin-bottom: 0.25rem;
 }
 
+.stat-primary {
+  color: var(--primary);
+}
+
+.dark-theme .stat-primary {
+  color: var(--primary-dark-mode);
+}
+
+.stat-warning {
+  color: #f59e0b;
+}
+
+.dark-theme .stat-warning {
+  color: #fbbf24;
+}
+
+.stat-success {
+  color: #22c55e;
+}
+
+.dark-theme .stat-success {
+  color: var(--success-dark-mode);
+}
+
+.stat-info {
+  color: #3b82f6;
+}
+
+.dark-theme .stat-info {
+  color: var(--info-dark-mode-light);
+}
+
 .stat-label {
   font-size: 0.75rem;
-  color: var(--tertiary-medium);
+  color: var(--text-secondary);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -2609,9 +2681,9 @@ textarea.modern-input {
 }
 
 .clickable-stat:hover {
-  background-color: var(--primary-light);
+  background-color: var(--state-hover);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
 }
 
 .text-primary-dark {
@@ -2624,6 +2696,89 @@ textarea.modern-input {
 
 .text-tertiary-dark {
   color: var(--tertiary-dark) !important;
+}
+
+/* Dark mode text classes */
+.page-subtitle {
+  color: var(--text-secondary);
+}
+
+.loading-text {
+  color: var(--text-secondary);
+}
+
+.rating-label {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.rating-value {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.performance-rating-divider {
+  border-top: 1px solid var(--border-primary);
+}
+
+.factor-weight {
+  color: var(--text-tertiary);
+}
+
+.section-title {
+  color: var(--text-primary);
+}
+
+.order-detail-text {
+  color: var(--text-secondary);
+}
+
+.order-meta-text {
+  color: var(--text-secondary);
+}
+
+.empty-state {
+  color: var(--text-secondary);
+}
+
+.empty-state-icon {
+  color: var(--text-tertiary);
+  opacity: 0.6;
+}
+
+.empty-state-text {
+  color: var(--text-secondary);
+}
+
+.activity-time {
+  color: var(--text-tertiary);
+}
+
+.activity-description {
+  color: var(--text-secondary);
+}
+
+.activity-user {
+  color: var(--text-tertiary);
+}
+
+.modal-subtitle {
+  color: var(--text-secondary);
+}
+
+/* Button links in info sections */
+.info-item .btn-link {
+  color: var(--text-tertiary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.info-item .btn-link:hover {
+  color: var(--text-accent);
+}
+
+.address-text {
+  color: var(--text-secondary);
 }
 
 /* Responsive adjustments */
@@ -2695,10 +2850,10 @@ textarea.modern-input {
   overflow-y: auto;
   animation: slideIn 0.3s ease;
   z-index: 10000 !important;
-  background: white;
+  background-color: var(--surface-elevated);
   border-radius: 16px;
-  border: none;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-primary);
+  box-shadow: var(--shadow-2xl);
 }
 
 @keyframes slideIn {
@@ -2841,10 +2996,10 @@ body:has(.modal-overlay) {
   bottom: 100%;
   right: 0;
   margin-bottom: 0.5rem;
-  background: white;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-xl);
   padding: 0;
   min-width: 300px;
   max-width: 400px;
@@ -2865,11 +3020,11 @@ body:has(.modal-overlay) {
 
 .tooltip-header {
   padding: 0.75rem 1rem;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background-color: var(--surface-tertiary);
+  border-bottom: 1px solid var(--border-primary);
   border-radius: 8px 8px 0 0;
   font-size: 0.875rem;
-  color: var(--primary-dark);
+  color: var(--text-primary);
 }
 
 .tooltip-content {
@@ -2887,7 +3042,7 @@ body:has(.modal-overlay) {
 .factor-name {
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--tertiary-dark);
+  color: var(--text-secondary);
 }
 
 .factor-weight {
@@ -2897,6 +3052,7 @@ body:has(.modal-overlay) {
 .factor-score-bar {
   position: relative;
   overflow: hidden;
+  background-color: var(--surface-tertiary);
 }
 
 .factor-score-fill {
@@ -2910,12 +3066,12 @@ body:has(.modal-overlay) {
   font-weight: 600;
   min-width: 45px;
   text-align: right;
-  color: var(--tertiary-dark);
+  color: var(--text-secondary);
 }
 
 .tooltip-divider {
   height: 1px;
-  background-color: var(--neutral-light);
+  background-color: var(--border-primary);
   margin: 0.75rem 0;
 }
 
