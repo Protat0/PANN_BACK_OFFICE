@@ -70,53 +70,15 @@
         <div class="action-row">
           <!-- Left Side: Main Actions (Always visible when no selection) -->
           <div v-if="suppliersComposable.selectedSuppliers?.value?.length === 0" class="d-flex gap-2">
-            <!-- Add Suppliers Dropdown -->
-            <div class="dropdown" ref="addDropdownRef">
-              <button 
-                class="btn btn-success btn-sm btn-with-icon-sm dropdown-toggle"
-                type="button"
-                @click="toggleAddDropdown"
-                :class="{ 'active': showAddDropdown }"
-              >
-                <Plus :size="14" />
-                ADD SUPPLIER
-              </button>
-              
-              <div 
-                class="dropdown-menu custom-dropdown-menu" 
-                :class="{ 'show': showAddDropdown }"
-              >
-                <button class="dropdown-item custom-dropdown-item" @click="handleSingleSupplier">
-                  <div class="d-flex align-items-center gap-3">
-                    <Plus :size="16" class="text-primary" />
-                    <div>
-                      <div class="fw-semibold">Single Supplier</div>
-                      <small class="text-muted">Add one supplier manually</small>
-                    </div>
-                  </div>
-                </button>
-                
-                <button class="dropdown-item custom-dropdown-item" @click="handleBulkAdd">
-                  <div class="d-flex align-items-center gap-3">
-                    <Building :size="16" class="text-primary" />
-                    <div>
-                      <div class="fw-semibold">Bulk Entry</div>
-                      <small class="text-muted">Add multiple suppliers (5-20 items)</small>
-                    </div>
-                  </div>
-                </button>
-                
-                <button class="dropdown-item custom-dropdown-item" @click="handleImport">
-                  <div class="d-flex align-items-center gap-3">
-                    <FileText :size="16" class="text-primary" />
-                    <div>
-                      <div class="fw-semibold">Import File</div>
-                      <small class="text-muted">Upload CSV/Excel (20+ items)</small>
-                    </div>
-                  </div>
-                </button>
-              </div>
-            </div>
+            <!-- Add Supplier Button -->
+            <button 
+              class="btn btn-success btn-sm btn-with-icon-sm"
+              type="button"
+              @click="handleSingleSupplier"
+            >
+              <Plus :size="14" />
+              ADD SUPPLIER
+            </button>
 
             <button 
               class="btn btn-outline-secondary btn-sm"
@@ -394,9 +356,7 @@ export default {
     const router = useRouter()
 
     // Local reactive state for UI
-    const showAddDropdown = ref(false)
     const searchMode = ref(false)
-    const addDropdownRef = ref(null)
     const searchInputRef = ref(null)
     
     // Active orders modal data
@@ -410,8 +370,6 @@ export default {
         await suppliersComposable.fetchSuppliers()
         await reportsComposable.refreshReports()
 
-        // Add click outside listener
-        document.addEventListener('click', handleClickOutside)
       } catch (error) {
         console.error('Error fetching suppliers:', error)
       }
@@ -424,26 +382,7 @@ export default {
       }
     })
 
-    // Cleanup
-    const cleanup = () => {
-      document.removeEventListener('click', handleClickOutside)
-    }
-
     // Methods
-    const handleClickOutside = (event) => {
-      if (addDropdownRef.value && !addDropdownRef.value.contains(event.target)) {
-        showAddDropdown.value = false
-      }
-    }
-
-    const toggleAddDropdown = (event) => {
-      event.stopPropagation()
-      showAddDropdown.value = !showAddDropdown.value
-    }
-
-    const closeAddDropdown = () => {
-      showAddDropdown.value = false
-    }
 
     const toggleSearchMode = () => {
       searchMode.value = !searchMode.value
@@ -484,16 +423,8 @@ export default {
       searchMode.value = false
     }
 
-    const handleSingleSupplier = (event) => {
-      if (event) event.stopPropagation()
+    const handleSingleSupplier = () => {
       formComposable.showAddSupplierModal()
-      closeAddDropdown()
-    }
-    
-    const handleBulkAdd = (event) => {
-      event.stopPropagation()
-      bulkComposable.openBulkModal() 
-      closeAddDropdown()
     }
 
     const handleBulkSave = (newSuppliers) => {
@@ -511,11 +442,6 @@ export default {
       }
     }
     
-    const handleImport = (event) => {
-      if (event) event.stopPropagation()
-      importComposable.openImportModal()
-      closeAddDropdown()
-    }
 
     const toggleSupplierSelection = (supplierId) => {
       const selectedSuppliers = suppliersComposable.selectedSuppliers?.value || []
@@ -652,17 +578,13 @@ export default {
       reportsComposable,
       
       // Local state
-      showAddDropdown,
       searchMode,
-      addDropdownRef,
       searchInputRef,
       activeOrdersForModal,
       activeOrdersLoading,
       
       // Methods
       handleSingleSupplier,
-      handleBulkAdd,
-      handleImport,
       toggleSupplierSelection,
       viewSupplier,
       createOrder,
@@ -674,13 +596,10 @@ export default {
       showActiveOrdersReport,
       showTopSuppliersReport,
       handleViewAllOrders,
-      toggleAddDropdown,
-      closeAddDropdown,
       toggleSearchMode,
       clearSearch,
       applyFilters,
-      clearFilters,
-      cleanup
+      clearFilters
     }
   }
 }

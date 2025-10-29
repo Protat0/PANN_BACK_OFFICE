@@ -3,7 +3,7 @@ import { ref, computed, reactive } from 'vue'
 import axios from 'axios'
 
 // Configure axios base URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
 // Create axios instance with auth token
 const api = axios.create({
@@ -15,7 +15,7 @@ const api = axios.create({
 
 // Add auth token to requests if available
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+  const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }

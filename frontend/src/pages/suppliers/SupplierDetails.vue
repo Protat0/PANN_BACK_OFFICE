@@ -16,81 +16,18 @@
         </div>
       </div>
       <div class="header-actions d-flex gap-2" v-if="!loading && supplier">
-        <!-- Quick Actions Dropdown -->
-        <div class="dropdown">
-          <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-            <Zap :size="16" class="me-1" />
-            Quick Actions
-          </button>
-          <ul class="dropdown-menu dropdown-menu-modern">
-            <li>
-              <a class="dropdown-item" href="#" @click.prevent="viewPaymentHistory">
-                <CreditCard :size="16" class="me-2" />
-                Payment History
-              </a>
-            </li>
-            <li>
-              <a class="dropdown-item" href="#" @click.prevent="viewDocuments">
-                <FileText :size="16" class="me-2" />
-                View Documents
-              </a>
-            </li>
-            <li>
-              <a class="dropdown-item" href="#" @click.prevent="scheduleVisit">
-                <Calendar :size="16" class="me-2" />
-                Schedule Visit
-              </a>
-            </li>
-            <li><hr class="dropdown-divider"></li>
-            <li>
-              <a class="dropdown-item" href="#" @click.prevent="callSupplier" :class="{ disabled: !supplier?.phone }">
-                <PhoneCall :size="16" class="me-2" />
-                Call Supplier
-                <small v-if="supplier?.phone" class="text-muted ms-auto">{{ supplier.phone }}</small>
-              </a>
-            </li>
-            <li>
-              <a class="dropdown-item" href="#" @click.prevent="emailSupplier" :class="{ disabled: !supplier?.email }">
-                <Mail :size="16" class="me-2" />
-                Email Supplier
-                <small v-if="supplier?.email" class="text-muted ms-auto">{{ supplier.email }}</small>
-              </a>
-            </li>
-            <li>
-              <a class="dropdown-item" href="#" @click.prevent="openMaps" :class="{ disabled: !supplier?.address }">
-                <Navigation :size="16" class="me-2" />
-                View on Map
-                <small v-if="!supplier?.address" class="text-muted ms-auto">(No address)</small>
-              </a>
-            </li>
-          </ul>
-        </div>
-        
         <button class="btn btn-primary" @click="editSupplier">
           <Edit :size="16" class="me-1" />
-          Edit
+          Edit Supplier
         </button>
-        <div class="d-flex gap-2">
-          <button class="btn btn-primary" @click="createOrder">
-            <ShoppingCart :size="16" class="me-1" />
-            Create Purchase Order
-          </button>
-          <button class="btn btn-success" @click="openReceiveStockModal">
-            <Package :size="16" class="me-1" />
-            Receive Stock
-          </button>
-        </div>
-        <div class="dropdown">
-          <button class="btn btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown">
-            <Download :size="16" class="me-1" />
-            Export
-          </button>
-          <ul class="dropdown-menu">
-            <li><a class="dropdown-item" href="#" @click="exportSupplierData('csv')">Export as CSV</a></li>
-            <li><a class="dropdown-item" href="#" @click="exportSupplierData('excel')">Export as Excel</a></li>
-            <li><a class="dropdown-item" href="#" @click="exportSupplierReport">Export Full Report</a></li>
-          </ul>
-        </div>
+        <button class="btn btn-primary" @click="createOrder">
+          <ShoppingCart :size="16" class="me-1" />
+          New Order
+        </button>
+        <button class="btn btn-success" @click="openReceiveStockModal">
+          <Package :size="16" class="me-1" />
+          Receive Stock
+        </button>
       </div>
     </div>
 
@@ -324,14 +261,19 @@
                   <option value="partially received">Partially Received</option>
                   <option value="depleted">Depleted</option>
                 </select>
-                <div class="dropdown">
-                  <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <div class="dropdown" ref="sortDropdownRef">
+                  <button 
+                    class="btn btn-outline-secondary btn-sm dropdown-toggle" 
+                    type="button" 
+                    @click="toggleSortDropdown"
+                    :class="{ 'active': showSortDropdown }"
+                  >
                     <Filter :size="14" />
                   </button>
-                  <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="#" @click="sortOrders('date')">Sort by Date</a></li>
-                    <li><a class="dropdown-item" href="#" @click="sortOrders('amount')">Sort by Amount</a></li>
-                    <li><a class="dropdown-item" href="#" @click="sortOrders('status')">Sort by Status</a></li>
+                  <ul class="dropdown-menu" :class="{ 'show': showSortDropdown }">
+                    <li><a class="dropdown-item" href="#" @click.prevent="handleSort('date')">Sort by Date</a></li>
+                    <li><a class="dropdown-item" href="#" @click.prevent="handleSort('amount')">Sort by Amount</a></li>
+                    <li><a class="dropdown-item" href="#" @click.prevent="handleSort('status')">Sort by Status</a></li>
                   </ul>
                 </div>
               </div>
@@ -693,7 +635,6 @@ import {
   ArrowLeft,
   Edit,
   Plus,
-  Download,
   Building,
   User,
   Phone,
@@ -710,15 +651,14 @@ import {
   PhoneCall,
   Send,
   Navigation,
-  Zap,
-  CreditCard,
   FileText,
   Trash2,
   Package,
   Eye,
   Filter,
   AlertTriangle,
-  Activity
+  Activity,
+  CreditCard
 } from 'lucide-vue-next'
 import CreateOrderModal from '@/components/suppliers/CreateOrderModal.vue'
 import ReceiveStockModal from '@/components/suppliers/ReceiveStockModal.vue'
@@ -731,7 +671,7 @@ import { useAuth } from '@/composables/auth/useAuth'
 import { useProducts } from '@/composables/api/useProducts'
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
 export default {
   name: 'SupplierDetails',
@@ -739,7 +679,6 @@ export default {
     ArrowLeft,
     Edit,
     Plus,
-    Download,
     Building,
     User,
     Phone,
@@ -756,8 +695,6 @@ export default {
     PhoneCall,
     Send,
     Navigation,
-    Zap,
-    CreditCard,
     FileText,
     Trash2,
     Package,
@@ -765,6 +702,7 @@ export default {
     Filter,
     AlertTriangle,
     Activity,
+    CreditCard,
     CreateOrderModal,
     ReceiveStockModal,
     BatchDetailsModal,
@@ -817,6 +755,8 @@ export default {
       
       showEditModal: false,
       showDeleteModal: false,
+      showSortDropdown: false,
+      sortDropdownRef: null,
       editForm: {
         name: '',
         contactPerson: '',
@@ -834,6 +774,14 @@ export default {
   },
   async mounted() {
     await this.fetchSupplierDetails()
+    
+    // Add click outside listener for sort dropdown
+    document.addEventListener('click', this.handleClickOutside)
+  },
+  
+  beforeUnmount() {
+    // Clean up click outside listener
+    document.removeEventListener('click', this.handleClickOutside)
   },
   watch: {
     supplierId: {
@@ -849,7 +797,7 @@ export default {
       this.error = null
       
       try {
-        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+        const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
         
         // ===== STEP 1: Fetch Supplier Info =====
         const supplierResponse = await axios.get(
@@ -1233,17 +1181,6 @@ export default {
       this.$router.push({ name: 'Suppliers' })
     },
 
-    viewPaymentHistory() {
-      this.showError('Payment history feature coming soon!')
-    },
-
-    viewDocuments() {
-      this.showError('View documents feature coming soon!')
-    },
-
-    scheduleVisit() {
-      this.showError('Schedule visit feature coming soon!')
-    },
 
     callSupplier() {
       if (this.supplier?.phone) {
@@ -1305,7 +1242,7 @@ export default {
       this.saving = true
       
       try {
-        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+        const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
         
         const backendData = {
           supplier_name: this.editForm.name,
@@ -1363,13 +1300,6 @@ export default {
       }
     },
 
-    exportSupplierData(format) {
-      this.showError(`Export as ${format} feature coming soon!`)
-    },
-
-    exportSupplierReport() {
-      this.showError('Export full report feature coming soon!')
-    },
 
     toggleFavorite() {
       this.supplier.isFavorite = !this.supplier.isFavorite
@@ -1390,7 +1320,7 @@ export default {
       this.deleting = true
       
       try {
-        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+        const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
         
         await axios.delete(
           `${API_BASE_URL}/suppliers/${this.supplier.id}/`,
@@ -1431,6 +1361,28 @@ export default {
           order.status.toLowerCase() === this.orderStatusFilter.toLowerCase()
         )
       }
+    },
+
+    toggleSortDropdown(event) {
+      if (event) {
+        event.stopPropagation()
+      }
+      this.showSortDropdown = !this.showSortDropdown
+    },
+
+    closeSortDropdown() {
+      this.showSortDropdown = false
+    },
+
+    handleClickOutside(event) {
+      if (this.$refs.sortDropdownRef && !this.$refs.sortDropdownRef.contains(event.target)) {
+        this.closeSortDropdown()
+      }
+    },
+
+    handleSort(criteria) {
+      this.sortOrders(criteria)
+      this.closeSortDropdown()
     },
 
     sortOrders(criteria) {
@@ -1802,6 +1754,63 @@ export default {
   color: var(--neutral-medium);
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+/* Fix for sort dropdown in Stock Receipt History */
+.dropdown {
+  position: relative;
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1000;
+  min-width: 160px;
+  padding: 0.5rem 0;
+  margin: 0.125rem 0 0;
+  font-size: 0.875rem;
+  color: #212529;
+  text-align: left;
+  list-style: none;
+  background-color: #fff;
+  background-clip: padding-box;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 0.375rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.175);
+}
+
+.dropdown-menu.show {
+  display: block !important;
+}
+
+.dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  clear: both;
+  font-weight: 400;
+  color: #212529;
+  text-align: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+  background-color: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+  color: #1e2125;
+  background-color: #e9ecef;
+}
+
+.btn.active {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: white;
 }
 
 .supplier-info-card {

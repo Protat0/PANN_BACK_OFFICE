@@ -1,7 +1,7 @@
 <template>
-  <div v-if="show" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-      <div class="modal-content modern-supplier-modal">
+  <Teleport to="body">
+    <div v-if="show" class="modal-overlay" @click="handleOverlayClick">
+      <div class="modal-content modern-supplier-modal" @click.stop>
         <!-- Modal Header -->
         <div class="modal-header border-0 pb-0">
           <div class="d-flex align-items-center">
@@ -228,7 +228,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <script>
@@ -276,17 +276,68 @@ export default {
   methods: {
     handleSubmit() {
       this.$emit('save')
+    },
+    handleOverlayClick() {
+      if (!this.loading) {
+        this.$emit('close')
+      }
     }
   }
 }
 </script>
 
 <style scoped>
-/* Modern Modal styling */
-.modern-supplier-modal {
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  z-index: 9999 !important;
+  animation: fadeIn 0.3s ease;
+  backdrop-filter: blur(4px);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Modal Content */
+.modal-content {
+  position: relative !important;
+  max-width: 800px;
+  width: 95%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideIn 0.3s ease;
+  z-index: 10000 !important;
+  background: white;
   border-radius: 16px;
   border: none;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+@keyframes slideIn {
+  from { 
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Modern Modal styling */
+.modern-supplier-modal {
   overflow: hidden;
 }
 
@@ -398,5 +449,121 @@ export default {
 .form-check-input:checked {
   background-color: var(--primary);
   border-color: var(--primary);
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+  .modal-content {
+    margin: 1rem;
+    max-height: calc(100vh - 2rem);
+    width: calc(100% - 2rem);
+  }
+
+  .modal-header {
+    padding: 1rem 1.5rem 0.75rem 1.5rem !important;
+  }
+
+  .modal-header h4 {
+    font-size: 1.25rem;
+  }
+
+  .modal-body {
+    padding: 1rem 1.5rem !important;
+  }
+
+  .modal-footer {
+    padding: 0.75rem 1.5rem 1.5rem 1.5rem !important;
+  }
+
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  /* Stack columns on mobile */
+  .row > [class*="col-md-"] {
+    width: 100%;
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-content {
+    margin: 0.5rem;
+    max-height: calc(100vh - 1rem);
+    width: calc(100% - 1rem);
+    border-radius: 8px;
+  }
+
+  .modal-header {
+    padding: 0.75rem 1rem 0.5rem 1rem !important;
+  }
+
+  .modal-header h4 {
+    font-size: 1.1rem;
+  }
+
+  .modal-body {
+    padding: 0.75rem 1rem !important;
+  }
+
+  .modal-footer {
+    padding: 0.5rem 1rem 1rem 1rem !important;
+    flex-direction: column;
+    gap: 0.75rem !important;
+  }
+
+  .modal-footer > div {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .modal-footer .form-check {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  .modal-footer .d-flex {
+    width: 100%;
+    flex-direction: column;
+    gap: 0.5rem !important;
+  }
+
+  .modal-footer .btn {
+    width: 100%;
+  }
+
+  .form-group {
+    margin-bottom: 0.75rem;
+  }
+
+  .modal-icon {
+    width: 40px !important;
+    height: 40px !important;
+  }
+}
+
+/* Custom Scrollbar */
+.modal-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-content::-webkit-scrollbar-track {
+  background: var(--neutral-light);
+  border-radius: 3px;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+  background: var(--neutral-medium);
+  border-radius: 3px;
+}
+
+.modal-content::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* Prevent body scroll when modal is open */
+body:has(.modal-overlay) {
+  overflow: hidden !important;
 }
 </style>
