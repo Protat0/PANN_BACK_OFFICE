@@ -35,7 +35,7 @@
                     </div>
                     <div class="text-end">
                       <div class="d-flex align-items-center mb-1">
-                        <Star :size="16" class="text-warning me-1" />
+                        <Star :size="16" class="text-warning me-1" :fill="supplier.rating !== 'N/A' ? 'currentColor' : 'none'" />
                         <span class="fw-bold">{{ supplier.rating }}</span>
                       </div>
                       <small class="text-tertiary-medium">{{ supplier.onTimeDelivery }}% on-time</small>
@@ -57,7 +57,7 @@
                     </div>
                     <div class="col-6 col-md-3">
                       <div class="text-center p-2 bg-light rounded">
-                        <div class="h5 mb-0 text-success fw-bold">₱{{ formatCurrency(supplier.averageOrderValue) }}</div>
+                        <div class="h5 mb-0 text-success fw-bold">₱{{ formatCurrency(supplier.averageOrderValue, 2) }}</div>
                         <small class="text-tertiary-medium">Avg Order</small>
                       </div>
                     </div>
@@ -74,7 +74,7 @@
                     <div class="mt-1">
                       <span v-for="(product, pIndex) in supplier.topProducts" :key="pIndex" 
                             class="badge bg-light text-dark me-1 mb-1">
-                        {{ product }}
+                        {{ getProductDisplayName(product) }}
                       </span>
                     </div>
                   </div>
@@ -128,8 +128,23 @@ export default {
       })
     },
 
-    formatCurrency(amount) {
-      return new Intl.NumberFormat('en-PH').format(amount)
+    formatCurrency(amount, decimals = 0) {
+      return new Intl.NumberFormat('en-PH', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      }).format(amount || 0)
+    },
+
+    getProductDisplayName(product) {
+      // Product is already the name from batches, but handle edge cases
+      // If it looks like an ID (starts with PROD-), try to extract name
+      if (product && product.startsWith && product.startsWith('PROD-')) {
+        // This means we got an ID instead of name - should not happen with enrichment
+        // But keep as fallback
+        return product
+      }
+      // Return the product name as-is (already enriched from batches)
+      return product || 'Unknown Product'
     }
   }
 }

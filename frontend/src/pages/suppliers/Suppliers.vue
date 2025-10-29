@@ -293,10 +293,8 @@ import { onMounted, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   Plus, 
-  Download, 
   RefreshCw,
-  Building, 
-  FileText,
+  Building,
   Trash2,
   Search,
   X
@@ -328,10 +326,8 @@ export default {
   name: 'Suppliers',
   components: {
     Plus,
-    Download,
     RefreshCw,
     Building,
-    FileText,
     Trash2,
     Search,
     X,

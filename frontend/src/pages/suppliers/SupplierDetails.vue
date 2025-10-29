@@ -71,12 +71,51 @@
         <div class="mt-3 pt-3 border-top">
           <div class="d-flex justify-content-between align-items-center mb-2">
             <small class="text-muted">Performance Rating</small>
-            <small class="text-muted">{{ supplier.rating || 4.5 }}/5.0</small>
+            <div class="rating-tooltip-wrapper position-relative d-inline-block">
+              <small class="text-muted rating-value" :class="{ 'cursor-help': getPerformanceRating() !== 'N/A' }">
+                {{ getPerformanceRating() }}/5.0
+                <Info v-if="getPerformanceRating() !== 'N/A'" :size="12" class="ms-1 opacity-75" />
+              </small>
+              <!-- Tooltip -->
+              <div v-if="getPerformanceRating() !== 'N/A'" class="rating-tooltip">
+                <div class="tooltip-header">
+                  <strong>Rating Breakdown</strong>
+                </div>
+                <div class="tooltip-content">
+                  <div v-for="factor in getRatingBreakdown()" :key="factor.name" class="tooltip-factor">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <span class="factor-name">{{ factor.name }}</span>
+                      <span class="factor-weight text-muted">({{ factor.weight }}%)</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                      <div class="factor-score-bar" style="flex: 1; height: 6px; background: var(--neutral-light); border-radius: 3px; margin-right: 0.5rem;">
+                        <div 
+                          class="factor-score-fill" 
+                          :style="{ 
+                            width: factor.score + '%',
+                            backgroundColor: factor.score >= 70 ? '#22c55e' : factor.score >= 50 ? '#3b82f6' : factor.score >= 30 ? '#f59e0b' : '#ef4444'
+                          }">
+                        </div>
+                      </div>
+                      <span class="factor-score-value">{{ factor.score.toFixed(1) }}%</span>
+                    </div>
+                  </div>
+                  <div class="tooltip-divider"></div>
+                  <div class="tooltip-total">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <strong>Final Rating:</strong>
+                      <strong>{{ getPerformanceRating() }}/5.0</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="progress" style="height: 6px;">
             <div 
-              class="progress-bar bg-success" 
-              :style="{ width: ((supplier.rating || 4.5) / 5 * 100) + '%' }">
+              class="progress-bar" 
+              :class="getPerformanceRatingClass()"
+              :style="{ width: (getPerformanceRatingPercentage() + '%') }">
             </div>
           </div>
         </div>
@@ -653,32 +692,38 @@
     </Teleport>
 
     <!-- Delete Confirmation Modal -->
-    <div v-if="showDeleteModal" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title text-danger">
-              <AlertTriangle :size="20" class="me-2" />
-              Delete Supplier
-            </h5>
-            <button type="button" class="btn-close" @click="showDeleteModal = false"></button>
+    <Teleport to="body">
+      <div v-if="showDeleteModal" class="modal-overlay" @click="handleDeleteModalOverlayClick">
+        <div class="modal-content modern-modal" @click.stop>
+          <div class="modal-header edit-supplier-header">
+            <div class="d-flex align-items-center">
+              <div class="modal-icon me-3" style="background: linear-gradient(135deg, #dc3545, #c82333);">
+                <AlertTriangle :size="24" />
+              </div>
+              <div>
+                <h4 class="modal-title mb-1 text-danger">Delete Supplier</h4>
+                <p class="text-muted mb-0 small">Confirm deletion</p>
+              </div>
+            </div>
+            <button type="button" class="btn-close btn-close-custom" @click="showDeleteModal = false"></button>
           </div>
-          <div class="modal-body">
-            <p>Are you sure you want to delete <strong>{{ supplier.name }}</strong>?</p>
+          <div class="modal-body edit-supplier-body">
+            <p>Are you sure you want to delete <strong>{{ supplier?.name }}</strong>?</p>
             <div class="alert alert-warning">
               <strong>Warning:</strong> This action cannot be undone. All associated purchase orders and history will be preserved but this supplier will be removed from your system.
             </div>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="showDeleteModal = false">Cancel</button>
-            <button type="button" class="btn btn-danger" @click="confirmDeleteSupplier" :disabled="deleting">
+          <div class="modal-footer edit-supplier-footer">
+            <button type="button" class="btn btn-outline-secondary btn-cancel" @click="showDeleteModal = false">Cancel</button>
+            <button type="button" class="btn btn-danger btn-delete" @click="confirmDeleteSupplier" :disabled="deleting">
               <div v-if="deleting" class="spinner-border spinner-border-sm me-2"></div>
-              Delete Supplier
+              <span v-if="!deleting">Delete Supplier</span>
+              <span v-else>Deleting...</span>
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>
 
@@ -709,7 +754,8 @@ import {
   Filter,
   AlertTriangle,
   Activity,
-  CreditCard
+  CreditCard,
+  Info
 } from 'lucide-vue-next'
 import CreateOrderModal from '@/components/suppliers/CreateOrderModal.vue'
 import ReceiveStockModal from '@/components/suppliers/ReceiveStockModal.vue'
@@ -742,7 +788,6 @@ export default {
     ShoppingCart,
     MoreVertical,
     Star,
-    Copy,
     PhoneCall,
     Send,
     Navigation,
@@ -754,6 +799,7 @@ export default {
     AlertTriangle,
     Activity,
     CreditCard,
+    Info,
     CreateOrderModal,
     ReceiveStockModal,
     BatchDetailsModal,
@@ -919,7 +965,7 @@ export default {
           purchaseOrders: 0, // Will be set after grouping batches into orders
           status: backendSupplier.isDeleted ? 'inactive' : 'active',
           type: backendSupplier.type || 'food',
-          rating: 4.5,
+          rating: null, // Will be calculated based on performance metrics
           isFavorite: false,
           notes: backendSupplier.notes || '',
           createdAt: backendSupplier.created_at,
@@ -1280,6 +1326,12 @@ export default {
     handleEditModalOverlayClick() {
       if (!this.saving) {
         this.closeEditModal()
+      }
+    },
+
+    handleDeleteModalOverlayClick() {
+      if (!this.deleting) {
+        this.showDeleteModal = false
       }
     },
 
@@ -1782,6 +1834,211 @@ export default {
       const today = new Date()
       const diffTime = Math.abs(today - createdDate)
       return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    },
+
+    getPerformanceRating() {
+      // Calculate performance rating based on multiple factors
+      if (!this.orders || this.orders.length === 0) {
+        return 'N/A'
+      }
+
+      const receivedOrders = this.orders.filter(order => 
+        order.status === 'Received' && order.expectedDate && order.receivedDate
+      )
+
+      // If no completed orders, return a baseline rating
+      if (receivedOrders.length === 0) {
+        const pendingOrders = this.orders.filter(order => 
+          order.status === 'Pending Delivery' || order.status === 'Partially Received'
+        )
+        // New supplier with only pending orders gets neutral rating
+        return pendingOrders.length > 0 ? '3.0' : 'N/A'
+      }
+
+      // Factor 1: On-time Delivery Rate (40% weight)
+      let onTimeDeliveryRate = 0
+      let onTimeCount = 0
+
+      receivedOrders.forEach(order => {
+        const expectedDate = new Date(order.expectedDate)
+        const receivedDate = new Date(order.receivedDate)
+        const diffDays = Math.ceil((receivedDate - expectedDate) / (1000 * 60 * 60 * 24))
+
+        if (diffDays <= 0) {
+          // On time or early (early is also good)
+          onTimeCount++
+        } else if (diffDays <= 3) {
+          // Slightly late (1-3 days) - partial credit
+          onTimeCount += 0.7
+        }
+        // Late more than 3 days gets 0 credit (onTimeCount stays the same)
+      })
+
+      onTimeDeliveryRate = receivedOrders.length > 0 
+        ? (onTimeCount / receivedOrders.length) * 100 
+        : 0
+
+      // Factor 2: Order Frequency/Activity (25% weight)
+      // More orders = better (capped at reasonable max)
+      const daysActive = this.getDaysActive() || 1
+      const ordersPerMonth = (this.orders.length / (daysActive / 30))
+      const frequencyScore = Math.min(ordersPerMonth / 2, 1) * 100 // Normalize to 0-100
+
+      // Factor 3: Value Contribution (20% weight)
+      // Higher total spent = better (normalized based on average)
+      // Use only receivedOrders with dates (same as Top Performers calculation)
+      const totalSpent = receivedOrders.reduce((sum, o) => sum + o.total, 0)
+      const avgOrderValue = receivedOrders.length > 0 ? totalSpent / receivedOrders.length : 0
+      // Assuming ₱10,000+ per order is good, scale accordingly
+      const valueScore = Math.min((avgOrderValue / 10000) * 100, 100)
+
+      // Factor 4: Consistency (15% weight)
+      // Regular ordering pattern = better
+      const orderDates = this.orders
+        .filter(o => o.date)
+        .map(o => new Date(o.date))
+        .sort((a, b) => a - b)
+      
+      let consistencyScore = 50 // Default neutral
+      if (orderDates.length >= 3) {
+        // Calculate time between orders
+        const intervals = []
+        for (let i = 1; i < orderDates.length; i++) {
+          const diffDays = (orderDates[i] - orderDates[i-1]) / (1000 * 60 * 60 * 24)
+          intervals.push(diffDays)
+        }
+        
+        if (intervals.length > 0) {
+          // Lower variance = more consistent
+          const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length
+          const variance = intervals.reduce((sum, interval) => {
+            return sum + Math.pow(interval - avgInterval, 2)
+          }, 0) / intervals.length
+          const stdDev = Math.sqrt(variance)
+          
+          // Lower standard deviation = higher consistency score
+          // Normalize: if stdDev is 0, score is 100; if stdDev is > avgInterval, score approaches 0
+          consistencyScore = Math.max(0, Math.min(100, 100 - (stdDev / avgInterval) * 100))
+        }
+      }
+
+      // Calculate weighted average
+      const weightedRating = (
+        (onTimeDeliveryRate * 0.40) +
+        (frequencyScore * 0.25) +
+        (valueScore * 0.20) +
+        (consistencyScore * 0.15)
+      ) / 100 * 5 // Convert to 0-5 scale
+
+      // Round to 1 decimal place and ensure it's between 0 and 5
+      return Math.max(0, Math.min(5, Math.round(weightedRating * 10) / 10)).toFixed(1)
+    },
+
+    getPerformanceRatingPercentage() {
+      const rating = this.getPerformanceRating()
+      if (rating === 'N/A') return 0
+      return (parseFloat(rating) / 5) * 100
+    },
+
+    getPerformanceRatingClass() {
+      const rating = this.getPerformanceRating()
+      if (rating === 'N/A') return 'bg-secondary'
+      
+      const numRating = parseFloat(rating)
+      if (numRating >= 4.0) return 'bg-success'
+      if (numRating >= 3.0) return 'bg-info'
+      if (numRating >= 2.0) return 'bg-warning'
+      return 'bg-danger'
+    },
+
+    getRatingBreakdown() {
+      // Calculate all factors and return breakdown
+      if (!this.orders || this.orders.length === 0) {
+        return []
+      }
+
+      const receivedOrders = this.orders.filter(order => 
+        order.status === 'Received' && order.expectedDate && order.receivedDate
+      )
+
+      if (receivedOrders.length === 0) {
+        return []
+      }
+
+      // Factor 1: On-time Delivery Rate (40% weight)
+      let onTimeCount = 0
+      receivedOrders.forEach(order => {
+        const expectedDate = new Date(order.expectedDate)
+        const receivedDate = new Date(order.receivedDate)
+        const diffDays = Math.ceil((receivedDate - expectedDate) / (1000 * 60 * 60 * 24))
+
+        if (diffDays <= 0) {
+          onTimeCount++
+        } else if (diffDays <= 3) {
+          onTimeCount += 0.7
+        }
+      })
+      const onTimeDeliveryRate = receivedOrders.length > 0 
+        ? (onTimeCount / receivedOrders.length) * 100 
+        : 0
+
+      // Factor 2: Order Frequency/Activity (25% weight)
+      const daysActive = this.getDaysActive() || 1
+      const ordersPerMonth = (this.orders.length / (daysActive / 30))
+      const frequencyScore = Math.min(ordersPerMonth / 2, 1) * 100
+
+      // Factor 3: Value Contribution (20% weight)
+      const totalSpent = receivedOrders.reduce((sum, o) => sum + o.total, 0)
+      const avgOrderValue = receivedOrders.length > 0 ? totalSpent / receivedOrders.length : 0
+      const valueScore = Math.min((avgOrderValue / 10000) * 100, 100)
+
+      // Factor 4: Consistency (15% weight)
+      const orderDates = this.orders
+        .filter(o => o.date)
+        .map(o => new Date(o.date))
+        .sort((a, b) => a - b)
+      
+      let consistencyScore = 50 // Default neutral
+      if (orderDates.length >= 3) {
+        const intervals = []
+        for (let i = 1; i < orderDates.length; i++) {
+          const diffDays = (orderDates[i] - orderDates[i-1]) / (1000 * 60 * 60 * 24)
+          intervals.push(diffDays)
+        }
+        
+        if (intervals.length > 0) {
+          const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length
+          const variance = intervals.reduce((sum, interval) => {
+            return sum + Math.pow(interval - avgInterval, 2)
+          }, 0) / intervals.length
+          const stdDev = Math.sqrt(variance)
+          
+          consistencyScore = Math.max(0, Math.min(100, 100 - (stdDev / avgInterval) * 100))
+        }
+      }
+
+      return [
+        {
+          name: 'On-time Delivery',
+          weight: 40,
+          score: Math.round(onTimeDeliveryRate * 10) / 10
+        },
+        {
+          name: 'Order Frequency',
+          weight: 25,
+          score: Math.round(frequencyScore * 10) / 10
+        },
+        {
+          name: 'Value Contribution',
+          weight: 20,
+          score: Math.round(valueScore * 10) / 10
+        },
+        {
+          name: 'Consistency',
+          weight: 15,
+          score: Math.round(consistencyScore * 10) / 10
+        }
+      ]
     },
 
     formatCurrency(amount) {
@@ -2290,6 +2547,28 @@ textarea.modern-input {
   cursor: not-allowed;
 }
 
+.btn-delete {
+  background: linear-gradient(135deg, #dc3545, #c82333);
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  padding: 10px 24px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(220, 53, 69, 0.25);
+  color: white;
+}
+
+.btn-delete:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.35);
+  background: linear-gradient(135deg, #c82333, #dc3545);
+}
+
+.btn-delete:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .form-label.required::after {
   content: '*';
   color: var(--error);
@@ -2540,5 +2819,118 @@ textarea.modern-input {
 /* Prevent body scroll when modal is open */
 body:has(.modal-overlay) {
   overflow: hidden !important;
+}
+
+/* Rating Tooltip Styles */
+.rating-tooltip-wrapper {
+  cursor: help;
+}
+
+.rating-value {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.cursor-help {
+  cursor: help;
+}
+
+.rating-tooltip {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 0.5rem;
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 0;
+  min-width: 300px;
+  max-width: 400px;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(5px);
+  transition: all 0.2s ease;
+  pointer-events: none;
+}
+
+.rating-tooltip-wrapper:hover .rating-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.tooltip-header {
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px 8px 0 0;
+  font-size: 0.875rem;
+  color: var(--primary-dark);
+}
+
+.tooltip-content {
+  padding: 1rem;
+}
+
+.tooltip-factor {
+  margin-bottom: 0.75rem;
+}
+
+.tooltip-factor:last-of-type {
+  margin-bottom: 0;
+}
+
+.factor-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--tertiary-dark);
+}
+
+.factor-weight {
+  font-size: 0.75rem;
+}
+
+.factor-score-bar {
+  position: relative;
+  overflow: hidden;
+}
+
+.factor-score-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.factor-score-value {
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 45px;
+  text-align: right;
+  color: var(--tertiary-dark);
+}
+
+.tooltip-divider {
+  height: 1px;
+  background-color: var(--neutral-light);
+  margin: 0.75rem 0;
+}
+
+.tooltip-total {
+  padding-top: 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* Responsive adjustments for tooltip */
+@media (max-width: 576px) {
+  .rating-tooltip {
+    right: auto;
+    left: 0;
+    min-width: 280px;
+    max-width: 90vw;
+  }
 }
 </style>
