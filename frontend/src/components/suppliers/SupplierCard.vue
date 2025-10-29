@@ -14,7 +14,23 @@
           <div class="supplier-icon me-3">
             <i class="bi bi-building"></i>
           </div>
-          <h5 class="card-title mb-0 supplier-name">{{ supplier.name }}</h5>
+          <h5 class="card-title mb-0 supplier-name">
+            {{ supplier.name }}
+            <button
+              @click.stop="$emit('toggle-favorite', supplier)"
+              class="btn btn-link p-0 ms-2 favorite-toggle"
+              type="button"
+              :title="supplier.isFavorite ? 'Remove from favorites' : 'Add to favorites'"
+            >
+              <Star 
+                :size="18" 
+                class="favorite-star" 
+                :class="{ 'favorite-filled': supplier.isFavorite }"
+                :fill="supplier.isFavorite ? 'currentColor' : 'none'"
+                :stroke-width="supplier.isFavorite ? 2 : 2.5"
+              />
+            </button>
+          </h5>
         </div>
         <div class="dropdown">
           <button 
@@ -117,9 +133,14 @@
 </template>
 
 <script>
+import { Star } from 'lucide-vue-next'
+
 export default {
   name: 'SupplierCard',
-  emits: ['toggle-select', 'edit', 'view', 'create-order', 'delete'],
+  components: {
+    Star
+  },
+  emits: ['toggle-select', 'toggle-favorite', 'edit', 'view', 'create-order', 'delete'],
   props: {
     supplier: {
       type: Object,
@@ -202,6 +223,45 @@ export default {
   color: var(--primary);
   font-weight: 600;
   font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+}
+
+.favorite-toggle {
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.2s ease;
+}
+
+.favorite-toggle:hover {
+  transform: scale(1.1);
+}
+
+.favorite-toggle:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.favorite-star {
+  color: #ffc107;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.favorite-star:not(.favorite-filled) {
+  color: #9e9e9e;
+  opacity: 1;
+  stroke-width: 2;
+}
+
+.favorite-star.favorite-filled {
+  color: #ffc107;
+}
+
+.favorite-star:hover {
+  transform: scale(1.15);
 }
 
 .supplier-contact {

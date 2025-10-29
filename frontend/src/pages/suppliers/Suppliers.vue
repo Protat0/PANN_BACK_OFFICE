@@ -181,6 +181,7 @@
           :supplier="supplier"
           :is-selected="suppliersComposable.selectedSuppliers?.value?.includes(supplier.id) || false"
           @toggle-select="toggleSupplierSelection"
+          @toggle-favorite="handleToggleFavorite"
           @edit="formComposable.editSupplier"
           @view="viewSupplier"
           @create-order="createOrder"
@@ -310,6 +311,7 @@ import { useBulkSuppliers } from '@/composables/ui/suppliers/useBulkSuppliers'
 import { useImportSuppliers } from '@/composables/ui/suppliers/useImportSuppliers'
 import { useCreateOrder } from '@/composables/ui/suppliers/useCreateOrder'
 import { useSupplierReports } from '@/composables/ui/suppliers/useSupplierReports'
+import { useToast } from '@/composables/ui/useToast'
 
 // Components
 import CardTemplate from '@/components/common/CardTemplate.vue'
@@ -353,6 +355,7 @@ export default {
     const importComposable = useImportSuppliers()
     const createOrderComposable = useCreateOrder()
     const reportsComposable = useSupplierReports()
+    const { success, error: showError } = useToast()
     const router = useRouter()
 
     // Local reactive state for UI
@@ -451,6 +454,18 @@ export default {
         selectedSuppliers.splice(index, 1)
       } else {
         selectedSuppliers.push(supplierId)
+      }
+    }
+
+    const handleToggleFavorite = async (supplier) => {
+      const result = await suppliersComposable.toggleFavorite(supplier)
+      
+      if (result.success) {
+        // Show success toast
+        success(`${supplier.name} ${supplier.isFavorite ? 'added to' : 'removed from'} favorites`)
+      } else if (result.error) {
+        // Show error toast
+        showError(result.error)
       }
     }
 
@@ -586,6 +601,7 @@ export default {
       // Methods
       handleSingleSupplier,
       toggleSupplierSelection,
+      handleToggleFavorite,
       viewSupplier,
       createOrder,
       handleOrderSave,
