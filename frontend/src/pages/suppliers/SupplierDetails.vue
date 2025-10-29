@@ -100,21 +100,29 @@
                   {{ formatStatus(supplier.status) }}
                 </span>
               </div>
-              <div class="dropdown">
-                <button class="btn btn-link text-white p-0" type="button" data-bs-toggle="dropdown">
+              <div class="dropdown" ref="supplierDropdownRef">
+                <button 
+                  class="btn btn-link text-white p-0" 
+                  type="button" 
+                  @click="toggleSupplierDropdown"
+                  :class="{ 'active': showSupplierDropdown }"
+                  style="transition: opacity 0.2s;"
+                  :style="{ opacity: showSupplierDropdown ? '1' : '0.8' }"
+                >
                   <MoreVertical :size="20" />
                 </button>
-                <ul class="dropdown-menu">
-                  <li><a class="dropdown-item" href="#" @click="toggleFavorite">
+                <ul class="dropdown-menu dropdown-menu-modern" :class="{ 'show': showSupplierDropdown }" style="right: 0; left: auto; margin-top: 0.5rem;">
+                  <li><a class="dropdown-item" href="#" @click.prevent="handleEditSupplier">
+                    <Edit :size="16" class="me-2" />
+                    Edit Supplier
+                  </a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item" href="#" @click.prevent="handleToggleFavorite">
                     <Star :size="16" class="me-2" :class="{ 'text-warning': supplier.isFavorite }" />
                     {{ supplier.isFavorite ? 'Remove from Favorites' : 'Add to Favorites' }}
                   </a></li>
-                  <li><a class="dropdown-item" href="#" @click="duplicateSupplier">
-                    <Copy :size="16" class="me-2" />
-                    Duplicate Supplier
-                  </a></li>
                   <li><hr class="dropdown-divider"></li>
-                  <li><a class="dropdown-item text-danger" href="#" @click="deleteSupplier">
+                  <li><a class="dropdown-item text-danger" href="#" @click.prevent="handleDeleteSupplier">
                     <Trash2 :size="16" class="me-2" />
                     Delete Supplier
                   </a></li>
@@ -349,17 +357,6 @@
                         >
                           <Edit :size="14" />
                         </button>
-                        <div class="dropdown">
-                          <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                            <MoreVertical :size="14" />
-                          </button>
-                          <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="#" @click="duplicateOrder(order)">Duplicate</a></li>
-                            <li><a class="dropdown-item" href="#" @click="trackOrder(order)">Track Order</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="#" @click="deleteOrder(order)">Delete</a></li>
-                          </ul>
-                        </div>
                       </div>
                     </td>
                   </tr>
@@ -493,10 +490,10 @@
     />
 
     <!-- Edit Supplier Modal -->
-    <div v-if="showEditModal" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-      <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content modern-modal">
-          <div class="modal-header">
+    <Teleport to="body">
+      <div v-if="showEditModal" class="modal-overlay" @click="handleEditModalOverlayClick">
+        <div class="modal-content modern-modal" @click.stop>
+          <div class="modal-header edit-supplier-header">
             <div class="d-flex align-items-center">
               <div class="modal-icon me-3">
                 <Edit :size="24" />
@@ -506,99 +503,154 @@
                 <p class="text-muted mb-0 small">Update supplier information</p>
               </div>
             </div>
-            <button type="button" class="btn-close" @click="closeEditModal"></button>
+            <button type="button" class="btn-close btn-close-custom" @click="closeEditModal"></button>
           </div>
-          <div class="modal-body">
+          <div class="modal-body edit-supplier-body">
             <form @submit.prevent="saveSupplier">
-              <div class="row g-3">
+              <div class="row g-4">
+                <!-- Basic Information Section -->
                 <div class="col-md-6">
-                  <label for="supplierName" class="form-label required">Company Name</label>
-                  <input 
-                    type="text" 
-                    class="form-control" 
-                    id="supplierName"
-                    v-model="editForm.name"
-                    required
-                  >
+                  <div class="form-group">
+                    <label for="supplierName" class="form-label modern-label required">
+                      <Building :size="16" class="me-2" />
+                      Company Name
+                    </label>
+                    <input 
+                      type="text" 
+                      class="form-control modern-input" 
+                      id="supplierName"
+                      v-model="editForm.name"
+                      placeholder="Enter company name"
+                      required
+                    >
+                  </div>
                 </div>
                 <div class="col-md-6">
-                  <label for="contactPerson" class="form-label">Contact Person</label>
-                  <input 
-                    type="text" 
-                    class="form-control"
-                    id="contactPerson"
-                    v-model="editForm.contactPerson"
-                  >
+                  <div class="form-group">
+                    <label for="contactPerson" class="form-label modern-label">
+                      <User :size="16" class="me-2" />
+                      Contact Person
+                    </label>
+                    <input 
+                      type="text" 
+                      class="form-control modern-input"
+                      id="contactPerson"
+                      v-model="editForm.contactPerson"
+                      placeholder="Enter contact person name"
+                    >
+                  </div>
                 </div>
                 <div class="col-md-6">
-                  <label for="email" class="form-label">Email Address</label>
-                  <input 
-                    type="email" 
-                    class="form-control"
-                    id="email"
-                    v-model="editForm.email"
-                  >
+                  <div class="form-group">
+                    <label for="email" class="form-label modern-label">
+                      <Mail :size="16" class="me-2" />
+                      Email Address
+                    </label>
+                    <input 
+                      type="email" 
+                      class="form-control modern-input"
+                      id="email"
+                      v-model="editForm.email"
+                      placeholder="company@example.com"
+                    >
+                  </div>
                 </div>
                 <div class="col-md-6">
-                  <label for="phone" class="form-label">Phone Number</label>
-                  <input 
-                    type="tel" 
-                    class="form-control"
-                    id="phone"
-                    v-model="editForm.phone"
-                  >
+                  <div class="form-group">
+                    <label for="phone" class="form-label modern-label">
+                      <Phone :size="16" class="me-2" />
+                      Phone Number
+                    </label>
+                    <input 
+                      type="tel" 
+                      class="form-control modern-input"
+                      id="phone"
+                      v-model="editForm.phone"
+                      placeholder="Enter phone number"
+                    >
+                  </div>
+                </div>
+
+                <!-- Divider -->
+                <div class="col-12">
+                  <hr class="form-divider">
+                </div>
+
+                <!-- Additional Information Section -->
+                <div class="col-md-6">
+                  <div class="form-group">
+                    <label for="type" class="form-label modern-label">
+                      <Tag :size="16" class="me-2" />
+                      Supplier Type
+                    </label>
+                    <select class="form-select modern-input" id="type" v-model="editForm.type">
+                      <option value="">Select type</option>
+                      <option value="food">Food & Beverages</option>
+                      <option value="packaging">Packaging Materials</option>
+                      <option value="equipment">Equipment & Tools</option>
+                      <option value="services">Services</option>
+                      <option value="raw_materials">Raw Materials</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
                 </div>
                 <div class="col-md-6">
-                  <label for="type" class="form-label">Supplier Type</label>
-                  <select class="form-select" id="type" v-model="editForm.type">
-                    <option value="">Select type</option>
-                    <option value="food">Food & Beverages</option>
-                    <option value="packaging">Packaging Materials</option>
-                    <option value="equipment">Equipment & Tools</option>
-                    <option value="services">Services</option>
-                    <option value="raw_materials">Raw Materials</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div class="col-md-6">
-                  <label for="status" class="form-label">Status</label>
-                  <select class="form-select" id="status" v-model="editForm.status">
-                    <option value="active">Active</option>
-                    <option value="pending">Pending</option>
-                    <option value="inactive">Inactive</option>
-                  </select>
+                  <div class="form-group">
+                    <label for="status" class="form-label modern-label">
+                      <Activity :size="16" class="me-2" />
+                      Status
+                    </label>
+                    <select class="form-select modern-input" id="status" v-model="editForm.status">
+                      <option value="active">Active</option>
+                      <option value="pending">Pending</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
                 </div>
                 <div class="col-12">
-                  <label for="address" class="form-label">Address</label>
-                  <textarea 
-                    class="form-control" 
-                    id="address"
-                    v-model="editForm.address"
-                    rows="3"
-                  ></textarea>
+                  <div class="form-group">
+                    <label for="address" class="form-label modern-label">
+                      <MapPin :size="16" class="me-2" />
+                      Address
+                    </label>
+                    <textarea 
+                      class="form-control modern-input" 
+                      id="address"
+                      v-model="editForm.address"
+                      rows="3"
+                      placeholder="Enter supplier address"
+                    ></textarea>
+                  </div>
                 </div>
                 <div class="col-12">
-                  <label for="notes" class="form-label">Notes</label>
-                  <textarea 
-                    class="form-control" 
-                    id="notes"
-                    v-model="editForm.notes"
-                    rows="3"
-                  ></textarea>
+                  <div class="form-group">
+                    <label for="notes" class="form-label modern-label">
+                      <FileText :size="16" class="me-2" />
+                      Notes
+                    </label>
+                    <textarea 
+                      class="form-control modern-input" 
+                      id="notes"
+                      v-model="editForm.notes"
+                      rows="3"
+                      placeholder="Additional notes about this supplier"
+                    ></textarea>
+                  </div>
                 </div>
               </div>
             </form>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="closeEditModal">Cancel</button>
-            <button type="button" class="btn btn-primary" @click="saveSupplier" :disabled="saving">
+          <div class="modal-footer edit-supplier-footer">
+            <button type="button" class="btn btn-outline-secondary btn-cancel" @click="closeEditModal">Cancel</button>
+            <button type="button" class="btn btn-primary btn-update" @click="saveSupplier" :disabled="saving">
               <div v-if="saving" class="spinner-border spinner-border-sm me-2"></div>
-              Update Supplier
+              <span v-if="!saving">Update Supplier</span>
+              <span v-else>Updating...</span>
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </Teleport>
 
     <!-- Delete Confirmation Modal -->
     <div v-if="showDeleteModal" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
@@ -647,7 +699,6 @@ import {
   ShoppingCart,
   MoreVertical,
   Star,
-  Copy,
   PhoneCall,
   Send,
   Navigation,
@@ -757,6 +808,8 @@ export default {
       showDeleteModal: false,
       showSortDropdown: false,
       sortDropdownRef: null,
+      showSupplierDropdown: false,
+      supplierDropdownRef: null,
       editForm: {
         name: '',
         contactPerson: '',
@@ -775,12 +828,12 @@ export default {
   async mounted() {
     await this.fetchSupplierDetails()
     
-    // Add click outside listener for sort dropdown
+    // Add click outside listeners for dropdowns
     document.addEventListener('click', this.handleClickOutside)
   },
   
   beforeUnmount() {
-    // Clean up click outside listener
+    // Clean up click outside listeners
     document.removeEventListener('click', this.handleClickOutside)
   },
   watch: {
@@ -1224,6 +1277,12 @@ export default {
       this.showEditModal = true
     },
 
+    handleEditModalOverlayClick() {
+      if (!this.saving) {
+        this.closeEditModal()
+      }
+    },
+
     closeEditModal() {
       this.showEditModal = false
       this.editForm = {
@@ -1301,15 +1360,35 @@ export default {
     },
 
 
-    toggleFavorite() {
+    async toggleFavorite() {
+      const previousFavoriteState = this.supplier.isFavorite
       this.supplier.isFavorite = !this.supplier.isFavorite
       
-      // Show toast instead of setting successMessage
-      this.success(`${this.supplier.name} ${this.supplier.isFavorite ? 'added to' : 'removed from'} favorites`)
-    },
-
-    duplicateSupplier() {
-      this.showError('Duplicate supplier functionality coming soon!')
+      try {
+        const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+        
+        await axios.put(
+          `${API_BASE_URL}/suppliers/${this.supplier.id}/`,
+          {
+            isFavorite: this.supplier.isFavorite
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        )
+        
+        // Show success toast
+        this.success(`${this.supplier.name} ${this.supplier.isFavorite ? 'added to' : 'removed from'} favorites`)
+      } catch (error) {
+        // Revert on error
+        this.supplier.isFavorite = previousFavoriteState
+        console.error('Error updating favorite status:', error)
+        const errorMessage = error.response?.data?.error || `Failed to update favorite status: ${error.message}`
+        this.showError(errorMessage)
+      }
     },
 
     deleteSupplier() {
@@ -1334,8 +1413,8 @@ export default {
         
         this.showDeleteModal = false
         
-        // Show success toast
-        this.success(`${this.supplier.name} has been deleted successfully`)
+        // Show success toast (soft delete)
+        this.success(`${this.supplier.name} has been deleted successfully (soft delete)`)
         
         setTimeout(() => {
           this.goBack()
@@ -1378,6 +1457,38 @@ export default {
       if (this.$refs.sortDropdownRef && !this.$refs.sortDropdownRef.contains(event.target)) {
         this.closeSortDropdown()
       }
+      if (this.$refs.supplierDropdownRef && !this.$refs.supplierDropdownRef.contains(event.target)) {
+        this.closeSupplierDropdown()
+      }
+    },
+
+    toggleSupplierDropdown(event) {
+      if (event) {
+        event.stopPropagation()
+      }
+      this.showSupplierDropdown = !this.showSupplierDropdown
+    },
+
+    closeSupplierDropdown() {
+      this.showSupplierDropdown = false
+    },
+
+    handleEditSupplier(event) {
+      event.preventDefault()
+      this.editSupplier()
+      this.closeSupplierDropdown()
+    },
+
+    handleToggleFavorite(event) {
+      event.preventDefault()
+      this.toggleFavorite()
+      this.closeSupplierDropdown()
+    },
+
+    handleDeleteSupplier(event) {
+      event.preventDefault()
+      this.deleteSupplier()
+      this.closeSupplierDropdown()
     },
 
     handleSort(criteria) {
@@ -1785,6 +1896,47 @@ export default {
   display: block !important;
 }
 
+/* Supplier dropdown specific styling */
+.dropdown-menu-modern {
+  border-radius: 12px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
+  border: 1px solid var(--neutral-medium) !important;
+  padding: 0.5rem 0 !important;
+  min-width: 220px !important;
+  margin-top: 0.5rem !important;
+  background-color: white !important;
+}
+
+.dropdown-menu-modern .dropdown-item {
+  padding: 0.75rem 1.25rem !important;
+  display: flex !important;
+  align-items: center !important;
+  color: var(--tertiary-dark) !important;
+  transition: all 0.2s ease !important;
+  font-size: 0.9rem !important;
+  text-decoration: none !important;
+}
+
+.dropdown-menu-modern .dropdown-item:hover {
+  background-color: var(--neutral-light) !important;
+  color: var(--primary) !important;
+}
+
+.dropdown-menu-modern .dropdown-item.text-danger {
+  color: var(--error) !important;
+}
+
+.dropdown-menu-modern .dropdown-item.text-danger:hover {
+  background-color: rgba(220, 53, 69, 0.1) !important;
+  color: var(--error) !important;
+}
+
+.dropdown-menu-modern .dropdown-divider {
+  margin: 0.5rem 0 !important;
+  border-top: 1px solid var(--neutral-light) !important;
+  opacity: 0.5 !important;
+}
+
 .dropdown-item {
   display: block;
   width: 100%;
@@ -1989,6 +2141,14 @@ export default {
   border-radius: 16px;
   border: none;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+/* Edit Supplier Modal Header */
+.edit-supplier-header {
+  padding: 2rem 2rem 1.5rem 2rem !important;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .modal-icon {
@@ -2000,6 +2160,134 @@ export default {
   align-items: center;
   justify-content: center;
   color: var(--primary-dark);
+  box-shadow: 0 2px 8px rgba(115, 146, 226, 0.2);
+}
+
+.btn-close-custom {
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.btn-close-custom:hover {
+  opacity: 1;
+}
+
+.modal-title {
+  color: var(--primary-dark);
+  font-weight: 600;
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+/* Edit Supplier Modal Body */
+.edit-supplier-body {
+  padding: 2rem 2rem 1.5rem 2rem !important;
+  background: white;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.modern-label {
+  color: var(--tertiary-dark);
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  font-size: 0.9rem;
+  letter-spacing: 0.01em;
+}
+
+.modern-input {
+  border: 2px solid var(--neutral-medium);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  background-color: #fafafa;
+  height: auto;
+}
+
+.modern-input:hover:not(:focus) {
+  border-color: var(--primary-light);
+  background-color: white;
+}
+
+.modern-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.15);
+  background-color: white;
+  outline: none;
+}
+
+.form-select.modern-input {
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 12px;
+  padding-right: 40px;
+}
+
+textarea.modern-input {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.form-divider {
+  margin: 1rem 0;
+  border: none;
+  border-top: 1px solid var(--neutral-light);
+  opacity: 0.5;
+}
+
+/* Edit Supplier Modal Footer */
+.edit-supplier-footer {
+  padding: 1.5rem 2rem 2rem 2rem !important;
+  background-color: #f8f9fa;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.btn-cancel {
+  border: 2px solid var(--neutral-medium);
+  color: var(--tertiary-dark);
+  border-radius: 8px;
+  font-weight: 500;
+  padding: 10px 24px;
+  transition: all 0.2s ease;
+}
+
+.btn-cancel:hover {
+  background-color: var(--neutral-medium);
+  border-color: var(--neutral-dark);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn-update {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  padding: 10px 24px;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(115, 146, 226, 0.25);
+}
+
+.btn-update:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(115, 146, 226, 0.35);
+  background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+}
+
+.btn-update:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .form-label.required::after {
@@ -2094,5 +2382,163 @@ export default {
   .section-divider {
     margin: 1rem 0;
   }
+}
+
+/* Modal Overlay (for Edit Supplier Modal) */
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  z-index: 9999 !important;
+  animation: fadeIn 0.3s ease;
+  backdrop-filter: blur(4px);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Modal Content (for Edit Supplier Modal) */
+.modal-content {
+  position: relative !important;
+  max-width: 800px;
+  width: 95%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideIn 0.3s ease;
+  z-index: 10000 !important;
+  background: white;
+  border-radius: 16px;
+  border: none;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+@keyframes slideIn {
+  from { 
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Responsive Modal Styles for Edit Supplier */
+@media (max-width: 768px) {
+  .modal-content {
+    margin: 1rem;
+    max-height: calc(100vh - 2rem);
+    width: calc(100% - 2rem);
+  }
+
+  .edit-supplier-header {
+    padding: 1.5rem 1.5rem 1rem 1.5rem !important;
+  }
+
+  .edit-supplier-header h4 {
+    font-size: 1.25rem;
+  }
+
+  .edit-supplier-body {
+    padding: 1.5rem 1.5rem 1rem 1.5rem !important;
+  }
+
+  .edit-supplier-footer {
+    padding: 1rem 1.5rem 1.5rem 1.5rem !important;
+  }
+
+  .form-group {
+    margin-bottom: 1.25rem;
+  }
+
+  /* Stack columns on mobile */
+  .row > [class*="col-md-"] {
+    width: 100%;
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+
+  .form-divider {
+    margin: 0.75rem 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-content {
+    margin: 0.5rem;
+    max-height: calc(100vh - 1rem);
+    width: calc(100% - 1rem);
+    border-radius: 8px;
+  }
+
+  .edit-supplier-header {
+    padding: 1rem 1rem 0.75rem 1rem !important;
+  }
+
+  .edit-supplier-header h4 {
+    font-size: 1.1rem;
+  }
+
+  .edit-supplier-body {
+    padding: 1rem 1rem 0.75rem 1rem !important;
+  }
+
+  .edit-supplier-footer {
+    padding: 0.75rem 1rem 1rem 1rem !important;
+    flex-direction: column;
+    gap: 0.75rem !important;
+  }
+
+  .edit-supplier-footer .btn {
+    width: 100%;
+  }
+
+  .modal-icon {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .modern-input {
+    padding: 10px 14px;
+    font-size: 0.9rem;
+  }
+}
+
+/* Custom Scrollbar for modals */
+.modal-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-content::-webkit-scrollbar-track {
+  background: var(--neutral-light);
+  border-radius: 3px;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+  background: var(--neutral-medium);
+  border-radius: 3px;
+}
+
+.modal-content::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* Prevent body scroll when modal is open */
+body:has(.modal-overlay) {
+  overflow: hidden !important;
 }
 </style>
