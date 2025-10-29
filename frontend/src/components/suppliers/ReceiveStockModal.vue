@@ -169,7 +169,7 @@ import {
 import { useToast } from '@/composables/ui/useToast'
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
 export default {
   name: 'ReceiveStockModal',
@@ -210,7 +210,7 @@ export default {
       loading.value = true
       
       try {
-        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+        const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
         
         const response = await axios.get(
           `${API_BASE_URL}/batches/by-supplier/${props.supplier.id}/`,
@@ -262,7 +262,7 @@ export default {
       receiving.value = true
       
       try {
-        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+        const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
         const results = {
           successful: [],
           failed: []
