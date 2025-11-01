@@ -376,6 +376,49 @@ export function useCustomers() {
     }
   }
 
+  /**
+   * Export customers to CSV
+   */
+  const exportCustomers = async (includeDeleted = false) => {
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+      const blob = await customerApiService.exportCustomers(includeDeleted);
+      const url = window.URL.createObjectURL(new Blob([blob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'customers_export.csv');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      error.value = err.message || 'Failed to export customers';
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  /**
+   * Import customers from CSV file
+   */
+  const importCustomers = async (file) => {
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+      const response = await customerApiService.importCustomers(file);
+      await refreshCustomers(); // Refresh after import
+      return response;
+    } catch (err) {
+      error.value = err.message || 'Failed to import customers';
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
   // Utility methods
 
   /**
@@ -399,6 +442,8 @@ export function useCustomers() {
   }
 
   return {
+    exportCustomers,
+    importCustomers,
     // State (readonly)
     customers: readonly(customers),
     selectedCustomer: readonly(selectedCustomer),

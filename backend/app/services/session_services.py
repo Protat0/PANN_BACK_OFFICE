@@ -1,7 +1,7 @@
 import csv
 import os
 from datetime import datetime, timedelta
-from ...database import db_manager
+from ..database import db_manager
 from notifications.services import notification_service
 import logging
 import threading

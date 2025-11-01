@@ -297,25 +297,22 @@ import { useCategories } from '@/composables/api/useCategories'
 
 export default {
   name: 'UncategorizedProducts',
-  components: {
-    DataTable
-  },
+  components: { DataTable },
 
   setup() {
     // Composables
-    const { 
+    const {
       products: allProducts,
       loading: productsLoading,
       error: productsError,
       fetchProducts,
-      exportProducts,
       moveProductToCategory: moveProduct,
       bulkMoveProductsToCategory,
       moveProductLoading,
       bulkMoveLoading
     } = useProducts()
 
-    const { 
+    const {
       activeCategories,
       loading: categoriesLoading,
       fetchCategories
@@ -334,123 +331,90 @@ export default {
     const loading = computed(() => productsLoading.value || categoriesLoading.value)
     const error = computed(() => productsError.value)
 
-    const uncategorizedProducts = computed(() => {
-      return allProducts.value.filter(product => {
-        // Product is uncategorized if it has no category_id or if it's in the uncategorized category
-        return !product.category_id || 
-               product.category_id === 'UNCTGRY-001' ||
-               product.subcategory_name === 'General' ||
-               product.category_id?.startsWith?.('UNCTGRY-')
-      }).map(product => ({
-        ...product,
-        selectedCategory: '',
-        selectedSubcategory: ''
-      }))
-    })
+    // ✅ True uncategorized filter
+    const uncategorizedProducts = computed(() =>
+      allProducts.value
+        .filter(p => !p.category_id || p.category_id === 'UNCTGRY-001')
+        .map(p => ({
+          ...p,
+          selectedCategory: '',
+          selectedSubcategory: ''
+        }))
+    )
 
     const filteredProducts = computed(() => {
-      if (!searchFilter.value.trim()) {
-        return uncategorizedProducts.value
-      }
-      
-      const searchTerm = searchFilter.value.toLowerCase().trim()
-      return uncategorizedProducts.value.filter(product => 
-        (product.product_name || '').toLowerCase().includes(searchTerm) ||
-        (product.supplier || '').toLowerCase().includes(searchTerm) ||
-        (product._id || '').toLowerCase().includes(searchTerm) ||
-        (product.SKU || '').toLowerCase().includes(searchTerm)
+      const term = searchFilter.value.trim().toLowerCase()
+      if (!term) return uncategorizedProducts.value
+
+      return uncategorizedProducts.value.filter(p =>
+        (p.product_name || '').toLowerCase().includes(term) ||
+        (p.SKU || '').toLowerCase().includes(term) ||
+        (p._id || '').toLowerCase().includes(term) ||
+        (p.supplier || '').toLowerCase().includes(term)
       )
     })
 
     const paginatedProducts = computed(() => {
       const start = (currentPage.value - 1) * itemsPerPage.value
-      const end = start + itemsPerPage.value
-      return filteredProducts.value.slice(start, end)
+      return filteredProducts.value.slice(start, start + itemsPerPage.value)
     })
 
     const isAllSelected = computed(() => {
-      const currentPageProductIds = paginatedProducts.value.map(p => p._id)
-      return currentPageProductIds.length > 0 && 
-            currentPageProductIds.every(id => selectedProducts.value.includes(id))
+      const ids = paginatedProducts.value.map(p => p._id)
+      return ids.length > 0 && ids.every(id => selectedProducts.value.includes(id))
     })
 
     const isIndeterminate = computed(() => {
-      const currentPageProductIds = paginatedProducts.value.map(p => p._id)
-      const selectedOnPage = currentPageProductIds.filter(id => selectedProducts.value.includes(id))
-      return selectedOnPage.length > 0 && selectedOnPage.length < currentPageProductIds.length
+      const ids = paginatedProducts.value.map(p => p._id)
+      const selectedOnPage = ids.filter(id => selectedProducts.value.includes(id))
+      return selectedOnPage.length > 0 && selectedOnPage.length < ids.length
     })
 
-    const totalValue = computed(() => {
-      return uncategorizedProducts.value.reduce((total, product) => {
-        return total + (parseFloat(product.selling_price) || 0) * (parseInt(product.stock) || 0)
-      }, 0)
-    })
+    const totalValue = computed(() =>
+      uncategorizedProducts.value.reduce(
+        (sum, p) => sum + (parseFloat(p.selling_price) || 0) * (parseInt(p.stock) || 0),
+        0
+      )
+    )
 
     // Methods
-    const getSubcategoriesForCategory = (categoryId) => {
-      if (!categoryId) return []
-      const category = activeCategories.value.find(c => c._id === categoryId)
-      return category?.sub_categories || []
+    const getSubcategoriesForCategory = id => {
+      const cat = activeCategories.value.find(c => c._id === id)
+      return cat?.sub_categories || []
     }
 
-    const onCategorySelect = (product) => {
-      // Reset subcategory when category changes
-      product.selectedSubcategory = ''
-    }
+    const onCategorySelect = product => (product.selectedSubcategory = '')
 
-    const moveProductToCategory = async (productId, categoryId, subcategoryName) => {
-      if (!categoryId || !subcategoryName) return
-      
+    const moveProductToCategory = async (id, catId, subcat) => {
+      if (!catId || !subcat) return
       try {
-        const product = uncategorizedProducts.value.find(p => p._id === productId)
-        const category = activeCategories.value.find(c => c._id === categoryId)
-        
-        if (!product || !category) {
-          throw new Error('Product or category not found')
-        }
-        
-        await moveProduct(productId, categoryId, subcategoryName)
-
-        // Remove from selections if selected
-        selectedProducts.value = selectedProducts.value.filter(id => id !== productId)
-        
-      } catch (error) {
-        console.error('Error moving product:', error)
-        alert(`Failed to move product: ${error.message}`)
+        await moveProduct(id, catId, subcat)
+        selectedProducts.value = selectedProducts.value.filter(pid => pid !== id)
+      } catch (err) {
+        console.error('Error moving product:', err)
+        alert(`Failed to move product: ${err.message}`)
       }
     }
 
     const moveSelectedToCategory = async () => {
-      if (selectedProducts.value.length === 0 || !bulkTargetCategory.value || !bulkTargetSubcategory.value) return
-      
+      if (!selectedProducts.value.length || !bulkTargetCategory.value || !bulkTargetSubcategory.value) return
       try {
-        const category = activeCategories.value.find(c => c._id === bulkTargetCategory.value)
-        if (!category) {
-          throw new Error('Target category not found')
-        }
-        
         await bulkMoveProductsToCategory(selectedProducts.value, bulkTargetCategory.value, bulkTargetSubcategory.value)
-
-        // Clear selections and reset form
         selectedProducts.value = []
         bulkTargetCategory.value = ''
         bulkTargetSubcategory.value = ''
-        
-      } catch (error) {
-        console.error('Error in bulk move:', error)
-        alert(`Bulk move failed: ${error.message}`)
+      } catch (err) {
+        console.error('Bulk move error:', err)
+        alert(`Bulk move failed: ${err.message}`)
       }
     }
 
     const toggleSelectAll = () => {
-      const currentPageProductIds = paginatedProducts.value.map(p => p._id)
-      
-      if (isAllSelected.value) {
-        selectedProducts.value = selectedProducts.value.filter(id => !currentPageProductIds.includes(id))
-      } else {
-        const newSelections = currentPageProductIds.filter(id => !selectedProducts.value.includes(id))
-        selectedProducts.value = [...selectedProducts.value, ...newSelections]
-      }
+      const ids = paginatedProducts.value.map(p => p._id)
+      if (isAllSelected.value)
+        selectedProducts.value = selectedProducts.value.filter(id => !ids.includes(id))
+      else
+        selectedProducts.value = [...new Set([...selectedProducts.value, ...ids])]
     }
 
     const clearSelection = () => {
@@ -459,64 +423,81 @@ export default {
       bulkTargetSubcategory.value = ''
     }
 
-    const handlePageChange = (page) => {
-      currentPage.value = page
-    }
+    const handlePageChange = page => (currentPage.value = page)
 
+    // ✅ Frontend-only CSV export
     const exportUncategorizedProducts = async () => {
       try {
         isExporting.value = true
-        
-        // Export products with no category filter to get uncategorized ones
-        await exportProducts({
-          category_id: null,
-          uncategorized_only: true
-        })
-        
-      } catch (error) {
-        console.error('Export failed:', error)
-        alert(`Export failed: ${error.message}`)
+        const data = uncategorizedProducts.value
+        if (!data.length) {
+          alert('No uncategorized products to export.')
+          return
+        }
+
+        // Build CSV
+        const headers = [
+          'Product ID', 'Product Name', 'SKU', 'Category ID', 'Subcategory',
+          'Stock', 'Cost Price', 'Selling Price', 'Status', 'Created At'
+        ]
+        const rows = data.map(p => [
+          p._id,
+          p.product_name,
+          p.SKU,
+          p.category_id || 'None',
+          p.subcategory_name || 'None',
+          p.stock ?? p.total_stock ?? 0,
+          p.cost_price ?? 0,
+          p.selling_price ?? 0,
+          p.status ?? 'active',
+          p.created_at ?? ''
+        ])
+
+        const csvContent = [
+          headers.join(','),
+          ...rows.map(row =>
+            row.map(String).map(v => `"${v.replace(/"/g, '""')}"`).join(',')
+          )
+        ].join('\n')
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'uncategorized_products.csv'
+        link.click()
+        URL.revokeObjectURL(url)
+      } catch (err) {
+        console.error('Export failed:', err)
+        alert(`Export failed: ${err.message}`)
       } finally {
         isExporting.value = false
       }
     }
 
     const retryLoad = async () => {
-      await Promise.all([
-        fetchProducts(),
-        fetchCategories()
-      ])
+      await Promise.all([fetchProducts(), fetchCategories()])
     }
 
-    // Utility methods
-    const formatPrice = (price) => parseFloat(price || 0).toFixed(2)
-
-    const formatDate = (dateString) => {
-      if (!dateString) return 'N/A'
-      const date = new Date(dateString)
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      })
+    const formatPrice = p => parseFloat(p || 0).toFixed(2)
+    const formatDate = d => {
+      if (!d) return 'N/A'
+      const date = new Date(d)
+      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
     }
-
-    const getStockClass = (stock) => {
-      if (stock === 0) return 'text-error fw-bold'
-      if (stock <= 15) return 'text-warning fw-semibold'
+    const getStockClass = s => {
+      if (s === 0) return 'text-error fw-bold'
+      if (s <= 15) return 'text-warning fw-semibold'
       return 'text-success fw-medium'
     }
 
-    // Initialize data
+    // Init
     onMounted(async () => {
-      await Promise.all([
-        fetchProducts(),
-        fetchCategories()
-      ])
+      await Promise.all([fetchProducts(), fetchCategories()])
     })
 
     return {
-      // State
+      // state
       loading,
       error,
       uncategorizedProducts,
@@ -531,14 +512,14 @@ export default {
       moveProductLoading,
       bulkMoveLoading,
 
-      // Computed
+      // computed
       filteredProducts,
       paginatedProducts,
       isAllSelected,
       isIndeterminate,
       totalValue,
 
-      // Methods
+      // methods
       getSubcategoriesForCategory,
       onCategorySelect,
       moveProductToCategory,
@@ -555,6 +536,8 @@ export default {
   }
 }
 </script>
+
+
 
 <style scoped>
 .uncategorized-page {

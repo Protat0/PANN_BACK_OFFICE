@@ -280,6 +280,10 @@ from .kpi_views.customer_auth_views import (
     CustomerChangePasswordView,
 )
 
+from .kpi_views.customer_exportimport_views import (
+     CustomerImportExportView,
+)
+
 urlpatterns = [
     # ========== SYSTEM & HEALTH ==========
     path('', SystemStatusView.as_view(), name='system-status'),  # Root endpoint
@@ -314,12 +318,14 @@ urlpatterns = [
     path('customers/', CustomerListView.as_view(), name='customer-list'),
     path('customers/search/', CustomerSearchView.as_view(), name='customer-search'),
     path('customers/statistics/', CustomerStatisticsView.as_view(), name='customer-statistics'),
+    path('customers/import-export/', CustomerImportExportView.as_view(), name='customer-import-export'),
     path('customers/email/<str:email>/', CustomerByEmailView.as_view(), name='customer-by-email'),
     path('customers/<str:customer_id>/', CustomerDetailView.as_view(), name='customer-detail'),
     path('customers/<str:customer_id>/restore/', CustomerRestoreView.as_view(), name='customer-restore'),
     path('customers/<str:customer_id>/hard-delete/', CustomerHardDeleteView.as_view(), name='customer-hard-delete'),
     path('customers/<str:customer_id>/loyalty/', CustomerLoyaltyView.as_view(), name='customer-loyalty'),
     
+
     # ========== SUPPLIER MANAGEMENT ==========
     path('suppliers/health/', SupplierHealthCheckView.as_view(), name='supplier-health-check'),
 
