@@ -17,7 +17,7 @@ class DatabaseManager:
         """Connect to MongoDB Atlas"""
         try:
             uri = config('MONGODB_URI')
-            database_name = config('MONGODB_DATABASE', default='pann_production')
+            database_name = config('MONGODB_DATABASE', default='pos_system')
             
             self.cloud_client = pymongo.MongoClient(uri)
             # Test connection

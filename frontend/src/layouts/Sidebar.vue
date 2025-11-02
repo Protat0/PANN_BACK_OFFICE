@@ -47,7 +47,7 @@
     <div class="user-profile" v-if="!isCollapsed">
       <div class="profile-card">
         <div class="profile-avatar">
-          <User :size="20" class="text-primary" />
+          <User :size="20" class="text-accent" />
         </div>
         <div class="profile-info">
           <span class="profile-name">My Profile</span>
@@ -308,7 +308,6 @@ export default {
         
         try {
           await this.callLogoutAPI()
-          console.log('Logout API call successful')
         } catch (error) {
           console.error('Logout API error:', error)
           // Continue with local logout even if API fails
@@ -320,18 +319,15 @@ export default {
     
     async callLogoutAPI() {
       const token = this.getStoredToken()
-      
+
       if (!token) {
         console.warn('No token found for logout')
         return
       }
-      
-      console.log('Calling logout API using apiService...')
-      
+
       try {
         // ✅ Use the API service (same pattern as login)
         const result = await apiService.logout()
-        console.log('Logout successful via apiService:', result)
         return result
       } catch (error) {
         console.error('API service logout error:', error)
@@ -340,41 +336,31 @@ export default {
     },
     
     getStoredToken() {
-      // Debug: Log all localStorage keys to see what's actually stored
-      console.log('All localStorage keys:', Object.keys(localStorage))
-      console.log('All sessionStorage keys:', Object.keys(sessionStorage))
-      
       // Try different possible token storage keys (reordered to match login)
       const possibleKeys = [
         'authToken',        // Login.vue uses this
         'access_token',
-        'auth_token', 
+        'auth_token',
         'token',
         'accessToken',
         'jwt_token',
         'bearer_token',
         'user_token'
       ]
-      
+
       for (const key of possibleKeys) {
         const token = localStorage.getItem(key) || sessionStorage.getItem(key)
         if (token) {
-          console.log(`Found token with key: ${key}`, token.substring(0, 20) + '...')
           return token
         }
       }
-      
-      console.log('No token found in any storage location')
+
       return null
     },
     
     performLocalLogout() {
-      console.log('Performing local logout...')
-      
       // Clear ALL localStorage and sessionStorage to be absolutely sure
-      console.log('Before clearing - localStorage length:', localStorage.length)
-      console.log('Before clearing - sessionStorage length:', sessionStorage.length)
-      
+
       // Method 1: Clear specific auth keys
       const authKeys = [
         'access_token', 'refresh_token', 'auth_token', 'token',
@@ -383,46 +369,33 @@ export default {
         'user_data', 'user_info', 'user', 'userData', 'userInfo',
         'isAuthenticated', 'isLoggedIn', 'authState'
       ]
-      
+
       authKeys.forEach(key => {
-        const hadLocal = localStorage.getItem(key) !== null
-        const hadSession = sessionStorage.getItem(key) !== null
-        
         localStorage.removeItem(key)
         sessionStorage.removeItem(key)
-        
-        if (hadLocal || hadSession) {
-          console.log(`Cleared key: ${key}`)
-        }
       })
-      
+
       // Method 2: Nuclear option - clear everything (comment out if too aggressive)
       // localStorage.clear()
       // sessionStorage.clear()
-      
-      console.log('After clearing - localStorage length:', localStorage.length)
-      console.log('After clearing - sessionStorage length:', sessionStorage.length)
-      
+
       // Clear any global state if using Vuex/Pinia
       if (this.$store && this.$store.dispatch) {
         try {
           this.$store.dispatch('auth/logout')
           this.$store.dispatch('auth/clearAuth')
           this.$store.dispatch('user/logout')
-          console.log('Cleared store state')
         } catch (e) {
-          console.log('No auth store found or dispatch failed:', e.message)
+          // No auth store found or dispatch failed
         }
       }
-      
+
       // Reset component state
       this.isLoggingOut = false
-      
+
       // Use Vue router for smooth navigation
-      console.log('Redirecting to login...')
       this.$router.push('/login').catch(err => {
         // Handle navigation failures (e.g., already on login page)
-        console.log('Navigation to login:', err.message)
       })
     },
     
@@ -463,35 +436,43 @@ export default {
 </script>
 
 <style scoped>
-/* Sidebar Container - Fixed positioning */
+/* ==========================================================================
+   SIDEBAR CONTAINER - SEMANTIC THEME SYSTEM
+   ========================================================================== */
+
 .sidebar-container {
   width: 280px;
   height: 100vh;
-  background-color: white;
-  border-right: 1px solid var(--neutral);
   display: flex;
   flex-direction: column;
-  transition: width 0.3s ease;
   position: fixed;
   left: 0;
   top: 0;
-  z-index: 1000;
-  /* Enhanced shadow */
-  box-shadow: 
-    0 10px 15px -3px rgba(0, 0, 0, 0.15),
-    0 4px 6px -2px rgba(0, 0, 0, 0.08);
+  bottom: 0;
+  z-index: 9999;
+  transition: width 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+  background-color: var(--surface-primary);
+  border-right: 1px solid var(--border-primary);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
 .sidebar-container.collapsed {
   width: 80px;
 }
 
-/* Sidebar Header */
+/* ==========================================================================
+   SIDEBAR HEADER - SEMANTIC STYLING
+   ========================================================================== */
+
 .sidebar-header {
+  height: 100px; /* Match main layout header height */
   padding: 1.5rem 1rem;
-  border-bottom: 1px solid var(--neutral);
-  background-color: white;
   flex-shrink: 0;
+  background-color: var(--surface-primary);
+  border-bottom: 1px solid var(--border-primary);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+  display: flex;
+  align-items: center;
 }
 
 .brand-container {
@@ -518,7 +499,7 @@ export default {
 
 .toggle-row {
   display: flex;
-  justify-content: flex-end; /* Right align the button in expanded mode */
+  justify-content: flex-end;
 }
 
 .collapsed-header-row {
@@ -530,23 +511,8 @@ export default {
   gap: 0.5rem;
 }
 
-.logo-row {
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  margin-bottom: 0.75rem;
-}
-
-.button-row {
-  display: flex;
-  justify-content: flex-end; /* Right align the button */
-  width: 100%;
-  padding-right: 0.25rem; /* Small padding from edge */
-}
-
-/* Collapsed toggle button styling */
 .collapsed-toggle {
-  margin: 0; /* Remove any default margins */
+  margin: 0;
 }
 
 .logo-circle {
@@ -557,44 +523,52 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 8px rgba(115, 146, 226, 0.3);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .logo-text {
   font-weight: 700;
   font-size: 1.25rem;
-  color: white;
+  color: var(--text-inverse);
 }
 
 .brand-title {
   font-weight: 700;
   font-size: 1.1rem;
-  color: var(--primary-dark);
   margin: 0;
+  color: var(--text-primary);
+  transition: color 0.3s ease;
 }
 
 .brand-subtitle {
-  color: var(--tertiary-medium);
   font-size: 0.75rem;
+  color: var(--text-tertiary);
+  transition: color 0.3s ease;
 }
 
 .sidebar-toggle {
-  background-color: var(--neutral-light);
-  border-color: var(--neutral);
-  color: var(--tertiary-dark);
+  background-color: var(--surface-secondary);
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  transition: all 0.3s ease;
 }
 
 .sidebar-toggle:hover {
-  background-color: var(--primary-light);
-  border-color: var(--primary);
-  color: var(--primary-dark);
+  background-color: var(--state-hover);
+  border-color: var(--border-accent);
+  color: var(--text-accent);
 }
 
-/* User Profile */
+/* ==========================================================================
+   USER PROFILE - SEMANTIC STYLING
+   ========================================================================== */
+
 .user-profile {
   padding: 1rem;
-  border-bottom: 1px solid var(--neutral);
   flex-shrink: 0;
+  border-bottom: 1px solid var(--border-primary);
+  transition: border-color 0.3s ease;
 }
 
 .profile-card {
@@ -602,37 +576,39 @@ export default {
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem;
-  background-color: var(--neutral-light);
   border-radius: 0.75rem;
-  border: 1px solid var(--neutral);
-  transition: all 0.2s ease;
+  background-color: var(--surface-secondary);
+  border: 1px solid var(--border-primary);
+  transition: all 0.3s ease;
 }
 
 .profile-card:hover {
-  background-color: var(--primary-light);
-  border-color: var(--primary);
+  background-color: var(--state-hover);
 }
 
 .profile-avatar {
   width: 36px;
   height: 36px;
-  background-color: white;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--primary-light);
+  border: 2px solid var(--border-accent);
+  background-color: var(--surface-primary);
+  transition: all 0.3s ease;
 }
 
 .profile-name {
   font-weight: 600;
-  color: var(--tertiary-dark);
   font-size: 0.875rem;
+  color: var(--text-primary);
+  transition: color 0.3s ease;
 }
 
 .profile-role {
-  color: var(--tertiary-medium);
   font-size: 0.75rem;
+  color: var(--text-tertiary);
+  transition: color 0.3s ease;
 }
 
 .profile-info {
@@ -643,22 +619,26 @@ export default {
 
 .profile-settings {
   background-color: transparent;
-  border-color: var(--neutral);
-  color: var(--tertiary-medium);
+  border: 1px solid var(--border-primary);
+  color: var(--text-tertiary);
+  transition: all 0.3s ease;
 }
 
 .profile-settings:hover {
-  background-color: var(--primary-light);
-  border-color: var(--primary);
-  color: var(--primary-dark);
+  background-color: var(--state-hover);
+  border-color: var(--border-accent);
+  color: var(--text-accent);
 }
 
-/* Navigation */
+/* ==========================================================================
+   NAVIGATION - SEMANTIC STYLING
+   ========================================================================== */
+
 .sidebar-nav {
   flex: 1;
   padding: 1rem 0;
   overflow-y: auto;
-  overflow-x: hidden; /* Prevent horizontal scroll */
+  overflow-x: hidden;
 }
 
 .nav-list {
@@ -678,12 +658,12 @@ export default {
   padding: 0.75rem 1rem;
   border-radius: 0.75rem;
   text-decoration: none;
-  color: var(--tertiary-dark);
   font-weight: 500;
   font-size: 0.875rem;
-  transition: all 0.2s ease;
   position: relative;
   border: 1px solid transparent;
+  color: var(--text-secondary);
+  transition: all 0.3s ease;
 }
 
 .nav-button {
@@ -695,18 +675,18 @@ export default {
 }
 
 .nav-link:hover {
-  background-color: var(--primary-light);
-  color: var(--primary-dark);
-  border-color: var(--primary);
   transform: translateX(2px);
-  box-shadow: 0 2px 4px rgba(115, 146, 226, 0.15);
+  background-color: var(--state-hover);
+  color: var(--text-accent);
+  border-color: var(--border-accent);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 .nav-link.active {
-  background-color: var(--primary);
-  color: white;
-  border-color: var(--primary-dark);
-  box-shadow: 0 4px 8px rgba(115, 146, 226, 0.3);
+  color: var(--text-inverse);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  background: linear-gradient(135deg, var(--secondary), var(--secondary-dark));
+  border-color: var(--secondary-dark);
 }
 
 .nav-icon {
@@ -715,7 +695,7 @@ export default {
 
 .nav-text {
   flex: 1;
-  white-space: nowrap; /* Prevent text wrapping */
+  white-space: nowrap;
 }
 
 .nav-chevron {
@@ -733,12 +713,15 @@ export default {
   transform: translateY(-50%);
   width: 4px;
   height: 24px;
-  background-color: white;
   border-radius: 2px 0 0 2px;
-  box-shadow: -2px 0 4px rgba(0, 0, 0, 0.1);
+  background-color: var(--text-inverse);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
-/* Submenu */
+/* ==========================================================================
+   SUBMENU - SEMANTIC STYLING
+   ========================================================================== */
+
 .nav-submenu {
   list-style: none;
   padding: 0.5rem 0 0;
@@ -757,31 +740,38 @@ export default {
   padding: 0.5rem 0.75rem;
   border-radius: 0.5rem;
   text-decoration: none;
-  color: var(--tertiary-medium);
   font-size: 0.8125rem;
   font-weight: 500;
-  transition: all 0.2s ease;
   white-space: nowrap;
+  color: var(--text-tertiary);
+  transition: all 0.3s ease;
 }
 
 .nav-sublink:hover {
-  background-color: var(--primary-light);
-  color: var(--primary-dark);
+  background-color: var(--state-hover);
+  color: var(--text-accent);
 }
 
 .nav-subicon {
   flex-shrink: 0;
 }
 
-/* Sidebar Footer */
+/* ==========================================================================
+   SIDEBAR FOOTER - SEMANTIC STYLING
+   ========================================================================== */
+
 .sidebar-footer {
   padding: 1rem;
-  border-top: 1px solid var(--neutral);
-  background-color: white;
   flex-shrink: 0;
+  background-color: var(--surface-primary);
+  border-top: 1px solid var(--border-primary);
+  transition: all 0.3s ease;
 }
 
-/* Loading Spinner */
+/* ==========================================================================
+   LOADING SPINNER
+   ========================================================================== */
+
 .loading-spinner {
   width: 16px;
   height: 16px;
@@ -796,18 +786,25 @@ export default {
   100% { transform: rotate(360deg); }
 }
 
-/* Disabled state for logout button */
+/* ==========================================================================
+   BUTTON STATES
+   ========================================================================== */
+
 .btn:disabled {
+  background-color: var(--state-disabled);
   opacity: 0.6;
   cursor: not-allowed;
 }
 
 .btn:disabled:hover {
   transform: none;
-  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
-/* Collapsed State Adjustments */
+/* ==========================================================================
+   COLLAPSED STATE ADJUSTMENTS
+   ========================================================================== */
+
 .sidebar-container.collapsed .nav-link {
   justify-content: center;
   padding: 0.75rem;
@@ -817,18 +814,24 @@ export default {
   margin: 0.25rem 0.5rem;
 }
 
-/* Enhanced Button Shadows for Sidebar */
+/* ==========================================================================
+   ENHANCED INTERACTIONS
+   ========================================================================== */
+
 .sidebar-container .btn {
-  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.08);
-  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
 }
 
 .sidebar-container .btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-/* Responsive Design */
+/* ==========================================================================
+   RESPONSIVE DESIGN
+   ========================================================================== */
+
 @media (max-width: 768px) {
   .sidebar-container {
     transform: translateX(-100%);
@@ -843,21 +846,24 @@ export default {
   }
 }
 
-/* Scrollbar Styling */
+/* ==========================================================================
+   SCROLLBAR STYLING - SEMANTIC
+   ========================================================================== */
+
 .sidebar-nav::-webkit-scrollbar {
   width: 6px;
 }
 
 .sidebar-nav::-webkit-scrollbar-track {
-  background: var(--neutral-light);
+  background: var(--surface-tertiary);
 }
 
 .sidebar-nav::-webkit-scrollbar-thumb {
-  background: var(--neutral);
+  background: var(--border-primary);
   border-radius: 3px;
 }
 
 .sidebar-nav::-webkit-scrollbar-thumb:hover {
-  background: var(--tertiary-medium);
+  background: var(--text-tertiary);
 }
 </style>

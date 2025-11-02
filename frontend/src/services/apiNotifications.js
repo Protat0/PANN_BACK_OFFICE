@@ -25,12 +25,11 @@ class NotificationsAPI {
  
   async DisplayLogs(params = {}) {
     try {
-        console.log("This API call is getting All the SessionLogsData");
         const response = await api.get('/session-logs/display/');
-        
+
         // Return the data from the response
         return response.data;
-        
+
     } catch (error) {
         console.error("Error fetching active users:", error);
         throw error; // Re-throw so calling code can handle it
@@ -39,17 +38,12 @@ class NotificationsAPI {
 
   async DisplayNotifs(params = {}) {
     try {
-        console.log("This API call is getting All the Notifications");
-        
         // Add include_archived=true to get ALL notifications for total count
         const response = await api.get('/notifications/all/?include_archived=true');
-        
-        // Log the response structure for debugging
-        console.log('API response structure:', response);
-        
+
         // Return the response directly since it already has the correct structure
         return response.data;
-        
+
     } catch (error) {
         console.error("Error fetching all notifications:", error);
         throw error;

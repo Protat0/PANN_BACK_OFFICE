@@ -22,7 +22,7 @@ USE_MONGODB = config('USE_MONGODB', default=False, cast=bool)
 if USE_MONGODB:
     # MongoDB for development (if you want to test with MongoDB locally)
     MONGODB_URI = config('MONGODB_URI', default='mongodb://localhost:27017')
-    MONGODB_DATABASE = config('MONGODB_DATABASE', default='pos_system_dev')
+    MONGODB_DATABASE = config('MONGODB_DATABASE', default='pos_system')
     
     DATABASES = {
         'default': {
@@ -103,4 +103,3 @@ LOGGING = {
         'level': 'INFO',
     },
 }
-

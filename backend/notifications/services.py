@@ -1,15 +1,46 @@
 # notifications/services.py
 from datetime import datetime, timedelta
-from bson import ObjectId
 from django.contrib.auth.models import User
 from django.http import JsonResponse
 from app.database import db_manager
-import uuid
 
 class NotificationService:
     def __init__(self):
         self.db = db_manager.get_database()
         self.collection = self.db.notifications
+    
+    # ================================================================
+    # ID GENERATION METHOD
+    # ================================================================
+    
+    def generate_notification_id(self):
+        """
+        Generate sequential notification ID in format NOTIF-XXXXXX
+        Uses MongoDB aggregation to find the highest existing ID
+        """
+        try:
+            pipeline = [
+                {'$match': {'_id': {'$regex': '^NOTIF-'}}},
+                {'$project': {
+                    'numericPart': {
+                        '$toInt': {'$substr': ['$_id', 6, -1]}  # Extract number after "NOTIF-"
+                    }
+                }},
+                {'$sort': {'numericPart': -1}},
+                {'$limit': 1}
+            ]
+            
+            result = list(self.collection.aggregate(pipeline))
+            
+            if result:
+                next_number = result[0]['numericPart'] + 1
+            else:
+                next_number = 1  # First notification
+            
+            return f"NOTIF-{next_number:06d}"  # Format as NOTIF-000001, NOTIF-000002, etc.
+            
+        except Exception as e:
+            raise Exception(f"Error generating notification ID: {str(e)}")
     
     # ================================================================
     # NOTIFICATION CREATION METHODS
@@ -19,13 +50,15 @@ class NotificationService:
                           priority='medium', notification_type='system', metadata=None):
         """Create a new notification"""
         try:
+            notification_id = self.generate_notification_id()
+            
             notification_doc = {
-                "_id": ObjectId(),
+                "_id": notification_id,
                 "title": title,
                 "message": message,
                 "priority": priority,
                 "is_read": False,
-                "archived": False,  # Add archived field
+                "archived": False,
                 "created_at": datetime.utcnow(),
                 "updated_at": datetime.utcnow(),
                 "notification_type": notification_type,
@@ -43,8 +76,7 @@ class NotificationService:
                     "recipient_username": recipient.username
                 })
             
-            result = self.collection.insert_one(notification_doc)
-            notification_doc['_id'] = str(result.inserted_id)
+            self.collection.insert_one(notification_doc)
             
             return notification_doc
             
@@ -98,7 +130,7 @@ class NotificationService:
     def get_notification_by_id(self, notification_id):
         """Get a specific notification by ID"""
         try:
-            notification = self.collection.find_one({'_id': ObjectId(notification_id)})
+            notification = self.collection.find_one({'_id': notification_id})
             if notification:
                 notification = self._format_notification(notification)
             return notification
@@ -168,7 +200,7 @@ class NotificationService:
             notifications, total_count = self.get_all_notifications(
                 skip=skip,
                 limit=limit,
-                include_archived=include_archived  # ✅ Pass this parameter
+                include_archived=include_archived
             )
             
             # Calculate pagination info
@@ -210,7 +242,7 @@ class NotificationService:
             notifications = self.get_recent_notifications(
                 limit=limit,
                 hours=hours,
-                include_archived=include_archived  # ✅ Pass this parameter
+                include_archived=include_archived
             )
             
             return JsonResponse({
@@ -246,7 +278,7 @@ class NotificationService:
         """Mark notification as read"""
         try:
             result = self.collection.update_one(
-                {'_id': ObjectId(notification_id)},
+                {'_id': notification_id},  # String ID now
                 {
                     '$set': {
                         'is_read': True,
@@ -284,7 +316,7 @@ class NotificationService:
         """Mark notification as unread"""
         try:
             result = self.collection.update_one(
-                {'_id': ObjectId(notification_id)},
+                {'_id': notification_id},  # String ID now
                 {
                     '$set': {
                         'is_read': False,
@@ -308,9 +340,8 @@ class NotificationService:
             int: Number of notifications marked as read
         """
         try:
-            query = {'is_read': False, 'archived': {'$ne': True}}  # Don't mark archived notifications
+            query = {'is_read': False, 'archived': {'$ne': True}}
             
-            # If recipient_id provided, only mark that user's notifications
             if recipient_id:
                 query['recipient_id'] = str(recipient_id)
             
@@ -359,9 +390,8 @@ class NotificationService:
             int: Number of notifications marked as unread
         """
         try:
-            query = {'is_read': True, 'archived': {'$ne': True}}  # Don't mark archived notifications
+            query = {'is_read': True, 'archived': {'$ne': True}}
             
-            # If recipient_id provided, only mark that user's notifications
             if recipient_id:
                 query['recipient_id'] = str(recipient_id)
             
@@ -396,7 +426,7 @@ class NotificationService:
         """
         try:
             result = self.collection.update_one(
-                {'_id': ObjectId(notification_id)},
+                {'_id': notification_id},  # String ID now
                 {
                     '$set': {
                         'archived': True,
@@ -443,7 +473,7 @@ class NotificationService:
         """
         try:
             result = self.collection.update_one(
-                {'_id': ObjectId(notification_id)},
+                {'_id': notification_id},  # String ID now
                 {
                     '$set': {
                         'archived': False,
@@ -553,7 +583,7 @@ class NotificationService:
     def delete_notification(self, notification_id):
         """Delete a notification"""
         try:
-            result = self.collection.delete_one({'_id': ObjectId(notification_id)})
+            result = self.collection.delete_one({'_id': notification_id})  # String ID now
             return result.deleted_count > 0
         except Exception:
             return False
@@ -564,21 +594,21 @@ class NotificationService:
             success = self.delete_notification(notification_id)
             
             if success:
-                return jsonify({
+                return JsonResponse({
                     'success': True,
                     'message': 'Notification deleted successfully'
                 })
             else:
-                return jsonify({
+                return JsonResponse({
                     'success': False,
                     'error': 'Failed to delete notification'
-                }), 400
+                }, status=400)
                 
         except Exception as e:
-            return jsonify({
+            return JsonResponse({
                 'success': False,
                 'error': str(e)
-            }), 500
+            }, status=500)
     
     def delete_all_notifications(self, recipient_id=None, notification_type=None):
         """
@@ -656,7 +686,7 @@ class NotificationService:
     def _format_notification(self, notification):
         """Format a single notification for JSON serialization"""
         if notification:
-            notification['_id'] = str(notification['_id'])
+            # _id is already a string, no conversion needed
             notification['id'] = notification['_id']  # Add id field for consistency
         return notification
     

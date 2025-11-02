@@ -1,0 +1,524 @@
+/* ==========================================================================
+   THEME UTILITIES - SEMANTIC CLASSES
+   Auto-adapting utility classes that work in both light and dark themes
+   ========================================================================== */
+
+/* ==========================================================================
+   SURFACE UTILITIES
+   Background colors for different surface types
+   ========================================================================== */
+
+.surface-primary {
+  background-color: var(--surface-primary) !important;
+}
+
+.surface-secondary {
+  background-color: var(--surface-secondary) !important;
+}
+
+.surface-tertiary {
+  background-color: var(--surface-tertiary) !important;
+}
+
+.surface-elevated {
+  background-color: var(--surface-elevated) !important;
+}
+
+.surface-overlay {
+  background-color: var(--surface-overlay) !important;
+}
+
+/* Surface with automatic border */
+.surface-card {
+  background-color: var(--surface-primary) !important;
+  border: 1px solid var(--border-secondary) !important;
+}
+
+.surface-panel {
+  background-color: var(--surface-secondary) !important;
+  border: 1px solid var(--border-primary) !important;
+}
+
+/* ==========================================================================
+   TEXT UTILITIES
+   Text colors for different content hierarchy
+   ========================================================================== */
+
+.text-primary {
+  color: var(--text-primary) !important;
+}
+
+.text-secondary {
+  color: var(--text-secondary) !important;
+}
+
+.text-tertiary {
+  color: var(--text-tertiary) !important;
+}
+
+.text-disabled {
+  color: var(--text-disabled) !important;
+}
+
+.text-inverse {
+  color: var(--text-inverse) !important;
+}
+
+.text-accent {
+  color: var(--text-accent) !important;
+}
+
+/* Text with semantic meaning */
+.text-error {
+  color: var(--status-error) !important;
+}
+
+.text-success {
+  color: var(--status-success) !important;
+}
+
+.text-warning {
+  color: var(--status-warning) !important;
+}
+
+.text-info {
+  color: var(--status-info) !important;
+}
+
+/* ==========================================================================
+   BORDER UTILITIES
+   Border colors and styles
+   ========================================================================== */
+
+.border-primary {
+  border-color: var(--border-primary) !important;
+}
+
+.border-secondary {
+  border-color: var(--border-secondary) !important;
+}
+
+.border-accent {
+  border-color: var(--border-accent) !important;
+}
+
+.border-error {
+  border-color: var(--border-error) !important;
+}
+
+.border-success {
+  border-color: var(--border-success) !important;
+}
+
+/* Border utilities with automatic border width */
+.border-theme {
+  border: 1px solid var(--border-primary) !important;
+}
+
+.border-theme-accent {
+  border: 1px solid var(--border-accent) !important;
+}
+
+.border-theme-subtle {
+  border: 1px solid var(--border-secondary) !important;
+}
+
+/* Border sides */
+.border-top-theme {
+  border-top: 1px solid var(--border-primary) !important;
+}
+
+.border-bottom-theme {
+  border-bottom: 1px solid var(--border-primary) !important;
+}
+
+.border-left-theme {
+  border-left: 1px solid var(--border-primary) !important;
+}
+
+.border-right-theme {
+  border-right: 1px solid var(--border-primary) !important;
+}
+
+/* ==========================================================================
+   SHADOW UTILITIES
+   Elevation system using semantic shadows
+   ========================================================================== */
+
+.shadow-sm {
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.shadow {
+  box-shadow: var(--shadow-md) !important;
+}
+
+.shadow-md {
+  box-shadow: var(--shadow-md) !important;
+}
+
+.shadow-lg {
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.shadow-xl {
+  box-shadow: var(--shadow-xl) !important;
+}
+
+.shadow-2xl {
+  box-shadow: var(--shadow-2xl) !important;
+}
+
+.shadow-none {
+  box-shadow: none !important;
+}
+
+/* ==========================================================================
+   STATE UTILITIES
+   Interactive state overlays and backgrounds
+   ========================================================================== */
+
+.state-hover {
+  background-color: var(--state-hover) !important;
+}
+
+.state-active {
+  background-color: var(--state-active) !important;
+}
+
+.state-selected {
+  background-color: var(--state-selected) !important;
+}
+
+.state-disabled {
+  background-color: var(--state-disabled) !important;
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Hover states (applied on hover) */
+.hover-surface:hover {
+  background-color: var(--state-hover) !important;
+}
+
+.hover-accent:hover {
+  color: var(--text-accent) !important;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg) !important;
+  transition: all 0.2s ease;
+}
+
+/* ==========================================================================
+   COMPONENT-SPECIFIC UTILITIES
+   Pre-built combinations for common components
+   ========================================================================== */
+
+/* Card utilities */
+.card-theme {
+  background-color: var(--card-bg) !important;
+  border: 1px solid var(--card-border) !important;
+  box-shadow: var(--card-shadow) !important;
+}
+
+.card-elevated {
+  background-color: var(--surface-elevated) !important;
+  border: 1px solid var(--border-secondary) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+/* Input utilities */
+.input-theme {
+  background-color: var(--input-bg) !important;
+  border: 1px solid var(--input-border) !important;
+  color: var(--input-text) !important;
+}
+
+.input-theme::placeholder {
+  color: var(--input-placeholder) !important;
+}
+
+.input-theme:focus {
+  border-color: var(--border-accent) !important;
+  box-shadow: 0 0 0 0.2rem rgba(160, 123, 227, 0.25) !important;
+}
+
+/* Button utilities */
+.btn-theme {
+  background-color: var(--button-bg) !important;
+  border: 1px solid var(--button-border) !important;
+  color: var(--button-text) !important;
+}
+
+.btn-theme:hover {
+  background-color: var(--state-hover) !important;
+  border-color: var(--border-accent) !important;
+}
+
+/* Navigation utilities */
+.nav-theme {
+  background-color: var(--nav-bg) !important;
+  color: var(--nav-text) !important;
+}
+
+.nav-link-theme {
+  color: var(--nav-text) !important;
+}
+
+.nav-link-theme:hover,
+.nav-link-theme.active {
+  color: var(--nav-text-active) !important;
+}
+
+/* ==========================================================================
+   STATUS UTILITIES
+   Status indicators and alerts
+   ========================================================================== */
+
+/* Status backgrounds */
+.status-error {
+  background-color: var(--status-error-bg) !important;
+  color: var(--status-error) !important;
+  border: 1px solid var(--status-error) !important;
+}
+
+.status-success {
+  background-color: var(--status-success-bg) !important;
+  color: var(--status-success) !important;
+  border: 1px solid var(--status-success) !important;
+}
+
+.status-warning {
+  background-color: var(--status-warning-bg) !important;
+  color: var(--status-warning) !important;
+  border: 1px solid var(--status-warning) !important;
+}
+
+.status-info {
+  background-color: var(--status-info-bg) !important;
+  color: var(--status-info) !important;
+  border: 1px solid var(--status-info) !important;
+}
+
+/* Status text only */
+.text-status-error {
+  color: var(--status-error) !important;
+}
+
+.text-status-success {
+  color: var(--status-success) !important;
+}
+
+.text-status-warning {
+  color: var(--status-warning) !important;
+}
+
+.text-status-info {
+  color: var(--status-info) !important;
+}
+
+/* ==========================================================================
+   LAYOUT UTILITIES
+   Common layout patterns with theme integration
+   ========================================================================== */
+
+/* Page layouts */
+.page-container {
+  background-color: var(--surface-secondary) !important;
+  color: var(--text-secondary) !important;
+}
+
+.content-container {
+  background-color: var(--surface-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Modal layouts */
+.modal-theme {
+  background-color: var(--surface-elevated) !important;
+  border: 1px solid var(--border-primary) !important;
+  box-shadow: var(--shadow-2xl) !important;
+  color: var(--text-primary) !important;
+}
+
+.modal-overlay-theme {
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+/* Sidebar layouts */
+.sidebar-theme {
+  background-color: var(--surface-primary) !important;
+  border-right: 1px solid var(--border-primary) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+/* Header layouts */
+.header-theme {
+  background-color: var(--surface-primary) !important;
+  border-bottom: 1px solid var(--border-primary) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* ==========================================================================
+   SPACING UTILITIES WITH THEME AWARENESS
+   Add theme-aware spacing that adapts to different modes
+   ========================================================================== */
+
+.divider-theme {
+  border-top: 1px solid var(--border-secondary) !important;
+  margin: 1rem 0;
+}
+
+.divider-theme-accent {
+  border-top: 2px solid var(--border-accent) !important;
+  margin: 1.5rem 0;
+}
+
+/* ==========================================================================
+   TRANSITION UTILITIES
+   Smooth transitions for theme switching
+   ========================================================================== */
+
+.transition-theme {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease !important;
+}
+
+.transition-theme-fast {
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease !important;
+}
+
+.transition-theme-slow {
+  transition: background-color 0.5s ease, color 0.5s ease, border-color 0.5s ease !important;
+}
+
+.transition-all-theme {
+  transition: all 0.3s ease !important;
+}
+
+/* ==========================================================================
+   RESPONSIVE UTILITIES
+   Theme-aware responsive adjustments
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .card-theme {
+    box-shadow: var(--shadow-md) !important;
+  }
+  
+  .modal-theme {
+    box-shadow: var(--shadow-xl) !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .sidebar-theme {
+    box-shadow: var(--shadow-xl) !important;
+  }
+}
+
+/* ==========================================================================
+   FOCUS UTILITIES
+   Accessible focus states that adapt to themes
+   ========================================================================== */
+
+.focus-theme:focus,
+.focus-theme:focus-visible {
+  outline: 2px solid var(--border-accent) !important;
+  outline-offset: 2px;
+}
+
+.focus-ring-theme:focus,
+.focus-ring-theme:focus-visible {
+  box-shadow: 0 0 0 0.2rem rgba(160, 123, 227, 0.25) !important;
+}
+
+/* ==========================================================================
+   UTILITY COMBINATIONS
+   Pre-built combinations for common patterns
+   ========================================================================== */
+
+/* Complete card */
+.card-complete {
+  background-color: var(--surface-primary) !important;
+  border: 1px solid var(--border-secondary) !important;
+  box-shadow: var(--shadow-md) !important;
+  color: var(--text-primary) !important;
+  transition: all 0.3s ease;
+}
+
+.card-complete:hover {
+  box-shadow: var(--shadow-lg) !important;
+  transform: translateY(-2px);
+}
+
+/* Complete input */
+.input-complete {
+  background-color: var(--input-bg) !important;
+  border: 1px solid var(--input-border) !important;
+  color: var(--input-text) !important;
+  transition: all 0.2s ease;
+}
+
+.input-complete:focus {
+  border-color: var(--border-accent) !important;
+  box-shadow: 0 0 0 0.2rem rgba(160, 123, 227, 0.25) !important;
+}
+
+.input-complete::placeholder {
+  color: var(--input-placeholder) !important;
+}
+
+/* Complete button */
+.btn-complete {
+  background-color: var(--button-bg) !important;
+  border: 1px solid var(--button-border) !important;
+  color: var(--button-text) !important;
+  transition: all 0.2s ease;
+}
+
+.btn-complete:hover {
+  background-color: var(--state-hover) !important;
+  border-color: var(--border-accent) !important;
+  transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   ACCESSIBILITY ENHANCEMENTS
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .transition-theme,
+  .transition-theme-fast,
+  .transition-theme-slow,
+  .transition-all-theme,
+  .hover-lift,
+  .card-complete,
+  .input-complete,
+  .btn-complete {
+    transition: none !important;
+  }
+  
+  .hover-lift:hover,
+  .card-complete:hover,
+  .btn-complete:hover {
+    transform: none !important;
+  }
+}
+
+/* High contrast mode adjustments */
+@media (prefers-contrast: high) {
+  .border-theme,
+  .border-theme-accent,
+  .border-theme-subtle {
+    border-width: 2px !important;
+  }
+  
+  .card-theme,
+  .card-elevated,
+  .modal-theme {
+    border-width: 2px !important;
+  }
+}
