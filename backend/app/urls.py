@@ -92,6 +92,7 @@ from .kpi_views.product_views import (
     BulkCreateProductsView,
     ImportTemplateView,
     TestTemplateView,
+    ProductDetailsExportCSVView
 )
 
 # BATCH VIEWS
@@ -401,6 +402,7 @@ urlpatterns = [
     path('products/<str:product_id>/stock/adjust/', StockAdjustmentView.as_view(), name='stock-adjustment'),
     path('products/<str:product_id>/stock/history/', StockHistoryView.as_view(), name='stock-history'),
     path('products/<str:product_id>/restock/', RestockProductView.as_view(), name='restock-product'),
+    path('products/<str:product_id>/export/details/', ProductDetailsExportCSVView.as_view(), name='product-details-export-csv'),
 
     # ========== BATCH MANAGEMENT ==========
     # Batch CRUD (static paths first)

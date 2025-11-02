@@ -6,6 +6,8 @@ from notifications.services import notification_service
 from .batch_service import BatchService
 import pandas as pd
 import logging
+import csv
+from io import StringIO
 
 logger = logging.getLogger(__name__)
 
@@ -1654,3 +1656,109 @@ class ProductService:
         except Exception as e:
             logger.error(f"Error creating initial batch: {str(e)}")
             raise Exception(f"Error creating initial batch: {str(e)}")
+    
+    def export_product_details_csv(self, product_id):
+        """Export a single product and all related batch data (purchases + adjustments) into a CSV"""
+        try:
+            product = self.get_product_by_id(product_id)
+            if not product:
+                raise ValueError(f"Product with ID {product_id} not found")
+
+            from io import StringIO
+            import csv
+
+            # Fetch all batches for this product
+            batches = list(self.db.batches.find({"product_id": product_id}))
+            output = StringIO()
+            writer = csv.writer(output)
+
+            # === PRODUCT DETAILS ===
+            writer.writerow(["=== PRODUCT DETAILS ==="])
+            writer.writerow(["Field", "Value"])
+            for key, value in product.items():
+                writer.writerow([key, value])
+            writer.writerow([])
+
+            # === PURCHASE HISTORY ===
+            writer.writerow(["=== PURCHASE HISTORY ==="])
+            if batches:
+                writer.writerow([
+                    "Batch Number", "Purchase Date", "Expiry Date", "Initial Qty",
+                    "Current Qty", "Unit Cost", "Total Cost", "Status"
+                ])
+                for batch in batches:
+                    total_cost = (
+                        float(batch.get("quantity_received", 0)) *
+                        float(batch.get("cost_price", 0))
+                    )
+                    writer.writerow([
+                        batch.get("batch_number", ""),
+                        batch.get("date_received", ""),
+                        batch.get("expiry_date", ""),
+                        batch.get("quantity_received", ""),
+                        batch.get("quantity_remaining", ""),
+                        batch.get("cost_price", ""),
+                        total_cost,
+                        batch.get("status", "")
+                    ])
+            else:
+                writer.writerow(["No batches found"])
+            writer.writerow([])
+
+            # === STOCK ADJUSTMENTS ===
+            writer.writerow(["=== STOCK ADJUSTMENTS ==="])
+            adjustment_rows = []
+            for batch in batches:
+                usage_history = batch.get("usage_history", [])
+                for usage in usage_history:
+                    adjustment_rows.append({
+                        "timestamp": usage.get("timestamp", ""),
+                        "batch_number": batch.get("batch_number", ""),
+                        "type": usage.get("adjustment_type", usage.get("reason", "")),
+                        "quantity": usage.get("quantity_used", ""),
+                        "remaining_after": usage.get("remaining_after", ""),
+                        "adjusted_by": usage.get("adjusted_by", ""),
+                        "notes": usage.get("notes", "")
+                    })
+
+            if adjustment_rows:
+                writer.writerow([
+                    "Date & Time", "Batch Number", "Type", "Quantity",
+                    "Remaining After", "Adjusted By", "Notes"
+                ])
+                for adj in adjustment_rows:
+                    writer.writerow([
+                        adj["timestamp"],
+                        adj["batch_number"],
+                        adj["type"],
+                        adj["quantity"],
+                        adj["remaining_after"],
+                        adj["adjusted_by"],
+                        adj["notes"]
+                    ])
+            else:
+                writer.writerow(["No adjustments found"])
+            writer.writerow([])
+
+            # === ACTIVE BATCHES ===
+            writer.writerow(["=== ACTIVE BATCHES ==="])
+            if batches:
+                writer.writerow(["Batch ID", "Quantity", "Cost Price", "Expiry Date", "Status"])
+                for batch in batches:
+                    writer.writerow([
+                        batch.get("_id", ""),
+                        batch.get("quantity_remaining", ""),
+                        batch.get("cost_price", ""),
+                        batch.get("expiry_date", ""),
+                        batch.get("status", "")
+                    ])
+            else:
+                writer.writerow(["No active batches found"])
+            writer.writerow([])
+
+            csv_content = output.getvalue()
+            output.close()
+            return csv_content
+
+        except Exception as e:
+            raise Exception(f"Error exporting product details to CSV: {str(e)}")

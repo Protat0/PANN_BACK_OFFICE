@@ -1000,3 +1000,24 @@ class BulkDeleteProductsView(APIView):
                 {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+class ProductDetailsExportCSVView(APIView):
+    """Export a single product and related data as a CSV"""
+
+    def get(self, request, product_id):
+        try:
+            product_service = ProductService()
+            csv_data = product_service.export_product_details_csv(product_id)
+
+            response = HttpResponse(csv_data, content_type='text/csv')
+            response['Content-Disposition'] = f'attachment; filename=product_{product_id}_details.csv'
+            return response
+
+        except ValueError as ve:
+            return Response({"error": str(ve)}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Error in ProductDetailsExportCSVView.get: {e}")
+            return Response(
+                {"error": f"Failed to export product details: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

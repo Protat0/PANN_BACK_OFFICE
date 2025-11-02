@@ -371,6 +371,25 @@ class ApiProductsService {
     }
   }
 
+  async exportProductDetails(productId) {
+    try {
+      const response = await api.get(`/products/${productId}/export/details/`, {
+        responseType: 'blob',
+      });
+
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `product_${productId}_details.csv`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+
   async downloadImportTemplate(format = 'csv') {
     try {
       // Use raw axios WITHOUT interceptors

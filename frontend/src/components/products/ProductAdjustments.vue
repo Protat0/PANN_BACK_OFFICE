@@ -7,10 +7,10 @@
           <Filter :size="16" class="me-1" />
           Filter
         </button>
-        <button class="btn btn-export btn-sm" @click="handleExport">
+        <!--<button class="btn btn-export btn-sm" @click="handleExport">
           <Download :size="16" class="me-1" />
           Export
-        </button>
+        </button>-->
       </div>
     </div>
 

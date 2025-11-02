@@ -7,10 +7,10 @@
           <Filter :size="16" class="me-1" />
           Filter
         </button>
-        <button class="btn btn-export btn-sm" @click="handleExport">
+        <!--<button class="btn btn-export btn-sm" @click="handleExport">
           <Download :size="16" class="me-1" />
           Export
-        </button>
+        </button>-->
       </div>
     </div>
 
@@ -179,6 +179,8 @@
         </tr>
       </template>
     </TableTemplate>
+    <BatchDetailsModal ref="batchDetailsModal" />
+    <StockUpdateModal ref="stockUpdateModal" />
   </div>
 </template>
 
@@ -187,10 +189,18 @@ import { ref, computed, onMounted, watch } from 'vue'
 import TableTemplate from '@/components/common/TableTemplate.vue'
 import { useBatches } from '@/composables/api/useBatches'
 
+// ✅ Import the new BatchDetailsModal
+import BatchDetailsModal from '@/components/products/BatchDetailsModal.vue'
+
+// ✅ Import your existing StockUpdateModal
+import StockUpdateModal from '@/components/products/StockUpdateModal.vue'
+
 export default {
   name: 'ProductPurchases',
   components: {
-    TableTemplate
+    TableTemplate,
+    BatchDetailsModal,
+    StockUpdateModal
   },
   props: {
     productId: {
@@ -199,6 +209,7 @@ export default {
     }
   },
   setup(props) {
+    // --- Composables ---
     const {
       batches,
       loading,
@@ -209,14 +220,19 @@ export default {
       clearFilters
     } = useBatches()
 
+    // --- Pagination ---
     const currentPage = ref(1)
     const itemsPerPage = 10
     const showFilters = ref(false)
 
-    // Set initial filter for this product
+    // --- Modal Refs ---
+    const batchDetailsModal = ref(null)
+    const stockUpdateModal = ref(null)
+
+    // --- Set initial product filter ---
     filters.productId = props.productId
 
-    // Computed properties
+    // --- Computed Data ---
     const paginatedBatches = computed(() => {
       const start = (currentPage.value - 1) * itemsPerPage
       const end = start + itemsPerPage
@@ -238,15 +254,13 @@ export default {
 
     const lastPurchaseDate = computed(() => {
       if (batches.value.length === 0) return null
-      
-      const sorted = [...batches.value].sort((a, b) => 
+      const sorted = [...batches.value].sort((a, b) =>
         new Date(b.date_received) - new Date(a.date_received)
       )
-      
       return sorted[0]?.date_received
     })
 
-    // Methods
+    // --- Utility Functions ---
     const calculateTotalCost = (batch) => {
       return (batch.cost_price || 0) * (batch.quantity_received || 0)
     }
@@ -260,13 +274,10 @@ export default {
       })
     }
 
-    const formatPrice = (price) => {
-      return parseFloat(price || 0).toFixed(2)
-    }
+    const formatPrice = (price) => parseFloat(price || 0).toFixed(2)
 
-    const formatStatus = (status) => {
-      return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown'
-    }
+    const formatStatus = (status) =>
+      status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown'
 
     const getStatusBadgeClass = (status) => {
       const statusClasses = {
@@ -280,9 +291,8 @@ export default {
     const getQuantityBadgeClass = (batch) => {
       if (batch.status === 'depleted') return 'bg-danger'
       if (batch.status === 'expired') return 'bg-secondary'
-      
+
       const percentage = ((batch.quantity_remaining || 0) / (batch.quantity_received || 1)) * 100
-      
       if (percentage <= 20) return 'bg-danger'
       if (percentage <= 50) return 'bg-warning'
       return 'bg-success'
@@ -290,16 +300,15 @@ export default {
 
     const getExpiryClass = (expiryDate) => {
       if (!expiryDate) return ''
-      
       const now = new Date()
       const expiry = new Date(expiryDate)
       const daysUntilExpiry = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24))
-      
       if (daysUntilExpiry < 0) return 'text-error'
       if (daysUntilExpiry <= 7) return 'text-warning'
       return ''
     }
 
+    // --- Table Pagination & Filters ---
     const handlePageChange = (page) => {
       currentPage.value = page
     }
@@ -310,23 +319,26 @@ export default {
 
     const handleClearFilters = () => {
       clearFilters()
-      filters.productId = props.productId // Keep product filter
+      filters.productId = props.productId // keep product context
       showFilters.value = false
     }
 
+    // --- Actions ---
     const handleExport = () => {
-      // TODO: Implement export functionality
+      // Optional: Connect to CSV export logic here
     }
 
     const viewDetails = (batch) => {
-      // TODO: Implement view details modal or navigation
+      // ✅ Opens batch details modal
+      batchDetailsModal.value?.open(batch)
     }
 
     const adjustQuantity = (batch) => {
-      // TODO: Implement adjust quantity modal
+      // ✅ Opens stock adjustment modal (existing component)
+      stockUpdateModal.value?.openStock?.(batch)
     }
 
-    // Initialize data
+    // --- Data Initialization ---
     const loadData = async () => {
       try {
         await fetchBatchesByProduct(props.productId)
@@ -335,7 +347,7 @@ export default {
       }
     }
 
-    // Watch for product ID changes
+    // Watch for product changes
     watch(() => props.productId, (newId) => {
       if (newId) {
         filters.productId = newId
@@ -358,13 +370,17 @@ export default {
       currentPage,
       itemsPerPage,
       showFilters,
-      
+
+      // Modals
+      batchDetailsModal,
+      stockUpdateModal,
+
       // Computed
       paginatedBatches,
       totalActiveQuantity,
       totalCost,
       lastPurchaseDate,
-      
+
       // Methods
       calculateTotalCost,
       formatDate,
@@ -383,6 +399,7 @@ export default {
   }
 }
 </script>
+
 
 <style scoped>
 .purchases-container {

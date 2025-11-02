@@ -179,7 +179,8 @@ export default {
       error,
       fetchProductById,
       deleteProduct,
-      exportProducts
+      exportProducts,
+      exportProductDetails
     } = useProducts()
 
     const {
@@ -244,14 +245,19 @@ export default {
     }
 
     const handleExport = async () => {
+      if (!currentProduct.value || !currentProduct.value._id) {
+        console.warn('⚠️ No product loaded for export');
+        return;
+      }
+
       try {
-        console.log('📤 Exporting product:', currentProduct.value._id)
-        const filters = { _id: currentProduct.value._id }
-        await exportProducts(filters)
+        console.log('📤 Exporting product details (CSV) for:', currentProduct.value._id);
+        await exportProductDetails(currentProduct.value._id);
       } catch (err) {
-        console.error('❌ Error exporting:', err)
+        console.error('❌ Error exporting product details:', err);
       }
     }
+
 
     const handleModalSuccess = async (result) => {
       console.log('✅ Modal success:', result)
