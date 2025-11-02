@@ -230,6 +230,7 @@ from .kpi_views.sales_display_views import (
 # Online orders
 from .kpi_views.online_transaction_views import (
     CreateOnlineOrderView,
+    GetCustomerOrderHistoryView,
 )
 
 from .views import (
@@ -433,6 +434,7 @@ urlpatterns = [
 
     # ========== ONLINE ORDERS (Customer Website) ==========
     path('online/orders/create/', CreateOnlineOrderView.as_view(), name='create_online_order'),
+    path('online/orders/history/', GetCustomerOrderHistoryView.as_view(), name='get_customer_order_history'),
     
     # ========== PROMOTIONS ==========
     path('promotions/', PromotionListView.as_view(), name='promotion-list'),

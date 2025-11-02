@@ -53,3 +53,54 @@ class CreateOnlineOrderView(APIView):
             return Response({'success': False, 'message': f'Failed to create order: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class GetCustomerOrderHistoryView(APIView):
+    """Get customer's order history from online_transactions collection."""
+    
+    @require_authentication
+    def get(self, request):
+        try:
+            from ..database import db_manager
+            
+            # Get customer_id from JWT token
+            user_ctx = getattr(request, 'current_user', None) or {}
+            customer_id = user_ctx.get('user_id')
+            
+            if not customer_id:
+                return Response({
+                    'success': False,
+                    'message': 'Customer ID is required'
+                }, status=status.HTTP_401_UNAUTHORIZED)
+            
+            # Get limit from query params
+            limit = int(request.query_params.get('limit', 50))
+            
+            # Query online_transactions collection
+            db = db_manager.get_database()
+            online_transactions = db.online_transactions
+            
+            query = {'customer_id': customer_id}
+            orders = list(
+                online_transactions.find(query)
+                .sort('transaction_date', -1)  # Most recent first
+                .limit(limit)
+            )
+            
+            # Convert ObjectId to string if present
+            for order in orders:
+                if '_id' in order:
+                    order['_id'] = str(order['_id'])
+            
+            return Response({
+                'success': True,
+                'results': orders,
+                'count': len(orders)
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error getting order history: {e}")
+            return Response({
+                'success': False,
+                'error': f'Failed to get order history: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
