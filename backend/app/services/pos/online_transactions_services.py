@@ -980,7 +980,8 @@ class OnlineTransactionService:
             print(f"   Subtotal: ₱{subtotal:.2f}")
             
             # Step 3: Apply points discount (if any)
-            points_to_redeem = order_data.get('points_to_redeem', 0)
+            # Accept both 'points_to_redeem' and 'loyalty_points' for compatibility
+            points_to_redeem = order_data.get('points_to_redeem', 0) or order_data.get('loyalty_points', 0)
             points_discount = 0
             
             if points_to_redeem > 0:
@@ -1137,7 +1138,29 @@ class OnlineTransactionService:
             print(f"✅ Online order created successfully: {order_id}")
             print(f"{'='*60}\n")
             
-            # Step 11: Send notifications
+            # Step 11: Add order to customer's order history
+            print("Step 7: Adding order to customer history...")
+            try:
+                self.customers_collection.update_one(
+                    {'_id': customer_id},
+                    {
+                        '$push': {
+                            'order_history': {
+                                'order_id': order_id,
+                                'transaction_date': transaction_date,
+                                'total_amount': total_amount,
+                                'order_status': 'pending',
+                                'items': [{'product_name': item['product_name'], 'quantity': item['quantity']} for item in items_with_prices]
+                            }
+                        }
+                    }
+                )
+                print("   ✅ Order added to customer history\n")
+            except Exception as e:
+                logger.error(f"Failed to add order to customer history: {str(e)}")
+                # Don't fail the order if history update fails
+            
+            # Step 12: Send notifications
             self._send_order_notification('new_order_created', order_id)
             
             return {

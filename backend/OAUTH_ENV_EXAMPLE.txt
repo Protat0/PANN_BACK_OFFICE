@@ -1,0 +1,28 @@
+# Add these to your .env file
+
+# ============================================
+# OAuth Configuration (Google & Facebook)
+# ============================================
+
+# Google OAuth
+# Get these from: https://console.cloud.google.com/
+GOOGLE_CLIENT_ID=your-google-client-id-here.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret-here
+GOOGLE_REDIRECT_URI=http://localhost:8000/api/v1/auth/google/callback/
+
+# Facebook OAuth
+# Get these from: https://developers.facebook.com/
+FACEBOOK_APP_ID=your-facebook-app-id-here
+FACEBOOK_APP_SECRET=your-facebook-app-secret-here
+FACEBOOK_REDIRECT_URI=http://localhost:8000/api/v1/auth/facebook/callback/
+
+# Frontend URL (where OAuth will redirect after success/failure)
+FRONTEND_URL=http://localhost:5173
+
+# ============================================
+# Production Settings (update for deployment)
+# ============================================
+# GOOGLE_REDIRECT_URI=https://yourdomain.com/api/v1/auth/google/callback/
+# FACEBOOK_REDIRECT_URI=https://yourdomain.com/api/v1/auth/facebook/callback/
+# FRONTEND_URL=https://yourdomain.com
+

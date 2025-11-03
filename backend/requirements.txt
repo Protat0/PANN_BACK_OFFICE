@@ -21,6 +21,12 @@ python-jose==3.5.0
 passlib==1.7.4
 PyJWT==2.8.0
 
+# OAuth Authentication
+google-auth==2.35.0
+google-auth-oauthlib==1.2.1
+google-auth-httplib2==0.2.0
+requests-oauthlib==2.0.0
+
 # Date & Time
 pytz==2025.2
 tzdata==2025.2

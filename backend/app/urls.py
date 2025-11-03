@@ -242,6 +242,7 @@ from .kpi_views.online_transaction_views import (
     CreateOnlineOrderView,
     GetOnlineOrderView,
     GetCustomerOrdersView,
+    GetMyOrderHistoryView,
     GetAllOrdersView,
     UpdateOrderStatusView,
     UpdatePaymentStatusView,
@@ -554,6 +555,7 @@ urlpatterns = [
     path('online-orders/', CreateOnlineOrderView.as_view(), name='create-online-order'),
     path('online-orders/<str:order_id>/', GetOnlineOrderView.as_view(), name='get-online-order'),
     path('online-orders/customer/<str:customer_id>/', GetCustomerOrdersView.as_view(), name='get-customer-orders'),
+    path('online/orders/history/', GetMyOrderHistoryView.as_view(), name='get-my-order-history'),  # Customer's own order history (JWT auth)
     path('online-orders/all/', GetAllOrdersView.as_view(), name='get-all-orders'),
     
     # Order Status Management

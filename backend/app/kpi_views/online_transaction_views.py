@@ -56,6 +56,9 @@ class GetOnlineOrderView(OnlineTransactionServiceView):
             order = self.service.get_order_by_id(order_id)
             
             if order:
+                # Add order_id alias for frontend compatibility
+                if '_id' in order:
+                    order['order_id'] = order['_id']
                 return Response(order, status=status.HTTP_200_OK)
             else:
                 return Response(
@@ -84,12 +87,108 @@ class GetCustomerOrdersView(OnlineTransactionServiceView):
                 limit=limit
             )
             
+            # Add order_id alias for frontend compatibility
+            for order in orders:
+                if '_id' in order:
+                    order['order_id'] = order['_id']
+            
             return Response(orders, status=status.HTTP_200_OK)
             
         except Exception as e:
             logger.error(f"Error fetching customer orders: {str(e)}")
             return Response(
                 {"error": f"Failed to fetch customer orders: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class GetMyOrderHistoryView(OnlineTransactionServiceView):
+    """Get order history for the currently logged-in customer (uses JWT auth)"""
+    
+    def get(self, request):
+        try:
+            # Get customer ID from authenticated user
+            user = request.user
+            logger.info(f"=== ORDER HISTORY REQUEST ===")
+            logger.info(f"User: {user}")
+            logger.info(f"User authenticated: {user.is_authenticated if hasattr(user, 'is_authenticated') else 'Unknown'}")
+            logger.info(f"User ID: {user.id if hasattr(user, 'id') and user.id else 'None'}")
+            logger.info(f"Has 'customer' attribute: {hasattr(user, 'customer')}")
+            
+            if not user or not hasattr(user, 'id') or not user.is_authenticated:
+                logger.error("❌ User not authenticated")
+                return Response(
+                    {
+                        "success": False,
+                        "error": "Authentication required",
+                        "results": []
+                    }, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            if not hasattr(user, 'customer'):
+                logger.error(f"❌ User {user.id} has no customer attribute")
+                logger.error(f"User dir: {[attr for attr in dir(user) if not attr.startswith('_')]}")
+                return Response(
+                    {
+                        "success": False,
+                        "error": "Customer profile not found",
+                        "results": []
+                    }, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            customer = user.customer
+            customer_id = customer.customer_id
+            logger.info(f"✅ Customer ID extracted: {customer_id}")
+            logger.info(f"✅ Customer email: {getattr(customer, 'email', 'N/A')}")
+            
+            # Get query parameters
+            status_filter = request.query_params.get('status')
+            limit = int(request.query_params.get('limit', 50))
+            offset = int(request.query_params.get('offset', 0))
+            
+            logger.info(f"Query params: status={status_filter}, limit={limit}, offset={offset}")
+            
+            # Fetch orders from the online_orders collection
+            logger.info(f"📞 Calling service.get_customer_orders(customer_id={customer_id})")
+            orders_list = self.service.get_customer_orders(
+                customer_id, 
+                status=status_filter, 
+                limit=limit
+            )
+            
+            logger.info(f"📦 Service returned: {type(orders_list)} with {len(orders_list) if orders_list else 0} items")
+            
+            # Convert MongoDB documents to JSON-serializable format
+            orders_json = []
+            for order in orders_list:
+                # Convert ObjectId to string (if needed) and add order_id alias
+                if '_id' in order:
+                    order['_id'] = str(order['_id'])
+                    order['order_id'] = order['_id']  # Add order_id alias for frontend
+                orders_json.append(order)
+                logger.info(f"  - Order: {order.get('order_id')} | Status: {order.get('order_status')} | Customer: {order.get('customer_id')}")
+            
+            logger.info(f"✅ FINAL: Found {len(orders_json)} orders for customer {customer_id}")
+            
+            # Return in the format expected by frontend
+            response_data = {
+                'success': True,
+                'results': orders_json,
+                'count': len(orders_json)
+            }
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error fetching customer order history: {str(e)}")
+            logger.exception(e)  # Log full stack trace
+            return Response(
+                {
+                    "success": False,
+                    "error": f"Failed to fetch order history: {str(e)}",
+                    "results": []  # Add empty results for frontend compatibility
+                }, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -119,6 +218,11 @@ class GetAllOrdersView(OnlineTransactionServiceView):
             limit = int(request.query_params.get('limit', 100))
             
             orders = self.service.get_all_orders(filters=filters, limit=limit)
+            
+            # Add order_id alias for frontend compatibility
+            for order in orders:
+                if '_id' in order:
+                    order['order_id'] = order['_id']
             
             return Response(orders, status=status.HTTP_200_OK)
             
@@ -155,6 +259,10 @@ class UpdateOrderStatusView(OnlineTransactionServiceView):
                 notes
             )
             
+            # Add order_id alias for frontend compatibility
+            if order and '_id' in order:
+                order['order_id'] = order['_id']
+            
             return Response(order, status=status.HTTP_200_OK)
             
         except Exception as e:
@@ -186,6 +294,10 @@ class UpdatePaymentStatusView(OnlineTransactionServiceView):
                 confirmed_by
             )
             
+            # Add order_id alias for frontend compatibility
+            if order and '_id' in order:
+                order['order_id'] = order['_id']
+            
             return Response(order, status=status.HTTP_200_OK)
             
         except Exception as e:
@@ -209,6 +321,10 @@ class MarkReadyForDeliveryView(OnlineTransactionServiceView):
                 delivery_notes
             )
             
+            # Add order_id alias for frontend compatibility
+            if order and '_id' in order:
+                order['order_id'] = order['_id']
+            
             return Response(order, status=status.HTTP_200_OK)
             
         except Exception as e:
@@ -231,6 +347,10 @@ class CompleteOrderView(OnlineTransactionServiceView):
                 completed_by, 
                 delivery_person
             )
+            
+            # Add order_id alias for frontend compatibility
+            if order and '_id' in order:
+                order['order_id'] = order['_id']
             
             return Response(order, status=status.HTTP_200_OK)
             
@@ -264,6 +384,10 @@ class CancelOrderView(OnlineTransactionServiceView):
                 cancellation_reason, 
                 cancelled_by
             )
+            
+            # Add order_id alias for frontend compatibility
+            if order and '_id' in order:
+                order['order_id'] = order['_id']
             
             return Response(order, status=status.HTTP_200_OK)
             
@@ -350,6 +474,12 @@ class GetPendingOrdersView(OnlineTransactionServiceView):
     def get(self, request):
         try:
             orders = self.service.get_pending_orders()
+            
+            # Add order_id alias for frontend compatibility
+            for order in orders:
+                if '_id' in order:
+                    order['order_id'] = order['_id']
+            
             return Response(orders, status=status.HTTP_200_OK)
             
         except Exception as e:
@@ -365,6 +495,12 @@ class GetProcessingOrdersView(OnlineTransactionServiceView):
     def get(self, request):
         try:
             orders = self.service.get_processing_orders()
+            
+            # Add order_id alias for frontend compatibility
+            for order in orders:
+                if '_id' in order:
+                    order['order_id'] = order['_id']
+            
             return Response(orders, status=status.HTTP_200_OK)
             
         except Exception as e:
@@ -381,6 +517,11 @@ class GetOrdersByStatusView(OnlineTransactionServiceView):
         try:
             limit = int(request.query_params.get('limit', 50))
             orders = self.service.get_orders_by_status(status, limit)
+            
+            # Add order_id alias for frontend compatibility
+            for order in orders:
+                if '_id' in order:
+                    order['order_id'] = order['_id']
             
             return Response(orders, status=status.HTTP_200_OK)
             

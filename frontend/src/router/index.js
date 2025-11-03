@@ -22,6 +22,7 @@ import TesterPage from '@/pages/TesterPage.vue'
 import Suppliers from '@/pages/suppliers/Suppliers.vue'
 import SupplierDetails from '@/pages/suppliers/SupplierDetails.vue'
 import OrdersHistory from '@/pages/suppliers/OrdersHistory.vue'
+import OnlineOrders from '@/pages/OnlineOrders.vue'
 
 // Debug components (only for development)
 import ToastDebug from '@/pages/ToastDebug.vue'
@@ -78,6 +79,14 @@ const router = createRouter({
           component: Customers,
           meta: {
             title: 'Customers'
+          }
+        },
+        {
+          path: 'online-orders',
+          name: 'OnlineOrders',
+          component: OnlineOrders,
+          meta: {
+            title: 'Online Orders'
           }
         },
         // Inventory routes
