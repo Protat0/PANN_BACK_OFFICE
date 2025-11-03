@@ -120,20 +120,24 @@
           </td>
           <td>
             <div class="d-flex justify-content-center gap-1">
+              <!-- ✅ Fixed View Button -->
               <button 
                 class="btn btn-outline-primary action-btn btn-icon-only btn-sm shadow-sm"
-                @click="viewCustomer(customer)"
+                @click="openViewCustomerModal(customer)"
                 title="View Customer Details"
               >
                 <Eye :size="14" />
               </button>
+
+              <!-- ✅ Fixed Edit Button -->
               <button 
                 class="btn btn-outline-secondary action-btn btn-icon-only btn-sm shadow-sm"
-                @click="editCustomer(customer)"
+                @click="openEditCustomerModal(customer)"
                 title="Edit Customer"
               >
                 <Edit :size="14" />
               </button>
+
               <button 
                 class="btn btn-outline-danger action-btn btn-icon-only btn-sm shadow-sm"
                 @click="deleteCustomer(customer)"
@@ -373,8 +377,6 @@ const handlePageChange = (page) => {
 // =====================
 // IMPORT / EXPORT / TEMPLATE
 // =====================
-
-// Import customers via CSV
 const handleImport = async (event) => {
   const file = event.target.files[0]
   if (!file) return
@@ -387,15 +389,14 @@ const handleImport = async (event) => {
     alert('❌ Import failed: ' + err.message)
   } finally {
     isLoading.value = false
-    event.target.value = '' // Reset file input
+    event.target.value = ''
   }
 }
 
-// Export customers as CSV
 const handleExport = async () => {
   try {
     exporting.value = true
-    await exportCustomers() // Uses composable (GET /customers/import-export/)
+    await exportCustomers()
   } catch (err) {
     alert('❌ Export failed: ' + err.message)
   } finally {
@@ -403,7 +404,6 @@ const handleExport = async () => {
   }
 }
 
-// Download a ready CSV template
 const downloadTemplate = () => {
   const csvTemplate = `username,full_name,email,phone,loyalty_points,status
 johndoe,John Doe,john@example.com,09171234567,100,active
@@ -438,7 +438,6 @@ const handleAddAction = (actionKey) => {
 const handleSelectionAction = (actionKey, selectedItems) => {
   switch (actionKey) {
     case 'delete':
-      // You can implement bulk delete here
       break
   }
 }
@@ -450,7 +449,6 @@ const handleFilterChange = (filterKey, value) => {
 
 const handleSearchInput = async (value) => {
   searchValue.value = value
-  // Optional: integrate your search logic here if needed
 }
 
 const handleSearchClear = async () => {
@@ -541,6 +539,7 @@ onMounted(async () => {
   }
 })
 </script>
+
 
 
 

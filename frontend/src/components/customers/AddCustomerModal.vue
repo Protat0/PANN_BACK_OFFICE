@@ -11,22 +11,15 @@
       @click.stop
     >
       <!-- Modal Header -->
-      <div class="modal-header">
+      <div class="modal-header d-flex justify-content-between align-items-center">
         <h3 class="text-primary mb-0 fw-semibold">
           {{ getModalTitle() }}
         </h3>
+
+        <!-- Right-side buttons -->
         <div class="d-flex align-items-center gap-2">
-          <!-- Edit button in view mode -->
-          <button 
-            v-if="mode === 'view'"
-            class="btn btn-edit btn-sm"
-            @click="switchToEditMode"
-            :disabled="isLoading"
-          >
-            <Edit :size="16" class="me-1" />
-            Edit
-          </button>
-          
+          <!-- ✅ Purple Edit button beside Close -->
+  
           <button 
             class="btn-close"
             @click="closeModal"
@@ -37,6 +30,7 @@
           </button>
         </div>
       </div>
+
 
       <!-- Modal Body -->
       <div class="modal-body">
@@ -301,6 +295,16 @@
       <!-- Modal Footer -->
       <div class="modal-footer">
         <div class="d-flex justify-content-end gap-3">
+            <button 
+            v-if="mode === 'view'"
+            class="btn btn-edit btn-sm d-flex align-items-center gap-1"
+            @click="switchToEditMode"
+            :disabled="isLoading"
+          >
+            <Edit :size="16" />
+            Edit
+          </button>
+
           <button
             type="button"
             class="btn btn-cancel"
@@ -808,5 +812,24 @@ defineExpose({
 .bg-success {
   background-color: var(--status-success) !important;
   color: white !important;
+}
+
+.btn-edit {
+  background-color: var(--accent, #6c3ef0);
+  color: #fff;
+  border: none;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-edit:hover:not(:disabled) {
+  background-color: #5a32c8;
+}
+
+.btn-edit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 </style>

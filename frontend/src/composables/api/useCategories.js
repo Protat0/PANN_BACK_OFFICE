@@ -55,6 +55,9 @@ export function useCategories() {
     categories.value.filter(cat => cat.status === 'active' && !cat.isDeleted)
   )
 
+  // ✅ NEW: total number of active (non-deleted) categories
+  const totalActiveCategories = computed(() => activeCategories.value.length)
+
   const categoryStats = computed(() => ({
     total: categories.value.length,
     active: categories.value.filter(c => c.status === 'active').length,
@@ -65,9 +68,11 @@ export function useCategories() {
   const categoriesWithProductCounts = computed(() =>
     categories.value.map(category => ({
       ...category,
-      productCount: category.sub_categories?.reduce((total, sub) => 
-        total + (sub.product_count || 0), 0
-      ) || 0
+      productCount:
+        category.sub_categories?.reduce(
+          (total, sub) => total + (sub.product_count || 0),
+          0
+        ) || 0
     }))
   )
 
@@ -83,9 +88,9 @@ export function useCategories() {
     try {
       const mergedFilters = { ...filters.value, ...customFilters }
       const response = await categoryApiService.CategoryData(mergedFilters)
-      
+
       categories.value = response.categories || []
-      
+
       if (Object.keys(customFilters).length > 0 || categories.value.length > 0) {
         toast.success(`Loaded ${categories.value.length} categories`)
       }
@@ -105,7 +110,10 @@ export function useCategories() {
     error.value = null
 
     try {
-      const response = await categoryApiService.getCategoryById(categoryId, includeDeleted)
+      const response = await categoryApiService.getCategoryById(
+        categoryId,
+        includeDeleted
+      )
       currentCategory.value = response.category
       return response
     } catch (err) {
@@ -117,18 +125,18 @@ export function useCategories() {
     }
   }
 
-  const createCategory = async (categoryData) => {
+  const createCategory = async categoryData => {
     loading.value = true
     error.value = null
     validationErrors.value = []
 
     try {
       const response = await categoryApiService.AddCategoryData(categoryData)
-      
+
       // Add to local state
       categories.value.unshift(response.category)
       currentCategory.value = response.category
-      
+
       toast.success(`Category "${categoryData.category_name}" created successfully`)
       return response
     } catch (err) {
@@ -150,17 +158,17 @@ export function useCategories() {
         id: categoryId,
         ...categoryData
       })
-      
+
       // Update local state
       const index = categories.value.findIndex(c => c._id === categoryId)
       if (index !== -1) {
         categories.value[index] = response.category
       }
-      
+
       if (currentCategory.value?._id === categoryId) {
         currentCategory.value = response.category
       }
-      
+
       toast.success('Category updated successfully')
       return response
     } catch (err) {
@@ -172,13 +180,13 @@ export function useCategories() {
     }
   }
 
-  const softDeleteCategory = async (categoryId) => {
+  const softDeleteCategory = async categoryId => {
     deleteLoading.value = true
     error.value = null
 
     try {
       const response = await categoryApiService.SoftDeleteCategory(categoryId)
-      
+
       // Move to deleted categories
       const deletedCategory = categories.value.find(c => c._id === categoryId)
       if (deletedCategory) {
@@ -186,11 +194,11 @@ export function useCategories() {
         categories.value = categories.value.filter(c => c._id !== categoryId)
         deletedCategories.value.unshift(deletedCategory)
       }
-      
+
       if (currentCategory.value?._id === categoryId) {
         currentCategory.value = null
       }
-      
+
       toast.success('Category deleted successfully')
       return response
     } catch (err) {
@@ -202,21 +210,23 @@ export function useCategories() {
     }
   }
 
-  const hardDeleteCategory = async (categoryId) => {
+  const hardDeleteCategory = async categoryId => {
     deleteLoading.value = true
     error.value = null
 
     try {
       const response = await categoryApiService.HardDeleteCategory(categoryId)
-      
+
       // Remove from all local state
       categories.value = categories.value.filter(c => c._id !== categoryId)
-      deletedCategories.value = deletedCategories.value.filter(c => c._id !== categoryId)
-      
+      deletedCategories.value = deletedCategories.value.filter(
+        c => c._id !== categoryId
+      )
+
       if (currentCategory.value?._id === categoryId) {
         currentCategory.value = null
       }
-      
+
       toast.success('Category permanently deleted')
       return response
     } catch (err) {
@@ -228,21 +238,25 @@ export function useCategories() {
     }
   }
 
-  const restoreCategory = async (categoryId) => {
+  const restoreCategory = async categoryId => {
     loading.value = true
     error.value = null
 
     try {
       const response = await categoryApiService.RestoreCategory(categoryId)
-      
+
       // Move back to active categories
-      const restoredCategory = deletedCategories.value.find(c => c._id === categoryId)
+      const restoredCategory = deletedCategories.value.find(
+        c => c._id === categoryId
+      )
       if (restoredCategory) {
         restoredCategory.isDeleted = false
-        deletedCategories.value = deletedCategories.value.filter(c => c._id !== categoryId)
+        deletedCategories.value = deletedCategories.value.filter(
+          c => c._id !== categoryId
+        )
         categories.value.unshift(restoredCategory)
       }
-      
+
       toast.success('Category restored successfully')
       return response
     } catch (err) {
@@ -256,7 +270,7 @@ export function useCategories() {
 
   // ================ SUBCATEGORY MANAGEMENT ================
 
-  const fetchSubcategories = async (categoryId) => {
+  const fetchSubcategories = async categoryId => {
     subcategoryLoading.value = true
     error.value = null
 
@@ -278,17 +292,20 @@ export function useCategories() {
     error.value = null
 
     try {
-      const response = await categoryApiService.AddSubCategoryData(categoryId, subcategoryData)
-      
+      const response = await categoryApiService.AddSubCategoryData(
+        categoryId,
+        subcategoryData
+      )
+
       // Update local category state
       const category = categories.value.find(c => c._id === categoryId)
       if (category && category.sub_categories) {
         category.sub_categories.push(subcategoryData)
       }
-      
+
       // Refresh subcategories
       await fetchSubcategories(categoryId)
-      
+
       toast.success(`Subcategory "${subcategoryData.name}" added successfully`)
       return response
     } catch (err) {
@@ -305,8 +322,11 @@ export function useCategories() {
     error.value = null
 
     try {
-      const response = await categoryApiService.RemoveSubCategoryData(categoryId, subcategoryName)
-      
+      const response = await categoryApiService.RemoveSubCategoryData(
+        categoryId,
+        subcategoryName
+      )
+
       // Update local category state
       const category = categories.value.find(c => c._id === categoryId)
       if (category && category.sub_categories) {
@@ -314,10 +334,10 @@ export function useCategories() {
           sub => sub.name !== subcategoryName
         )
       }
-      
+
       // Refresh subcategories
       await fetchSubcategories(categoryId)
-      
+
       toast.success(`Subcategory "${subcategoryName}" removed successfully`)
       return response
     } catch (err) {
@@ -331,7 +351,11 @@ export function useCategories() {
 
   // ================ PRODUCT-CATEGORY RELATIONSHIP MANAGEMENT ================
 
-  const moveProductToCategory = async (productId, newCategoryId, newSubcategoryName = null) => {
+  const moveProductToCategory = async (
+    productId,
+    newCategoryId,
+    newSubcategoryName = null
+  ) => {
     moveProductLoading.value = true
     error.value = null
 
@@ -341,7 +365,7 @@ export function useCategories() {
         new_category_id: newCategoryId,
         new_subcategory_name: newSubcategoryName
       })
-      
+
       toast.success('Product moved to different category successfully')
       return response
     } catch (err) {
@@ -353,7 +377,11 @@ export function useCategories() {
     }
   }
 
-  const bulkMoveProductsToCategory = async (productIds, newCategoryId, newSubcategoryName = null) => {
+  const bulkMoveProductsToCategory = async (
+    productIds,
+    newCategoryId,
+    newSubcategoryName = null
+  ) => {
     bulkMoveLoading.value = true
     error.value = null
 
@@ -363,8 +391,10 @@ export function useCategories() {
         new_category_id: newCategoryId,
         new_subcategory_name: newSubcategoryName
       })
-      
-      toast.success(`${response.moved_count || productIds.length} products moved successfully`)
+
+      toast.success(
+        `${response.moved_count || productIds.length} products moved successfully`
+      )
       return response
     } catch (err) {
       error.value = err.message
@@ -375,7 +405,7 @@ export function useCategories() {
     }
   }
 
-  const moveProductToUncategorized = async (productId) => {
+  const moveProductToUncategorized = async productId => {
     moveProductLoading.value = true
     error.value = null
 
@@ -383,7 +413,7 @@ export function useCategories() {
       const response = await categoryApiService.MoveProductToUncategorized({
         product_id: productId
       })
-      
+
       toast.success('Product moved to Uncategorized successfully')
       return response
     } catch (err) {
@@ -395,7 +425,7 @@ export function useCategories() {
     }
   }
 
-  const bulkMoveProductsToUncategorized = async (productIds) => {
+  const bulkMoveProductsToUncategorized = async productIds => {
     bulkMoveLoading.value = true
     error.value = null
 
@@ -403,8 +433,10 @@ export function useCategories() {
       const response = await categoryApiService.BulkMoveProductsToUncategorized({
         product_ids: productIds
       })
-      
-      toast.success(`${response.moved_count || productIds.length} products moved to Uncategorized`)
+
+      toast.success(
+        `${response.moved_count || productIds.length} products moved to Uncategorized`
+      )
       return response
     } catch (err) {
       error.value = err.message
@@ -432,7 +464,7 @@ export function useCategories() {
     }
   }
 
-  const getCategoryDeleteInfo = async (categoryId) => {
+  const getCategoryDeleteInfo = async categoryId => {
     loading.value = true
     error.value = null
 
@@ -473,7 +505,7 @@ export function useCategories() {
         id: categoryId,
         subcategory_name: subcategoryName
       })
-      
+
       // ✅ FIXED: Return the products array directly
       return response.products || response || []
     } catch (err) {
@@ -495,7 +527,7 @@ export function useCategories() {
       const response = await categoryApiService.ExportCategoryData({
         categories: exportCategories
       })
-      
+
       toast.success('Categories exported successfully')
       return response
     } catch (err) {
@@ -509,7 +541,7 @@ export function useCategories() {
 
   // ================ SEARCH AND FILTERING ================
 
-  const searchCategories = async (query) => {
+  const searchCategories = async query => {
     loading.value = true
     error.value = null
 
@@ -518,7 +550,7 @@ export function useCategories() {
         search: query,
         ...filters.value
       })
-      
+
       categories.value = response.categories || []
       return response
     } catch (err) {
@@ -540,7 +572,7 @@ export function useCategories() {
     currentCategory.value = null
   }
 
-  const setFilters = (newFilters) => {
+  const setFilters = newFilters => {
     filters.value = { ...filters.value, ...newFilters }
   }
 
@@ -552,13 +584,13 @@ export function useCategories() {
     }
   }
 
-  const validateCategoryData = (categoryData) => {
+  const validateCategoryData = categoryData => {
     const errors = []
-    
+
     if (!categoryData.category_name?.trim()) {
       errors.push('Category name is required')
     }
-    
+
     if (categoryData.sub_categories) {
       categoryData.sub_categories.forEach((sub, index) => {
         if (!sub.name?.trim()) {
@@ -566,7 +598,7 @@ export function useCategories() {
         }
       })
     }
-    
+
     return {
       isValid: errors.length === 0,
       errors
@@ -610,6 +642,7 @@ export function useCategories() {
     // Computed
     filteredCategories,
     activeCategories,
+    totalActiveCategories, // ✅ Added
     categoryStats,
     categoriesWithProductCounts,
     hasCategories,

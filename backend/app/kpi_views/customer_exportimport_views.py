@@ -32,8 +32,7 @@ class CustomerImportExportView(APIView):
 
             # Call service method (safe user handling)
             csv_data = self.customer_service.export_customers_to_csv(
-                include_deleted=include_deleted,
-                current_user=getattr(request, "current_user", None)
+                include_deleted=include_deleted
             )
 
             if not csv_data:

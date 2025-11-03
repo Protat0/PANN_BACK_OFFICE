@@ -412,6 +412,7 @@ export default {
 .modal-body {
   padding: 1.5rem 2rem;
   background-color: var(--surface-elevated);
+  overflow-y: auto;
 }
 
 .modal-footer {

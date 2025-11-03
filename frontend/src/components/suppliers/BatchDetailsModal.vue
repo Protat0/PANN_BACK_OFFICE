@@ -176,10 +176,10 @@
           <button type="button" class="btn btn-outline-secondary" @click="handleClose">
             Close
           </button>
-          <button type="button" class="btn btn-primary" @click="printReceipt">
+          <!--<button type="button" class="btn btn-primary" @click="printReceipt">
             <Printer :size="16" class="me-1" />
             Print Receipt
-          </button>
+          </button> -->
         </div>
       </div>
     </div>

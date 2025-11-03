@@ -53,9 +53,9 @@
           <span class="profile-name">My Profile</span>
           <small class="profile-role">Administrator</small>
         </div>
-        <button class="btn btn-icon-only btn-xs profile-settings">
+       <!-- <button class="btn btn-icon-only btn-xs profile-settings">
           <Settings :size="14" />
-        </button>
+        </button>-->
       </div>
     </div>
 

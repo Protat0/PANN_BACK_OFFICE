@@ -724,13 +724,19 @@ class CustomerService:
             if not customers:
                 return None
 
-            # Define CSV headers
             headers = [
                 "_id", "username", "full_name", "email", "phone",
                 "loyalty_points", "status", "date_created", "last_updated", "isDeleted"
             ]
 
-            # Create CSV in memory
+            def safe_date(value):
+                from datetime import datetime
+                if not value:
+                    return ""
+                if isinstance(value, datetime):
+                    return value.strftime("%Y-%m-%d %H:%M:%S")
+                return str(value)
+
             output = io.StringIO()
             writer = csv.DictWriter(output, fieldnames=headers)
             writer.writeheader()
@@ -744,8 +750,8 @@ class CustomerService:
                     "phone": c.get("phone", ""),
                     "loyalty_points": c.get("loyalty_points", 0),
                     "status": c.get("status", ""),
-                    "date_created": c.get("date_created", "").strftime("%Y-%m-%d %H:%M:%S") if c.get("date_created") else "",
-                    "last_updated": c.get("last_updated", "").strftime("%Y-%m-%d %H:%M:%S") if c.get("last_updated") else "",
+                    "date_created": safe_date(c.get("date_created")),
+                    "last_updated": safe_date(c.get("last_updated")),
                     "isDeleted": c.get("isDeleted", False),
                 })
 
@@ -754,6 +760,7 @@ class CustomerService:
 
         except Exception as e:
             raise Exception(f"Error exporting customers: {str(e)}")
+
     
 
     def import_customers_from_csv(self, file_path, current_user=None):
