@@ -181,3 +181,4 @@ Run: `pip install google-auth google-auth-oauthlib`
 - Verify your API_BASE_URL in frontend environment variables
 - Check that the backend server is running on the expected port
 
+
