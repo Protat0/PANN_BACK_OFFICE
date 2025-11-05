@@ -7,7 +7,7 @@ from functools import wraps
 logger = logging.getLogger(__name__)
 
 def get_authenticated_user_from_jwt(request):
-    """Unified JWT authentication helper for all systems"""
+    """Unified JWT authentication helper for all systems - handles both admin users and customers"""
     try:
         if not hasattr(request, 'headers'):
             logger.error(f"Request object missing headers attribute: {type(request)}")
@@ -19,28 +19,66 @@ def get_authenticated_user_from_jwt(request):
         
         token = authorization.split(" ", 1)[1]
         
-        auth_service = AuthService()
-        user_data = auth_service.get_current_user(token)
+        # Decode JWT token to check for customer_id or sub
+        import jwt as pyjwt
+        from django.conf import settings
         
-        if not user_data or not user_data.get('user_id'):
+        try:
+            payload = pyjwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+        except Exception as e:
+            logger.error(f"JWT decode error: {e}")
             return None
         
-        user_id = user_data.get('user_id')
-        user_doc = auth_service.user_collection.find_one({"_id": user_id})
+        # Check if this is a customer token (has customer_id)
+        customer_id = payload.get('customer_id')
+        if customer_id:
+            # This is a customer token - look up in customers collection
+            from ..database import db_manager
+            db = db_manager.get_database()
+            customers = db.customers
+            customer_doc = customers.find_one({"_id": customer_id})
+            
+            if customer_doc:
+                return {
+                    "user_id": str(customer_id),
+                    "customer_id": str(customer_id),
+                    "username": customer_doc.get('username', ''),
+                    "email": customer_doc.get('email', ''),
+                    "role": "customer"
+                }
+            else:
+                logger.error(f"Customer not found: {customer_id}")
+                return None
         
-        if not user_doc:
-            return None
-        
-        username = user_doc.get('username', '').strip()
-        display_username = username or user_doc.get('email', 'unknown')
+        # Check if this is an admin token (has sub)
+        user_id = payload.get('sub')
+        if user_id:
+            # This is an admin token - use AuthService
+            auth_service = AuthService()
+            user_data = auth_service.get_current_user(token)
+            
+            if not user_data or not user_data.get('user_id'):
+                return None
+            
+            user_id = user_data.get('user_id')
+            user_doc = auth_service.user_collection.find_one({"_id": user_id})
+            
+            if not user_doc:
+                return None
+            
+            username = user_doc.get('username', '').strip()
+            display_username = username or user_doc.get('email', 'unknown')
 
-        return {
-            "user_id": user_id,
-            "username": display_username,
-            "email": user_doc.get('email'),
-            "branch_id": user_doc.get('branch_id', 1),
-            "role": user_doc.get('role', 'admin')
-        }
+            return {
+                "user_id": user_id,
+                "username": display_username,
+                "email": user_doc.get('email'),
+                "branch_id": user_doc.get('branch_id', 1),
+                "role": user_doc.get('role', 'admin')
+            }
+        
+        # No valid token payload
+        return None
 
     except Exception as e:
         logger.error(f"JWT authentication error: {e}")

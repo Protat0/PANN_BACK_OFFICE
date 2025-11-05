@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from ..services.pos.online_transactions_services import OnlineTransactionService
+from ..decorators.authenticationDecorator import require_authentication
 from datetime import datetime, timedelta
 import logging
 
@@ -101,20 +102,22 @@ class GetCustomerOrdersView(OnlineTransactionServiceView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-class GetMyOrderHistoryView(OnlineTransactionServiceView):
+class GetMyOrderHistoryView(APIView):
     """Get order history for the currently logged-in customer (uses JWT auth)"""
     
+    def __init__(self):
+        super().__init__()
+        self.service = OnlineTransactionService()
+    
+    @require_authentication
     def get(self, request):
         try:
-            # Get customer ID from authenticated user
-            user = request.user
+            # Get customer ID from JWT authentication
+            current_user = request.current_user
             logger.info(f"=== ORDER HISTORY REQUEST ===")
-            logger.info(f"User: {user}")
-            logger.info(f"User authenticated: {user.is_authenticated if hasattr(user, 'is_authenticated') else 'Unknown'}")
-            logger.info(f"User ID: {user.id if hasattr(user, 'id') and user.id else 'None'}")
-            logger.info(f"Has 'customer' attribute: {hasattr(user, 'customer')}")
+            logger.info(f"Current user: {current_user}")
             
-            if not user or not hasattr(user, 'id') or not user.is_authenticated:
+            if not current_user:
                 logger.error("❌ User not authenticated")
                 return Response(
                     {
@@ -125,22 +128,22 @@ class GetMyOrderHistoryView(OnlineTransactionServiceView):
                     status=status.HTTP_401_UNAUTHORIZED
                 )
             
-            if not hasattr(user, 'customer'):
-                logger.error(f"❌ User {user.id} has no customer attribute")
-                logger.error(f"User dir: {[attr for attr in dir(user) if not attr.startswith('_')]}")
+            # Get customer_id from current_user (set by @require_authentication)
+            customer_id = current_user.get('customer_id') or current_user.get('user_id')
+            
+            if not customer_id:
+                logger.error(f"❌ No customer_id found in current_user: {current_user}")
                 return Response(
                     {
                         "success": False,
-                        "error": "Customer profile not found",
+                        "error": "Customer ID not found",
                         "results": []
                     }, 
                     status=status.HTTP_404_NOT_FOUND
                 )
             
-            customer = user.customer
-            customer_id = customer.customer_id
             logger.info(f"✅ Customer ID extracted: {customer_id}")
-            logger.info(f"✅ Customer email: {getattr(customer, 'email', 'N/A')}")
+            logger.info(f"✅ Customer email: {current_user.get('email', 'N/A')}")
             
             # Get query parameters
             status_filter = request.query_params.get('status')
