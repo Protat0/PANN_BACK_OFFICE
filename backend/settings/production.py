@@ -22,6 +22,12 @@ CORS_ALLOWED_ORIGINS = config(
     cast=lambda v: [s.strip() for s in v.split(',') if s.strip()]
 )
 
+# Allow localhost for development/testing
+if not CORS_ALLOWED_ORIGINS:
+    CORS_ALLOW_ALL_ORIGINS = True  # Temporary - remove in production!
+else:
+    CORS_ALLOW_ALL_ORIGINS = False
+
 # Database Configuration - Always use SQLite for Django ORM
 DATABASES = {
     'default': {
