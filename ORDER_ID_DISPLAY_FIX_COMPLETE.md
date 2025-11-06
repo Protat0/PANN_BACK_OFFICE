@@ -149,3 +149,7 @@ id: order.order_id || order._id,  // Try order_id first, fallback to _id
 **Frontend Auto-Reload**: Yes (Vite dev server)
 
 
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
