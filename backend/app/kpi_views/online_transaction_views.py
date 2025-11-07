@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 from ..services.pos.online_transactions_services import OnlineTransactionService
+from ..authentication import JWTAuthentication
 from datetime import datetime, timedelta
 import logging
 
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 class OnlineTransactionServiceView(APIView):
     """Base view for online transaction operations"""
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
     permission_classes = [IsAuthenticated]
     
     def __init__(self):
