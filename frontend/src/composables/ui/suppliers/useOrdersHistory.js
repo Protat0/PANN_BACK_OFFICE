@@ -267,8 +267,6 @@ export function useOrdersHistory() {
         batches: batchesBySupplier[supplier._id] || []
       }))
       
-      console.log('Orders fetched from suppliers:', allOrders.value.length)
-      console.log('Total batches:', allBatches.length)
       
     } catch (err) {
       error.value = err.response?.data?.error || 'Failed to fetch orders history'

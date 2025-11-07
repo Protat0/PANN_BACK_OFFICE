@@ -164,8 +164,6 @@ export default {
     }
   },
   setup(props) {
-    console.log('🎬 ProductDetails setup() called with id:', props.id)
-    
     const router = useRouter()
     
     // Template refs
@@ -202,28 +200,24 @@ export default {
 
     // Methods
     const handleEdit = () => {
-      console.log('✏️ Edit clicked')
       if (currentProduct.value && currentProduct.value._id) {
         addProductModal.value?.openEdit?.(currentProduct.value)
       }
     }
 
     const handleStockAdjustment = () => {
-      console.log('📦 Stock adjustment clicked')
       if (currentProduct.value && currentProduct.value._id) {
         stockUpdateModal.value?.openStock?.(currentProduct.value)
       }
     }
 
     const handleImageUpload = () => {
-      console.log('🖼️ Image upload clicked')
       if (currentProduct.value && currentProduct.value._id) {
         addProductModal.value?.openEdit?.(currentProduct.value)
       }
     }
 
     const handleReorder = () => {
-      console.log('🔄 Reorder clicked for product:', currentProduct.value)
       // TODO: Implement reorder logic
     }
 
@@ -235,7 +229,6 @@ export default {
       const confirmed = confirm(`Are you sure you want to delete "${currentProduct.value.product_name}"?`)
       if (confirmed) {
         try {
-          console.log('🗑️ Deleting product:', currentProduct.value._id)
           await deleteProduct(currentProduct.value._id)
           router.push('/products')
         } catch (err) {
@@ -251,7 +244,6 @@ export default {
       }
 
       try {
-        console.log('📤 Exporting product details (CSV) for:', currentProduct.value._id);
         await exportProductDetails(currentProduct.value._id);
       } catch (err) {
         console.error('❌ Error exporting product details:', err);
@@ -260,8 +252,6 @@ export default {
 
 
     const handleModalSuccess = async (result) => {
-      console.log('✅ Modal success:', result)
-      
       if (result?.message) {
         successMessage.value = result.message
         setTimeout(() => {
@@ -278,7 +268,6 @@ export default {
     }
 
     const setActiveTab = (tab) => {
-      console.log('🔄 Switching to tab:', tab)
       activeTab.value = tab
       
       // Mark this tab as visited for lazy loading
@@ -288,11 +277,8 @@ export default {
     const initializeData = async () => {
       // Prevent multiple initialization
       if (isInitialized.value) {
-        console.log('⏭️ Already initialized, skipping')
         return
       }
-      
-      console.log('🚀 Initializing ProductDetails data...')
       
       try {
         // Only fetch product and categories here
@@ -302,10 +288,6 @@ export default {
           fetchProductById(props.id)
         ])
         
-        console.log('✅ ProductDetails initialized')
-        console.log('Product:', currentProduct.value?.product_name)
-        console.log('Categories:', activeCategories.value.length)
-        
         isInitialized.value = true
       } catch (err) {
         console.error('❌ Failed to initialize data:', err)
@@ -314,7 +296,6 @@ export default {
     }
 
     onMounted(() => {
-      console.log('🎬 ProductDetails mounted')
       initializeData()
     })
 

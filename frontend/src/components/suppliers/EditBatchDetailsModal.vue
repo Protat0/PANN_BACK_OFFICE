@@ -390,8 +390,6 @@ export default {
         return
       }
       
-      console.log('📝 Initializing edit form with receipt:', receipt)
-      
       // Ensure expectedDate is in YYYY-MM-DD format for date input
       let expectedDate = receipt.expectedDate
       if (expectedDate && typeof expectedDate === 'string' && expectedDate.includes('T')) {
@@ -403,15 +401,7 @@ export default {
         date: receipt.date,  // Order date (created_at)
         expectedDate: expectedDate,
         status: receipt.status,
-        items: (receipt.items || []).map((item, index) => {
-          console.log(`📋 Mapping item ${index + 1}:`, {
-            name: item.name,
-            productId: item.productId,
-            categoryId: item.categoryId,
-            categoryName: item.categoryName,
-            subcategoryName: item.subcategoryName
-          })
-          
+        items: (receipt.items || []).map((item) => {
           return {
             productId: item.productId,
             name: item.name,
@@ -437,18 +427,10 @@ export default {
       // Reset editing state
       isEditingExpectedDate.value = false
       
-      console.log('✅ Edit form initialized with', editForm.value.items.length, 'items')
-      console.log('Items with category info:', editForm.value.items.map(i => ({
-        name: i.name,
-        categoryId: i.categoryId,
-        categoryName: i.categoryName,
-        subcategoryName: i.subcategoryName
-      })))
     }
     
     // Initialize form immediately if receipt is already available
     if (props.receipt) {
-      console.log('🚀 Initial receipt available, initializing form immediately')
       initializeFormData(props.receipt)
     }
     
@@ -483,13 +465,11 @@ export default {
       if (existingItem?.batchNumber) {
         // Reuse the existing batch number for grouping
         sharedBatchNumber = existingItem.batchNumber
-        console.log(`🔄 Reusing existing batch number: ${sharedBatchNumber}`)
       } else {
         // Generate new batch number in format BATCH-0001
         const timestamp = Date.now().toString().slice(-6)
         const random = Math.floor(Math.random() * 100).toString().padStart(2, '0')
         sharedBatchNumber = `BATCH-${timestamp}${random}`
-        console.log(`🆕 Generated new batch number: ${sharedBatchNumber}`)
       }
       
       editForm.value.items.push({
@@ -508,8 +488,6 @@ export default {
         isNew: true,
         errors: {}
       })
-      
-      console.log(`➕ Added new item with batch number: ${sharedBatchNumber}`)
     }
     
     // Category/Product Selection Functions
@@ -613,7 +591,6 @@ export default {
       }
       
       try {
-        console.log('Loading products for:', categoryId, subcategoryName)
         const response = await fetchProductsByCategory(categoryId, subcategoryName)
         
         let productsArray = []
@@ -667,14 +644,9 @@ export default {
       try {
         const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
         
-        console.log('💾 Starting save operation...')
-        console.log('Form data:', editForm.value)
-        
         // Update each batch with new details
         const updates = []
         for (const item of editForm.value.items) {
-          console.log(`Processing item: ${item.name}, isNew: ${item.isNew}, batchId: ${item.batchId}`)
-          
           if (!item.isNew && item.batchId) {
             // Update existing batch
             const updateData = {
@@ -684,8 +656,6 @@ export default {
               expected_delivery_date: editForm.value.expectedDate,
               notes: editForm.value.notes
             }
-            
-            console.log(`📝 Updating batch ${item.batchId}:`, updateData)
             
             updates.push(
               axios.put(
@@ -697,10 +667,7 @@ export default {
                     'Content-Type': 'application/json'
                   }
                 }
-              ).then(response => {
-                console.log(`✅ Updated batch ${item.batchId} successfully`)
-                return response
-              }).catch(error => {
+              ).catch(error => {
                 console.error(`❌ Failed to update batch ${item.batchId}:`, error.response?.data || error.message)
                 throw error
               })
@@ -719,8 +686,6 @@ export default {
                notes: editForm.value.notes
              }
              
-             console.log(`➕ Creating new batch:`, createData)
-             
              updates.push(
                axios.post(
                  `${API_BASE_URL}/batches/create/`,
@@ -731,10 +696,7 @@ export default {
                      'Content-Type': 'application/json'
                    }
                  }
-               ).then(response => {
-                 console.log(`✅ Created new batch successfully`)
-                 return response
-               }).catch(error => {
+               ).catch(error => {
                  console.error(`❌ Failed to create new batch:`, error.response?.data || error.message)
                  throw error
                })
@@ -742,10 +704,8 @@ export default {
            }
         }
         
-        console.log(`⏳ Waiting for ${updates.length} operations to complete...`)
         await Promise.all(updates)
         
-        console.log('✅ All operations completed successfully')
         showSuccess('Purchase order updated successfully')
         emit('saved', {
           ...editForm.value,
@@ -799,7 +759,6 @@ export default {
     // Watch for show prop changes
     watch(() => props.show, (newVal) => {
       if (newVal && props.receipt) {
-        console.log('🔄 Modal opened, initializing form...')
         initializeFormData(props.receipt)
       }
     })
@@ -807,7 +766,6 @@ export default {
     // Also watch for receipt changes
     watch(() => props.receipt, (newVal) => {
       if (newVal && props.show) {
-        console.log('🔄 Receipt data changed, re-initializing form...')
         initializeFormData(newVal)
       }
     })
@@ -816,7 +774,6 @@ export default {
     onMounted(async () => {
       try {
         await fetchCategories()
-        console.log('✅ Categories loaded:', categories.value?.length || 0)
       } catch (error) {
         console.error('Error loading categories:', error)
         showError('Failed to load categories')

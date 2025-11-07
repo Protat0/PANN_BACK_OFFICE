@@ -475,7 +475,6 @@ export default {
       handler(newOrder, oldOrder) {
         try {
           if (this.show && newOrder) {
-            console.log('Order watcher triggered, calling initializeModal')
             this.initializeModal()
           }
         } catch (error) {
@@ -502,7 +501,6 @@ export default {
   },
   methods: {
     initializeModal() {
-      console.log('=== INITIALIZE MODAL ===')
       this.isEditMode = this.initialMode === 'edit'
       this.resetEditForm()
       this.loadOrderData()
@@ -537,10 +535,6 @@ export default {
 
     loadOrderData() {
       try {
-        console.log('=== LOAD ORDER DATA START ===')
-        console.log('Order received:', this.order)
-        console.log('Order items:', this.order?.items)
-        
         // Reset state
         this.itemsReady = false
         
@@ -555,12 +549,8 @@ export default {
         
         // Process items with better error handling
         if (this.order.items && Array.isArray(this.order.items) && this.order.items.length > 0) {
-          console.log('Processing', this.order.items.length, 'items...')
-          
           // Create new arrays with proper reactivity
           const processedItems = this.order.items.map((item, index) => {
-            console.log(`Processing item ${index}:`, item)
-            
             const processedItem = {
               name: item?.name || item?.product_name || `Item ${index + 1}`,
               quantity: Number(item?.quantity) || 0,
@@ -580,11 +570,7 @@ export default {
           // Assign new arrays directly (Vue 3 handles reactivity automatically)
           this.orderItems = [...processedItems]
           this.editableItems = JSON.parse(JSON.stringify(processedItems))
-          
-          console.log('Successfully processed orderItems:', this.orderItems)
-          console.log('Items count:', this.orderItems.length)
         } else {
-          console.log('No valid items array found')
           this.orderItems = []
           this.editableItems = []
         }
@@ -599,11 +585,7 @@ export default {
         
         // Signal that items are ready
         this.itemsReady = true
-        
-        console.log('=== LOAD ORDER DATA COMPLETE ===')
-        console.log('Final orderItems:', this.orderItems)
-        console.log('Items ready:', this.itemsReady)
-        
+
         // Force update in Vue 3
         this.$nextTick(() => {
           // Force re-render if needed

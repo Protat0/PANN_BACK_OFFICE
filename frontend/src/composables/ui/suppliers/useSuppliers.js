@@ -204,12 +204,9 @@ export function useSuppliers() {
             batches.map(async (batch) => {
               try {
                 if (batch.product_id) {
-                  console.log(`🔍 Fetching product details for batch ${batch._id}, product_id: ${batch.product_id}`)
                   const productResponse = await api.get(`/products/${batch.product_id}/`)
-                  console.log(`📡 Product API response:`, productResponse.data)
                   
                   const product = productResponse.data.data
-                  console.log(`✅ Product fetched for ${batch.product_id}:`, product)
                   
                   if (product) {
                     const enrichedBatch = {
@@ -219,8 +216,6 @@ export function useSuppliers() {
                       category_name: product.category_name || '',
                       subcategory_name: product.subcategory_name || ''
                     }
-                    console.log(`📦 Enriched batch:`, enrichedBatch)
-                    console.log(`📦 Product name set to:`, enrichedBatch.product_name)
                     return enrichedBatch
                   } else {
                     console.warn(`⚠️ No product data returned for ${batch.product_id}`)
@@ -295,13 +290,6 @@ export function useSuppliers() {
                   expiryDate: batch.expiry_date,
                   quantityRemaining: batch.quantity_remaining
                 }
-                console.log(`🔍 Creating item for batch ${batch._id}:`, {
-                  batch_product_name: batch.product_name,
-                  batch_name: batch.name,
-                  batch_product_id: batch.product_id,
-                  item_name: item.name,
-                  item_product_name: item.product_name
-                })
                 return item
               }),
               description: `Stock receipt with ${enrichedBatches.length} item(s)`,

@@ -79,10 +79,9 @@
           <div class="alert alert-secondary">
             <small>
               <strong>Manual Test Instructions:</strong><br>
-              1. Open browser dev tools (F12)<br>
-              2. Click "Console Log Test" button<br>
-              3. Check console for toast debug info<br>
-              4. Look for any error messages
+              1. Click "Console Log Test" button<br>
+              2. Review the popup for toast debug info<br>
+              3. Verify there are no error alerts
             </small>
           </div>
           <button class="btn btn-outline-info btn-sm" @click="consoleTest">
@@ -107,7 +106,6 @@ export default {
     try {
       toast = useToast()
       composableAvailable = true
-      console.log('✅ Toast composable loaded successfully:', toast)
     } catch (error) {
       console.error('❌ Error loading toast composable:', error)
       composableAvailable = false
@@ -132,9 +130,6 @@ export default {
   },
   mounted() {
     this.updateToastCount()
-    console.log('🧪 ToastDebug component mounted')
-    console.log('Toast composable available:', this.composableAvailable)
-    console.log('Toast object:', this.toast)
     
     // Set up interval to update toast count
     setInterval(() => {
@@ -149,7 +144,6 @@ export default {
     },
     
     testSuccess() {
-      console.log('🧪 Testing success toast')
       this.lastAction = 'Success Toast'
       
       if (this.toast && this.toast.success) {
@@ -161,7 +155,6 @@ export default {
     },
     
     testError() {
-      console.log('🧪 Testing error toast')
       this.lastAction = 'Error Toast'
       
       if (this.toast && this.toast.error) {
@@ -173,7 +166,6 @@ export default {
     },
     
     testWarning() {
-      console.log('🧪 Testing warning toast')
       this.lastAction = 'Warning Toast'
       
       if (this.toast && this.toast.warning) {
@@ -185,7 +177,6 @@ export default {
     },
     
     testInfo() {
-      console.log('🧪 Testing info toast')
       this.lastAction = 'Info Toast'
       
       if (this.toast && this.toast.info) {
@@ -197,7 +188,6 @@ export default {
     },
     
     testProductAdded() {
-      console.log('🧪 Testing product addition toast')
       this.lastAction = 'Product Added'
       
       if (this.toast && this.toast.success) {
@@ -210,7 +200,6 @@ export default {
     },
     
     testProductUpdate() {
-      console.log('🧪 Testing product update toast')
       this.lastAction = 'Product Updated'
       
       if (this.toast && this.toast.success) {
@@ -222,7 +211,6 @@ export default {
     },
     
     testProductError() {
-      console.log('🧪 Testing product error toast')
       this.lastAction = 'Product Error'
       
       if (this.toast && this.toast.error) {
@@ -234,7 +222,6 @@ export default {
     },
     
     testLoading() {
-      console.log('🧪 Testing loading toast')
       this.lastAction = 'Loading Toast'
       
       if (this.toast && this.toast.loading) {
@@ -254,7 +241,6 @@ export default {
     },
     
     testPersistent() {
-      console.log('🧪 Testing persistent toast')
       this.lastAction = 'Persistent Toast'
       
       if (this.toast && this.toast.warning) {
@@ -268,7 +254,6 @@ export default {
     },
     
     testMultiple() {
-      console.log('🧪 Testing multiple toasts')
       this.lastAction = 'Multiple Toasts'
       
       if (this.toast) {
@@ -283,7 +268,6 @@ export default {
     },
     
     clearAll() {
-      console.log('🧪 Clearing all toasts')
       this.lastAction = 'Clear All'
       
       if (this.toast && this.toast.dismissAll) {
@@ -295,21 +279,8 @@ export default {
     },
     
     consoleTest() {
-      console.log('🧪 === TOAST DEBUG CONSOLE TEST ===')
-      console.log('Composable Available:', this.composableAvailable)
-      console.log('Toast Object:', this.toast)
-      console.log('Toast Container in DOM:', this.containerPresent)
-      console.log('Current Toast Count:', this.toastCount)
-      
-      if (this.toast) {
-        console.log('Available Toast Methods:', Object.keys(this.toast))
-        console.log('Toast State:', this.toast.toasts)
-      }
-      
-      console.log('=== END TOAST DEBUG ===')
-      
-      // Also show in alert for easy viewing
-      alert(`Toast Debug Info (check console for details):
+      // Display relevant toast debug info in an alert for easy viewing
+      alert(`Toast Debug Info:
       
 Composable: ${this.composableAvailable ? 'Available' : 'Not Available'}
 Container: ${this.containerPresent ? 'Present' : 'Missing'}

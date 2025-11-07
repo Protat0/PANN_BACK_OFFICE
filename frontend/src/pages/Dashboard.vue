@@ -590,8 +590,6 @@ export default {
       const currentMonth = currentDate.getMonth() // 0-indexed
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
       
-      console.log('📅 Current date info:', { currentYear, currentMonth, currentMonthName: months[currentMonth] })
-      
       // Generate labels from October to current month
       let labels = []
       const startMonth = 9 // October (0-indexed)
@@ -599,34 +597,26 @@ export default {
       // Always start with October of current year
       if (currentMonth >= startMonth) {
         // We're in October or later - show from October to current month
-        console.log(`🏷️ Adding months from ${startMonth} to ${currentMonth}`)
         for (let monthIndex = startMonth; monthIndex <= currentMonth; monthIndex++) {
           const label = `${months[monthIndex]} ${currentYear}`
           labels.push(label)
-          console.log(`🏷️ Added label: ${label}`)
         }
       } else {
         // We're before October - show from October of previous year to current month
-        console.log(`🏷️ Adding months from previous year October to current month`)
         // First, add remaining months from previous year (Oct, Nov, Dec)
         for (let monthIndex = startMonth; monthIndex < 12; monthIndex++) {
           const label = `${months[monthIndex]} ${currentYear - 1}`
           labels.push(label)
-          console.log(`🏷️ Added previous year label: ${label}`)
         }
         // Then add months from current year up to current month
         for (let monthIndex = 0; monthIndex <= currentMonth; monthIndex++) {
           const label = `${months[monthIndex]} ${currentYear}`
           labels.push(label)
-          console.log(`🏷️ Added current year label: ${label}`)
         }
       }
-      
-      console.log(`🏷️ Total labels generated: ${labels.length}`, labels)
-      
+
       // Ensure we always have at least one label (fallback)
       if (labels.length === 0) {
-        console.log(`🏷️ No labels generated, using fallback`)
         labels = [`Oct ${currentYear}`]
       }
       
@@ -647,14 +637,6 @@ export default {
         }
       }
       
-      console.log('📊 Monthly chart data generated:', { 
-        labels: labels, 
-        data: data, 
-        monthlyIncome: this.monthlyIncome,
-        labelsLength: labels.length,
-        dataLength: data.length
-      })
-      
       return { labels, data }
     },
     /**
@@ -662,7 +644,6 @@ export default {
      */
     updateChartWithMonthlyData() {
       if (!this.chart || !this.monthlyIncome) {
-        console.log('📊 Chart or monthly income not available')
         return
       }
       
@@ -671,9 +652,7 @@ export default {
         const currentYear = 2025
         const labels = ['Oct 2025']
         const data = [this.monthlyIncome]
-        
-        console.log('📊 Updating chart with simple data:', { labels, data, monthlyIncome: this.monthlyIncome })
-        
+
         // Direct update without reactivity
         if (this.chart.data && this.chart.data.datasets && this.chart.data.datasets[0]) {
           // Clear and set new data directly
@@ -681,10 +660,9 @@ export default {
           this.chart.data.labels.push(...labels)
           this.chart.data.datasets[0].data.length = 0
           this.chart.data.datasets[0].data.push(...data)
-          
+
           // Update chart
           this.chart.update('none')
-          console.log('📊 Chart updated successfully')
         }
       } catch (error) {
         console.error('📊 Simple chart update failed:', error)
@@ -697,29 +675,24 @@ export default {
     async loadChartDataOnly() {
       // Prevent recursion - check flag first
       if (this.isUpdatingChart) {
-        console.log('📊 Chart update already in progress, skipping')
         return
       }
       
       // Only update chart if it exists and is properly initialized
       if (!this.chart || !this.chart.data || !this.chart.data.datasets || this.chart.data.datasets.length === 0) {
-        console.log('📊 Chart not ready yet, skipping data load')
         return
       }
       
       this.isUpdatingChart = true
       
       try {
-        console.log('📊 Starting chart data load for frequency:', this.salesSelectedFrequency)
-        
+
         // For monthly frequency, use the simple update method
         if (this.salesSelectedFrequency === 'monthly' && this.monthlyIncome) {
           this.updateChartWithMonthlyData()
           return
         }
-        
-        console.log('📊 No valid data to load for current frequency')
-        
+
       } catch (error) {
         console.error('Failed to load chart data only:', error)
       } finally {
@@ -766,7 +739,6 @@ export default {
      * Handle frequency change from the dropdown
      */
     async onFrequencyChangeHandler() {
-      console.log('🔄 Frequency changed to:', this.salesSelectedFrequency)
       
       // Prevent multiple rapid changes
       if (this.isUpdatingChart) {
@@ -779,7 +751,6 @@ export default {
           this.updateChartWithMonthlyData()
         } else {
           // For other frequencies, we could implement similar simple methods
-          console.log('📊 Frequency change handled, chart will be updated manually')
         }
       } catch (error) {
         console.error('Failed to handle frequency change:', error)
@@ -897,19 +868,11 @@ export default {
       try {
         // Use initializeProducts for cleaner initial data loading
         await this.initializeProducts()
-        console.log('Products data loaded successfully:', {
-          productsCount: this.products?.length || 0,
-          productStats: this.productStats
-        })
       } catch (error) {
         console.error('Failed to load products data:', error)
         // Fallback to fetchProducts if initializeProducts fails
         try {
           await this.fetchProducts()
-          console.log('Products data loaded via fallback method:', {
-            productsCount: this.products?.length || 0,
-            productStats: this.productStats
-          })
         } catch (fallbackError) {
           console.error('Fallback fetchProducts also failed:', fallbackError)
           // The error is already handled by the useProducts composable
@@ -928,71 +891,43 @@ export default {
         const startDate = startOfLastMonth.toISOString().split('T')[0]
         const endDate = endOfLastMonth.toISOString().split('T')[0]
         
-        console.log('Loading sales data - checking both last month and all-time:', { startDate, endDate })
         
         // Load the last month's sales count
         await this.loadTotalSalesCount(startDate, endDate)
         const lastMonthCount = this.totalSalesCount
         
-        console.log('Last month sales count:', { 
-          totalSales: lastMonthCount, 
-          period: `${startDate} to ${endDate}` 
-        })
-        
         // Load all-time count for comparison
-        console.log('🔍 Loading all-time sales count for comparison...')
         await this.loadTotalSalesCountAllTime()
         const allTimeCount = this.totalSalesCount
         
-        console.log('🔍 COMPARISON:', {
-          lastMonth: `${lastMonthCount} items sold (${startDate} to ${endDate})`,
-          allTime: `${allTimeCount} items sold (no date filter)`,
-          difference: `${allTimeCount - lastMonthCount} items sold in other periods`
-        })
-        
         // Use all-time count if last month shows 0, otherwise use last month
         if (lastMonthCount > 0) {
-          console.log('✅ Using last month count:', lastMonthCount)
           this.totalSalesCount = lastMonthCount
           this.isShowingAllTimeSales = false
         } else {
-          console.log('⚠️ Last month had no sales, using all-time count:', allTimeCount)
           this.totalSalesCount = allTimeCount
           this.isShowingAllTimeSales = true
         }
         
         // Also load profit data with the same date range
-        console.log('💰 Loading profit data for same period...')
         await this.loadTotalProfit(startDate, endDate)
         const lastMonthProfit = this.totalProfit
-        
-        console.log('Last month profit:', lastMonthProfit)
-        
+
         // Load all-time profit for comparison
-        console.log('💰 Loading all-time profit for comparison...')
         await this.loadTotalProfitAllTime()
         const allTimeProfit = this.totalProfit
         
-        console.log('💰 COMPARISON:', {
-          lastMonth: `${lastMonthProfit} profit (${startDate} to ${endDate})`,
-          allTime: `${allTimeProfit} profit (no date filter)`,
-          difference: `${allTimeProfit - lastMonthProfit} profit in other periods`
-        })
-        
         // Use all-time profit if last month shows 0, otherwise use last month
         if (lastMonthProfit > 0) {
-          console.log('✅ Using last month profit:', lastMonthProfit)
           // Restore the last month profit value
           this.totalProfit = lastMonthProfit
           this.isShowingAllTimeProfit = false
         } else {
-          console.log('⚠️ Last month had no profit, using all-time profit:', allTimeProfit)
           // Keep the all-time profit value (already set)
           this.isShowingAllTimeProfit = true
         }
         
         // Load current month's revenue (separate from the last month date range used for sales/profit)
-        console.log('💵 Loading current month revenue...')
         await this.loadCurrentMonthIncome()
         
         // Set the current month period for the subtitle
@@ -1003,7 +938,6 @@ export default {
           month: 'long'
         })
         
-        console.log('✅ Monthly revenue loaded:', this.monthlyIncome, 'for', this.currentMonthPeriod)
         
       } catch (error) {
         console.error('Failed to load sales data:', error)
@@ -1022,12 +956,10 @@ export default {
       setTimeout(async () => {
         try {
           await this.initChart()
-          console.log('📊 Chart initialized successfully')
           
           // Load chart data only after chart is properly initialized and monthly income is available
           setTimeout(() => {
             if (this.chart && this.monthlyIncome && this.salesSelectedFrequency === 'monthly') {
-              console.log('📊 Loading initial chart data with simple method...')
               try {
                 this.updateChartWithMonthlyData()
               } catch (error) {

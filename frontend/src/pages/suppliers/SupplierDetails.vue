@@ -910,7 +910,6 @@ export default {
         )
         
         const backendSupplier = supplierResponse.data
-        console.log('✅ Supplier loaded:', backendSupplier.supplier_name)
         
         // ===== STEP 2: Fetch Batches for this Supplier =====
         let batchesList = []
@@ -925,12 +924,6 @@ export default {
             }
           )
           
-          console.log('=== BATCHES RESPONSE DEBUG ===')
-          console.log('Response data:', batchesResponse.data)
-          console.log('Type:', typeof batchesResponse.data)
-          console.log('Is array?', Array.isArray(batchesResponse.data))
-          console.log('==============================')
-          
           // Handle different response formats
           const rawBatches = batchesResponse.data.batches || batchesResponse.data || []
           
@@ -943,8 +936,6 @@ export default {
             console.warn('⚠️ Batches response is not an array:', rawBatches)
             batchesList = []
           }
-          
-          console.log(`📦 Found ${batchesList.length} batches`)
           
         } catch (batchesError) {
           console.error('❌ Error fetching batches:', batchesError)
@@ -981,7 +972,6 @@ export default {
         
         // If no batches, set empty orders
         if (batchesList.length === 0) {
-          console.log('ℹ️ No batches found for this supplier')
           this.orders = []
           this.filteredOrders = []
           this.editableNotes = this.supplier.notes
@@ -996,10 +986,6 @@ export default {
             }
           ]
           
-          console.log('=== SUMMARY (No Batches) ===')
-          console.log('Supplier:', this.supplier.name)
-          console.log('Orders: 0')
-          console.log('============================')
           return
         }
         
@@ -1137,12 +1123,6 @@ export default {
           }
         ]
         
-        console.log('=== SUMMARY ===')
-        console.log('Supplier:', this.supplier.name)
-        console.log('Orders:', this.orders.length)
-        console.log('Total Batches:', batchesList.length)
-        console.log('First Order:', this.orders[0])
-        console.log('===============')
         
       } catch (error) {
         console.error('Error fetching supplier details:', error)
@@ -1194,7 +1174,6 @@ export default {
     },
     
     async handleStockReceived(results) {
-      console.log('✅ Stock received:', results)
       
       if (results.successful?.length > 0) {
         this.success(`Successfully received ${results.successful.length} batch(es)`)
@@ -1222,7 +1201,6 @@ export default {
     },
 
     async handleOrderSave(result) {
-      console.log('✅ Order created:', result)
       
       const { successful, failed } = result.results
       
@@ -1244,7 +1222,6 @@ export default {
 
 
     viewReceipt(receipt) {
-      console.log('Viewing receipt:', receipt)
       this.selectedReceiptForView = receipt
       this.showBatchDetailsModal = true
     },
@@ -1255,10 +1232,6 @@ export default {
     },
 
     editBatchDetails(receipt) {
-      console.log('📝 Editing batch details for receipt:', receipt)
-      console.log('Receipt has', receipt.items?.length || 0, 'items')
-      console.log('Order Date (created_at):', receipt.date)
-      console.log('Expected Delivery:', receipt.expectedDate)
       this.selectedReceiptForEdit = receipt
       this.showEditBatchDetailsModal = true
     },
@@ -1269,7 +1242,6 @@ export default {
     },
 
     async handleBatchDetailsUpdated(updatedReceipt) {
-      console.log('✅ Batch details updated:', updatedReceipt)
       this.success('Purchase order updated successfully')
       
       // Refresh supplier details to show updated batches
@@ -1637,12 +1609,6 @@ export default {
     },
 
     viewOrder(order) {
-      console.log('=== VIEWING ORDER ===')
-      console.log('Order being passed to modal:', order)
-      console.log('Order items:', order.items)
-      console.log('Items length:', order.items?.length)
-      console.log('Items structure:', order.items?.[0])
-      console.log('===================')
       
       this.selectedOrderForView = order
       this.orderModalMode = 'view'
@@ -1771,22 +1737,16 @@ export default {
     },
 
     getActiveOrdersForModal() {
-      console.log('🔍 Getting active orders for modal...')
-      console.log('All orders:', this.orders.length)
-      console.log('Orders with statuses:', this.orders.map(o => ({ id: o.id, status: o.status })))
       
       // Filter for pending orders (both Pending Delivery and Partially Received)
       const activeOrders = this.orders.filter(order => {
         const isActive = order.status === 'Pending Delivery' || order.status === 'Partially Received'
-        console.log(`Order ${order.id}: status=${order.status}, isActive=${isActive}`)
         return isActive
       })
       
-      console.log('Active orders found:', activeOrders.length)
       
       // Transform the orders to match the format expected by ActiveOrdersModal
       const transformedOrders = activeOrders.map(order => {
-        console.log(`Transforming order ${order.id} with ${order.items?.length || 0} items`)
         
         return {
           id: order.id,
@@ -1799,7 +1759,6 @@ export default {
           totalAmount: order.total, // Map total to totalAmount
           status: order.status,
           items: order.items.map(item => {
-            console.log(`Item: name="${item.name}", product_name="${item.product_name}", productId="${item.productId}"`)
             return {
               name: item.name || item.product_name || item.productId || 'Unknown Product',
               product_name: item.name || item.product_name || 'Unknown Product',
@@ -1818,7 +1777,6 @@ export default {
         }
       })
       
-      console.log('Transformed orders:', transformedOrders.length)
       return transformedOrders
     },
 

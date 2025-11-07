@@ -631,10 +631,7 @@ export default {
       }
       
       try {
-        console.log('Loading products for:', categoryId, subcategoryName)
         const response = await fetchProductsByCategory(categoryId, subcategoryName)
-        
-        console.log('Products response:', response)
         
         // ✅ HANDLE DIFFERENT RESPONSE FORMATS
         let productsArray = []
@@ -650,7 +647,6 @@ export default {
           productsArray = []
         }
         
-        console.log('Parsed products array:', productsArray)
         productsByCategory.value[key] = productsArray
         
       } catch (error) {
@@ -730,7 +726,6 @@ export default {
         
         // Use user-provided batch number or generate one automatically
         const sharedBatchNumber = orderData.value.referenceNumber?.trim() || generateBatchNumber()
-        console.log(`📦 Using batch number for all items: ${sharedBatchNumber}`)
         
         // Update the orderData with the final batch number (in case it was auto-generated)
         if (!orderData.value.referenceNumber?.trim()) {

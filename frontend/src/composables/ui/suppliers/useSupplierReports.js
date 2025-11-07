@@ -480,12 +480,6 @@ export function useSupplierReports() {
         ...supplier,
         batches: enrichedBatchesBySupplier[supplier._id] || []
       }))
-      
-      console.log('Suppliers fetched for reports:', allSuppliers.value.length)
-      console.log('Total batches:', allBatches.length)
-      console.log('Active orders found:', activeOrders.value.length)
-      console.log('Top performers found:', topPerformers.value.length)
-      
     } catch (err) {
       error.value = err.response?.data?.error || 'Failed to fetch supplier reports'
       console.error('Error fetching suppliers for reports:', err)

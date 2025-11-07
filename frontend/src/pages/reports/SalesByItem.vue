@@ -569,17 +569,12 @@ export default {
           return;
         }
         
-        console.log('📊 Fetching sales data with date range:', dateRange);
-        console.log('📅 Frequency:', this.selectedFrequency);
-        
         const response = await salesDisplayService.getSalesByItem(
           dateRange.start_date, 
           dateRange.end_date,
           false
         );
 
-        console.log('📦 Raw API response:', response);
-        
         let data = [];
         
         if (Array.isArray(response)) {
@@ -592,8 +587,6 @@ export default {
           console.warn('⚠️ Unexpected API response format:', response);
           data = [];
         }
-
-        console.log('📈 Processed data for table:', data);
 
         this.allSalesByItemRows = data
           .filter(item => item && typeof item === 'object')
@@ -617,9 +610,6 @@ export default {
 
         this.salesByItemPagination.current_page = 1;
         this.updateSalesByItemPageData();
-
-        console.log('🎯 Final table rows:', this.salesByItemRows);
-        console.log('📄 Pagination info:', this.salesByItemPagination);
 
         this.connectionLost = false;
         this.consecutiveErrors = 0;
@@ -686,8 +676,6 @@ export default {
           defaultDate.setDate(defaultDate.getDate() - 30);
           start_date = this.formatDateForAPI(defaultDate);
       }
-      
-      console.log(`📅 ${frequency} date range:`, { start_date, end_date });
       
       return { start_date, end_date };
     },

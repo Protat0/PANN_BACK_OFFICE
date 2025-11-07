@@ -151,15 +151,6 @@ export default {
       default: false
     }
   },
-  mounted() {
-    console.log('SupplierCard received supplier data:', {
-      name: this.supplier.name,
-      purchaseOrders: this.supplier.purchaseOrders,
-      activeOrders: this.supplier.activeOrders,
-      totalSpent: this.supplier.totalSpent,
-      daysActive: this.supplier.daysActive
-    })
-  },
   methods: {
     getStatusBadgeClass(status) {
       const classes = {

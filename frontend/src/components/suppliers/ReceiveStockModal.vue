@@ -223,8 +223,6 @@ export default {
           }
         )
         
-        console.log('📦 Raw response:', response.data)
-        
         // Handle response structure: {success: true, data: [...]}
         if (response.data.success && response.data.data) {
           pendingBatches.value = response.data.data
@@ -234,11 +232,6 @@ export default {
           pendingBatches.value = []
         }
         
-        console.log('📦 Loaded pending batches:', pendingBatches.value.length)
-        
-        if (pendingBatches.value.length > 0) {
-          console.log('📦 Sample batch:', pendingBatches.value[0])
-        }
         
       } catch (error) {
         console.error('Error loading pending batches:', error)

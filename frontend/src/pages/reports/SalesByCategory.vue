@@ -516,7 +516,6 @@ export default {
 
     viewCategoryDetails(category) {
       // You can implement a modal or navigation to detailed view
-      console.log('Viewing category details:', category);
       this.$notify({
         title: 'Category Details',
         message: `Detailed view for ${category.name} would open here`,

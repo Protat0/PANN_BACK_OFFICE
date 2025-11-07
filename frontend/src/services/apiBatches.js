@@ -120,7 +120,6 @@ class BatchService {
 
   async getBatchesBySupplier(supplierId, filters = {}) {
     try {
-      console.log('📦 Getting batches for supplier:', { supplierId, filters });
       const params = {};
       
       if (filters.status) params.status = filters.status;
