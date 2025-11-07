@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 from ..services.pos.online_transactions_services import OnlineTransactionService
 from datetime import datetime, timedelta
@@ -25,7 +25,7 @@ class CreateOnlineOrderView(OnlineTransactionServiceView):
     """Create a new online order"""
     # Override authentication and permission to allow JWT token authentication
     authentication_classes = []  # Disable default authentication, we'll validate JWT manually
-    permission_classes = []  # Allow access, we'll validate JWT manually
+    permission_classes = [AllowAny]  # Allow access without Django auth, we'll validate JWT manually
     
     def post(self, request):
         try:
