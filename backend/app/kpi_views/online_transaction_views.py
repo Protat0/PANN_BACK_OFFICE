@@ -21,11 +21,15 @@ class OnlineTransactionServiceView(APIView):
 # ORDER MANAGEMENT
 # ================================================================
 
-class CreateOnlineOrderView(OnlineTransactionServiceView):
-    """Create a new online order"""
-    # Override authentication and permission to allow JWT token authentication
+class CreateOnlineOrderView(APIView):
+    """Create a new online order - allows JWT token authentication"""
+    # Completely bypass base class authentication
     authentication_classes = []  # Disable default authentication, we'll validate JWT manually
     permission_classes = [AllowAny]  # Allow access without Django auth, we'll validate JWT manually
+    
+    def __init__(self):
+        super().__init__()
+        self.service = OnlineTransactionService()
     
     def post(self, request):
         try:
