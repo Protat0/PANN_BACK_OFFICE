@@ -2,6 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 from ..services.pos.online_transactions_services import OnlineTransactionService
 from datetime import datetime, timedelta
 import logging
@@ -22,27 +23,62 @@ class OnlineTransactionServiceView(APIView):
 
 class CreateOnlineOrderView(OnlineTransactionServiceView):
     """Create a new online order"""
+    # Override authentication and permission to allow JWT token authentication
+    authentication_classes = []  # Disable default authentication, we'll validate JWT manually
+    permission_classes = []  # Allow access, we'll validate JWT manually
     
     def post(self, request):
         try:
+            # Extract customer_id from JWT token if available, otherwise use request data
+            import jwt
+            from django.conf import settings
+            
+            logger.info(f"=== CREATE ORDER REQUEST ===")
+            
+            # Try to get customer_id from JWT token first
+            auth_header = request.headers.get('Authorization', '')
+            customer_id_from_token = None
+            
+            if auth_header.startswith('Bearer '):
+                try:
+                    token = auth_header.split(' ')[1]
+                    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+                    customer_id_from_token = payload.get('customer_id')
+                    logger.info(f"✅ Customer ID extracted from JWT: {customer_id_from_token}")
+                except jwt.ExpiredSignatureError:
+                    logger.error("❌ JWT token expired")
+                except jwt.InvalidTokenError as e:
+                    logger.error(f"❌ Invalid JWT token: {str(e)}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not decode JWT token: {str(e)}")
+            
             order_data = request.data
-            customer_id = order_data.get('customer_id')
+            customer_id = customer_id_from_token or order_data.get('customer_id')
             
             if not customer_id:
+                logger.error("❌ No customer_id found in token or request data")
                 return Response(
-                    {"error": "Customer ID is required"}, 
+                    {"error": "Customer ID is required. Please ensure you are logged in."}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
+            
+            # Use customer_id from token if available, otherwise use the one from request
+            if customer_id_from_token:
+                order_data['customer_id'] = customer_id_from_token
+                logger.info(f"✅ Using customer_id from JWT token: {customer_id_from_token}")
             
             result = self.service.create_online_order(order_data, customer_id)
             
             if result['success']:
+                logger.info(f"✅ Order created successfully: {result.get('data', {}).get('order_id', 'N/A')}")
                 return Response(result, status=status.HTTP_201_CREATED)
             else:
+                logger.error(f"❌ Order creation failed: {result.get('error', 'Unknown error')}")
                 return Response(result, status=status.HTTP_400_BAD_REQUEST)
                 
         except Exception as e:
-            logger.error(f"Error creating online order: {str(e)}")
+            logger.error(f"❌ Error creating online order: {str(e)}")
+            logger.exception(e)
             return Response(
                 {"error": f"Failed to create order: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -106,16 +142,16 @@ class GetMyOrderHistoryView(OnlineTransactionServiceView):
     
     def get(self, request):
         try:
-            # Get customer ID from authenticated user
-            user = request.user
-            logger.info(f"=== ORDER HISTORY REQUEST ===")
-            logger.info(f"User: {user}")
-            logger.info(f"User authenticated: {user.is_authenticated if hasattr(user, 'is_authenticated') else 'Unknown'}")
-            logger.info(f"User ID: {user.id if hasattr(user, 'id') and user.id else 'None'}")
-            logger.info(f"Has 'customer' attribute: {hasattr(user, 'customer')}")
+            # Extract customer_id from JWT token in Authorization header
+            import jwt
+            from django.conf import settings
             
-            if not user or not hasattr(user, 'id') or not user.is_authenticated:
-                logger.error("❌ User not authenticated")
+            logger.info(f"=== ORDER HISTORY REQUEST ===")
+            
+            # Get JWT token from Authorization header
+            auth_header = request.headers.get('Authorization', '')
+            if not auth_header.startswith('Bearer '):
+                logger.error("❌ No Bearer token in Authorization header")
                 return Response(
                     {
                         "success": False,
@@ -125,22 +161,47 @@ class GetMyOrderHistoryView(OnlineTransactionServiceView):
                     status=status.HTTP_401_UNAUTHORIZED
                 )
             
-            if not hasattr(user, 'customer'):
-                logger.error(f"❌ User {user.id} has no customer attribute")
-                logger.error(f"User dir: {[attr for attr in dir(user) if not attr.startswith('_')]}")
+            token = auth_header.split(' ')[1]
+            
+            try:
+                # Decode JWT token to get customer_id
+                payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+                customer_id = payload.get('customer_id')
+                
+                if not customer_id:
+                    logger.error("❌ No customer_id in JWT token payload")
+                    return Response(
+                        {
+                            "success": False,
+                            "error": "Invalid token: customer_id not found",
+                            "results": []
+                        }, 
+                        status=status.HTTP_401_UNAUTHORIZED
+                    )
+                
+                logger.info(f"✅ Customer ID extracted from JWT: {customer_id}")
+                logger.info(f"✅ Customer email from token: {payload.get('email', 'N/A')}")
+                
+            except jwt.ExpiredSignatureError:
+                logger.error("❌ JWT token expired")
                 return Response(
                     {
                         "success": False,
-                        "error": "Customer profile not found",
+                        "error": "Token expired",
                         "results": []
                     }, 
-                    status=status.HTTP_404_NOT_FOUND
+                    status=status.HTTP_401_UNAUTHORIZED
                 )
-            
-            customer = user.customer
-            customer_id = customer.customer_id
-            logger.info(f"✅ Customer ID extracted: {customer_id}")
-            logger.info(f"✅ Customer email: {getattr(customer, 'email', 'N/A')}")
+            except jwt.InvalidTokenError as e:
+                logger.error(f"❌ Invalid JWT token: {str(e)}")
+                return Response(
+                    {
+                        "success": False,
+                        "error": "Invalid token",
+                        "results": []
+                    }, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
             
             # Get query parameters
             status_filter = request.query_params.get('status')
