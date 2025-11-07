@@ -1,6 +1,7 @@
 // composables/ui/suppliers/useSuppliers.js
 import { ref, computed, reactive } from 'vue'
 import axios from 'axios'
+import { useToast } from '@/composables/ui/useToast'
 
 // Configure axios base URL
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
@@ -23,6 +24,7 @@ api.interceptors.request.use((config) => {
 })
 
 export function useSuppliers() {
+  const { success: showSuccess, error: showError } = useToast()
   // Reactive state
   const suppliers = ref([])
   const allBatches = ref([])
@@ -468,8 +470,10 @@ export function useSuppliers() {
       const newSupplier = transformSupplier(response.data)
       suppliers.value.unshift(newSupplier)
       
-      successMessage.value = `Supplier "${newSupplier.name}" added successfully`
+      const message = `Supplier "${newSupplier.name}" added successfully`
+      successMessage.value = message
       setTimeout(() => { successMessage.value = null }, 3000)
+      showSuccess(message)
       
       return { success: true, supplier: newSupplier }
       
@@ -477,6 +481,7 @@ export function useSuppliers() {
       console.error('Error adding supplier:', err)
       const errorMessage = err.response?.data?.error || 'Failed to add supplier'
       error.value = errorMessage
+      showError(errorMessage)
       return { success: false, error: errorMessage }
     } finally {
       loading.value = false
@@ -505,8 +510,10 @@ export function useSuppliers() {
         suppliers.value[index] = updatedSupplier
       }
       
-      successMessage.value = `Supplier "${updatedSupplier.name}" updated successfully`
+      const message = `Supplier "${updatedSupplier.name}" updated successfully`
+      successMessage.value = message
       setTimeout(() => { successMessage.value = null }, 3000)
+      showSuccess(message)
       
       return { success: true, supplier: updatedSupplier }
       
@@ -514,6 +521,7 @@ export function useSuppliers() {
       console.error('Error updating supplier:', err)
       const errorMessage = err.response?.data?.error || 'Failed to update supplier'
       error.value = errorMessage
+      showError(errorMessage)
       return { success: false, error: errorMessage }
     } finally {
       loading.value = false
@@ -558,8 +566,10 @@ export function useSuppliers() {
       await api.delete(`/suppliers/${supplier.id}/`)
       suppliers.value = suppliers.value.filter(s => s.id !== supplier.id)
       
-      successMessage.value = `Supplier "${supplier.name}" deleted successfully`
+      const message = `Supplier "${supplier.name}" deleted successfully`
+      successMessage.value = message
       setTimeout(() => { successMessage.value = null }, 3000)
+      showSuccess(message)
       
       return { success: true }
       
@@ -567,6 +577,7 @@ export function useSuppliers() {
       console.error('Error deleting supplier:', err)
       const errorMessage = err.response?.data?.error || 'Failed to delete supplier'
       error.value = errorMessage
+      showError(errorMessage)
       return { success: false, error: errorMessage }
     } finally {
       loading.value = false
@@ -593,8 +604,10 @@ export function useSuppliers() {
       const count = selectedSuppliers.value.length
       selectedSuppliers.value = []
       
-      successMessage.value = `Successfully deleted ${count} supplier(s)`
+      const message = `Successfully deleted ${count} supplier(s)`
+      successMessage.value = message
       setTimeout(() => { successMessage.value = null }, 3000)
+      showSuccess(message)
       
       return { success: true }
       
@@ -602,6 +615,7 @@ export function useSuppliers() {
       console.error('Error deleting suppliers:', err)
       const errorMessage = err.response?.data?.error || 'Failed to delete some suppliers'
       error.value = errorMessage
+      showError(errorMessage)
       return { success: false, error: errorMessage }
     } finally {
       loading.value = false
