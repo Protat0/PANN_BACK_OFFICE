@@ -21,90 +21,29 @@ class OnlineTransactionServiceView(APIView):
 # ORDER MANAGEMENT
 # ================================================================
 
-class CreateOnlineOrderView(APIView):
-    """Create a new online order - allows JWT token authentication"""
-    # Completely bypass base class authentication
-    authentication_classes = []  # Disable default authentication, we'll validate JWT manually
-    permission_classes = [AllowAny]  # Allow access without Django auth, we'll validate JWT manually
-    
-    def __init__(self):
-        super().__init__()
-        self.service = OnlineTransactionService()
-    
-    def check_permissions(self, request):
-        # Override to completely bypass permission checks
-        # We validate JWT manually in the post method
-        pass
-    
-    def check_throttles(self, request):
-        # Override to bypass throttling if needed
-        pass
+class CreateOnlineOrderView(OnlineTransactionServiceView):
+    """Create a new online order"""
     
     def post(self, request):
         try:
-            # Extract customer_id from JWT token if available, otherwise use request data
-            import jwt
-            from django.conf import settings
-            
-            logger.info(f"=== CREATE ORDER REQUEST ===")
-            logger.info(f"Request method: {request.method}")
-            logger.info(f"Request path: {request.path}")
-            logger.info(f"Has Authorization header: {bool(request.headers.get('Authorization'))}")
-            
-            # Try to get customer_id from JWT token first
-            auth_header = request.headers.get('Authorization', '')
-            customer_id_from_token = None
-            
-            logger.info(f"Authorization header: {auth_header[:50] if auth_header else 'None'}...")
-            
-            if auth_header.startswith('Bearer '):
-                try:
-                    token = auth_header.split(' ')[1]
-                    logger.info(f"Attempting to decode JWT token...")
-                    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-                    customer_id_from_token = payload.get('customer_id')
-                    logger.info(f"✅ Customer ID extracted from JWT: {customer_id_from_token}")
-                    logger.info(f"Token payload keys: {list(payload.keys())}")
-                except jwt.ExpiredSignatureError:
-                    logger.error("❌ JWT token expired")
-                except jwt.InvalidTokenError as e:
-                    logger.error(f"❌ Invalid JWT token: {str(e)}")
-                except Exception as e:
-                    logger.warning(f"⚠️ Could not decode JWT token: {str(e)}")
-                    logger.exception(e)
-            else:
-                logger.warning(f"⚠️ No Bearer token in Authorization header. Header value: {auth_header}")
-            
             order_data = request.data
-            logger.info(f"Order data received: customer_id={order_data.get('customer_id')}, items={len(order_data.get('items', []))}")
-            
-            customer_id = customer_id_from_token or order_data.get('customer_id')
+            customer_id = order_data.get('customer_id')
             
             if not customer_id:
-                logger.error("❌ No customer_id found in token or request data")
-                logger.error(f"Token customer_id: {customer_id_from_token}, Request customer_id: {order_data.get('customer_id')}")
                 return Response(
-                    {"error": "Customer ID is required. Please ensure you are logged in."}, 
+                    {"error": "Customer ID is required"}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            
-            # Use customer_id from token if available, otherwise use the one from request
-            if customer_id_from_token:
-                order_data['customer_id'] = customer_id_from_token
-                logger.info(f"✅ Using customer_id from JWT token: {customer_id_from_token}")
             
             result = self.service.create_online_order(order_data, customer_id)
             
             if result['success']:
-                logger.info(f"✅ Order created successfully: {result.get('data', {}).get('order_id', 'N/A')}")
                 return Response(result, status=status.HTTP_201_CREATED)
             else:
-                logger.error(f"❌ Order creation failed: {result.get('error', 'Unknown error')}")
                 return Response(result, status=status.HTTP_400_BAD_REQUEST)
                 
         except Exception as e:
-            logger.error(f"❌ Error creating online order: {str(e)}")
-            logger.exception(e)
+            logger.error(f"Error creating online order: {str(e)}")
             return Response(
                 {"error": f"Failed to create order: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
