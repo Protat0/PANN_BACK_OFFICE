@@ -34,29 +34,42 @@ class CreateOnlineOrderView(OnlineTransactionServiceView):
             from django.conf import settings
             
             logger.info(f"=== CREATE ORDER REQUEST ===")
+            logger.info(f"Request method: {request.method}")
+            logger.info(f"Request path: {request.path}")
+            logger.info(f"Has Authorization header: {bool(request.headers.get('Authorization'))}")
             
             # Try to get customer_id from JWT token first
             auth_header = request.headers.get('Authorization', '')
             customer_id_from_token = None
             
+            logger.info(f"Authorization header: {auth_header[:50] if auth_header else 'None'}...")
+            
             if auth_header.startswith('Bearer '):
                 try:
                     token = auth_header.split(' ')[1]
+                    logger.info(f"Attempting to decode JWT token...")
                     payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
                     customer_id_from_token = payload.get('customer_id')
                     logger.info(f"✅ Customer ID extracted from JWT: {customer_id_from_token}")
+                    logger.info(f"Token payload keys: {list(payload.keys())}")
                 except jwt.ExpiredSignatureError:
                     logger.error("❌ JWT token expired")
                 except jwt.InvalidTokenError as e:
                     logger.error(f"❌ Invalid JWT token: {str(e)}")
                 except Exception as e:
                     logger.warning(f"⚠️ Could not decode JWT token: {str(e)}")
+                    logger.exception(e)
+            else:
+                logger.warning(f"⚠️ No Bearer token in Authorization header. Header value: {auth_header}")
             
             order_data = request.data
+            logger.info(f"Order data received: customer_id={order_data.get('customer_id')}, items={len(order_data.get('items', []))}")
+            
             customer_id = customer_id_from_token or order_data.get('customer_id')
             
             if not customer_id:
                 logger.error("❌ No customer_id found in token or request data")
+                logger.error(f"Token customer_id: {customer_id_from_token}, Request customer_id: {order_data.get('customer_id')}")
                 return Response(
                     {"error": "Customer ID is required. Please ensure you are logged in."}, 
                     status=status.HTTP_400_BAD_REQUEST
