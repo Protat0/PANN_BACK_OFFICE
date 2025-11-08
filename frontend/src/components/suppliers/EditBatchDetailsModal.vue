@@ -3,14 +3,14 @@
     <div v-if="show" class="modal-overlay" @click="handleOverlayClick">
       <div class="modal-content modern-modal" @click.stop>
         <!-- Modal Header -->
-        <div class="modal-header border-0 pb-0">
+        <div class="modal-header">
           <div class="d-flex align-items-center">
             <div class="modal-icon me-3">
               <Edit :size="24" />
             </div>
-            <div>
-              <h4 class="modal-title mb-1">Edit Purchase Order</h4>
-              <p class="text-muted mb-0 small">
+            <div class="modal-heading">
+              <h4 class="modal-title mb-1">Edit Order Details</h4>
+              <p class="modal-subtitle mb-0">
                 Order ID: <strong>{{ editForm.id }}</strong>
               </p>
             </div>
@@ -252,12 +252,18 @@
                   </tbody>
                   <tfoot class="table-light">
                     <tr>
-                      <td colspan="3" class="text-end"><strong>Total Items:</strong></td>
-                      <td class="text-center"><strong>{{ getTotalQuantity() }}</strong></td>
-                      <td colspan="2" class="text-end">
-                        <strong class="text-primary fs-5">₱{{ formatCurrency(getGrandTotal()) }}</strong>
+                      <td colspan="10">
+                        <div class="table-summary-bar">
+                          <div class="table-summary-item">
+                            <span class="label">Total Items</span>
+                            <strong>{{ getTotalQuantity() }}</strong>
+                          </div>
+                          <div class="table-summary-item">
+                            <span class="label">Total Cost</span>
+                            <strong>₱{{ formatCurrency(getGrandTotal()) }}</strong>
+                          </div>
+                        </div>
                       </td>
-                      <td></td>
                     </tr>
                   </tfoot>
                 </table>
@@ -831,7 +837,7 @@ export default {
   border-radius: 16px;
   border: none;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-  width: min(960px, 90vw);
+  width: min(1200px, 90vw);
   max-height: 90vh;
   display: flex;
   flex-direction: column;
@@ -840,14 +846,14 @@ export default {
 
 .clickable-field {
   cursor: pointer;
-  background-color: #f8f9fa;
+  background-color: var(--surface-primary);
   transition: all 0.2s ease;
   position: relative;
   padding-right: 30px;
 }
 
 .clickable-field:hover {
-  background-color: #e9ecef;
+  background-color: var(--surface-tertiary);
   border-color: var(--primary);
   box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.15);
 }
@@ -864,17 +870,50 @@ export default {
 }
 
 .modal-header {
-  padding: 2rem 2rem 1rem 2rem;
-  background: linear-gradient(135deg, var(--info-light), var(--info) 80%);
-  border-bottom: none;
+  padding: 1.5rem 1.75rem 0.9rem 1.75rem;
+  background: linear-gradient(135deg, var(--surface-tertiary), var(--surface-secondary));
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   flex-shrink: 0;
 }
 
 .modal-body {
-  padding: 1.5rem 2rem;
+  padding: 1.5rem 1.75rem;
   max-height: calc(90vh - 220px);
   overflow-y: auto;
   background-color: var(--surface-elevated);
+}
+
+.modal-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.modal-title {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.modal-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  letter-spacing: 0.01em;
+}
+
+.modal-header .btn-close {
+  opacity: 0.7;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.modal-header .btn-close:hover {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.dark-theme .modal-header .btn-close {
+  filter: invert(1);
 }
 
 .edit-items-table {
@@ -884,21 +923,26 @@ export default {
 .edit-items-table th {
   font-weight: 600;
   font-size: 0.875rem;
-  background-color: #f8f9fa;
+  background-color: var(--surface-tertiary);
+  color: var(--text-primary);
   padding: 0.75rem 0.5rem;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.18);
+  border-top: 1px solid rgba(0, 0, 0, 0.18);
 }
 
 .edit-items-table td {
   vertical-align: middle;
   padding: 0.75rem 0.5rem;
+  color: var(--text-secondary);
+  background-color: var(--surface-primary);
 }
 
 .item-row {
-  border-bottom: 1px solid var(--neutral-light);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .item-row:hover {
-  background-color: rgba(115, 146, 226, 0.05);
+  background-color: var(--state-hover);
 }
 
 .form-control-sm {
@@ -925,10 +969,55 @@ code {
 }
 
 .modal-footer {
-  padding: 1.5rem 2rem 2rem 2rem;
+  padding: 1.25rem 1.75rem 1.75rem 1.75rem;
   background-color: var(--surface-tertiary);
-  border-top: 1px solid rgba(115, 146, 226, 0.15);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
   flex-shrink: 0;
+}
+
+.modal-footer .text-muted {
+  color: var(--text-secondary) !important;
+}
+
+.edit-items-table tfoot td {
+  background-color: var(--surface-tertiary);
+  color: var(--text-primary);
+  border-top: 1px solid var(--border-primary);
+}
+
+.edit-items-table tfoot tr {
+  background-color: var(--surface-tertiary);
+}
+
+.table-summary-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+}
+
+.table-summary-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+}
+
+.table-summary-item .label {
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.table-summary-item strong {
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.table-summary-item:last-child strong {
+  color: var(--primary);
+  font-weight: 600;
 }
 
 .modal-overlay {
@@ -951,6 +1040,65 @@ code {
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+.card {
+  background-color: var(--surface-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.card-header {
+  background-color: var(--surface-tertiary) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.15) !important;
+  color: var(--text-primary) !important;
+}
+
+.card-body {
+  background-color: var(--surface-primary);
+  color: var(--text-secondary);
+}
+
+.card-body h6,
+.card-header h6 {
+  color: var(--text-primary) !important;
+}
+
+.card .text-muted,
+.card-header .text-muted {
+  color: var(--text-secondary) !important;
+}
+
+.bg-light,
+.table-light {
+  background-color: var(--surface-tertiary) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark-theme .clickable-field {
+  background-color: var(--surface-secondary);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark-theme .clickable-field:hover {
+  background-color: var(--surface-tertiary);
+}
+
+.dark-theme .card,
+.dark-theme .card-header,
+.dark-theme .card-body {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: var(--shadow-md);
+}
+
+.dark-theme .card-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+.dark-theme .edit-items-table th {
+  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 </style>
 

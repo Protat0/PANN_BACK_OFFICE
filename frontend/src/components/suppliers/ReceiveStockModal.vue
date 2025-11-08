@@ -3,14 +3,14 @@
     <div v-if="show" class="modal-overlay" @click="handleOverlayClick">
       <div class="modal-content modern-modal" @click.stop>
         <!-- Modal Header -->
-        <div class="modal-header border-0 pb-0">
+        <div class="modal-header">
           <div class="d-flex align-items-center">
             <div class="modal-icon me-3">
               <Package :size="24" />
             </div>
-            <div>
+            <div class="modal-heading">
               <h4 class="modal-title mb-1 receive-stock-title">Receive Pending Stock</h4>
-              <p class="modal-subtitle mb-0 small">
+              <p class="modal-subtitle mb-0">
                 Select pending orders from <strong>{{ supplier?.name }}</strong> to receive
               </p>
             </div>
@@ -452,14 +452,40 @@ export default {
 }
 
 .modal-header {
-  padding: 2rem 2rem 1rem 2rem;
-  background-color: var(--surface-tertiary);
-  border-bottom: 1px solid var(--border-primary);
+  padding: 1.5rem 1.75rem 0.9rem 1.75rem;
+  background: linear-gradient(135deg, var(--surface-tertiary), var(--surface-secondary));
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   flex-shrink: 0;
+}
+
+.modal-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
 }
 
 .receive-stock-title {
   color: var(--text-primary);
+}
+
+.modal-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  letter-spacing: 0.01em;
+}
+
+.modal-header .btn-close {
+  opacity: 0.7;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.modal-header .btn-close:hover {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.dark-theme .modal-header .btn-close {
+  filter: invert(1);
 }
 
 .modal-body {

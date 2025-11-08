@@ -546,7 +546,7 @@
           </div>
           <div class="modal-body edit-supplier-body">
             <form @submit.prevent="saveSupplier">
-              <div class="row g-4">
+              <div class="row g-3">
                 <!-- Basic Information Section -->
                 <div class="col-md-6">
                   <div class="form-group">
@@ -564,7 +564,7 @@
                     >
                   </div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
                   <div class="form-group">
                     <label for="contactPerson" class="form-label modern-label">
                       <User :size="16" class="me-2" />
@@ -579,7 +579,7 @@
                     >
                   </div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
                   <div class="form-group">
                     <label for="email" class="form-label modern-label">
                       <Mail :size="16" class="me-2" />
@@ -594,7 +594,7 @@
                     >
                   </div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
                   <div class="form-group">
                     <label for="phone" class="form-label modern-label">
                       <Phone :size="16" class="me-2" />
@@ -616,7 +616,7 @@
                 </div>
 
                 <!-- Additional Information Section -->
-                <div class="col-md-6">
+                <div class="col-md-4">
                   <div class="form-group">
                     <label for="type" class="form-label modern-label">
                       <Tag :size="16" class="me-2" />
@@ -633,7 +633,7 @@
                     </select>
                   </div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
                   <div class="form-group">
                     <label for="status" class="form-label modern-label">
                       <Activity :size="16" class="me-2" />
@@ -646,6 +646,22 @@
                     </select>
                   </div>
                 </div>
+                <div class="col-md-4">
+                  <div class="form-group">
+                    <label for="phone" class="form-label modern-label">
+                      <Phone :size="16" class="me-2" />
+                      Phone Number
+                    </label>
+                    <input 
+                      type="tel" 
+                      class="form-control modern-input"
+                      id="phone"
+                      v-model="editForm.phone"
+                      placeholder="Enter phone number"
+                    >
+                  </div>
+                </div>
+
                 <div class="col-12">
                   <div class="form-group">
                     <label for="address" class="form-label modern-label">
@@ -2327,6 +2343,10 @@ export default {
   border-radius: 4px;
 }
 
+.dark-theme .order-status.bg-warning {
+  color: #111827; /* near-black for contrast */
+}
+
 .action-buttons {
   display: flex;
   gap: 0.25rem;
@@ -2399,9 +2419,9 @@ export default {
 
 /* Edit Supplier Modal Header */
 .edit-supplier-header {
-  padding: 2rem 2rem 1.5rem 2rem !important;
-  background-color: var(--surface-tertiary);
-  border-bottom: 1px solid var(--border-primary);
+  padding: 1.5rem 1.75rem 1rem 1.75rem !important;
+  background: linear-gradient(135deg, var(--surface-tertiary), var(--surface-secondary));
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .modal-icon {
@@ -2417,12 +2437,17 @@ export default {
 }
 
 .btn-close-custom {
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
+  opacity: 0.7;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .btn-close-custom:hover {
   opacity: 1;
+  transform: scale(1.05);
+}
+
+.dark-theme .btn-close-custom {
+  filter: invert(1);
 }
 
 .modal-title {
@@ -2434,12 +2459,14 @@ export default {
 
 /* Edit Supplier Modal Body */
 .edit-supplier-body {
-  padding: 2rem 2rem 1.5rem 2rem !important;
+  padding: 1.5rem 1.75rem 1.25rem 1.75rem !important;
   background-color: var(--surface-elevated);
+  max-height: calc(90vh - 200px);
+  overflow-y: auto;
 }
 
 .form-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .modern-label {
@@ -2453,10 +2480,10 @@ export default {
 }
 
 .modern-input {
-  border: 2px solid var(--input-border);
-  border-radius: 8px;
-  padding: 12px 16px;
-  font-size: 0.95rem;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
   transition: all 0.2s ease;
   background-color: var(--input-bg);
   color: var(--input-text);
@@ -2498,9 +2525,9 @@ textarea.modern-input {
 
 /* Edit Supplier Modal Footer */
 .edit-supplier-footer {
-  padding: 1.5rem 2rem 2rem 2rem !important;
+  padding: 1.25rem 1.75rem 1.75rem 1.75rem !important;
   background-color: var(--surface-tertiary);
-  border-top: 1px solid var(--border-primary);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
@@ -2802,7 +2829,7 @@ textarea.modern-input {
 /* Modal Content (for Edit Supplier Modal) */
 .modal-content {
   position: relative !important;
-  max-width: 800px;
+  max-width: 720px;
   width: 95%;
   max-height: 90vh;
   overflow-y: auto;
@@ -2834,7 +2861,7 @@ textarea.modern-input {
   }
 
   .edit-supplier-header {
-    padding: 1.5rem 1.5rem 1rem 1.5rem !important;
+    padding: 1.25rem 1.5rem 0.75rem 1.5rem !important;
   }
 
   .edit-supplier-header h4 {
@@ -2842,11 +2869,11 @@ textarea.modern-input {
   }
 
   .edit-supplier-body {
-    padding: 1.5rem 1.5rem 1rem 1.5rem !important;
+    padding: 1.25rem 1.5rem 1rem 1.5rem !important;
   }
 
   .edit-supplier-footer {
-    padding: 1rem 1.5rem 1.5rem 1.5rem !important;
+    padding: 1rem 1.5rem 1.25rem 1.5rem !important;
   }
 
   .form-group {
@@ -2874,7 +2901,7 @@ textarea.modern-input {
   }
 
   .edit-supplier-header {
-    padding: 1rem 1rem 0.75rem 1rem !important;
+    padding: 0.9rem 1rem 0.65rem 1rem !important;
   }
 
   .edit-supplier-header h4 {
@@ -2882,11 +2909,11 @@ textarea.modern-input {
   }
 
   .edit-supplier-body {
-    padding: 1rem 1rem 0.75rem 1rem !important;
+    padding: 0.9rem 1rem 0.75rem 1rem !important;
   }
 
   .edit-supplier-footer {
-    padding: 0.75rem 1rem 1rem 1rem !important;
+    padding: 0.75rem 1rem 0.9rem 1rem !important;
     flex-direction: column;
     gap: 0.75rem !important;
   }
@@ -2901,12 +2928,12 @@ textarea.modern-input {
   }
 
   .form-group {
-    margin-bottom: 1rem;
+    margin-bottom: 0.9rem;
   }
 
   .modern-input {
-    padding: 10px 14px;
-    font-size: 0.9rem;
+    padding: 10px 12px;
+    font-size: 0.85rem;
   }
 }
 

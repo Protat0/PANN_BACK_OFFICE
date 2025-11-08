@@ -3,15 +3,15 @@
     <div v-if="show" class="modal-overlay" @click="handleOverlayClick">
       <div class="modal-content modern-order-modal" @click.stop>
         <!-- Modal Header -->
-        <div class="modal-header border-0 pb-0">
+        <div class="modal-header new-order-modal-header">
           <div class="d-flex align-items-center">
             <div class="modal-icon modal-icon-pending me-3">
               <ShoppingCart :size="24" />
             </div>
-            <div>
+            <div class="modal-heading">
               <h4 class="modal-title mb-1">New Order</h4>
-              <p class="text-muted mb-0 small">
-                Order stock from <strong>{{ supplier?.name }}</strong> (Status: Pending)
+              <p class="modal-subtitle mb-0">
+                Order stock from <strong>{{ supplier?.name }}</strong>
               </p>
             </div>
           </div>
@@ -893,14 +893,47 @@ export default {
 }
 
 .modal-header {
-  padding: 2rem 2rem 1rem 2rem;
-  background-color: var(--surface-tertiary);
-  border-bottom: 1px solid var(--border-primary);
+  padding: 1.5rem 1.75rem 0.9rem 1.75rem;
+  background: linear-gradient(135deg, var(--surface-tertiary), var(--surface-secondary));
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   flex-shrink: 0;
 }
 
+.modal-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.modal-title {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.modal-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  letter-spacing: 0.01em;
+}
+
+.modal-header .btn-close {
+  opacity: 0.7;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.modal-header .btn-close:hover {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.dark-theme .modal-header .btn-close {
+  filter: invert(1);
+}
+
 .modal-body {
-  padding: 1.5rem 2rem;
+  padding: 1.5rem 1.75rem;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
@@ -913,10 +946,10 @@ export default {
 
 .order-info-card,
 .supplier-info-card {
-  padding: 1.5rem;
+  padding: 1.25rem 1.5rem;
   background-color: var(--surface-tertiary);
   border-radius: 12px;
-  border: 1px solid var(--border-primary);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   height: 100%;
   box-shadow: var(--shadow-sm);
 }
@@ -950,11 +983,16 @@ export default {
   flex: 1;
 }
 
+.dark-theme .detail-row strong,
+.dark-theme .detail-row span {
+  color: var(--text-secondary);
+}
+
 .order-items-section {
   background-color: var(--surface-primary);
   border-radius: 12px;
-  border: 1px solid var(--border-primary);
-  padding: 1.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 1.5rem 1.5rem 1.25rem;
   box-shadow: var(--shadow-sm);
 }
 
@@ -986,7 +1024,7 @@ export default {
 
 .order-items-table td {
   vertical-align: middle;
-  padding: 0.75rem 0.5rem;
+  padding: 0.65rem 0.5rem;
   border: 1px solid var(--border-primary);
   border-top: none;
   color: var(--text-secondary);
@@ -1070,14 +1108,17 @@ export default {
 }
 
 .sticky-footer {
+  padding: 1.25rem 1.75rem 1.5rem 1.75rem;
   background-color: var(--surface-tertiary);
-  border-top: 1px solid var(--border-primary);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
   flex-shrink: 0;
   position: sticky;
   bottom: 0;
   z-index: 10;
   box-shadow: var(--shadow-md);
-  padding: 1.5rem 2rem 2rem 2rem !important;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .order-id-input {
@@ -1116,7 +1157,7 @@ export default {
 /* Modal Content */
 .modal-content {
   position: relative !important;
-  max-width: 1200px;
+  max-width: 1350px;
   width: 95%;
   max-height: 90vh;
   overflow-y: auto;
@@ -1156,9 +1197,19 @@ export default {
   }
 
   .modal-body {
-    padding: 1rem 1.5rem !important;
+    padding: 1.25rem 1.5rem !important;
   }
 
+  .scrollable-content {
+    padding: 0 !important;
+  }
+
+  .new-order-modal-header {
+    padding: 1.5rem 1.75rem 1rem 1.75rem !important;
+    background: linear-gradient(135deg, var(--surface-tertiary), var(--surface-secondary));
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  }
+  
   .sticky-footer {
     padding: 1rem 1.5rem 1.5rem 1.5rem !important;
   }
@@ -1167,6 +1218,19 @@ export default {
   .supplier-info-card {
     margin-bottom: 1rem;
     height: auto;
+  }
+
+  .order-info-card h5,
+  .order-items-section h5 {
+    color: var(--text-primary);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .order-info-card label,
+  .supplier-info-card label {
+    font-weight: 500;
+    color: var(--text-secondary);
   }
 
   /* Stack columns on mobile */
@@ -1207,7 +1271,7 @@ export default {
   }
 
   .modal-body {
-    padding: 0.75rem 1rem !important;
+    padding: 1rem 1.25rem !important;
     max-height: calc(100vh - 200px);
   }
 
