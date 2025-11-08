@@ -307,6 +307,7 @@
                   <option value="received">Received</option>
                   <option value="partially received">Partially Received</option>
                   <option value="depleted">Depleted</option>
+                  <option value="cancelled">Cancelled</option>
                 </select>
                 <div class="dropdown" ref="sortDropdownRef">
                   <button 
@@ -392,9 +393,18 @@
                           class="btn btn-outline-warning btn-sm" 
                           @click="editBatchDetails(order)" 
                           title="Edit Order Details"
-                          :disabled="order.status === 'Received' || order.status === 'Depleted'"
+                          :disabled="order.status === 'Received' || order.status === 'Depleted' || order.status === 'Cancelled' || cancelingOrderId === order.id"
                         >
                           <Edit :size="14" />
+                        </button>
+                        <button 
+                          class="btn btn-outline-danger btn-sm"
+                          @click="promptCancelOrder(order)"
+                          title="Cancel Order"
+                          :disabled="order.status === 'Cancelled' || order.status === 'Received' || order.status === 'Depleted' || cancelingOrderId === order.id"
+                        >
+                          <span v-if="cancelingOrderId === order.id" class="spinner-border spinner-border-sm"></span>
+                          <XCircle v-else :size="14" />
                         </button>
                       </div>
                     </td>
@@ -409,9 +419,9 @@
               <div>
                 <h6 class="empty-state-text">No orders found</h6>
                 <p class="mb-3">No orders have been placed with this supplier yet.</p>
-                <button class="btn btn-primary btn-sm" @click="openReceiveStockModal">
+                <button class="btn btn-primary btn-sm" @click="openCreateOrderModal">
                   <Plus :size="16" class="me-1" />
-                  Receive First Stock
+                  New Order
                 </button>
               </div>
             </div>
@@ -771,7 +781,8 @@ import {
   AlertTriangle,
   Activity,
   CreditCard,
-  Info
+  Info,
+  XCircle
 } from 'lucide-vue-next'
 import CreateOrderModal from '@/components/suppliers/CreateOrderModal.vue'
 import ReceiveStockModal from '@/components/suppliers/ReceiveStockModal.vue'
@@ -816,6 +827,7 @@ export default {
     Activity,
     CreditCard,
     Info,
+    XCircle,
     CreateOrderModal,
     ReceiveStockModal,
     BatchDetailsModal,
@@ -854,6 +866,7 @@ export default {
       orderStatusFilter: 'all',
       selectedOrders: [],
       selectAllOrders: false,
+      cancelingOrderId: null,
 
       showCreateOrderModal: false,
       showReceiveStockModal: false,
@@ -1005,30 +1018,35 @@ export default {
           return
         }
         
-        // Group batches by receipt (either date_received for completed or expected_delivery_date for pending)
-        const batchesByDate = {}
+        // Group batches by receipt/order identifier to prevent unrelated orders from merging
+        const getBatchGroupKey = (batch) => {
+          const notes = batch?.notes || ''
+          const receiptMatch = notes.match(/Receipt:\s*([^\|]+)/i)
+          if (receiptMatch) {
+            return `receipt:${receiptMatch[1].trim()}`
+          }
+          if (batch?.batch_number) {
+            return `batch:${batch.batch_number}`
+          }
+          if (batch?.reference_number) {
+            return `reference:${batch.reference_number}`
+          }
+          return `id:${batch?._id || 'unknown'}`
+        }
+
+        const batchesByReceipt = {}
         batchesList.forEach(batch => {
-          // For pending orders, group by expected_delivery_date
-          // For received orders, group by date_received
-          let dateKey
-          if (batch.date_received) {
-            dateKey = typeof batch.date_received === 'string' ? batch.date_received.split('T')[0] : new Date(batch.date_received).toISOString().split('T')[0]
-          } else if (batch.expected_delivery_date) {
-            dateKey = typeof batch.expected_delivery_date === 'string' ? batch.expected_delivery_date.split('T')[0] : new Date(batch.expected_delivery_date).toISOString().split('T')[0]
-          } else {
-            dateKey = batch.created_at.split('T')[0]
+          const key = getBatchGroupKey(batch)
+          if (!batchesByReceipt[key]) {
+            batchesByReceipt[key] = []
           }
-          
-          if (!batchesByDate[dateKey]) {
-            batchesByDate[dateKey] = []
-          }
-          batchesByDate[dateKey].push(batch)
+          batchesByReceipt[key].push(batch)
         })
         
         // ===== STEP 4.5: Enrich batches with product details for complete category info =====
-        const enrichedBatchesByDate = {}
-        for (const [dateKey, batches] of Object.entries(batchesByDate)) {
-          enrichedBatchesByDate[dateKey] = await Promise.all(
+        const enrichedBatchesByReceipt = {}
+        for (const [groupKey, batches] of Object.entries(batchesByReceipt)) {
+          enrichedBatchesByReceipt[groupKey] = await Promise.all(
             batches.map(async (batch) => {
               try {
                 // Always fetch product details to get category info (don't rely on batch fields)
@@ -1058,11 +1076,14 @@ export default {
         }
         
         // Convert grouped batches to "orders" format
-        this.orders = Object.entries(enrichedBatchesByDate).map(([date, batches]) => {
+        this.orders = Object.values(enrichedBatchesByReceipt).map((batches) => {
           const totalCost = batches.reduce((sum, b) => sum + ((b.cost_price || 0) * (b.quantity_received || 0)), 0)
           const totalQuantity = batches.reduce((sum, b) => sum + (b.quantity_received || 0), 0)
           
-          let receiptId = `SR-${date.replace(/-/g, '')}`
+          const firstBatch = batches[0]
+          const createdDate = firstBatch?.created_at ? firstBatch.created_at.split('T')[0] : new Date().toISOString().split('T')[0]
+
+          let receiptId = `SR-${createdDate.replace(/-/g, '')}`
           const firstBatchNotes = batches[0].notes || ''
           const receiptMatch = firstBatchNotes.match(/Receipt:\s*([^\|]+)/)
           if (receiptMatch) {
@@ -1070,17 +1091,16 @@ export default {
           }
           
           // Get expected_delivery_date and date_received from first batch
-          const firstBatch = batches[0]
           const expectedDate = firstBatch.expected_delivery_date ? 
             (typeof firstBatch.expected_delivery_date === 'string' ? firstBatch.expected_delivery_date.split('T')[0] : new Date(firstBatch.expected_delivery_date).toISOString().split('T')[0]) : 
-            date
+            createdDate
           const receivedDate = firstBatch.date_received ? 
             (typeof firstBatch.date_received === 'string' ? firstBatch.date_received.split('T')[0] : new Date(firstBatch.date_received).toISOString().split('T')[0]) : 
             null
           
           return {
             id: receiptId,
-            date: firstBatch.created_at ? firstBatch.created_at.split('T')[0] : date, // Order date (when PO was created)
+            date: firstBatch.created_at ? firstBatch.created_at.split('T')[0] : createdDate, // Order date (when PO was created)
             quantity: totalQuantity,
             total: totalCost,
             expectedDate: expectedDate, // Expected delivery date
@@ -1156,20 +1176,24 @@ export default {
     },
 
     getReceiptStatus(batches) {
-      if (!batches || batches.length === 0) return 'Unknown'
-      
-      const allPending = batches.every(b => b.status === 'pending')
-      const allActive = batches.every(b => b.status === 'active')
-      const allInactive = batches.every(b => b.status === 'inactive')
-      const hasPending = batches.some(b => b.status === 'pending')
-      
-      if (allPending) return 'Pending Delivery'
-      if (allActive) return 'Received'
-      if (allInactive) return 'Depleted'
-      if (hasPending) return 'Partially Received'
-      
-      return 'Mixed Status'
-    },
+       if (!batches || batches.length === 0) return 'Unknown'
+       
+       const allCancelled = batches.every(b => b.status === 'cancelled')
+       const allPending = batches.every(b => b.status === 'pending')
+       const allActive = batches.every(b => b.status === 'active')
+       const allInactive = batches.every(b => b.status === 'inactive')
+       const hasPending = batches.some(b => b.status === 'pending')
+       const hasCancelled = batches.some(b => b.status === 'cancelled')
+       
+       if (allCancelled) return 'Cancelled'
+       if (allPending) return 'Pending Delivery'
+       if (allActive) return 'Received'
+       if (allInactive) return 'Depleted'
+       if (hasCancelled) return 'Mixed Status'
+       if (hasPending) return 'Partially Received'
+       
+       return 'Mixed Status'
+     },
 
     openReceiveStockModal() {
       // Open the "Receive Stock" modal that shows ALL pending batches
@@ -1258,11 +1282,11 @@ export default {
     },
 
     async handleBatchDetailsUpdated(updatedReceipt) {
-      this.success('Purchase order updated successfully')
-      
-      // Refresh supplier details to show updated batches
-      await this.fetchSupplierDetails()
-    },
+       this.success('Purchase order updated successfully')
+       
+       // Refresh supplier details to show updated batches
+       await this.fetchSupplierDetails()
+     },
 
     goBack() {
       this.$router.push({ name: 'Suppliers' })
@@ -2043,7 +2067,110 @@ export default {
 
     formatStatus(status) {
       return status.charAt(0).toUpperCase() + status.slice(1)
-    }
+    },
+
+    async promptCancelOrder(order) {
+      if (!order) {
+        return
+      }
+
+      if (order.status === 'Received' || order.status === 'Depleted') {
+        this.showError('Completed orders cannot be cancelled.')
+        return
+      }
+
+      if (order.status === 'Cancelled') {
+        this.showError(`Order ${order.id} has already been cancelled.`)
+        return
+      }
+
+      const confirmed = window.confirm(`Cancel order ${order.id}? This will mark the order as cancelled and cannot be undone.`)
+      if (!confirmed) {
+        return
+      }
+
+      await this.performOrderCancellation(order)
+    },
+
+    async performOrderCancellation(order) {
+      if (!order) {
+        return
+      }
+
+      const batchIds = Array.isArray(order.items)
+        ? order.items.map(item => item.batchId).filter(Boolean)
+        : []
+
+      if (batchIds.length === 0) {
+        this.showError('Cannot cancel this order because no batch information was found.')
+        return
+      }
+
+      const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+
+      if (!token) {
+        this.showError('Authentication token not found. Please sign in again.')
+        return
+      }
+
+      this.cancelingOrderId = order.id
+
+      try {
+        await Promise.all(batchIds.map(batchId =>
+          axios.put(
+            `${API_BASE_URL}/batches/${batchId}/`,
+            { status: 'cancelled' },
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          )
+        ))
+
+        const applyStatusUpdate = (list) => {
+          if (!Array.isArray(list)) {
+            return
+          }
+          const match = list.find(o => o.id === order.id)
+          if (match) {
+            match.status = 'Cancelled'
+            if (Array.isArray(match.items)) {
+              match.items.forEach(item => {
+                item.status = 'cancelled'
+              })
+            }
+          }
+        }
+
+        applyStatusUpdate(this.orders)
+        applyStatusUpdate(this.filteredOrders)
+
+        order.status = 'Cancelled'
+        if (Array.isArray(order.items)) {
+          order.items.forEach(item => {
+            item.status = 'cancelled'
+          })
+        }
+
+        if (this.selectedOrderForView && this.selectedOrderForView.id === order.id) {
+          this.selectedOrderForView.status = 'Cancelled'
+        }
+
+        this.selectedOrders = this.selectedOrders.filter(id => id !== order.id)
+        this.selectAllOrders = false
+
+        this.filterOrders()
+        this.success(`Order ${order.id} has been cancelled`)
+      } catch (error) {
+        console.error('Error cancelling order:', error)
+        const message = error.response?.data?.error || 'Failed to cancel the order. Please try again.'
+        this.showError(message)
+      } finally {
+        this.cancelingOrderId = null
+      }
+    },
   }
 }
 </script>

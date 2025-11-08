@@ -680,6 +680,30 @@ class BatchService:
                         expected_delivery_date = None
                 updates['expected_delivery_date'] = expected_delivery_date
             
+            # Update status if provided
+            if 'status' in update_data:
+                status = update_data['status']
+                if status is None or (isinstance(status, str) and status.strip() == ''):
+                    raise ValueError("Status cannot be empty")
+
+                if not isinstance(status, str):
+                    raise ValueError("Status must be a string")
+
+                normalized_status = status.strip().lower()
+                allowed_statuses = {
+                    'pending',
+                    'active',
+                    'inactive',
+                    'depleted',
+                    'cancelled',
+                    'expired'
+                }
+
+                if normalized_status not in allowed_statuses:
+                    raise ValueError(f"Invalid status '{status}'. Allowed values: {', '.join(sorted(allowed_statuses))}")
+
+                updates['status'] = normalized_status
+            
             # Update notes if provided
             if 'notes' in update_data:
                 updates['notes'] = update_data['notes']
