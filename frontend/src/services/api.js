@@ -147,17 +147,41 @@ class ApiService {
 
       // Your backend's get_current_user returns user info directly
       // Extract the user data from the response
+      console.log('API: Raw response data:', data);
+      
       if (data.user_data) {
-        // If backend returns nested user_data
-        return {
+        // If backend returns nested user_data, spread it to top level
+        // This ensures email_verified and other fields are accessible
+        // Priority: top-level email_verified > user_data.email_verified > false
+        const emailVerified = data.email_verified !== undefined ? data.email_verified :
+                             (data.user_data.email_verified !== undefined ? data.user_data.email_verified : false);
+        
+        console.log('API: email_verified from top level:', data.email_verified);
+        console.log('API: email_verified from user_data:', data.user_data.email_verified);
+        console.log('API: Final email_verified:', emailVerified);
+        
+        // Build merged data - put email_verified AFTER spread so it's not overwritten
+        const mergedData = {
           id: data.user_id,
           email: data.email,
           role: data.role,
-          ...data.user_data
+          ...data.user_data,  // Spread user_data first
+          // Then override with explicit values to ensure they're set
+          email_verified: emailVerified  // Set after spread to ensure it's included
         };
+        
+        console.log('API: Merged user data:', mergedData);
+        console.log('API: email_verified in merged data:', mergedData.email_verified);
+        return mergedData;
       } else {
         // If backend returns user info directly
-        return data;
+        // Ensure email_verified is set
+        const result = {
+          ...data,
+          email_verified: data.email_verified !== undefined ? data.email_verified : false
+        };
+        console.log('API: Direct user data:', result);
+        return result;
       }
 
     } catch (error) {

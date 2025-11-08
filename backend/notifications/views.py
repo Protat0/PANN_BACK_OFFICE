@@ -4,7 +4,9 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
+from app.decorators.authenticationDecorator import get_authenticated_user_from_jwt
 from .services import notification_service
+from .email_verification_service import email_verification_service
 
 # ================================================================
 # UTILITY FUNCTIONS
@@ -665,4 +667,162 @@ def notification_stats(request):
         return Response({
             'success': False,
             'message': f'Error retrieving notification statistics: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# ================================================================
+# EMAIL VERIFICATION ENDPOINTS
+# ================================================================
+
+@api_view(['GET'])
+def verify_email(request):
+    """Verify user email using JWT token"""
+    try:
+        token = request.query_params.get('token')
+        
+        if not token:
+            return Response({
+                'success': False,
+                'message': 'Verification token is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        result = email_verification_service.verify_email(token)
+        
+        if result.get('success'):
+            return Response({
+                'success': True,
+                'message': result.get('message', 'Email verified successfully'),
+                'data': {
+                    'email': result.get('email'),
+                    'user_id': result.get('user_id'),
+                    'username': result.get('username')
+                }
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'success': False,
+                'message': result.get('error', 'Email verification failed')
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error verifying email: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+def resend_verification_email(request):
+    """Resend verification email to user (legacy - sends code now)"""
+    try:
+        email = request.data.get('email')
+        
+        if not email:
+            return Response({
+                'success': False,
+                'message': 'Email address is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        result = email_verification_service.resend_verification_code(email)
+        
+        if result.get('success'):
+            return Response({
+                'success': True,
+                'message': 'Verification code sent successfully',
+                'token': result.get('token')  # Return token for frontend
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'success': False,
+                'message': result.get('error', 'Failed to send verification code')
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error resending verification code: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+def send_verification_code(request):
+    """Send verification code to user's email"""
+    try:
+        email = request.data.get('email')
+        
+        if not email:
+            return Response({
+                'success': False,
+                'message': 'Email address is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Get current user from JWT token if available
+        user_id = None
+        user_name = None
+        current_user = get_authenticated_user_from_jwt(request)
+        if current_user:
+            # Get user_id - it might be in different formats
+            user_id = current_user.get('user_id') or current_user.get('_id')
+            if user_id:
+                user_id = str(user_id)
+            user_name = current_user.get('full_name') or current_user.get('username', '')
+        
+        result = email_verification_service.send_verification_code(email, user_id=user_id, user_name=user_name)
+        
+        if result.get('success'):
+            return Response({
+                'success': True,
+                'message': 'Verification code sent successfully',
+                'token': result.get('token')  # Return token for frontend to use when verifying
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'success': False,
+                'message': result.get('error', 'Failed to send verification code')
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error sending verification code: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
+def verify_code(request):
+    """Verify email using verification code"""
+    try:
+        token = request.data.get('token')
+        code = request.data.get('code')
+        
+        if not token:
+            return Response({
+                'success': False,
+                'message': 'Verification token is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not code:
+            return Response({
+                'success': False,
+                'message': 'Verification code is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        result = email_verification_service.verify_code(token, code)
+        
+        if result.get('success'):
+            return Response({
+                'success': True,
+                'message': result.get('message', 'Email verified successfully'),
+                'data': {
+                    'email': result.get('email'),
+                    'user_id': result.get('user_id'),
+                    'username': result.get('username')
+                }
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'success': False,
+                'message': result.get('error', 'Email verification failed')
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'message': f'Error verifying code: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
