@@ -1,8 +1,8 @@
 <template>
-  <div v-if="show" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-      <div class="modal-content modern-modal">
-        <div class="modal-header">
+  <Teleport to="body">
+    <div v-if="show" class="modal-overlay" @click="handleOverlayClick">
+      <div class="modal-content modern-modal order-details-modal" @click.stop>
+        <div class="modal-header border-0 pb-0">
           <div class="d-flex align-items-center flex-grow-1">
             <div class="modal-icon me-3">
               <component :is="isEditMode ? Edit : Eye" :size="24" />
@@ -30,7 +30,7 @@
           </div>
         </div>
         
-        <div class="modal-body">
+        <div class="modal-body pt-4">
           <!-- Order Header Info -->
           <div class="row mb-4">
             <div class="col-md-6">
@@ -320,7 +320,7 @@
           </div>
         </div>
 
-        <div class="modal-footer">
+        <div class="modal-footer border-0 pt-4">
           <div class="d-flex justify-content-between w-100">
             <div>
               <button 
@@ -352,7 +352,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <script>
@@ -505,6 +505,18 @@ export default {
       this.resetEditForm()
       this.loadOrderData()
       this.$emit('edit-mode-changed', this.isEditMode)
+    },
+
+    handleOverlayClick(event) {
+      if (event.target === event.currentTarget && !this.saving) {
+        if (this.isEditMode) {
+          this.isEditMode = false
+          this.resetEditForm()
+          this.editableItems = [...this.orderItems]
+          this.$emit('edit-mode-changed', this.isEditMode)
+        }
+        this.closeModal()
+      }
     },
 
     resetEditForm() {
@@ -807,6 +819,32 @@ export default {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
 }
 
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  z-index: 9999 !important;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.3s ease;
+}
+
+.order-details-modal {
+  width: min(1100px, 95vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 10000 !important;
+}
+
 .modal-icon {
   width: 48px;
   height: 48px;
@@ -822,8 +860,34 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.5rem;
+  padding: 2rem 2rem 1rem 2rem;
   border-bottom: 1px solid var(--neutral);
+  background-color: var(--surface-tertiary);
+  flex-shrink: 0;
+}
+
+.modal-body {
+  padding: 1.5rem 2rem 2rem 2rem;
+  overflow-y: auto;
+  background-color: var(--surface-elevated);
+  flex: 1;
+  max-height: calc(90vh - 220px);
+}
+
+.modal-footer {
+  padding: 1.5rem 2rem 2rem 2rem;
+  background-color: var(--surface-tertiary);
+  border-top: 1px solid var(--neutral);
+  flex-shrink: 0;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .modal-header .d-flex.align-items-center.flex-grow-1 {

@@ -1,7 +1,7 @@
 <template>
-  <div v-if="show" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-      <div class="modal-content modern-modal">
+  <Teleport to="body">
+    <div v-if="show" class="modal-overlay" @click="handleOverlayClick">
+      <div class="modal-content modern-modal" @click.stop>
         <!-- Modal Header -->
         <div class="modal-header border-0 pb-0">
           <div class="d-flex align-items-center">
@@ -315,7 +315,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <script>
@@ -755,6 +755,12 @@ export default {
     function handleClose() {
       emit('close')
     }
+
+    function handleOverlayClick(event) {
+      if (event.target === event.currentTarget && !saving.value) {
+        handleCancel()
+      }
+    }
     
     // Watch for show prop changes
     watch(() => props.show, (newVal) => {
@@ -769,7 +775,15 @@ export default {
         initializeFormData(newVal)
       }
     })
-    
+
+    function handleCancel() {
+      isEditingExpectedDate.value = false
+      if (props.receipt) {
+        initializeFormData(props.receipt)
+      }
+      handleClose()
+    }
+
     // Load categories on mount
     onMounted(async () => {
       try {
@@ -792,10 +806,12 @@ export default {
       calculateItemTotal,
       getTotalQuantity,
       getGrandTotal,
+      handleCancel,
       saveChanges,
       formatDate,
       formatCurrency,
       handleClose,
+      handleOverlayClick,
       // Category/Product selection
       getCategoryName,
       getSubcategoriesForItem,
@@ -815,6 +831,11 @@ export default {
   border-radius: 16px;
   border: none;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  width: min(960px, 90vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .clickable-field {
@@ -844,13 +865,16 @@ export default {
 
 .modal-header {
   padding: 2rem 2rem 1rem 2rem;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background: linear-gradient(135deg, var(--info-light), var(--info) 80%);
+  border-bottom: none;
+  flex-shrink: 0;
 }
 
 .modal-body {
   padding: 1.5rem 2rem;
-  max-height: 70vh;
+  max-height: calc(90vh - 220px);
   overflow-y: auto;
+  background-color: var(--surface-elevated);
 }
 
 .edit-items-table {
@@ -894,6 +918,39 @@ export default {
 code {
   font-family: 'Monaco', 'Menlo', monospace;
   font-size: 0.875rem;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.modal-footer {
+  padding: 1.5rem 2rem 2rem 2rem;
+  background-color: var(--surface-tertiary);
+  border-top: 1px solid rgba(115, 146, 226, 0.15);
+  flex-shrink: 0;
+}
+
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  z-index: 9999 !important;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 </style>
 

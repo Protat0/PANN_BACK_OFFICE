@@ -90,10 +90,6 @@ export function useCategories() {
       const response = await categoryApiService.CategoryData(mergedFilters)
 
       categories.value = response.categories || []
-
-      if (Object.keys(customFilters).length > 0 || categories.value.length > 0) {
-        toast.success(`Loaded ${categories.value.length} categories`)
-      }
       return response
     } catch (err) {
       error.value = err.message
