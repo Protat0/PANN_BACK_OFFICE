@@ -1024,7 +1024,7 @@ export default {
                     return {
                       ...batch,
                       // Get product name and category info from product, not from batch
-                      product_name: product.product_name || product.name || batch.product_id || 'Unknown Product',
+                      product_name: product.product_name || product.name || 'Unknown Product',
                       category_id: product.category_id || '',
                       category_name: product.category_name || '',
                       subcategory_name: product.subcategory_name || ''
@@ -1078,14 +1078,14 @@ export default {
             shippingCost: 0,
             taxRate: 0,
             items: batches.map(batch => ({
-              name: batch.product_name || batch.product_id || 'Unknown Product',
+            name: batch.product_name || batch.name || 'Unknown Product',
               quantity: batch.quantity_received,
               unit: 'pcs',
               unitPrice: batch.cost_price || 0,
               totalPrice: (batch.cost_price || 0) * (batch.quantity_received || 0),
               notes: batch.notes || '',
               productId: batch.product_id,
-              product_name: batch.product_name || 'Unknown Product', // Add product_name for ActiveOrdersModal
+              product_name: batch.product_name || batch.name || 'Unknown Product', // Add product_name for ActiveOrdersModal
               batchNumber: batch.batch_number,  // ✅ Pass batch number for activation
               batchId: batch._id,  // ✅ Pass batch ID 
               expiryDate: batch.expiry_date,

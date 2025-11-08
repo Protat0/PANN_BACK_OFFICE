@@ -83,8 +83,8 @@ export function useSupplierReports() {
               totalAmount: totalCost,
               status: orderStatus,
               items: batches.map(batch => ({
-                name: batch.product_name || batch.product_id || 'Unknown Product',
-                product_name: batch.product_name || 'Unknown Product',
+              name: batch.product_name || batch.name || 'Unknown Product',
+              product_name: batch.product_name || batch.name || 'Unknown Product',
                 product_id: batch.product_id,
                 quantity: batch.quantity_received,
                 unitPrice: batch.cost_price || 0,
@@ -342,7 +342,7 @@ export function useSupplierReports() {
         // Get top products from batches
         const productCounts = {}
         supplierBatches.forEach(batch => {
-          const productName = batch.product_name || batch.product_id || 'Unknown Product'
+        const productName = batch.product_name || batch.name || 'Unknown Product'
           productCounts[productName] = (productCounts[productName] || 0) + (batch.quantity_received || 0)
         })
         
@@ -452,16 +452,15 @@ export function useSupplierReports() {
       await Promise.all(
         uniqueProductIds.map(async (productId) => {
           try {
-            const productResponse = await api.get(`/products/${productId}/`)
+            const productResponse = await api.get(`/products/${productId}/`, {
+              params: { include_deleted: true }
+            })
             const product = productResponse.data?.data || productResponse.data
-            if (product) {
+            if (product && !product.isDeleted) {
               productNamesMap[productId] = product.product_name || product.name || productId
-            } else {
-              productNamesMap[productId] = productId
             }
           } catch (err) {
             console.warn(`Failed to fetch product name for ${productId}:`, err)
-            productNamesMap[productId] = productId
           }
         })
       )
@@ -471,7 +470,7 @@ export function useSupplierReports() {
       Object.entries(batchesBySupplier).forEach(([supplierId, batches]) => {
         enrichedBatchesBySupplier[supplierId] = batches.map(batch => ({
           ...batch,
-          product_name: batch.product_name || productNamesMap[batch.product_id] || batch.product_id || 'Unknown Product'
+          product_name: batch.product_name || productNamesMap[batch.product_id] || batch.name || 'Unknown Product'
         }))
       })
       

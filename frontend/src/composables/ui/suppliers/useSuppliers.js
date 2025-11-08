@@ -213,7 +213,7 @@ export function useSuppliers() {
                   if (product) {
                     const enrichedBatch = {
                       ...batch,
-                      product_name: product.product_name || product.name || batch.product_id || 'Unknown Product',
+                      product_name: product.product_name || product.name || 'Unknown Product',
                       category_id: product.category_id || '',
                       category_name: product.category_name || '',
                       subcategory_name: product.subcategory_name || ''
@@ -281,7 +281,7 @@ export function useSuppliers() {
               status: orderStatus,
               items: enrichedBatches.map(batch => {
                 const item = {
-                  name: batch.product_name || batch.name || batch.product_id || 'Unknown Product',
+                  name: batch.product_name || batch.name || 'Unknown Product',
                   product_name: batch.product_name || batch.name || 'Unknown Product',
                   product_id: batch.product_id,
                   quantity: batch.quantity_received,
