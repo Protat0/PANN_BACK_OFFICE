@@ -11,6 +11,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:3000",  # Alternative port
     "http://127.0.0.1:3000",
+    "http://localhost:8080",  # Vue CLI dev server (ramyeonsite)
+    "http://127.0.0.1:8080",
 ]
 
 # Allow all origins in development for easier testing
