@@ -162,8 +162,6 @@ const handleVerifyCode = async () => {
   
   setLoading(true)
   clearError()
-  console.log('Modal: Verifying with token:', verificationToken.value.substring(0, 50) + '...')
-  console.log('Modal: Code:', code.value)
   emit('verify-code', verificationToken.value, code.value, handleVerificationResult)
 }
 

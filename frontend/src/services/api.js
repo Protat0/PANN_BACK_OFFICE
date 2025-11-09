@@ -147,7 +147,6 @@ class ApiService {
 
       // Your backend's get_current_user returns user info directly
       // Extract the user data from the response
-      console.log('API: Raw response data:', data);
       
       if (data.user_data) {
         // If backend returns nested user_data, spread it to top level
@@ -155,10 +154,6 @@ class ApiService {
         // Priority: top-level email_verified > user_data.email_verified > false
         const emailVerified = data.email_verified !== undefined ? data.email_verified :
                              (data.user_data.email_verified !== undefined ? data.user_data.email_verified : false);
-        
-        console.log('API: email_verified from top level:', data.email_verified);
-        console.log('API: email_verified from user_data:', data.user_data.email_verified);
-        console.log('API: Final email_verified:', emailVerified);
         
         // Build merged data - put email_verified AFTER spread so it's not overwritten
         const mergedData = {
@@ -170,8 +165,6 @@ class ApiService {
           email_verified: emailVerified  // Set after spread to ensure it's included
         };
         
-        console.log('API: Merged user data:', mergedData);
-        console.log('API: email_verified in merged data:', mergedData.email_verified);
         return mergedData;
       } else {
         // If backend returns user info directly
@@ -180,7 +173,6 @@ class ApiService {
           ...data,
           email_verified: data.email_verified !== undefined ? data.email_verified : false
         };
-        console.log('API: Direct user data:', result);
         return result;
       }
 

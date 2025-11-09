@@ -29,11 +29,18 @@ class ShiftSummaryService:
             admins = list(self.user_collection.find({
                 "role": "admin",
                 "status": "active",
-                "isDeleted": {"$ne": True}
+                "isDeleted": {"$ne": True},
+                "email_verified": True
             }))
             
-            admin_emails = [admin.get("email") for admin in admins if admin.get("email")]
-            logger.info(f"Found {len(admin_emails)} admin emails")
+            # Ensure we only return unique, non-empty emails
+            admin_emails = []
+            for admin in admins:
+                email = admin.get("email")
+                if email and email not in admin_emails:
+                    admin_emails.append(email)
+            
+            logger.info(f"Found {len(admin_emails)} verified admin email(s)")
             return admin_emails
         
         except Exception as e:

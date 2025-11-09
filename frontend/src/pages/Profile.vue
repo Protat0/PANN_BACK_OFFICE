@@ -169,15 +169,6 @@ export default {
           const emailVerified = userData.email_verified !== undefined ? userData.email_verified : 
                                (rawUserData && rawUserData.email_verified !== undefined ? rawUserData.email_verified : false)
           
-          console.log('Raw user data:', JSON.parse(JSON.stringify(userData))) // Deep clone to see actual values
-          console.log('Email verified from userData:', userData.email_verified)
-          console.log('Email verified from rawUserData:', rawUserData?.email_verified)
-          console.log('Final email_verified value:', emailVerified)
-          console.log('All keys in userData:', Object.keys(userData))
-          if (rawUserData) {
-            console.log('All keys in rawUserData:', Object.keys(rawUserData))
-          }
-          
           userInfo.value = {
             id: userData.id || userData.user_id || rawUserData?._id || rawUserData?.id || '',
             username: userData.username || rawUserData?.username || '',
@@ -187,12 +178,8 @@ export default {
             status: userData.status || rawUserData?.status || 'active',
             email_verified: emailVerified
           }
-          
           // Set verification status - use strict boolean check
           isEmailVerified.value = emailVerified === true
-          
-          console.log('Loaded user info:', userInfo.value)
-          console.log('isEmailVerified set to:', isEmailVerified.value)
         } else {
           console.error('Failed to fetch user data')
           showError('Failed to load user information')
@@ -224,7 +211,6 @@ export default {
         
         if (result.success && result.token) {
           verificationToken.value = result.token
-          console.log('Verification token received:', result.token.substring(0, 50) + '...')
           success('Verification code sent to your email')
           callback(result.token)
         } else {
@@ -239,9 +225,6 @@ export default {
 
     const handleModalVerifyCode = async (token, code, callback) => {
       try {
-        console.log('Verifying code with token:', token ? token.substring(0, 50) + '...' : 'NO TOKEN')
-        console.log('Code:', code)
-        
         if (!token) {
           callback(false, 'Verification token is missing. Please request a new code.')
           return
