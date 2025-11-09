@@ -228,7 +228,7 @@ export default {
       
       this.markingAllAsRead = true
       try {
-        const response = await fetch('http://localhost:8000/api/notifications/mark-all-read/', {
+        const response = await fetch('http://localhost:8000/api/v1/notifications/mark-all-read/', {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json'

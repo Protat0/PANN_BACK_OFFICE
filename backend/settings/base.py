@@ -167,3 +167,20 @@ LOGGING = {
         },
     },
 }
+
+# ============================================
+# OAuth Configuration (Google & Facebook)
+# ============================================
+
+# Google OAuth
+GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID', default='')
+GOOGLE_CLIENT_SECRET = config('GOOGLE_CLIENT_SECRET', default='')
+GOOGLE_REDIRECT_URI = config('GOOGLE_REDIRECT_URI', default='http://localhost:8000/api/v1/auth/google/callback/')
+
+# Facebook OAuth
+FACEBOOK_APP_ID = config('FACEBOOK_APP_ID', default='')
+FACEBOOK_APP_SECRET = config('FACEBOOK_APP_SECRET', default='')
+FACEBOOK_REDIRECT_URI = config('FACEBOOK_REDIRECT_URI', default='http://localhost:8000/api/v1/auth/facebook/callback/')
+
+# Frontend URL (for OAuth redirects)
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')

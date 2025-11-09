@@ -260,6 +260,46 @@ class CustomerApiService {
       this.handleError(error);
     }
   }
+
+
+  /**
+   * Export customers as a CSV file
+   * @param {boolean} includeDeleted - Whether to include deleted customers
+   * @returns {Promise<Blob>} CSV file blob
+   */
+  async exportCustomers(includeDeleted = false) {
+    try {
+      const response = await api.get('/customers/import-export/', {
+        params: { include_deleted: includeDeleted },
+        responseType: 'blob', // important for file downloads
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error exporting customers:', error);
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Import customers from a CSV file
+   * @param {File} file - CSV file to upload
+   * @returns {Promise<Object>} Import summary
+   */
+  async importCustomers(file) {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await api.post('/customers/import-export/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error('Error importing customers:', error);
+      this.handleError(error);
+    }
+  }
 }
 
 // Create and export singleton instance

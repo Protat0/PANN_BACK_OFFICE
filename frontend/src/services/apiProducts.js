@@ -352,7 +352,6 @@ class ApiProductsService {
       if (filters.status) params.status = filters.status
       
       const response = await api.get(`${this.basePath}/export/`, { 
-        params,
         responseType: 'blob'
       })
       
@@ -499,6 +498,8 @@ class ApiProductsService {
       errors
     }
   }
+
+  
 }
 
 const apiProductsService = new ApiProductsService()

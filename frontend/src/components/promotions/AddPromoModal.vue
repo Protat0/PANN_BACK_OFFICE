@@ -624,7 +624,6 @@ const savePromotion = async () => {
     if (result?.success) {
       showSuccess('✅ Promotion created successfully!')
       emit('promotion-saved', { action: 'add', data: result.promotion })
-      handleClose()
     } else {
       let errorMsg = result?.message || 'Failed to create promotion'
       if (result?.errors?.length > 0) {
@@ -636,8 +635,11 @@ const savePromotion = async () => {
     setError(err.message || 'Error creating promotion')
   } finally {
     setLoading(false)
+    // ✅ Move handleClose here so it runs when isLoading = false
+    if (!error.value) handleClose()
   }
 }
+
 
 const updatePromotion = async () => {
   if (!validateForm()) return

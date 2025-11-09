@@ -218,6 +218,19 @@ from .kpi_views.pos.salesServiceView import (
     FetchRecentSales,
 )
 
+from .kpi_views.enhanced_pos_sales_views import (
+    CreateEnhancedPOSSaleView,
+    GetEnhancedSaleView,
+    VoidEnhancedSaleView,
+    ValidatePointsRedemptionView,
+    CalculateLoyaltyPointsView,
+    CalculatePointsDiscountView,
+    GetCustomerEnhancedSalesView,
+    GetEnhancedSalesByDateRangeView,
+    GetEnhancedSalesSummaryView,
+    GetRecentEnhancedSalesView,
+)
+
 from .kpi_views.sales_display_views import (
     SalesDisplayPOSItemSummaryView,
     SalesDisplayOnlineItemSummaryView,
@@ -227,13 +240,51 @@ from .kpi_views.sales_display_views import (
     SalesDisplaySummaryView 
 )
 
-# Online orders
 from .kpi_views.online_transaction_views import (
     CreateOnlineOrderView,
+    GetOnlineOrderView,
+    GetCustomerOrdersView,
+    GetMyOrderHistoryView,
+    GetAllOrdersView,
+    UpdateOrderStatusView,
+    UpdatePaymentStatusView,
+    MarkReadyForDeliveryView,
+    CompleteOrderView,
+    CancelOrderView,
+    AutoCancelExpiredOrdersView,
+    UpdateAutoCancellationSettingsView,
+    GetAutoCancellationStatusView,
+    GetPendingOrdersView,
+    GetProcessingOrdersView,
+    GetOrdersByStatusView,
+    GetOrderSummaryView,
+    ValidateOrderStockView,
+    ValidatePointsRedemptionView,
+    CalculateServiceFeeView,
+    CalculateLoyaltyPointsView,
+)
+
+from .kpi_views.sales_by_category_views import (
+    SalesByCategoryView, 
+    TopCategoriesView, 
+    CategoryPerformanceDetailView
 )
 
 from .views import (
     APIDocumentationView,
+)
+
+from .kpi_views.customer_auth_views import (
+    CustomerLoginView,
+    CustomerRegisterView,
+    CustomerLogoutView,
+    CustomerProfileView,
+    CustomerUpdateProfileView,
+    CustomerChangePasswordView,
+)
+
+from .kpi_views.customer_exportimport_views import (
+     CustomerImportExportView,
 )
 
 urlpatterns = [
@@ -248,8 +299,14 @@ urlpatterns = [
     path('auth/refresh/', RefreshTokenView.as_view(), name='refresh-token'),
     path('auth/me/', CurrentUserView.as_view(), name='current-user'),
     path('auth/verify-token/', VerifyTokenView.as_view(), name='verify-token'),
+    
+    # ========== CUSTOMER AUTHENTICATION ==========
     path('auth/customer/login/', CustomerLoginView.as_view(), name='customer-login'),
-    path('auth/customer/me/', CustomerCurrentUserView.as_view(), name='customer-current-user'),
+    path('auth/customer/register/', CustomerRegisterView.as_view(), name='customer-register'),
+    path('auth/customer/logout/', CustomerLogoutView.as_view(), name='customer-logout'),
+    path('auth/customer/profile/', CustomerProfileView.as_view(), name='customer-profile'),
+    path('auth/customer/profile/update/', CustomerUpdateProfileView.as_view(), name='customer-update-profile'),
+    path('auth/customer/change-password/', CustomerChangePasswordView.as_view(), name='customer-change-password'),
     
     # ========== USER MANAGEMENT ==========
     path('users/', UserListView.as_view(), name='user-list'),
@@ -264,12 +321,14 @@ urlpatterns = [
     path('customers/', CustomerListView.as_view(), name='customer-list'),
     path('customers/search/', CustomerSearchView.as_view(), name='customer-search'),
     path('customers/statistics/', CustomerStatisticsView.as_view(), name='customer-statistics'),
+    path('customers/import-export/', CustomerImportExportView.as_view(), name='customer-import-export'),
     path('customers/email/<str:email>/', CustomerByEmailView.as_view(), name='customer-by-email'),
     path('customers/<str:customer_id>/', CustomerDetailView.as_view(), name='customer-detail'),
     path('customers/<str:customer_id>/restore/', CustomerRestoreView.as_view(), name='customer-restore'),
     path('customers/<str:customer_id>/hard-delete/', CustomerHardDeleteView.as_view(), name='customer-hard-delete'),
     path('customers/<str:customer_id>/loyalty/', CustomerLoyaltyView.as_view(), name='customer-loyalty'),
     
+
     # ========== SUPPLIER MANAGEMENT ==========
     path('suppliers/health/', SupplierHealthCheckView.as_view(), name='supplier-health-check'),
 
@@ -430,9 +489,21 @@ urlpatterns = [
     path('sales/log/create/', CreateSalesLog.as_view(), name='create_sales_log'),
     path('sales/recent/', FetchRecentSales.as_view(), name='recent_sales'),
     path('sales/get/<str:sale_id>/', GetSaleID.as_view(), name='get_sale_by_id'),
-
-    # ========== ONLINE ORDERS (Customer Website) ==========
-    path('online/orders/create/', CreateOnlineOrderView.as_view(), name='create_online_order'),
+    
+    # ========== ENHANCED POS SALES ==========
+    # Enhanced POS Sales Management
+    path('pos-sales/enhanced/', CreateEnhancedPOSSaleView.as_view(), name='create-enhanced-pos-sale'),
+    path('pos-sales/enhanced/<str:sale_id>/', GetEnhancedSaleView.as_view(), name='get-enhanced-sale'),
+    path('pos-sales/enhanced/<str:sale_id>/void/', VoidEnhancedSaleView.as_view(), name='void-enhanced-sale'),
+    path('pos-sales/enhanced/customer/<str:customer_id>/', GetCustomerEnhancedSalesView.as_view(), name='get-customer-enhanced-sales'),
+    path('pos-sales/enhanced/recent/', GetRecentEnhancedSalesView.as_view(), name='get-recent-enhanced-sales'),
+    path('pos-sales/enhanced/by-date/', GetEnhancedSalesByDateRangeView.as_view(), name='get-enhanced-sales-by-date'),
+    path('pos-sales/enhanced/summary/', GetEnhancedSalesSummaryView.as_view(), name='get-enhanced-sales-summary'),
+    
+    # Enhanced POS Sales Utilities
+    path('pos-sales/validate-points/', ValidatePointsRedemptionView.as_view(), name='validate-points-redemption'),
+    path('pos-sales/calculate-points/', CalculateLoyaltyPointsView.as_view(), name='calculate-loyalty-points'),
+    path('pos-sales/calculate-discount/', CalculatePointsDiscountView.as_view(), name='calculate-points-discount'),
     
     # ========== PROMOTIONS ==========
     path('promotions/', PromotionListView.as_view(), name='promotion-list'),
@@ -480,4 +551,43 @@ urlpatterns = [
     path('sales-display/online-transactions/', SalesDisplayAllOnlineTransactionsView.as_view(), name='sales-display-all-online-transactions'),
     path('sales-display/by-item/', SalesDisplayByItemView.as_view(), name='sales-display-by-item'),
     path('sales-display/summary/', SalesDisplaySummaryView.as_view(), name='sales-display-summary'),  
+    
+    # ========== ONLINE TRANSACTIONS ==========
+    # Order Management
+    path('online-orders/', CreateOnlineOrderView.as_view(), name='create-online-order'),
+    path('online-orders/<str:order_id>/', GetOnlineOrderView.as_view(), name='get-online-order'),
+    path('online-orders/customer/<str:customer_id>/', GetCustomerOrdersView.as_view(), name='get-customer-orders'),
+    path('online/orders/history/', GetMyOrderHistoryView.as_view(), name='get-my-order-history'),  # Customer's own order history (JWT auth)
+    path('online-orders/all/', GetAllOrdersView.as_view(), name='get-all-orders'),
+    
+    # Order Status Management
+    path('online-orders/<str:order_id>/status/', UpdateOrderStatusView.as_view(), name='update-order-status'),
+    path('online-orders/<str:order_id>/payment/', UpdatePaymentStatusView.as_view(), name='update-payment-status'),
+    path('online-orders/<str:order_id>/ready/', MarkReadyForDeliveryView.as_view(), name='mark-ready-for-delivery'),
+    path('online-orders/<str:order_id>/complete/', CompleteOrderView.as_view(), name='complete-order'),
+    path('online-orders/<str:order_id>/cancel/', CancelOrderView.as_view(), name='cancel-order'),
+    
+    # Auto-Cancellation Management
+    path('online-orders/auto-cancel/', AutoCancelExpiredOrdersView.as_view(), name='auto-cancel-expired-orders'),
+    path('online-orders/auto-cancel/settings/', UpdateAutoCancellationSettingsView.as_view(), name='update-auto-cancel-settings'),
+    path('online-orders/auto-cancel/status/', GetAutoCancellationStatusView.as_view(), name='get-auto-cancel-status'),
+    
+    # Order Filtering
+    path('online-orders/pending/', GetPendingOrdersView.as_view(), name='get-pending-orders'),
+    path('online-orders/processing/', GetProcessingOrdersView.as_view(), name='get-processing-orders'),
+    path('online-orders/status/<str:status>/', GetOrdersByStatusView.as_view(), name='get-orders-by-status'),
+    
+    # Reporting and Analytics
+    path('online-orders/summary/', GetOrderSummaryView.as_view(), name='get-order-summary'),
+    
+    # Utility Functions
+    path('online-orders/validate-stock/', ValidateOrderStockView.as_view(), name='validate-order-stock'),
+    path('online-orders/validate-points/', ValidatePointsRedemptionView.as_view(), name='validate-points-redemption'),
+    path('online-orders/calculate-fee/', CalculateServiceFeeView.as_view(), name='calculate-service-fee'),
+    path('online-orders/calculate-points/', CalculateLoyaltyPointsView.as_view(), name='calculate-loyalty-points'),
+    path('sales-display/summary/', SalesDisplaySummaryView.as_view(), name='sales-display-summary'),
+
+    path("sales/category/", SalesByCategoryView.as_view(), name="sales-by-category"),
+    path("sales/category/top/", TopCategoriesView.as_view(), name="top-categories"),
+    path("sales/category/<str:category_id>/", CategoryPerformanceDetailView.as_view(), name="category-performance-detail"),
 ]

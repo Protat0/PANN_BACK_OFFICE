@@ -3,7 +3,7 @@ import { ref, computed, reactive } from 'vue'
 import axios from 'axios'
 
 // Configure axios base URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
 // Create axios instance with auth token
 const api = axios.create({
@@ -15,7 +15,7 @@ const api = axios.create({
 
 // Add auth token to requests if available
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+  const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -334,6 +334,7 @@ export function useSuppliers() {
       daysActive: daysActive,
       status: backendSupplier.isDeleted ? 'inactive' : 'active',
       type: backendSupplier.type || 'food',
+      isFavorite: backendSupplier.isFavorite || false,
       createdAt: backendSupplier.created_at,
       updatedAt: backendSupplier.updated_at,
       raw: backendSupplier
@@ -373,6 +374,16 @@ export function useSuppliers() {
         supplier.contactPerson?.toLowerCase().includes(search)
       )
     }
+
+    // Sort: Favorites first, then by name alphabetically
+    filtered.sort((a, b) => {
+      // First, sort by favorite status (favorites first)
+      if (a.isFavorite && !b.isFavorite) return -1
+      if (!a.isFavorite && b.isFavorite) return 1
+      
+      // If both have same favorite status, sort alphabetically by name
+      return (a.name || '').localeCompare(b.name || '')
+    })
 
     return filtered
   })
@@ -521,6 +532,33 @@ export function useSuppliers() {
     }
   }
 
+  const toggleFavorite = async (supplier) => {
+    const previousFavoriteState = supplier.isFavorite
+    supplier.isFavorite = !supplier.isFavorite
+    
+    try {
+      await api.put(`/suppliers/${supplier.id}/`, {
+        isFavorite: supplier.isFavorite
+      })
+      
+      // Update the supplier in the list
+      const index = suppliers.value.findIndex(s => s.id === supplier.id)
+      if (index !== -1) {
+        suppliers.value[index].isFavorite = supplier.isFavorite
+      }
+      
+      return { success: true }
+      
+    } catch (err) {
+      // Revert on error
+      supplier.isFavorite = previousFavoriteState
+      console.error('Error updating favorite status:', err)
+      const errorMessage = err.response?.data?.error || 'Failed to update favorite status'
+      error.value = errorMessage
+      return { success: false, error: errorMessage }
+    }
+  }
+
   const deleteSupplier = async (supplier) => {
     const confirmed = confirm(`Are you sure you want to delete "${supplier.name}"?`)
     if (!confirmed) return { success: false, cancelled: true }
@@ -651,6 +689,7 @@ export function useSuppliers() {
     fetchSuppliers,
     addSupplier,
     updateSupplier,
+    toggleFavorite,
     deleteSupplier,
     deleteSelected,
     clearFilters,

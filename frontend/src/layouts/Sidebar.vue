@@ -200,6 +200,19 @@
             <div class="nav-indicator" v-if="isActiveRoute('/customers')"></div>
           </router-link>
         </li>
+
+        <!-- Online Orders -->
+        <li class="nav-item">
+          <router-link 
+            to="/online-orders" 
+            class="nav-link"
+            :class="{ 'active': isActiveRoute('/online-orders') }"
+          >
+            <ShoppingCart :size="18" class="nav-icon" />
+            <span class="nav-text" v-if="!isCollapsed">Online Orders</span>
+            <div class="nav-indicator" v-if="isActiveRoute('/online-orders')"></div>
+          </router-link>
+        </li>
       </ul>
     </nav>
 
@@ -249,7 +262,8 @@ import {
   LogOut,
   Box,
   FolderOpen,
-  FileText
+  FileText,
+  ShoppingCart
 } from 'lucide-vue-next'
 
 export default {
@@ -272,7 +286,8 @@ export default {
     LogOut,
     Box,
     FolderOpen,
-    FileText
+    FileText,
+    ShoppingCart
   },
   data() {
     return {

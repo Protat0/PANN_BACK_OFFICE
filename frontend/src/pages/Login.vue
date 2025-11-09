@@ -45,14 +45,14 @@
                 />
               </div>
 
-              <!-- Error Message -->
-              <div v-if="error" class="error-message">
-                {{ error }}
-              </div>
-
               <!-- Success Message -->
               <div v-if="successMessage" class="success-message">
                 {{ successMessage }}
+              </div>
+
+              <!-- Failure Message -->
+              <div v-if="failureMessage" class="failure-message">
+                {{ failureMessage }}
               </div>
 
               <!-- Login Button -->
@@ -102,6 +102,7 @@ const loginForm = ref({
 })
 
 const successMessage = ref(null)
+const failureMessage = ref(null)
 
 // Computed
 const apiBaseUrl = computed(() => import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1')
@@ -109,7 +110,9 @@ const isDev = computed(() => import.meta.env.DEV)
 
 // Enhanced login handler with debugging
 const handleLogin = async () => {
+  // Clear previous messages
   successMessage.value = null
+  failureMessage.value = null
   
   try {
     if (!loginForm.value.email || !loginForm.value.password) {
@@ -122,6 +125,8 @@ const handleLogin = async () => {
       await handleLoginSuccess()
     } else {
       console.error('LOGIN PAGE: Login failed, no success result')
+      // If login returns false but no error is set, set a generic error
+      failureMessage.value = error.value || 'Login failed. Please check your credentials and try again.'
     }
   } catch (err) {
     console.error('LOGIN PAGE: Login exception:', err)
@@ -129,10 +134,15 @@ const handleLogin = async () => {
       message: err.message,
       stack: err.stack
     })
+    // Ensure error is set even if the composable doesn't set it
+    failureMessage.value = err.message || 'An unexpected error occurred. Please try again.'
   }
 }
 
 const handleLoginSuccess = async () => {
+  // Clear any previous errors
+  failureMessage.value = null
+  
   // Wait a bit more for reactivity to settle
   await new Promise(resolve => setTimeout(resolve, 100))
 
@@ -320,6 +330,16 @@ onMounted(() => {
   background-color: #f0fdf4;
   border: 1px solid #bbf7d0;
   color: #16a34a;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.failure-message {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
   padding: 0.75rem;
   border-radius: 0.5rem;
   font-size: 0.875rem;

@@ -1,7 +1,7 @@
 <template>
-  <div v-if="show" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-      <div class="modal-content modern-order-modal">
+  <Teleport to="body">
+    <div v-if="show" class="modal-overlay" @click="handleOverlayClick">
+      <div class="modal-content modern-order-modal" @click.stop>
         <!-- Modal Header -->
         <div class="modal-header border-0 pb-0">
           <div class="d-flex align-items-center">
@@ -9,7 +9,7 @@
               <ShoppingCart :size="24" />
             </div>
             <div>
-              <h4 class="modal-title mb-1">Create Purchase Order</h4>
+              <h4 class="modal-title mb-1">New Order</h4>
               <p class="text-muted mb-0 small">
                 Order stock from <strong>{{ supplier?.name }}</strong> (Status: Pending)
               </p>
@@ -24,7 +24,7 @@
         </div>
 
         <!-- Modal Body -->
-        <div class="modal-body pt-4">
+        <div class="modal-body pt-4 scrollable-content">
           <!-- Order Information -->
           <div class="row mb-4">
             <!-- Left Column - Order Details -->
@@ -40,11 +40,10 @@
                     <label for="orderId" class="form-label">Order ID</label>
                     <input 
                       type="text" 
-                      class="form-control" 
+                      class="form-control order-id-input" 
                       id="orderId"
                       v-model="orderData.orderId"
                       readonly
-                      style="background-color: #f8f9fa;"
                     >
                   </div>
                   
@@ -59,6 +58,21 @@
                   </div>
                   
                   <div class="col-md-6">
+                    <label for="referenceNumber" class="form-label">Batch Number</label>
+                    <input 
+                      type="text" 
+                      class="form-control" 
+                      id="referenceNumber"
+                      v-model="orderData.referenceNumber"
+                      placeholder="Leave empty to auto-generate"
+                    >
+                    <small class="text-muted d-block mt-1">
+                      <Clock :size="12" class="me-1" />
+                      Will auto-generate if left empty
+                    </small>
+                  </div>
+                  
+                  <div class="col-md-6">
                     <label for="expectedDeliveryDate" class="form-label">Expected Delivery <span class="text-danger">*</span></label>
                     <input 
                       type="date" 
@@ -66,17 +80,6 @@
                       id="expectedDeliveryDate"
                       v-model="orderData.expectedDeliveryDate"
                       :min="orderData.orderDate"
-                    >
-                  </div>
-                  
-                  <div class="col-md-6">
-                    <label for="referenceNumber" class="form-label">Reference #</label>
-                    <input 
-                      type="text" 
-                      class="form-control" 
-                      id="referenceNumber"
-                      v-model="orderData.referenceNumber"
-                      placeholder="Optional"
                     >
                   </div>
                   
@@ -146,7 +149,7 @@
 
             <!-- Items Table -->
             <div class="table-responsive">
-              <table class="table table-bordered order-items-table">
+              <table class="table order-items-table">
                 <thead class="table-light">
                   <tr>
                     <th style="width: 40px;">#</th>
@@ -317,7 +320,7 @@
           <div class="order-summary-section mt-4">
             <div class="row">
               <div class="col-md-8">
-                <div class="alert alert-info">
+                <div class="alert alert-warning">
                   <Clock :size="16" class="me-2" />
                   <strong>Purchase Order (Pending Delivery):</strong> Batches will be created with "pending" status. 
                   Use "Receive Stock" button to activate them when delivery arrives.
@@ -357,7 +360,7 @@
         </div>
 
         <!-- Modal Footer -->
-        <div class="modal-footer border-0 pt-4">
+        <div class="modal-footer sticky-footer border-0">
           <div class="d-flex justify-content-between align-items-center w-100">
             <div class="text-muted small">
               <Clock :size="16" class="me-1" />
@@ -389,7 +392,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <script>
@@ -725,9 +728,14 @@ export default {
           failed: []
         }
         
-        // Generate a single batch number for all items in this purchase order
-        const sharedBatchNumber = generateBatchNumber()
-        console.log(`📦 Using shared batch number for all items: ${sharedBatchNumber}`)
+        // Use user-provided batch number or generate one automatically
+        const sharedBatchNumber = orderData.value.referenceNumber?.trim() || generateBatchNumber()
+        console.log(`📦 Using batch number for all items: ${sharedBatchNumber}`)
+        
+        // Update the orderData with the final batch number (in case it was auto-generated)
+        if (!orderData.value.referenceNumber?.trim()) {
+          orderData.value.referenceNumber = sharedBatchNumber
+        }
         
         // Validate supplier exists
         if (!props.supplier?.id) {
@@ -748,7 +756,7 @@ export default {
               expected_delivery_date: orderData.value.expectedDeliveryDate, // ✅ Expected delivery date (for pending orders)
               // date_received will be null until stock is actually received/activated
               status: 'pending', // ✅ CREATE AS PENDING (on-going delivery)
-              notes: `Receipt: ${orderData.value.orderId}${orderData.value.referenceNumber ? ` | Ref: ${orderData.value.referenceNumber}` : ''}${orderData.value.notes ? ` | ${orderData.value.notes}` : ''}`
+              notes: `Receipt: ${orderData.value.orderId} | Batch: ${sharedBatchNumber}${orderData.value.notes ? ` | ${orderData.value.notes}` : ''}`
             }
             
             const response = await createBatch(batchData)
@@ -791,6 +799,12 @@ export default {
     
     // ================ MODAL CONTROLS ================
     
+    function handleOverlayClick() {
+      if (!saving.value) {
+        handleClose()
+      }
+    }
+
     function handleClose() {
       emit('close')
       resetForm()
@@ -801,7 +815,7 @@ export default {
         orderId: generateOrderId(),
         orderDate: new Date().toISOString().split('T')[0],
         expectedDeliveryDate: '',
-        referenceNumber: '',
+        referenceNumber: '', // Leave empty - will auto-generate when saving if not filled
         notes: '',
         items: [createEmptyItem()]
       }
@@ -852,19 +866,24 @@ export default {
       validateItem,
       calculateItemTotal,
       saveOrder,
-      handleClose
+      handleClose,
+      handleOverlayClick
     }
   }
 }
 </script>
 
 <style scoped>
+@import '@/assets/styles/colors.css';
 /* Keep all existing styles from CreateOrderModal */
 .modern-order-modal {
   border-radius: 16px;
   border: none;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
 }
 
 .modal-icon-pending {
@@ -880,22 +899,31 @@ export default {
 
 .modal-header {
   padding: 2rem 2rem 1rem 2rem;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background-color: var(--surface-tertiary);
+  border-bottom: 1px solid var(--border-primary);
+  flex-shrink: 0;
 }
 
 .modal-body {
   padding: 1.5rem 2rem;
-  max-height: 70vh;
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.scrollable-content {
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .order-info-card,
 .supplier-info-card {
   padding: 1.5rem;
-  background: var(--neutral-light);
+  background-color: var(--surface-tertiary);
   border-radius: 12px;
-  border: 1px solid var(--neutral-medium);
+  border: 1px solid var(--border-primary);
   height: 100%;
+  box-shadow: var(--shadow-sm);
 }
 
 .supplier-details {
@@ -909,7 +937,7 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0;
-  border-bottom: 1px solid var(--neutral-light);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .detail-row:last-child {
@@ -917,61 +945,101 @@ export default {
 }
 
 .detail-row strong {
-  color: var(--tertiary-dark);
+  color: var(--text-primary);
   min-width: 80px;
 }
 
 .detail-row span {
-  color: var(--tertiary-medium);
+  color: var(--text-secondary);
   text-align: right;
   flex: 1;
 }
 
 .order-items-section {
-  background: white;
+  background-color: var(--surface-primary);
   border-radius: 12px;
-  border: 1px solid var(--neutral-medium);
+  border: 1px solid var(--border-primary);
   padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
 }
 
 .order-items-table {
   margin-bottom: 0;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 .order-items-table th {
-  background-color: #f8f9fa;
+  background-color: var(--surface-tertiary);
   font-weight: 600;
-  color: var(--tertiary-dark);
-  border-bottom: 2px solid var(--neutral-medium);
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--border-primary);
   font-size: 0.875rem;
+  border-top: 1px solid var(--border-primary);
+  border-left: 1px solid var(--border-primary);
+}
+
+.order-items-table th:first-child {
+  border-left: 1px solid var(--border-primary);
+  border-top-left-radius: 8px;
+}
+
+.order-items-table th:last-child {
+  border-right: 1px solid var(--border-primary);
+  border-top-right-radius: 8px;
 }
 
 .order-items-table td {
   vertical-align: middle;
   padding: 0.75rem 0.5rem;
+  border: 1px solid var(--border-primary);
+  border-top: none;
+  color: var(--text-secondary);
+}
+
+.order-items-table tr:last-child td {
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.order-items-table tr td:first-child {
+  border-left: 1px solid var(--border-primary);
+}
+
+.order-items-table tr td:last-child {
+  border-right: 1px solid var(--border-primary);
+}
+
+.order-items-table tr:last-child td:first-child {
+  border-bottom-left-radius: 8px;
+}
+
+.order-items-table tr:last-child td:last-child {
+  border-bottom-right-radius: 8px;
 }
 
 .total-price {
   font-weight: 600;
-  color: var(--primary);
+  color: var(--text-primary);
   text-align: right;
   padding: 0.5rem;
-  background: var(--primary-light);
+  background-color: var(--surface-tertiary);
   border-radius: 4px;
 }
 
 .order-summary-section {
-  background: var(--neutral-light);
+  background-color: var(--surface-tertiary);
   border-radius: 12px;
   padding: 1.5rem;
-  border: 1px solid var(--neutral-medium);
+  border: 1px solid var(--border-primary);
+  box-shadow: var(--shadow-sm);
 }
 
 .order-totals {
-  background: white;
+  background-color: var(--surface-primary);
   border-radius: 8px;
   padding: 1.5rem;
-  border: 1px solid var(--neutral-medium);
+  border: 1px solid var(--border-primary);
+  box-shadow: var(--shadow-sm);
 }
 
 .summary-row {
@@ -979,7 +1047,8 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0;
-  border-bottom: 1px solid var(--neutral-light);
+  border-bottom: 1px solid var(--border-primary);
+  color: var(--text-secondary);
 }
 
 .summary-row:last-child {
@@ -989,7 +1058,7 @@ export default {
 .total-row {
   margin-top: 0.5rem;
   padding-top: 1rem;
-  border-top: 2px solid var(--neutral-medium);
+  border-top: 2px solid var(--border-primary);
 }
 
 .btn-primary {
@@ -1005,7 +1074,219 @@ export default {
   box-shadow: 0 4px 12px rgba(115, 146, 226, 0.3);
 }
 
+.sticky-footer {
+  background-color: var(--surface-tertiary);
+  border-top: 1px solid var(--border-primary);
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  box-shadow: var(--shadow-md);
+  padding: 1.5rem 2rem 2rem 2rem !important;
+}
+
+.order-id-input {
+  background-color: var(--input-bg) !important;
+  color: var(--input-text) !important;
+  border-color: var(--input-border) !important;
+}
+
 .table-danger {
   background-color: rgba(220, 53, 69, 0.1) !important;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  z-index: 9999 !important;
+  animation: fadeIn 0.3s ease;
+  backdrop-filter: blur(4px);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Modal Content */
+.modal-content {
+  position: relative !important;
+  max-width: 1200px;
+  width: 95%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideIn 0.3s ease;
+  z-index: 10000 !important;
+  background-color: var(--surface-elevated);
+  border-radius: 16px;
+  border: 1px solid var(--border-primary);
+  box-shadow: var(--shadow-2xl);
+}
+
+@keyframes slideIn {
+  from { 
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+  .modal-content {
+    margin: 1rem;
+    max-height: calc(100vh - 2rem);
+    width: calc(100% - 2rem);
+  }
+
+  .modal-header {
+    padding: 1.5rem 1.5rem 1rem 1.5rem !important;
+  }
+
+  .modal-header h4 {
+    font-size: 1.25rem;
+  }
+
+  .modal-body {
+    padding: 1rem 1.5rem !important;
+  }
+
+  .sticky-footer {
+    padding: 1rem 1.5rem 1.5rem 1.5rem !important;
+  }
+
+  .order-info-card,
+  .supplier-info-card {
+    margin-bottom: 1rem;
+    height: auto;
+  }
+
+  /* Stack columns on mobile */
+  .row > [class*="col-md-"] {
+    width: 100%;
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+
+  .order-items-section {
+    padding: 1rem;
+  }
+
+  .order-items-table {
+    font-size: 0.85rem;
+  }
+
+  .order-items-table th,
+  .order-items-table td {
+    padding: 0.5rem 0.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-content {
+    margin: 0.5rem;
+    max-height: calc(100vh - 1rem);
+    width: calc(100% - 1rem);
+    border-radius: 8px;
+  }
+
+  .modal-header {
+    padding: 1rem 1rem 0.75rem 1rem !important;
+  }
+
+  .modal-header h4 {
+    font-size: 1.1rem;
+  }
+
+  .modal-body {
+    padding: 0.75rem 1rem !important;
+    max-height: calc(100vh - 200px);
+  }
+
+  .sticky-footer {
+    padding: 0.75rem 1rem 1rem 1rem !important;
+  }
+
+  .sticky-footer > div {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .sticky-footer > div > div:first-child {
+    text-align: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .sticky-footer > div > div:last-child {
+    flex-direction: column;
+    width: 100%;
+    gap: 0.5rem;
+  }
+
+  .sticky-footer .btn {
+    width: 100%;
+  }
+
+  .modal-icon {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  .order-info-card,
+  .supplier-info-card,
+  .order-items-section {
+    padding: 1rem;
+  }
+
+  .order-items-table {
+    font-size: 0.8rem;
+  }
+
+  .order-items-table th,
+  .order-items-table td {
+    padding: 0.4rem 0.2rem;
+  }
+
+  .btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+}
+
+/* Custom Scrollbar */
+.modal-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-content::-webkit-scrollbar-track {
+  background: var(--neutral-light);
+  border-radius: 3px;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+  background: var(--neutral-medium);
+  border-radius: 3px;
+}
+
+.modal-content::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* Prevent body scroll when modal is open */
+body:has(.modal-overlay) {
+  overflow: hidden !important;
 }
 </style>

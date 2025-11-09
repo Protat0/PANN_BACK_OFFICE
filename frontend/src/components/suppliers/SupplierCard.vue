@@ -14,11 +14,27 @@
           <div class="supplier-icon me-3">
             <i class="bi bi-building"></i>
           </div>
-          <h5 class="card-title mb-0 supplier-name">{{ supplier.name }}</h5>
+          <h5 class="card-title mb-0 supplier-name">
+            {{ supplier.name }}
+            <button
+              @click.stop="$emit('toggle-favorite', supplier)"
+              class="btn btn-link p-0 ms-2 favorite-toggle"
+              type="button"
+              :title="supplier.isFavorite ? 'Remove from favorites' : 'Add to favorites'"
+            >
+              <Star 
+                :size="18" 
+                class="favorite-star" 
+                :class="{ 'favorite-filled': supplier.isFavorite }"
+                :fill="supplier.isFavorite ? 'currentColor' : 'none'"
+                :stroke-width="supplier.isFavorite ? 2 : 2.5"
+              />
+            </button>
+          </h5>
         </div>
         <div class="dropdown">
           <button 
-            class="btn btn-link p-0 text-muted"
+            class="btn btn-link p-0 dropdown-toggle-btn"
             type="button"
             :id="`dropdownMenuButton${supplier.id}`"
             data-bs-toggle="dropdown"
@@ -55,22 +71,22 @@
       <!-- Supplier Info -->
       <div class="mb-3">
         <div class="supplier-contact mb-2">
-          <i class="bi bi-envelope text-muted me-2"></i>
-          <span class="text-muted">{{ supplier.email || 'No email' }}</span>
+          <i class="bi bi-envelope contact-icon me-2"></i>
+          <span class="contact-text">{{ supplier.email || 'No email' }}</span>
         </div>
         <div class="supplier-contact mb-2">
-          <i class="bi bi-telephone text-muted me-2"></i>
-          <span class="text-muted">{{ supplier.phone || 'No phone' }}</span>
+          <i class="bi bi-telephone contact-icon me-2"></i>
+          <span class="contact-text">{{ supplier.phone || 'No phone' }}</span>
         </div>
         <div class="supplier-contact">
-          <i class="bi bi-geo-alt text-muted me-2"></i>
-          <span class="text-muted">{{ getShortAddress(supplier.address) }}</span>
+          <i class="bi bi-geo-alt contact-icon me-2"></i>
+          <span class="contact-text">{{ getShortAddress(supplier.address) }}</span>
         </div>
       </div>
 
       <!-- Purchase Orders Info -->
       <div class="mb-3 mt-auto">
-        <p class="text-muted mb-2 purchase-orders-label">Purchase Orders</p>
+        <p class="purchase-orders-label mb-2">Purchase Orders</p>
         <div class="d-flex justify-content-between align-items-center mb-2">
           <span class="purchase-orders-count">{{ supplier.purchaseOrders }}</span>
           <span :class="['badge', 'rounded-pill', getStatusBadgeClass(supplier.status)]">
@@ -117,9 +133,14 @@
 </template>
 
 <script>
+import { Star } from 'lucide-vue-next'
+
 export default {
   name: 'SupplierCard',
-  emits: ['toggle-select', 'edit', 'view', 'create-order', 'delete'],
+  components: {
+    Star
+  },
+  emits: ['toggle-select', 'toggle-favorite', 'edit', 'view', 'create-order', 'delete'],
   props: {
     supplier: {
       type: Object,
@@ -169,39 +190,80 @@ export default {
 </script>
 
 <style scoped>
+@import '@/assets/styles/colors.css';
 /* Supplier card styling */
 .supplier-card {
-  border: 1px solid var(--neutral-medium);
+  border: 1px solid var(--border-primary);
   border-radius: 12px;
   transition: all 0.3s ease;
-  background-color: white;
+  background-color: var(--surface-primary);
 }
 
 .supplier-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
   transform: translateY(-2px);
+  border-color: var(--border-accent);
 }
 
 .supplier-card.card-selected {
-  border-color: var(--primary);
-  background-color: var(--primary-light);
+  border-color: var(--border-accent);
+  background-color: var(--state-selected);
 }
 
 .supplier-icon {
   width: 40px;
   height: 40px;
-  background-color: var(--primary-light);
+  background-color: var(--surface-tertiary);
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--primary);
+  color: var(--text-accent);
 }
 
 .supplier-name {
-  color: var(--primary);
+  color: var(--text-primary);
   font-weight: 600;
   font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+}
+
+.favorite-toggle {
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.2s ease;
+}
+
+.favorite-toggle:hover {
+  transform: scale(1.1);
+}
+
+.favorite-toggle:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.favorite-star {
+  color: #ffc107;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.favorite-star:not(.favorite-filled) {
+  color: #9e9e9e;
+  opacity: 1;
+  stroke-width: 2;
+}
+
+.favorite-star.favorite-filled {
+  color: #ffc107;
+}
+
+.favorite-star:hover {
+  transform: scale(1.15);
 }
 
 .supplier-contact {
@@ -210,24 +272,42 @@ export default {
   font-size: 0.9rem;
 }
 
+.contact-icon {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.contact-text {
+  color: var(--text-secondary);
+}
+
+.dropdown-toggle-btn {
+  color: var(--text-tertiary);
+  transition: color 0.2s ease;
+}
+
+.dropdown-toggle-btn:hover {
+  color: var(--text-secondary);
+}
+
 .purchase-orders-label {
   font-size: 0.9rem;
-  color: var(--tertiary-dark);
+  color: var(--text-secondary);
   margin-bottom: 0.25rem;
 }
 
 .purchase-orders-count {
   font-size: 2rem;
   font-weight: 700;
-  color: var(--primary);
+  color: var(--text-accent);
 }
 
 /* Supplier Stats Styling */
 .supplier-stats {
-  background-color: var(--neutral-light);
+  background-color: var(--surface-secondary);
   border-radius: 8px;
   padding: 0.75rem;
-  border: 1px solid var(--neutral-medium);
+  border: 1px solid var(--border-primary);
 }
 
 .stat-row {
@@ -243,7 +323,7 @@ export default {
 
 .stat-label {
   font-size: 0.75rem;
-  color: var(--tertiary-medium);
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
