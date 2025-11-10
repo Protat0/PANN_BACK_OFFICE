@@ -3,6 +3,7 @@ import os
 from datetime import datetime, timedelta
 from ..database import db_manager
 from notifications.services import notification_service
+from notifications.shift_summary_service import shift_summary_service
 import logging
 import threading
 import time
@@ -284,17 +285,33 @@ class SessionLogService:
             )
 
             if update_result.modified_count > 0:
-                # Send logout notification
-                logout_data = {
+                # Prepare session data with logout info
+                session_with_logout = {
                     "_id": session["_id"],
                     "username": session.get("username"),
                     "branch_id": session.get("branch_id"),
-                    "user_id": user_id
+                    "user_id": user_id,
+                    "login_time": session.get("login_time"),
+                    "logout_time": logout_time,
+                    "session_duration": duration
                 }
-                self._send_session_notification("logout", logout_data, {
+                
+                # Send logout notification
+                self._send_session_notification("logout", session_with_logout, {
                     "duration": duration,
                     "logout_reason": reason
                 })
+                
+                # Send shift summary email to admins
+                try:
+                    email_result = shift_summary_service.send_shift_summary_email(session_with_logout)
+                    if email_result.get('success'):
+                        logger.info(f"Shift summary email sent successfully. Sent to {email_result.get('sent_count', 0)} admin(s)")
+                    else:
+                        logger.warning(f"Failed to send shift summary email: {email_result.get('error')}")
+                except Exception as email_error:
+                    logger.error(f"Error sending shift summary email: {email_error}")
+                    # Don't fail logout if email fails
                 
                 logger.info(f"Logout logged for user {session.get('username')} (duration: {duration}s)")
                 return {

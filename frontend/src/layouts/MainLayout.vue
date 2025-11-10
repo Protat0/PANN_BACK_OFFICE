@@ -121,7 +121,8 @@ export default {
         '/salesbyitem': 'Sales By Item',
         '/salesbycategory': 'Sales By Category',
         '/uncategorized': 'Uncategorized Products',
-        '/allNotifications': 'All Notifications'
+        '/allNotifications': 'All Notifications',
+        '/profile': 'User Profile'
       }
       
       if (this.$route.path.startsWith('/products/') && this.$route.path !== '/products/bulk') {

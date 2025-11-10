@@ -147,17 +147,33 @@ class ApiService {
 
       // Your backend's get_current_user returns user info directly
       // Extract the user data from the response
+      
       if (data.user_data) {
-        // If backend returns nested user_data
-        return {
+        // If backend returns nested user_data, spread it to top level
+        // This ensures email_verified and other fields are accessible
+        // Priority: top-level email_verified > user_data.email_verified > false
+        const emailVerified = data.email_verified !== undefined ? data.email_verified :
+                             (data.user_data.email_verified !== undefined ? data.user_data.email_verified : false);
+        
+        // Build merged data - put email_verified AFTER spread so it's not overwritten
+        const mergedData = {
           id: data.user_id,
           email: data.email,
           role: data.role,
-          ...data.user_data
+          ...data.user_data,  // Spread user_data first
+          // Then override with explicit values to ensure they're set
+          email_verified: emailVerified  // Set after spread to ensure it's included
         };
+        
+        return mergedData;
       } else {
         // If backend returns user info directly
-        return data;
+        // Ensure email_verified is set
+        const result = {
+          ...data,
+          email_verified: data.email_verified !== undefined ? data.email_verified : false
+        };
+        return result;
       }
 
     } catch (error) {

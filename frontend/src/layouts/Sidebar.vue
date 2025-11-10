@@ -45,18 +45,20 @@
 
     <!-- User Profile Section -->
     <div class="user-profile" v-if="!isCollapsed">
-      <div class="profile-card">
-        <div class="profile-avatar">
-          <User :size="20" class="text-accent" />
+      <router-link to="/profile" class="profile-card-link">
+        <div class="profile-card">
+          <div class="profile-avatar">
+            <User :size="20" class="text-accent" />
+          </div>
+          <div class="profile-info">
+            <span class="profile-name">My Profile</span>
+            <small class="profile-role">Administrator</small>
+          </div>
+          <button class="btn btn-icon-only btn-xs profile-settings" @click.prevent="$router.push('/profile')">
+            <Settings :size="14" />
+          </button>
         </div>
-        <div class="profile-info">
-          <span class="profile-name">My Profile</span>
-          <small class="profile-role">Administrator</small>
-        </div>
-        <button class="btn btn-icon-only btn-xs profile-settings">
-          <Settings :size="14" />
-        </button>
-      </div>
+      </router-link>
     </div>
 
     <!-- Navigation Menu -->
@@ -563,6 +565,12 @@ export default {
 /* ==========================================================================
    USER PROFILE - SEMANTIC STYLING
    ========================================================================== */
+
+.profile-card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
 
 .user-profile {
   padding: 1rem;

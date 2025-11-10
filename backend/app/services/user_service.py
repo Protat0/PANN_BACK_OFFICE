@@ -6,6 +6,7 @@ import bcrypt
 import logging
 from .audit_service import AuditLogService
 from notifications.services import  NotificationService
+from notifications.email_verification_service import email_verification_service
 logger = logging.getLogger(__name__)
 
 class UserService:
@@ -185,6 +186,23 @@ class UserService:
             # Send notification
             user_name = user_data.get('full_name', user_data.get('username', 'User'))
             self._send_user_notification('created', user_name, user_id)
+            
+            # Send email verification code
+            user_email = user_data.get('email')
+            if user_email:
+                try:
+                    email_result = email_verification_service.send_verification_code(
+                        email=user_email,
+                        user_id=user_id,
+                        user_name=user_name
+                    )
+                    if email_result.get('success'):
+                        logger.info(f"Verification code sent successfully to {user_email}")
+                    else:
+                        logger.warning(f"Failed to send verification code to {user_email}: {email_result.get('error')}")
+                except Exception as email_error:
+                    logger.error(f"Error sending verification code: {email_error}")
+                    # Don't fail user creation if email fails
             
             # Audit logging
             if current_user and self.audit_service:

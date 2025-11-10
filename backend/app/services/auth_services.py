@@ -222,12 +222,32 @@ class AuthService:
             user = self.user_collection.find_one({"_id": user_id})
             
             if user:
-                return {
+                # Ensure email_verified field is included (defaults to False if not set)
+                # Convert user document to dict and ensure email_verified is present
+                import logging
+                logger = logging.getLogger(__name__)
+                
+                user_data = dict(user)
+                email_verified = user_data.get('email_verified', False)
+                
+                # Log for debugging
+                logger.info(f"get_current_user - User: {user.get('email')}, email_verified in DB: {email_verified}, type: {type(email_verified)}")
+                
+                # Ensure email_verified is explicitly set (convert to boolean)
+                email_verified_bool = bool(email_verified) if email_verified is not None else False
+                user_data['email_verified'] = email_verified_bool
+                
+                response_data = {
                     "user_id": str(user["_id"]),
                     "email": user["email"],
                     "role": user["role"],
-                    "user_data": user
+                    "email_verified": email_verified_bool,  # Also include at top level for easy access
+                    "user_data": user_data
                 }
+                
+                logger.info(f"get_current_user response - email_verified: {response_data.get('email_verified')}")
+                
+                return response_data
             return None
         
         except Exception as e:
