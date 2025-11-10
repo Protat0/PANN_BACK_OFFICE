@@ -1,13 +1,31 @@
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 import bcrypt
+from decouple import config
+from django.conf import settings
 from ..database import db_manager
 
+
+def _resolve_secret_key():
+    """
+    Determine the JWT secret key.
+
+    Precedence:
+    1. AUTH_JWT_SECRET env (explicit override)
+    2. Django settings.SECRET_KEY
+    3. Fallback to legacy hard-coded default
+    """
+    explicit_secret = config('AUTH_JWT_SECRET', default=None)
+    if explicit_secret:
+        return explicit_secret
+    return getattr(settings, 'SECRET_KEY', None) or "your-secret-key-here-change-in-production"
+
+
 # JWT settings
-SECRET_KEY = "your-secret-key-here-change-in-production"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 10000
-REFRESH_TOKEN_EXPIRE_DAYS = 7
+SECRET_KEY = _resolve_secret_key()
+ALGORITHM = config('AUTH_JWT_ALGORITHM', default='HS256')
+ACCESS_TOKEN_EXPIRE_MINUTES = config('AUTH_ACCESS_TOKEN_EXPIRE_MINUTES', default=10000, cast=int)
+REFRESH_TOKEN_EXPIRE_DAYS = config('AUTH_REFRESH_TOKEN_EXPIRE_DAYS', default=7, cast=int)
 
 class AuthService:
     def __init__(self):

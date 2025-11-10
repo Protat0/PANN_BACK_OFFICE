@@ -63,6 +63,10 @@ from .kpi_views.authentication_views import (
     CurrentUserView,
     VerifyTokenView,
 )
+from .kpi_views.oauth_views import (
+    OAuthAuthorizeView,
+    OAuthCallbackView,
+)
 
 from .kpi_views.product_views import (
     # Product CRUD views
@@ -249,6 +253,8 @@ urlpatterns = [
     path('auth/refresh/', RefreshTokenView.as_view(), name='refresh-token'),
     path('auth/me/', CurrentUserView.as_view(), name='current-user'),
     path('auth/verify-token/', VerifyTokenView.as_view(), name='verify-token'),
+    path('auth/oauth/<str:provider>/authorize/', OAuthAuthorizeView.as_view(), name='oauth-authorize'),
+    path('auth/oauth/<str:provider>/callback/', OAuthCallbackView.as_view(), name='oauth-callback'),
     path('auth/customer/login/', CustomerLoginView.as_view(), name='customer-login'),
     path('auth/customer/me/', CustomerCurrentUserView.as_view(), name='customer-current-user'),
     
