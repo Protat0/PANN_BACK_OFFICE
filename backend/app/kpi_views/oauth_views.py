@@ -108,10 +108,11 @@ class OAuthCallbackView(APIView):
             return self._redirect_with_error(provider, state_token, str(validation_error))
         except Exception as exc:  # pylint: disable=broad-except
             logger.exception("OAuth callback failed for %s: %s", provider, exc)
+            message = str(exc) or "OAuth authentication failed."
             return self._redirect_with_error(
                 provider,
                 state_token,
-                "OAuth authentication failed.",
+                message,
             )
 
     @staticmethod

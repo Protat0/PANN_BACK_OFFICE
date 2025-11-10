@@ -171,17 +171,25 @@ class OAuthService:
             state=state_token,
         )
 
-        token = oauth_session.fetch_token(
-            provider_cfg["token_url"],
-            client_secret=provider_cfg["client_secret"],
-            code=code,
-            include_client_id=True,
-        )
+        try:
+            token = oauth_session.fetch_token(
+                provider_cfg["token_url"],
+                client_secret=provider_cfg["client_secret"],
+                code=code,
+                include_client_id=True,
+            )
+        except Exception as exc:  # pylint: disable=broad-except
+            raise ValueError(f"Token exchange failed: {exc}") from exc
 
         userinfo_params = provider_cfg.get("userinfo_params", {})
-        userinfo = oauth_session.get(
-            provider_cfg["userinfo_endpoint"], params=userinfo_params
-        ).json()
+        try:
+            response = oauth_session.get(
+                provider_cfg["userinfo_endpoint"], params=userinfo_params
+            )
+            response.raise_for_status()
+            userinfo = response.json()
+        except Exception as exc:  # pylint: disable=broad-except
+            raise ValueError(f"Failed to fetch user profile: {exc}") from exc
 
         profile = self._normalize_profile(provider, userinfo)
         profile["provider_tokens"] = {k: token.get(k) for k in ("access_token", "id_token", "token_type")}
