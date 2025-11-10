@@ -21,7 +21,11 @@ class OAuthService:
     and user upsert/token issuance.
     """
 
-    GOOGLE_SCOPE = ["openid", "email", "profile"]
+    GOOGLE_SCOPE = [
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "https://www.googleapis.com/auth/userinfo.profile",
+    ]
     FACEBOOK_SCOPE = ["public_profile", "email"]
 
     def __init__(self):
