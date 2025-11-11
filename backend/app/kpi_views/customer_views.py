@@ -83,6 +83,43 @@ class CustomerLoginView(APIView):
         self.customer_service = CustomerService()
         self.auth_service = AuthService()
 
+    def post(self, request):
+        try:
+            email = request.data.get('email')
+            password = request.data.get('password')
+
+            if not email or not password:
+                return Response({"error": "Email and password are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+            customer = self.customer_service.authenticate_customer(email, password)
+            if not customer:
+                return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
+
+            customer_id = str(customer.get('_id'))
+            token_data = {"sub": customer_id, "email": customer.get('email'), "role": "customer"}
+            access_token = self.auth_service.create_access_token(token_data)
+            refresh_token = self.auth_service.create_refresh_token(token_data)
+
+            sanitized = {
+                "id": customer_id,
+                "email": customer.get('email'),
+                "username": customer.get('username'),
+                "full_name": customer.get('full_name'),
+                "loyalty_points": customer.get('loyalty_points', 0),
+                "role": "customer",
+            }
+
+            return Response({
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "token_type": "bearer",
+                "user": sanitized
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error(f"Customer login error: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class CustomerRegisterView(APIView):
     """Public endpoint to register a new customer"""
     def __init__(self):
