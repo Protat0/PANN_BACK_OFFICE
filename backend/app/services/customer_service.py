@@ -166,6 +166,45 @@ class CustomerService:
             
         except Exception as e:
             raise Exception(f"Error creating customer: {str(e)}")
+
+    def register_customer(self, customer_data: dict) -> dict:
+        """Public registration helper that wraps create_customer."""
+        try:
+            email = (customer_data.get('email') or '').strip().lower()
+            password = customer_data.get('password') or ''
+            if not email or not password:
+                raise ValueError("Email and password are required")
+
+            first_name = (customer_data.get('first_name') or '').strip()
+            last_name = (customer_data.get('last_name') or '').strip()
+            full_name = customer_data.get('full_name')
+            if not full_name:
+                full_name = f"{first_name} {last_name}".strip() or email.split('@')[0]
+
+            base_username = (customer_data.get('username') or email.split('@')[0] or 'customer').strip()
+            username_candidate = base_username
+            suffix = 1
+            while self.get_customer_by_username(username_candidate, include_deleted=True):
+                username_candidate = f"{base_username}{suffix}"
+                suffix += 1
+
+            payload = {
+                'email': email,
+                'password': password,
+                'username': username_candidate,
+                'full_name': full_name,
+                'phone': customer_data.get('phone', ''),
+                'delivery_address': customer_data.get('delivery_address', {}),
+                'status': 'active',
+                'auth_mode': 'password',
+                'source': customer_data.get('source', 'web'),
+            }
+
+            return self.create_customer(payload)
+        except ValueError:
+            raise
+        except Exception as exc:
+            raise Exception(f"Error registering customer: {exc}")
     
     def get_customer_by_id(self, customer_id, include_deleted=False):
         """Get customer by CUST-##### ID"""

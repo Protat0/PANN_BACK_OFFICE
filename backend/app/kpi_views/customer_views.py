@@ -20,36 +20,21 @@ class CustomerRegisterView(APIView):
             data = request.data or {}
             email = (data.get('email') or '').strip().lower()
             password = data.get('password') or ''
-            first_name = (data.get('first_name') or '').strip()
-            last_name = (data.get('last_name') or '').strip()
-            phone = (data.get('phone') or '').strip()
-            delivery_address = data.get('delivery_address') or {}
-
             if not email or not password:
                 return Response(
                     {'error': 'Email and password are required'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            username_base = email.split('@')[0].strip() or 'customer'
-            username_candidate = username_base
-            suffix = 1
-            while self.customer_service.get_customer_by_username(username_candidate, include_deleted=True):
-                username_candidate = f"{username_base}{suffix}"
-                suffix += 1
-
-            full_name = (f"{first_name} {last_name}" if first_name or last_name else username_candidate).strip()
-
-            customer_payload = {
+            customer = self.customer_service.register_customer({
                 'email': email,
                 'password': password,
-                'username': username_candidate,
-                'full_name': full_name or username_candidate,
-                'phone': phone,
-                'delivery_address': delivery_address,
-            }
-
-            customer = self.customer_service.create_customer(customer_payload, current_user=None)
+                'first_name': data.get('first_name', ''),
+                'last_name': data.get('last_name', ''),
+                'phone': data.get('phone', ''),
+                'delivery_address': data.get('delivery_address', {}),
+                'source': data.get('source', 'web')
+            })
 
             customer_id = customer.get('_id')
             token_data = {
@@ -65,8 +50,8 @@ class CustomerRegisterView(APIView):
                 'email': customer.get('email'),
                 'username': customer.get('username'),
                 'full_name': customer.get('full_name'),
-                'first_name': first_name or customer.get('full_name', '').split(' ')[0],
-                'last_name': last_name,
+                'first_name': (data.get('first_name') or '').strip(),
+                'last_name': (data.get('last_name') or '').strip(),
                 'phone': customer.get('phone', ''),
                 'loyalty_points': customer.get('loyalty_points', 0),
                 'email_verified': customer.get('email_verified', False),
