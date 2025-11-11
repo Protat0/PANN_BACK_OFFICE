@@ -8,48 +8,128 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class CustomerLoginView(APIView):
-    """Customer login using email/password; returns JWT compatible with auth decorator."""
+class CustomerRegisterView(APIView):
+    """Public endpoint for customer self-registration."""
+
     def __init__(self):
         self.customer_service = CustomerService()
         self.auth_service = AuthService()
 
     def post(self, request):
         try:
-            email = request.data.get('email')
-            password = request.data.get('password')
+            data = request.data or {}
+            email = (data.get('email') or '').strip().lower()
+            password = data.get('password') or ''
+            first_name = (data.get('first_name') or '').strip()
+            last_name = (data.get('last_name') or '').strip()
+            phone = (data.get('phone') or '').strip()
+            delivery_address = data.get('delivery_address') or {}
 
             if not email or not password:
-                return Response({"error": "Email and password are required"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {'error': 'Email and password are required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-            customer = self.customer_service.authenticate_customer(email, password)
-            if not customer:
-                return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
+            username_base = email.split('@')[0].strip() or 'customer'
+            username_candidate = username_base
+            suffix = 1
+            while self.customer_service.get_customer_by_username(username_candidate, include_deleted=True):
+                username_candidate = f"{username_base}{suffix}"
+                suffix += 1
 
-            customer_id = str(customer.get('_id'))
-            token_data = {"sub": customer_id, "email": customer.get('email'), "role": "customer"}
+            full_name = (f"{first_name} {last_name}" if first_name or last_name else username_candidate).strip()
+
+            customer_payload = {
+                'email': email,
+                'password': password,
+                'username': username_candidate,
+                'full_name': full_name or username_candidate,
+                'phone': phone,
+                'delivery_address': delivery_address,
+            }
+
+            customer = self.customer_service.create_customer(customer_payload, current_user=None)
+
+            customer_id = customer.get('_id')
+            token_data = {
+                'sub': str(customer_id),
+                'email': customer.get('email'),
+                'role': 'customer'
+            }
             access_token = self.auth_service.create_access_token(token_data)
             refresh_token = self.auth_service.create_refresh_token(token_data)
 
             sanitized = {
-                "id": customer_id,
-                "email": customer.get('email'),
-                "username": customer.get('username'),
-                "full_name": customer.get('full_name'),
-                "loyalty_points": customer.get('loyalty_points', 0),
-                "role": "customer",
+                'id': str(customer_id),
+                'email': customer.get('email'),
+                'username': customer.get('username'),
+                'full_name': customer.get('full_name'),
+                'first_name': first_name or customer.get('full_name', '').split(' ')[0],
+                'last_name': last_name,
+                'phone': customer.get('phone', ''),
+                'loyalty_points': customer.get('loyalty_points', 0),
+                'email_verified': customer.get('email_verified', False),
+                'auth_mode': customer.get('auth_mode', 'password'),
             }
 
-            return Response({
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "token_type": "bearer",
-                "user": sanitized
-            }, status=status.HTTP_200_OK)
+            return Response(
+                {
+                    'message': 'Account created successfully. Please verify your email address.',
+                    'access_token': access_token,
+                    'refresh_token': refresh_token,
+                    'token_type': 'bearer',
+                    'user': sanitized,
+                    'customer': sanitized,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        except ValueError as exc:
+            logger.warning(f"Customer registration validation error: {exc}")
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.error(f"Customer registration error: {exc}")
+            return Response({'error': 'Registration failed'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        except Exception as e:
-            logger.error(f"Customer login error: {e}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class CustomerLoginView(APIView):
+    """Customer login using email/password; returns JWT compatible with auth decorator."""
+    def __init__(self):
+        self.customer_service = CustomerService()
+        self.auth_service = AuthService()
+
+class CustomerRegisterView(APIView):
+    """Public endpoint to register a new customer"""
+    def __init__(self):
+        self.customer_service = CustomerService()
+
+    def post(self, request):
+        try:
+            payload = request.data or {}
+            customer = self.customer_service.register_customer(payload)
+
+            customer_sanitized = dict(customer)
+            customer_sanitized.pop("password", None)
+
+            return Response(
+                {
+                    "success": True,
+                    "customer": customer_sanitized,
+                    "message": "Account created successfully. Please verify your email to activate loyalty benefits.",
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        except ValueError as validation_error:
+            return Response(
+                {"error": str(validation_error)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.error(f"Customer registration error: {exc}")
+            return Response(
+                {"error": "Unable to complete registration at this time."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 class CustomerCurrentUserView(APIView):
     """Return current authenticated customer profile using JWT"""

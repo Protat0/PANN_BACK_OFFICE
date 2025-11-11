@@ -29,6 +29,7 @@ from .kpi_views.user_views import (
 )
 
 from .kpi_views.customer_views import (
+    CustomerRegisterView,
     CustomerListView,
     CustomerDetailView,
     CustomerRestoreView,
@@ -253,8 +254,7 @@ urlpatterns = [
     path('auth/refresh/', RefreshTokenView.as_view(), name='refresh-token'),
     path('auth/me/', CurrentUserView.as_view(), name='current-user'),
     path('auth/verify-token/', VerifyTokenView.as_view(), name='verify-token'),
-    path('auth/oauth/<str:provider>/authorize/', OAuthAuthorizeView.as_view(), name='oauth-authorize'),
-    path('auth/oauth/<str:provider>/callback/', OAuthCallbackView.as_view(), name='oauth-callback'),
+    path('auth/customer/register/', CustomerRegisterView.as_view(), name='customer-register'),
     path('auth/customer/login/', CustomerLoginView.as_view(), name='customer-login'),
     path('auth/customer/me/', CustomerCurrentUserView.as_view(), name='customer-current-user'),
     
