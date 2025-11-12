@@ -258,6 +258,10 @@ urlpatterns = [
     path('auth/customer/login/', CustomerLoginView.as_view(), name='customer-login'),
     path('auth/customer/me/', CustomerCurrentUserView.as_view(), name='customer-current-user'),
     
+    # ========== OAUTH ==========
+    path('auth/oauth/<str:provider>/authorize/', OAuthAuthorizeView.as_view(), name='oauth-authorize'),
+    path('auth/oauth/<str:provider>/callback/', OAuthCallbackView.as_view(), name='oauth-callback'),
+    
     # ========== USER MANAGEMENT ==========
     path('users/', UserListView.as_view(), name='user-list'),
     path('users/deleted/', DeletedUsersView.as_view(), name='deleted-users'),
