@@ -27,6 +27,11 @@ CORS_ALLOWED_ORIGINS = config(
     cast=lambda v: [s.strip() for s in v.split(',') if s.strip()]
 )
 
+# If no specific origins are configured, allow all origins (for flexibility)
+# Set CORS_ALLOWED_ORIGINS environment variable to restrict to specific domains
+if not CORS_ALLOWED_ORIGINS:
+    CORS_ALLOW_ALL_ORIGINS = True
+
 # CSRF trusted origins (comma-separated) for HTTPS domains
 CSRF_TRUSTED_ORIGINS = config(
     'CSRF_TRUSTED_ORIGINS',
