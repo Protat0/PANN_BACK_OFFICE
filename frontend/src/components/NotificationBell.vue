@@ -108,9 +108,11 @@
 </template>
 
 <script>
-import apijs from '../services/api'
+import apiNotifications from "@/services/apiNotifications.js"  
+
 export default {
   name: 'NotificationBell',
+
   data() {
     return {
       notifications: [],
@@ -121,56 +123,38 @@ export default {
       pollInterval: null
     }
   },
-  
+
   mounted() {
     this.fetchNotifications()
     this.startPolling()
   },
-  
+
   beforeUnmount() {
     this.stopPolling()
   },
-  
+
   methods: {
     // ================================================================
-    // DATA FETCHING METHODS
+    // 🔄 FIXED API CALL
     // ================================================================
-    
     async fetchNotifications() {
       this.loading = true
       try {
-        const response = await fetch('http://localhost:8000/api/v1/notifications/recent', {
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        })
+        const response = await apiNotifications.DisplayNotifs()
+        // Normalize response
+        this.notifications = Array.isArray(response)
+          ? response
+          : (response.data || response.notifications || [])
 
-        if (response.ok) {
-          const result = await response.json()
-          
-          if (result.success) {
-            this.notifications = result.data || []
-            this.updateUnreadCount()
-          } else {
-            console.error('API returned error:', result.message)
-            this.notifications = []
-          }
-        } else {
-          console.error('Failed to fetch recent notifications:', response.status, await response.text())
-          this.notifications = []
-        }
+        this.updateUnreadCount()
       } catch (error) {
-        console.error('Error fetching recent notifications:', error)
+        console.error("Error fetching notifications:", error)
         this.notifications = []
       } finally {
         this.loading = false
       }
     },
 
-    // ================================================================
-    // UI STATE MANAGEMENT
-    // ================================================================
-    
     updateUnreadCount() {
       this.unreadCount = this.notifications.filter(n => !n.is_read).length
     },
@@ -178,7 +162,7 @@ export default {
     toggleDropdown() {
       this.showDropdown = !this.showDropdown
       if (this.showDropdown) {
-        this.fetchNotifications() // Always fetch fresh data when opening dropdown
+        this.fetchNotifications()
       }
     },
 
@@ -187,90 +171,50 @@ export default {
     },
 
     // ================================================================
-    // NOTIFICATION ACTIONS
+    // 🔄 FIXED "mark as read"
     // ================================================================
-    
     async markAsRead(notification) {
       if (notification.is_read) return
 
-      const notificationId = notification.id || notification._id;
-      
-      // Vue 3 way - direct assignment
-      notification.isMarkingRead = true;
+      const notificationId = notification.id || notification._id
+      notification.isMarkingRead = true
 
       try {
-        const response = await fetch(
-          `http://localhost:8000/api/notifications/${notificationId}/mark-read/`,
-          {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+        // Use Axios wrapper
+        await apiNotifications.MarkAsRead(notificationId)
 
-        if (response.ok) {
-          notification.is_read = true
-          this.updateUnreadCount()
-        } else {
-          console.error('Failed to mark notification as read:', await response.text())
-        }
+        notification.is_read = true
+        this.updateUnreadCount()
       } catch (error) {
-        console.error('Error marking notification as read:', error)
+        console.error("Error marking as read:", error)
       } finally {
-        // Vue 3 way - direct assignment
-        notification.isMarkingRead = false;
+        notification.isMarkingRead = false
       }
     },
 
+    // ================================================================
+    // 🔄 FIXED "mark all read"
+    // ================================================================
     async markAllAsRead() {
       if (this.unreadCount === 0) return
-      
       this.markingAllAsRead = true
-      try {
-        const response = await fetch('http://localhost:8000/api/notifications/mark-all-read/', {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        })
 
-        if (response.ok) {
-          const result = await response.json()
-          
-          // Update all notifications to read status
-          this.notifications.forEach(notification => {
-            notification.is_read = true
-          })
-          
-          // Update counts
-          this.unreadCount = 0
-          
-        } else {
-          console.error('Failed to mark all as read:', await response.text())
-          await this.fallbackMarkAllAsRead()
-        }
+      try {
+        await apiNotifications.MarkAllAsRead()
+
+        this.notifications.forEach(n => n.is_read = true)
+        this.updateUnreadCount()
       } catch (error) {
-        console.error('Error marking all notifications as read:', error)
-        await this.fallbackMarkAllAsRead()
+        console.error("Error marking all as read:", error)
       } finally {
         this.markingAllAsRead = false
       }
     },
 
-    async fallbackMarkAllAsRead() {
-      const unreadNotifications = this.notifications.filter(n => !n.is_read)
-      for (const notification of unreadNotifications) {
-        await this.markAsRead(notification)
-      }
-    },
-
     // ================================================================
-    // POLLING AND BACKGROUND UPDATES
+    // POLLING
     // ================================================================
-    
     startPolling() {
-      // Poll for new notifications every 30 seconds
       this.pollInterval = setInterval(() => {
         if (!this.showDropdown) {
           this.fetchNotifications()
@@ -286,40 +230,31 @@ export default {
     },
 
     // ================================================================
-    // UTILITY METHODS
+    // UTILITY
     // ================================================================
-    
     formatTimeAgo(dateString) {
       const now = new Date()
-      const notificationDate = new Date(dateString)
-      const diffInSeconds = Math.floor((now - notificationDate) / 1000)
+      const created = new Date(dateString)
+      const diff = Math.floor((now - created) / 1000)
 
-      if (diffInSeconds < 60) {
-        return 'Just now'
-      } else if (diffInSeconds < 3600) {
-        const minutes = Math.floor(diffInSeconds / 60)
-        return `${minutes}m ago`
-      } else if (diffInSeconds < 86400) {
-        const hours = Math.floor(diffInSeconds / 3600)
-        return `${hours}h ago`
-      } else {
-        const days = Math.floor(diffInSeconds / 86400)
-        return `${days}d ago`
-      }
+      if (diff < 60) return "Just now"
+      if (diff < 3600) return Math.floor(diff / 60) + "m ago"
+      if (diff < 86400) return Math.floor(diff / 3600) + "h ago"
+      return Math.floor(diff / 86400) + "d ago"
     },
 
     formatPriority(priority) {
-      const priorities = {
-        low: 'Low',
-        medium: 'Medium',
-        high: 'High',
-        urgent: 'Urgent'
-      }
-      return priorities[priority] || priority
+      return {
+        low: "Low",
+        medium: "Medium",
+        high: "High",
+        urgent: "Urgent"
+      }[priority] || priority
     }
   }
 }
 </script>
+
 
 <style scoped>
 .notification-container {

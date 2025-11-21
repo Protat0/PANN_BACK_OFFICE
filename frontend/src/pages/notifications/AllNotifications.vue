@@ -306,33 +306,33 @@ export default {
     async fetchAllNotifications() {
       this.loading = true;
       try {
-          // Fetch ALL notifications (including archived) for accurate total count
-          const response = await apiNotif.DisplayNotifs();
+        const response = await apiNotif.DisplayNotifs();
 
-          // Set all notifications (this will include archived ones)
-          this.allNotifications = response.data || [];
-          
-          // Set pagination from response
-          this.pagination = response.pagination || {
-              current_page: 1,
-              total_pages: 1,
-              total_count: 0,
-              per_page: 50,
-              has_next: false,
-              has_previous: false
-          };
+        // FIX: DisplayNotifs returns array, not { data: [], pagination: {} }
+        this.allNotifications = Array.isArray(response)
+          ? response
+          : (response.data || []);
 
-          // Apply filters to show the data
-          this.applyModalFilters();
-          
+        // FIX: pagination is not included in response → compute manually
+        this.pagination = {
+          current_page: 1,
+          total_pages: 1,
+          total_count: this.allNotifications.length,
+          per_page: this.allNotifications.length,
+          has_next: false,
+          has_previous: false
+        };
+
+        this.applyModalFilters();
       } catch (error) {
-          console.error('Error fetching all notifications:', error);
-          this.allNotifications = [];
-          this.filteredModalNotifications = [];
+        console.error("Error fetching notifications:", error);
+        this.allNotifications = [];
+        this.filteredModalNotifications = [];
       } finally {
-          this.loading = false;
+        this.loading = false;
       }
-  },
+    },
+
 
     async loadMoreNotifications() {
       if (!this.pagination.has_next || this.loadingMore) return;
@@ -369,32 +369,20 @@ export default {
     async markAsRead(notification) {
       if (notification.is_read) return;
 
-      const notificationId = notification.id || notification._id;
       notification.isMarkingRead = true;
+      const id = notification.id || notification._id;
 
       try {
-        const response = await fetch(
-          `http://localhost:8000/api/v1/notifications/${notificationId}/mark-read/`,
-          {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        if (response.ok) {
-          notification.is_read = true;
-          this.applyModalFilters();
-        } else {
-          console.error('Failed to mark notification as read:', await response.text());
-        }
+        await apiNotif.MarkAsRead(id);
+        notification.is_read = true;
+        this.applyModalFilters();
       } catch (error) {
-        console.error('Error marking notification as read:', error);
+        console.error("Error marking read:", error);
       } finally {
         notification.isMarkingRead = false;
       }
     },
+
 
     async archiveNotification(notification) {
       const notificationId = notification.id || notification._id;
@@ -513,32 +501,22 @@ export default {
 
     async markAllAsRead() {
       if (this.unreadCount === 0) return;
-      
+
       this.markingAllAsRead = true;
       try {
-        const response = await fetch('http://localhost:8000/api/v1/notifications/mark-all-read/', {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
+        await apiNotif.MarkAllAsRead();
 
-        if (response.ok) {
-          // Update all notifications to read status
-          this.allNotifications.forEach(notification => {
-            notification.is_read = true;
-          });
-          
-          this.applyModalFilters();
-        } else {
-          console.error('Failed to mark all as read:', await response.text());
-        }
+        // update local state
+        this.allNotifications.forEach(n => n.is_read = true);
+
+        this.applyModalFilters();
       } catch (error) {
-        console.error('Error marking all notifications as read:', error);
+        console.error("Failed mark all read:", error);
       } finally {
         this.markingAllAsRead = false;
       }
     },
+
 
     // ================================================================
     // FALLBACK METHODS
