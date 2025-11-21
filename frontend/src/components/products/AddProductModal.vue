@@ -828,9 +828,7 @@ export default {
     }
 
     const handleSubmit = async () => {
-      if (!validateForm()) {
-        return
-      }
+      if (!validateForm()) return
 
       setLoading(true)
       clearError()
@@ -839,19 +837,16 @@ export default {
         let result
         const formData = { ...productForm.value }
 
-        // ✅ NEW: Set stock and cost_price based on createWithStock toggle
         if (createWithStock.value) {
           formData.stock = batchForm.value.quantity_received
-          formData.cost_price = batchForm.value.cost_price  // ← ADDED
-          formData.expiry_date = batchForm.value.expiry_date // ← ADDED
-          formData.supplier_id = batchForm.value.supplier_id || undefined // ← ADDED
-          formData.date_received = batchForm.value.date_received || undefined // ← ADDED
+          formData.cost_price = batchForm.value.cost_price
+          formData.expiry_date = batchForm.value.expiry_date
+          formData.supplier_id = batchForm.value.supplier_id || undefined
+          formData.date_received = batchForm.value.date_received || undefined
         } else {
-          formData.stock = 0  // No stock when toggle is off
-          // Don't include cost_price, expiry_date, etc. when stock is 0
+          formData.stock = 0
         }
 
-        // Handle uncategorized products
         if (!formData.category_id) {
           formData.category_id = 'UNCTGRY-001'
           formData.subcategory_name = 'General'
@@ -860,12 +855,8 @@ export default {
         if (isEditMode.value) {
           result = await updateProduct(editingProduct.value._id, formData)
         } else {
-          // ✅ Backend automatically creates initial batch when stock > 0
           result = await createProduct(formData)
         }
-
-        // ❌ REMOVED: Manual batch creation - backend does this now!
-        // The backend will automatically create the initial batch if stock > 0
 
         emit('success', {
           message: `Product "${formData.product_name}" ${isEditMode.value ? 'updated' : 'created'} successfully`,
@@ -874,15 +865,15 @@ export default {
           withBatch: !isEditMode.value && createWithStock.value
         })
 
-        closeModal()
-        
       } catch (error) {
         console.error('Error saving product:', error)
         setError(error.message || 'Failed to save product')
       } finally {
         setLoading(false)
+        closeModal() // ✅ ensure this runs after loading ends
       }
     }
+
 
     const clearValidationErrors = () => {
       validationErrors.value = {}

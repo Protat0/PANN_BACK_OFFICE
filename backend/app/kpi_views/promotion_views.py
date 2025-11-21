@@ -210,7 +210,6 @@ class ActivePromotionsView(APIView):
         super().__init__()
         self.promotion_service = PromotionService()
     
-
     def get(self, request):
         """Get all currently active promotions"""
         try:

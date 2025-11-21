@@ -1,9 +1,10 @@
 // composables/ui/suppliers/useSuppliers.js
 import { ref, computed, reactive } from 'vue'
 import axios from 'axios'
+import { useToast } from '@/composables/ui/useToast'
 
 // Configure axios base URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
 // Create axios instance with auth token
 const api = axios.create({
@@ -15,7 +16,7 @@ const api = axios.create({
 
 // Add auth token to requests if available
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+  const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -23,6 +24,7 @@ api.interceptors.request.use((config) => {
 })
 
 export function useSuppliers() {
+  const { success: showSuccess, error: showError } = useToast()
   // Reactive state
   const suppliers = ref([])
   const allBatches = ref([])
@@ -204,23 +206,18 @@ export function useSuppliers() {
             batches.map(async (batch) => {
               try {
                 if (batch.product_id) {
-                  console.log(`🔍 Fetching product details for batch ${batch._id}, product_id: ${batch.product_id}`)
                   const productResponse = await api.get(`/products/${batch.product_id}/`)
-                  console.log(`📡 Product API response:`, productResponse.data)
                   
                   const product = productResponse.data.data
-                  console.log(`✅ Product fetched for ${batch.product_id}:`, product)
                   
                   if (product) {
                     const enrichedBatch = {
                       ...batch,
-                      product_name: product.product_name || product.name || batch.product_id || 'Unknown Product',
+                      product_name: product.product_name || product.name || 'Unknown Product',
                       category_id: product.category_id || '',
                       category_name: product.category_name || '',
                       subcategory_name: product.subcategory_name || ''
                     }
-                    console.log(`📦 Enriched batch:`, enrichedBatch)
-                    console.log(`📦 Product name set to:`, enrichedBatch.product_name)
                     return enrichedBatch
                   } else {
                     console.warn(`⚠️ No product data returned for ${batch.product_id}`)
@@ -284,7 +281,7 @@ export function useSuppliers() {
               status: orderStatus,
               items: enrichedBatches.map(batch => {
                 const item = {
-                  name: batch.product_name || batch.name || batch.product_id || 'Unknown Product',
+                  name: batch.product_name || batch.name || 'Unknown Product',
                   product_name: batch.product_name || batch.name || 'Unknown Product',
                   product_id: batch.product_id,
                   quantity: batch.quantity_received,
@@ -295,13 +292,6 @@ export function useSuppliers() {
                   expiryDate: batch.expiry_date,
                   quantityRemaining: batch.quantity_remaining
                 }
-                console.log(`🔍 Creating item for batch ${batch._id}:`, {
-                  batch_product_name: batch.product_name,
-                  batch_name: batch.name,
-                  batch_product_id: batch.product_id,
-                  item_name: item.name,
-                  item_product_name: item.product_name
-                })
                 return item
               }),
               description: `Stock receipt with ${enrichedBatches.length} item(s)`,
@@ -334,6 +324,7 @@ export function useSuppliers() {
       daysActive: daysActive,
       status: backendSupplier.isDeleted ? 'inactive' : 'active',
       type: backendSupplier.type || 'food',
+      isFavorite: backendSupplier.isFavorite || false,
       createdAt: backendSupplier.created_at,
       updatedAt: backendSupplier.updated_at,
       raw: backendSupplier
@@ -373,6 +364,16 @@ export function useSuppliers() {
         supplier.contactPerson?.toLowerCase().includes(search)
       )
     }
+
+    // Sort: Favorites first, then by name alphabetically
+    filtered.sort((a, b) => {
+      // First, sort by favorite status (favorites first)
+      if (a.isFavorite && !b.isFavorite) return -1
+      if (!a.isFavorite && b.isFavorite) return 1
+      
+      // If both have same favorite status, sort alphabetically by name
+      return (a.name || '').localeCompare(b.name || '')
+    })
 
     return filtered
   })
@@ -469,8 +470,10 @@ export function useSuppliers() {
       const newSupplier = transformSupplier(response.data)
       suppliers.value.unshift(newSupplier)
       
-      successMessage.value = `Supplier "${newSupplier.name}" added successfully`
+      const message = `Supplier "${newSupplier.name}" added successfully`
+      successMessage.value = message
       setTimeout(() => { successMessage.value = null }, 3000)
+      showSuccess(message)
       
       return { success: true, supplier: newSupplier }
       
@@ -478,6 +481,7 @@ export function useSuppliers() {
       console.error('Error adding supplier:', err)
       const errorMessage = err.response?.data?.error || 'Failed to add supplier'
       error.value = errorMessage
+      showError(errorMessage)
       return { success: false, error: errorMessage }
     } finally {
       loading.value = false
@@ -506,8 +510,10 @@ export function useSuppliers() {
         suppliers.value[index] = updatedSupplier
       }
       
-      successMessage.value = `Supplier "${updatedSupplier.name}" updated successfully`
+      const message = `Supplier "${updatedSupplier.name}" updated successfully`
+      successMessage.value = message
       setTimeout(() => { successMessage.value = null }, 3000)
+      showSuccess(message)
       
       return { success: true, supplier: updatedSupplier }
       
@@ -515,9 +521,37 @@ export function useSuppliers() {
       console.error('Error updating supplier:', err)
       const errorMessage = err.response?.data?.error || 'Failed to update supplier'
       error.value = errorMessage
+      showError(errorMessage)
       return { success: false, error: errorMessage }
     } finally {
       loading.value = false
+    }
+  }
+
+  const toggleFavorite = async (supplier) => {
+    const previousFavoriteState = supplier.isFavorite
+    supplier.isFavorite = !supplier.isFavorite
+    
+    try {
+      await api.put(`/suppliers/${supplier.id}/`, {
+        isFavorite: supplier.isFavorite
+      })
+      
+      // Update the supplier in the list
+      const index = suppliers.value.findIndex(s => s.id === supplier.id)
+      if (index !== -1) {
+        suppliers.value[index].isFavorite = supplier.isFavorite
+      }
+      
+      return { success: true }
+      
+    } catch (err) {
+      // Revert on error
+      supplier.isFavorite = previousFavoriteState
+      console.error('Error updating favorite status:', err)
+      const errorMessage = err.response?.data?.error || 'Failed to update favorite status'
+      error.value = errorMessage
+      return { success: false, error: errorMessage }
     }
   }
 
@@ -532,8 +566,10 @@ export function useSuppliers() {
       await api.delete(`/suppliers/${supplier.id}/`)
       suppliers.value = suppliers.value.filter(s => s.id !== supplier.id)
       
-      successMessage.value = `Supplier "${supplier.name}" deleted successfully`
+      const message = `Supplier "${supplier.name}" deleted successfully`
+      successMessage.value = message
       setTimeout(() => { successMessage.value = null }, 3000)
+      showSuccess(message)
       
       return { success: true }
       
@@ -541,6 +577,7 @@ export function useSuppliers() {
       console.error('Error deleting supplier:', err)
       const errorMessage = err.response?.data?.error || 'Failed to delete supplier'
       error.value = errorMessage
+      showError(errorMessage)
       return { success: false, error: errorMessage }
     } finally {
       loading.value = false
@@ -567,8 +604,10 @@ export function useSuppliers() {
       const count = selectedSuppliers.value.length
       selectedSuppliers.value = []
       
-      successMessage.value = `Successfully deleted ${count} supplier(s)`
+      const message = `Successfully deleted ${count} supplier(s)`
+      successMessage.value = message
       setTimeout(() => { successMessage.value = null }, 3000)
+      showSuccess(message)
       
       return { success: true }
       
@@ -576,6 +615,7 @@ export function useSuppliers() {
       console.error('Error deleting suppliers:', err)
       const errorMessage = err.response?.data?.error || 'Failed to delete some suppliers'
       error.value = errorMessage
+      showError(errorMessage)
       return { success: false, error: errorMessage }
     } finally {
       loading.value = false
@@ -651,6 +691,7 @@ export function useSuppliers() {
     fetchSuppliers,
     addSupplier,
     updateSupplier,
+    toggleFavorite,
     deleteSupplier,
     deleteSelected,
     clearFilters,

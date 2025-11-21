@@ -1,16 +1,16 @@
 <template>
-  <div v-if="show" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-      <div class="modal-content modern-modal">
+  <Teleport to="body">
+    <div v-if="show" class="modal-overlay" @click="handleOverlayClick">
+      <div class="modal-content modern-modal" @click.stop>
         <!-- Modal Header -->
-        <div class="modal-header border-0 pb-0">
+        <div class="modal-header">
           <div class="d-flex align-items-center">
             <div class="modal-icon me-3">
               <Edit :size="24" />
             </div>
-            <div>
-              <h4 class="modal-title mb-1">Edit Purchase Order</h4>
-              <p class="text-muted mb-0 small">
+            <div class="modal-heading">
+              <h4 class="modal-title mb-1">Edit Order Details</h4>
+              <p class="modal-subtitle mb-0">
                 Order ID: <strong>{{ editForm.id }}</strong>
               </p>
             </div>
@@ -252,12 +252,18 @@
                   </tbody>
                   <tfoot class="table-light">
                     <tr>
-                      <td colspan="3" class="text-end"><strong>Total Items:</strong></td>
-                      <td class="text-center"><strong>{{ getTotalQuantity() }}</strong></td>
-                      <td colspan="2" class="text-end">
-                        <strong class="text-primary fs-5">₱{{ formatCurrency(getGrandTotal()) }}</strong>
+                      <td colspan="10">
+                        <div class="table-summary-bar">
+                          <div class="table-summary-item">
+                            <span class="label">Total Items</span>
+                            <strong>{{ getTotalQuantity() }}</strong>
+                          </div>
+                          <div class="table-summary-item">
+                            <span class="label">Total Cost</span>
+                            <strong>₱{{ formatCurrency(getGrandTotal()) }}</strong>
+                          </div>
+                        </div>
                       </td>
-                      <td></td>
                     </tr>
                   </tfoot>
                 </table>
@@ -315,7 +321,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <script>
@@ -390,8 +396,6 @@ export default {
         return
       }
       
-      console.log('📝 Initializing edit form with receipt:', receipt)
-      
       // Ensure expectedDate is in YYYY-MM-DD format for date input
       let expectedDate = receipt.expectedDate
       if (expectedDate && typeof expectedDate === 'string' && expectedDate.includes('T')) {
@@ -403,15 +407,7 @@ export default {
         date: receipt.date,  // Order date (created_at)
         expectedDate: expectedDate,
         status: receipt.status,
-        items: (receipt.items || []).map((item, index) => {
-          console.log(`📋 Mapping item ${index + 1}:`, {
-            name: item.name,
-            productId: item.productId,
-            categoryId: item.categoryId,
-            categoryName: item.categoryName,
-            subcategoryName: item.subcategoryName
-          })
-          
+        items: (receipt.items || []).map((item) => {
           return {
             productId: item.productId,
             name: item.name,
@@ -437,18 +433,10 @@ export default {
       // Reset editing state
       isEditingExpectedDate.value = false
       
-      console.log('✅ Edit form initialized with', editForm.value.items.length, 'items')
-      console.log('Items with category info:', editForm.value.items.map(i => ({
-        name: i.name,
-        categoryId: i.categoryId,
-        categoryName: i.categoryName,
-        subcategoryName: i.subcategoryName
-      })))
     }
     
     // Initialize form immediately if receipt is already available
     if (props.receipt) {
-      console.log('🚀 Initial receipt available, initializing form immediately')
       initializeFormData(props.receipt)
     }
     
@@ -483,13 +471,11 @@ export default {
       if (existingItem?.batchNumber) {
         // Reuse the existing batch number for grouping
         sharedBatchNumber = existingItem.batchNumber
-        console.log(`🔄 Reusing existing batch number: ${sharedBatchNumber}`)
       } else {
         // Generate new batch number in format BATCH-0001
         const timestamp = Date.now().toString().slice(-6)
         const random = Math.floor(Math.random() * 100).toString().padStart(2, '0')
         sharedBatchNumber = `BATCH-${timestamp}${random}`
-        console.log(`🆕 Generated new batch number: ${sharedBatchNumber}`)
       }
       
       editForm.value.items.push({
@@ -508,8 +494,6 @@ export default {
         isNew: true,
         errors: {}
       })
-      
-      console.log(`➕ Added new item with batch number: ${sharedBatchNumber}`)
     }
     
     // Category/Product Selection Functions
@@ -613,7 +597,6 @@ export default {
       }
       
       try {
-        console.log('Loading products for:', categoryId, subcategoryName)
         const response = await fetchProductsByCategory(categoryId, subcategoryName)
         
         let productsArray = []
@@ -667,14 +650,9 @@ export default {
       try {
         const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
         
-        console.log('💾 Starting save operation...')
-        console.log('Form data:', editForm.value)
-        
         // Update each batch with new details
         const updates = []
         for (const item of editForm.value.items) {
-          console.log(`Processing item: ${item.name}, isNew: ${item.isNew}, batchId: ${item.batchId}`)
-          
           if (!item.isNew && item.batchId) {
             // Update existing batch
             const updateData = {
@@ -684,8 +662,6 @@ export default {
               expected_delivery_date: editForm.value.expectedDate,
               notes: editForm.value.notes
             }
-            
-            console.log(`📝 Updating batch ${item.batchId}:`, updateData)
             
             updates.push(
               axios.put(
@@ -697,10 +673,7 @@ export default {
                     'Content-Type': 'application/json'
                   }
                 }
-              ).then(response => {
-                console.log(`✅ Updated batch ${item.batchId} successfully`)
-                return response
-              }).catch(error => {
+              ).catch(error => {
                 console.error(`❌ Failed to update batch ${item.batchId}:`, error.response?.data || error.message)
                 throw error
               })
@@ -719,8 +692,6 @@ export default {
                notes: editForm.value.notes
              }
              
-             console.log(`➕ Creating new batch:`, createData)
-             
              updates.push(
                axios.post(
                  `${API_BASE_URL}/batches/create/`,
@@ -731,10 +702,7 @@ export default {
                      'Content-Type': 'application/json'
                    }
                  }
-               ).then(response => {
-                 console.log(`✅ Created new batch successfully`)
-                 return response
-               }).catch(error => {
+               ).catch(error => {
                  console.error(`❌ Failed to create new batch:`, error.response?.data || error.message)
                  throw error
                })
@@ -742,10 +710,8 @@ export default {
            }
         }
         
-        console.log(`⏳ Waiting for ${updates.length} operations to complete...`)
         await Promise.all(updates)
         
-        console.log('✅ All operations completed successfully')
         showSuccess('Purchase order updated successfully')
         emit('saved', {
           ...editForm.value,
@@ -795,11 +761,16 @@ export default {
     function handleClose() {
       emit('close')
     }
+
+    function handleOverlayClick(event) {
+      if (event.target === event.currentTarget && !saving.value) {
+        handleCancel()
+      }
+    }
     
     // Watch for show prop changes
     watch(() => props.show, (newVal) => {
       if (newVal && props.receipt) {
-        console.log('🔄 Modal opened, initializing form...')
         initializeFormData(props.receipt)
       }
     })
@@ -807,16 +778,22 @@ export default {
     // Also watch for receipt changes
     watch(() => props.receipt, (newVal) => {
       if (newVal && props.show) {
-        console.log('🔄 Receipt data changed, re-initializing form...')
         initializeFormData(newVal)
       }
     })
-    
+
+    function handleCancel() {
+      isEditingExpectedDate.value = false
+      if (props.receipt) {
+        initializeFormData(props.receipt)
+      }
+      handleClose()
+    }
+
     // Load categories on mount
     onMounted(async () => {
       try {
         await fetchCategories()
-        console.log('✅ Categories loaded:', categories.value?.length || 0)
       } catch (error) {
         console.error('Error loading categories:', error)
         showError('Failed to load categories')
@@ -835,10 +812,12 @@ export default {
       calculateItemTotal,
       getTotalQuantity,
       getGrandTotal,
+      handleCancel,
       saveChanges,
       formatDate,
       formatCurrency,
       handleClose,
+      handleOverlayClick,
       // Category/Product selection
       getCategoryName,
       getSubcategoriesForItem,
@@ -858,18 +837,23 @@ export default {
   border-radius: 16px;
   border: none;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  width: min(1200px, 90vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .clickable-field {
   cursor: pointer;
-  background-color: #f8f9fa;
+  background-color: var(--surface-primary);
   transition: all 0.2s ease;
   position: relative;
   padding-right: 30px;
 }
 
 .clickable-field:hover {
-  background-color: #e9ecef;
+  background-color: var(--surface-tertiary);
   border-color: var(--primary);
   box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.15);
 }
@@ -886,14 +870,50 @@ export default {
 }
 
 .modal-header {
-  padding: 2rem 2rem 1rem 2rem;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  padding: 1.5rem 1.75rem 0.9rem 1.75rem;
+  background: linear-gradient(135deg, var(--surface-tertiary), var(--surface-secondary));
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
 }
 
 .modal-body {
-  padding: 1.5rem 2rem;
-  max-height: 70vh;
+  padding: 1.5rem 1.75rem;
+  max-height: calc(90vh - 220px);
   overflow-y: auto;
+  background-color: var(--surface-elevated);
+}
+
+.modal-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.modal-title {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.modal-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  letter-spacing: 0.01em;
+}
+
+.modal-header .btn-close {
+  opacity: 0.7;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.modal-header .btn-close:hover {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.dark-theme .modal-header .btn-close {
+  filter: invert(1);
 }
 
 .edit-items-table {
@@ -903,21 +923,26 @@ export default {
 .edit-items-table th {
   font-weight: 600;
   font-size: 0.875rem;
-  background-color: #f8f9fa;
+  background-color: var(--surface-tertiary);
+  color: var(--text-primary);
   padding: 0.75rem 0.5rem;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.18);
+  border-top: 1px solid rgba(0, 0, 0, 0.18);
 }
 
 .edit-items-table td {
   vertical-align: middle;
   padding: 0.75rem 0.5rem;
+  color: var(--text-secondary);
+  background-color: var(--surface-primary);
 }
 
 .item-row {
-  border-bottom: 1px solid var(--neutral-light);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .item-row:hover {
-  background-color: rgba(115, 146, 226, 0.05);
+  background-color: var(--state-hover);
 }
 
 .form-control-sm {
@@ -937,6 +962,143 @@ export default {
 code {
   font-family: 'Monaco', 'Menlo', monospace;
   font-size: 0.875rem;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.modal-footer {
+  padding: 1.25rem 1.75rem 1.75rem 1.75rem;
+  background-color: var(--surface-tertiary);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+}
+
+.modal-footer .text-muted {
+  color: var(--text-secondary) !important;
+}
+
+.edit-items-table tfoot td {
+  background-color: var(--surface-tertiary);
+  color: var(--text-primary);
+  border-top: 1px solid var(--border-primary);
+}
+
+.edit-items-table tfoot tr {
+  background-color: var(--surface-tertiary);
+}
+
+.table-summary-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+}
+
+.table-summary-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+}
+
+.table-summary-item .label {
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.table-summary-item strong {
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.table-summary-item:last-child strong {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  z-index: 9999 !important;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.card {
+  background-color: var(--surface-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.card-header {
+  background-color: var(--surface-tertiary) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.15) !important;
+  color: var(--text-primary) !important;
+}
+
+.card-body {
+  background-color: var(--surface-primary);
+  color: var(--text-secondary);
+}
+
+.card-body h6,
+.card-header h6 {
+  color: var(--text-primary) !important;
+}
+
+.card .text-muted,
+.card-header .text-muted {
+  color: var(--text-secondary) !important;
+}
+
+.bg-light,
+.table-light {
+  background-color: var(--surface-tertiary) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark-theme .clickable-field {
+  background-color: var(--surface-secondary);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.dark-theme .clickable-field:hover {
+  background-color: var(--surface-tertiary);
+}
+
+.dark-theme .card,
+.dark-theme .card-header,
+.dark-theme .card-body {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: var(--shadow-md);
+}
+
+.dark-theme .card-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+.dark-theme .edit-items-table th {
+  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 </style>
 

@@ -4,6 +4,8 @@ from ..database import db_manager
 import bcrypt
 import logging
 from .audit_service import AuditLogService
+import csv
+import io
 
 logger = logging.getLogger(__name__)
 
@@ -745,3 +747,109 @@ class CustomerService:
             
         except Exception as e:
             raise Exception(f"Error getting order history: {str(e)}")
+        
+    # ================================================================
+    # IMPORT & EXPORT METHODS
+    # ================================================================
+    
+    def export_customers_to_csv(self, include_deleted=False):
+        """Export customers to CSV format"""
+        try:
+            query = {}
+            if not include_deleted:
+                query["isDeleted"] = {"$ne": True}
+
+            customers = list(self.customer_collection.find(query))
+            if not customers:
+                return None
+
+            headers = [
+                "_id", "username", "full_name", "email", "phone",
+                "loyalty_points", "status", "date_created", "last_updated", "isDeleted"
+            ]
+
+            def safe_date(value):
+                from datetime import datetime
+                if not value:
+                    return ""
+                if isinstance(value, datetime):
+                    return value.strftime("%Y-%m-%d %H:%M:%S")
+                return str(value)
+
+            output = io.StringIO()
+            writer = csv.DictWriter(output, fieldnames=headers)
+            writer.writeheader()
+
+            for c in customers:
+                writer.writerow({
+                    "_id": c.get("_id", ""),
+                    "username": c.get("username", ""),
+                    "full_name": c.get("full_name", ""),
+                    "email": c.get("email", ""),
+                    "phone": c.get("phone", ""),
+                    "loyalty_points": c.get("loyalty_points", 0),
+                    "status": c.get("status", ""),
+                    "date_created": safe_date(c.get("date_created")),
+                    "last_updated": safe_date(c.get("last_updated")),
+                    "isDeleted": c.get("isDeleted", False),
+                })
+
+            output.seek(0)
+            return output.getvalue()
+
+        except Exception as e:
+            raise Exception(f"Error exporting customers: {str(e)}")
+
+    
+
+    def import_customers_from_csv(self, file_path, current_user=None):
+        """Import customers from a CSV file"""
+        try:
+            imported_count = 0
+            with open(file_path, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    # Skip rows without required fields
+                    if not row.get("email") or not row.get("username"):
+                        continue
+
+                    # Check if customer already exists
+                    existing = self.customer_collection.find_one({
+                        "email": row["email"].strip().lower(),
+                        "isDeleted": {"$ne": True}
+                    })
+                    if existing:
+                        continue  # skip duplicates
+
+                    # Generate sequential ID
+                    customer_id = self.generate_customer_id()
+                    now = datetime.utcnow()
+
+                    new_customer = {
+                        "_id": customer_id,
+                        "username": row["username"].strip(),
+                        "full_name": row.get("full_name", "").strip(),
+                        "email": row["email"].strip().lower(),
+                        "phone": row.get("phone", ""),
+                        "password": self.hash_password(row.get("password", "123456")),  # Default password
+                        "loyalty_points": int(row.get("loyalty_points", 0)),
+                        "isDeleted": False,
+                        "status": row.get("status", "active"),
+                        "date_created": now,
+                        "last_updated": now
+                    }
+
+                    self.customer_collection.insert_one(new_customer)
+                    imported_count += 1
+
+            # Log import action
+            if current_user and self.audit_service:
+                try:
+                    self.audit_service.log_bulk_action(current_user, "import_customers", {"count": imported_count})
+                except Exception as audit_error:
+                    logger.error(f"Audit logging failed: {audit_error}")
+
+            return {"imported_count": imported_count}
+
+        except Exception as e:
+            raise Exception(f"Error importing customers: {str(e)}")

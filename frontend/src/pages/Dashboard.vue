@@ -193,7 +193,6 @@ import { formatCurrency, formatNumber } from '@/helpers/currencyHelpers'
 import { useProducts } from '@/composables/api/useProducts.js'
 import { useSales } from '@/composables/api/useSales.js'
 import salesAPIService from '@/services/apiReports.js'
-import apiNotifications from "@/services/apiNotifications.js"
 
 export default {
   name: 'Dashboard',
@@ -263,65 +262,77 @@ export default {
       calculateDateRange
     }
   },
-
   data() {
     return {
       targetProgress: 78,
       chart: null,
-      isUpdatingChart: false,
-      isShowingAllTimeSales: false,
-      isShowingAllTimeProfit: false,
-      currentMonthPeriod: null,
+      isUpdatingChart: false, // Prevent recursion in chart updates
+      isShowingAllTimeSales: false, // Track if we're showing all-time data due to no last month sales
+      isShowingAllTimeProfit: false, // Track if we're showing all-time profit due to no last month profit
+      currentMonthPeriod: null, // Track current month period for monthly income
+      // Raw data values
       rawData: {
         totalProfit: 78452.23,
         monthlyIncome: 120042,
         totalSold: 12490,
         targetSales: 50000
-      },
-
-      // 🔔 Notification State
-      notifications: [],
-      notificationsLoading: false,
-      notificationsError: null,
-      notificationInterval: null,
+      }
     }
   },
-
   computed: {
+    // Formatted values for display
     formattedTotalProfit() {
       return formatCurrency(this.totalProfit || 0)
     },
     profitSubtitle() {
-      if (this.profitLoading) return 'Fetching data...'
+      if (this.profitLoading) {
+        return 'Fetching data...'
+      }
       return this.isShowingAllTimeProfit ? 'All time' : `From ${this.lastMonthPeriod}`
     },
     totalProducts() {
+      // Use dynamic data from products API - check multiple sources for total count
       let count = 0
-      if (this.productStats?.total !== undefined) count = this.productStats.total
-      else if (this.products && Array.isArray(this.products)) count = this.products.length
+      
+      // First try productStats.total (computed from products array)
+      if (this.productStats?.total !== undefined) {
+        count = this.productStats.total
+      }
+      // Fallback to direct products array length if productStats not available yet
+      else if (this.products && Array.isArray(this.products)) {
+        count = this.products.length
+      }
+      
       return formatNumber(count)
     },
     lastUpdated() {
       return new Date().toLocaleDateString('en-US', {
-        year: 'numeric', month: 'short', day: 'numeric'
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
       })
     },
     lastMonthPeriod() {
       const now = new Date()
       const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
       return lastMonth.toLocaleDateString('en-US', {
-        year: 'numeric', month: 'long'
+        year: 'numeric',
+        month: 'long'
       })
     },
     salesDataSubtitle() {
-      if (this.salesStatsLoading) return 'Fetching data...'
+      if (this.salesStatsLoading) {
+        return 'Fetching data...'
+      }
       return this.isShowingAllTimeSales ? 'All time' : `From ${this.lastMonthPeriod}`
     },
     formattedMonthlyRevenue() {
       return formatCurrency(this.monthlyIncome || 0)
     },
     monthlyRevenueSubtitle() {
-      if (this.monthlyIncomeLoading) return 'Fetching data...'
+      if (this.monthlyIncomeLoading) {
+        return 'Fetching data...'
+      }
       return this.currentMonthPeriod || 'Current month'
     },
     totalSold() {
@@ -334,6 +345,7 @@ export default {
       return formatCurrency(this.rawData.targetSales)
     },
     chartData() {
+      // Return a default chart structure to prevent issues during initialization
       return {
         labels: ['Initializing...'],
         datasets: [{
@@ -348,98 +360,621 @@ export default {
       }
     }
   },
-
+  // Removed watcher to prevent recursion issues - chart updates are now handled manually
   methods: {
-    // ======================================
-    // 🔔 FIXED NOTIFICATION METHODS
-    // ======================================
-    startNotificationPolling() {
-      if (this.notificationInterval) {
-        clearInterval(this.notificationInterval)
+    handleTargetSalesClick() {
+      // Target sales button clicked
+    },
+    /**
+     * Generate time-based chart data starting from September
+     */
+    getTimeBasedChartData() {
+      const currentDate = new Date()
+      const currentYear = currentDate.getFullYear()
+      
+      // Get labels based on selected frequency, starting from October
+      let labels = []
+      
+      switch(this.salesSelectedFrequency) {
+          case 'daily':
+          // Last 7 days
+          labels = []
+          for (let i = 6; i >= 0; i--) {
+            const date = new Date()
+            date.setDate(date.getDate() - i)
+            labels.push(date.toLocaleDateString('en-US', { weekday: 'short' }))
+          }
+            break
+          case 'weekly':
+          // Last 12 weeks starting from October
+          labels = []
+          for (let i = 11; i >= 0; i--) {
+            const weekStart = new Date(currentYear, 9, 1) // October is month 9 (0-indexed)
+            weekStart.setDate(weekStart.getDate() - (i * 7))
+            const weekNum = Math.ceil((weekStart.getDate()) / 7)
+            labels.push(`W${weekNum}`)
+          }
+            break
+          case 'yearly':
+          // From 2024 onwards (assuming we start from current year)
+          labels = []
+          const startYear = currentYear - 2 // Show last 3 years
+          for (let year = startYear; year <= currentYear; year++) {
+            labels.push(year.toString())
+          }
+            break
+          default: // monthly
+          // From October of current year
+          labels = []
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+          const startMonth = 9 // October (0-indexed)
+          
+          // Add months from October to current month, or next year if needed
+          for (let i = 0; i < 12; i++) {
+            const monthIndex = (startMonth + i) % 12
+            const yearOffset = Math.floor((startMonth + i) / 12)
+            const displayYear = currentYear + yearOffset
+            labels.push(`${months[monthIndex]} ${displayYear}`)
+            
+            // Break if we've reached current month and it's not a full year cycle
+            if (monthIndex === currentDate.getMonth() && yearOffset === 0 && i < 11) {
+              break
+            }
+          }
+      }
+      
+      // For now, return empty data - will be populated by real API data
+      return {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Sales',
+            data: new Array(labels.length).fill(0), // Placeholder data
+            borderColor: 'rgba(59, 130, 246, 1)',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 8
+          }
+        ]
+      }
+    },
+    /**
+     * Aggregate sales data by time period for chart display
+     */
+    aggregateSalesDataByTime(salesChartData, expectedLabelCount = null) {
+      if (!salesChartData || !salesChartData.datasets || !salesChartData.datasets[0]) {
+        // Avoid recursion by not calling getTimeBasedChartData()
+        const defaultLength = expectedLabelCount || 12 // Default to 12 months
+        return new Array(defaultLength).fill(0)
+      }
+      
+      // For now, return the sales data as-is since useSales already handles aggregation
+      // In the future, we could implement further aggregation here if needed
+      const salesValues = salesChartData.datasets[0].data || []
+      const expectedLength = expectedLabelCount || salesValues.length
+      
+      // If we have fewer data points than expected labels, pad with zeros
+      if (salesValues.length < expectedLength) {
+        return [...salesValues, ...new Array(expectedLength - salesValues.length).fill(0)]
+      }
+      
+      // If we have more data points than expected labels, take the first N points
+      return salesValues.slice(0, expectedLength)
+    },
+    /**
+     * Load time-based sales data for the chart
+     */
+    async loadTimeBasedSalesData() {
+      try {
+        // Use the calculateDateRange from useSales composable
+        const dateRange = this.calculateDateRange ? this.calculateDateRange(this.salesSelectedFrequency) : null
+        
+        if (dateRange) {
+          // Use the same service that's available in useSales
+          // For now, let's use the monthly income data we already have
+          if (this.salesSelectedFrequency === 'monthly' && this.monthlyIncome) {
+            return this.getMonthlyChartData()
+          }
+          
+          // For other frequencies, we can fall back to the existing method
+          return null
+        }
+      } catch (error) {
+        console.error('Failed to load time-based sales data:', error)
+        return null
+      }
+    },
+    /**
+     * Aggregate sales data by time periods for chart display
+     */
+    aggregateSalesByTimePeriod(salesData, frequency) {
+      if (!salesData || salesData.length === 0) {
+        return { labels: [], data: [] }
+      }
+      
+      const currentDate = new Date()
+      let labels = []
+      let aggregatedData = []
+      
+      switch (frequency) {
+        case 'daily':
+          // Last 7 days
+          labels = []
+          for (let i = 6; i >= 0; i--) {
+            const date = new Date()
+            date.setDate(date.getDate() - i)
+            labels.push(date.toLocaleDateString('en-US', { weekday: 'short' }))
+          }
+          // For daily, sum all sales for each day (simplified aggregation)
+          aggregatedData = new Array(7).fill(0)
+          const totalDaily = salesData.reduce((sum, item) => sum + (parseFloat(item.total_sales) || 0), 0)
+          aggregatedData.fill(totalDaily / 7) // Distribute evenly for now
+          break
+          
+        case 'weekly':
+          // Last 12 weeks
+          labels = []
+          for (let i = 11; i >= 0; i--) {
+            labels.push(`W${12 - i}`)
+          }
+          aggregatedData = new Array(12).fill(0)
+          const totalWeekly = salesData.reduce((sum, item) => sum + (parseFloat(item.total_sales) || 0), 0)
+          aggregatedData.fill(totalWeekly / 12) // Distribute evenly for now
+          break
+          
+        case 'monthly':
+          // From October to current month
+          labels = []
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+          const currentYear = currentDate.getFullYear()
+          const startMonth = 9 // October
+          
+          for (let i = 0; i < 12; i++) {
+            const monthIndex = (startMonth + i) % 12
+            const yearOffset = Math.floor((startMonth + i) / 12)
+            const displayYear = currentYear + yearOffset
+            labels.push(`${months[monthIndex]} ${displayYear}`)
+            
+            if (monthIndex === currentDate.getMonth() && yearOffset === 0) {
+              break
+            }
+          }
+          
+          // For monthly, use actual monthly revenue if available
+          aggregatedData = new Array(labels.length).fill(0)
+          const totalMonthly = salesData.reduce((sum, item) => sum + (parseFloat(item.total_sales) || 0), 0)
+          
+          // If we have current month data, use it; otherwise distribute evenly
+          if (this.monthlyIncome && this.monthlyIncome > 0) {
+            aggregatedData[aggregatedData.length - 1] = this.monthlyIncome // Last month (current)
+            const remainingTotal = Math.max(0, totalMonthly - this.monthlyIncome)
+            const remainingMonths = Math.max(1, aggregatedData.length - 1)
+            for (let i = 0; i < aggregatedData.length - 1; i++) {
+              aggregatedData[i] = remainingTotal / remainingMonths
+            }
+          } else {
+            aggregatedData.fill(totalMonthly / aggregatedData.length)
+          }
+          break
+          
+        case 'yearly':
+          labels = []
+          const startYear = currentDate.getFullYear() - 2
+          for (let year = startYear; year <= currentDate.getFullYear(); year++) {
+            labels.push(year.toString())
+          }
+          aggregatedData = new Array(labels.length).fill(0)
+          const totalYearly = salesData.reduce((sum, item) => sum + (parseFloat(item.total_sales) || 0), 0)
+          aggregatedData.fill(totalYearly / labels.length) // Distribute evenly for now
+          break
+          
+        default:
+          labels = ['No Data']
+          aggregatedData = [0]
+      }
+      
+      return { labels, data: aggregatedData }
+    },
+    /**
+     * Get monthly chart data using the actual monthly revenue
+     */
+    getMonthlyChartData() {
+      const currentDate = new Date()
+      const currentYear = currentDate.getFullYear()
+      const currentMonth = currentDate.getMonth() // 0-indexed
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      
+      // Generate labels from October to current month
+      let labels = []
+      const startMonth = 9 // October (0-indexed)
+      
+      // Always start with October of current year
+      if (currentMonth >= startMonth) {
+        // We're in October or later - show from October to current month
+        for (let monthIndex = startMonth; monthIndex <= currentMonth; monthIndex++) {
+          const label = `${months[monthIndex]} ${currentYear}`
+          labels.push(label)
+        }
+      } else {
+        // We're before October - show from October of previous year to current month
+        // First, add remaining months from previous year (Oct, Nov, Dec)
+        for (let monthIndex = startMonth; monthIndex < 12; monthIndex++) {
+          const label = `${months[monthIndex]} ${currentYear - 1}`
+          labels.push(label)
+        }
+        // Then add months from current year up to current month
+        for (let monthIndex = 0; monthIndex <= currentMonth; monthIndex++) {
+          const label = `${months[monthIndex]} ${currentYear}`
+          labels.push(label)
+        }
       }
 
-      this.fetchNotifications()
-
-      this.notificationInterval = setInterval(() => {
-        this.fetchNotifications()
-      }, 20000)
+      // Ensure we always have at least one label (fallback)
+      if (labels.length === 0) {
+        labels = [`Oct ${currentYear}`]
+      }
+      
+      // Create data array with the monthly income
+      const data = new Array(labels.length).fill(0)
+      
+      // Put the monthly income in the appropriate position
+      if (this.monthlyIncome && this.monthlyIncome > 0) {
+        // If we're in the current month, find its position
+        const currentMonthLabel = `${months[currentMonth]} ${currentYear}`
+        const currentIndex = labels.indexOf(currentMonthLabel)
+        
+        if (currentIndex >= 0) {
+          data[currentIndex] = this.monthlyIncome
+        } else {
+          // Fallback: put it in the last position
+          data[data.length - 1] = this.monthlyIncome
+        }
+      }
+      
+      return { labels, data }
     },
-
-    async fetchNotifications() {
+    /**
+     * Simple method to update chart with monthly data - bypasses reactivity issues
+     */
+    updateChartWithMonthlyData() {
+      if (!this.chart || !this.monthlyIncome) {
+        return
+      }
+      
       try {
-        this.notificationsLoading = true
-        this.notificationsError = null
+        // Create simple, static data for October 2025
+        const currentYear = 2025
+        const labels = ['Oct 2025']
+        const data = [this.monthlyIncome]
 
-        const data = await apiNotifications.DisplayNotifs()
+        // Direct update without reactivity
+        if (this.chart.data && this.chart.data.datasets && this.chart.data.datasets[0]) {
+          // Clear and set new data directly
+          this.chart.data.labels.length = 0
+          this.chart.data.labels.push(...labels)
+          this.chart.data.datasets[0].data.length = 0
+          this.chart.data.datasets[0].data.push(...data)
 
-        this.notifications = Array.isArray(data)
-          ? data
-          : (data.notifications || data.results || [])
+          // Update chart
+          this.chart.update('none')
+        }
+      } catch (error) {
+        console.error('📊 Simple chart update failed:', error)
+      }
+    },
+    
+    /**
+     * Load chart data only - without triggering profit calculations
+     */
+    async loadChartDataOnly() {
+      // Prevent recursion - check flag first
+      if (this.isUpdatingChart) {
+        return
+      }
+      
+      // Only update chart if it exists and is properly initialized
+      if (!this.chart || !this.chart.data || !this.chart.data.datasets || this.chart.data.datasets.length === 0) {
+        return
+      }
+      
+      this.isUpdatingChart = true
+      
+      try {
+
+        // For monthly frequency, use the simple update method
+        if (this.salesSelectedFrequency === 'monthly' && this.monthlyIncome) {
+          this.updateChartWithMonthlyData()
+          return
+        }
 
       } catch (error) {
-        console.error("Error fetching notifications:", error)
-        this.notificationsError =
-          error?.response?.data?.message ||
-          error?.message ||
-          "Failed to fetch notifications"
+        console.error('Failed to load chart data only:', error)
       } finally {
-        this.notificationsLoading = false
+        // Always reset the flag after a delay to prevent rapid successive calls
+        setTimeout(() => {
+          this.isUpdatingChart = false
+        }, 100)
       }
     },
+    async updateChart() {
+      // Prevent recursion by checking if already updating
+      if (this.isUpdatingChart) {
+        return
+      }
+      
+      this.isUpdatingChart = true
+      
+      try {
+        // Use the chart-only update method to avoid triggering profit calculations
+        await this.loadChartDataOnly()
+      } catch (error) {
+        console.error('Failed to update chart:', error)
+        // Fallback: update with just the labels (avoiding recursive calls)
+        if (this.chart && !this.isUpdatingChart) {
+          try {
+            // Use monthly data directly for fallback
+            if (this.salesSelectedFrequency === 'monthly') {
+              const monthlyData = this.getMonthlyChartData()
+              if (monthlyData && monthlyData.labels) {
+                this.chart.data.labels = monthlyData.labels
+                this.chart.data.datasets[0].data = monthlyData.data
+                this.chart.update('none')
+              }
+            }
+          } catch (fallbackError) {
+            console.error('Fallback chart update also failed:', fallbackError)
+          }
+        }
+      } finally {
+        this.isUpdatingChart = false
+      }
+    },
+    /**
+     * Handle frequency change from the dropdown
+     */
+    async onFrequencyChangeHandler() {
+      
+      // Prevent multiple rapid changes
+      if (this.isUpdatingChart) {
+        return
+      }
+      
+      try {
+        // For monthly frequency, use the simple update method
+        if (this.salesSelectedFrequency === 'monthly' && this.monthlyIncome) {
+          this.updateChartWithMonthlyData()
+        } else {
+          // For other frequencies, we could implement similar simple methods
+        }
+      } catch (error) {
+        console.error('Failed to handle frequency change:', error)
+      }
+    },
+    async initChart() {
+      // Import Chart.js dynamically
+      try {
+        const { Chart, registerables } = await import('chart.js')
+        Chart.register(...registerables)
+        
+        const ctx = this.$refs.chartCanvas.getContext('2d')
+        
+        // Initialize chart with stable data structure to prevent Chart.js errors
+        const initialData = {
+          labels: ['Loading...'],
+          datasets: [{
+            label: 'Sales',
+            data: [0],
+            borderColor: 'rgba(59, 130, 246, 1)',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 8
+          }]
+        }
+        
+        this.chart = new Chart(ctx, {
+          type: 'line',
+          data: initialData,
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: true,
+                position: 'bottom',
+                labels: {
+                  usePointStyle: true,
+                  padding: 20,
+                  font: {
+                    size: 12
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                grid: {
+                  display: true,
+                  color: 'rgba(0, 0, 0, 0.05)'
+                },
+                ticks: {
+                  font: {
+                    size: 11,
+                    weight: 'bold'
+                  },
+                  color: '#6b7280'
+                }
+              },
+              y: {
+                beginAtZero: true,
+                grid: {
+                  color: 'rgba(0, 0, 0, 0.05)'
+                },
+                ticks: {
+                  font: {
+                    size: 11
+                  },
+                  color: '#6b7280',
+                  callback: function(value) {
+                    return '₱' + value.toLocaleString()
+                  }
+                }
+              }
+            },
+            elements: {
+              point: {
+                hoverBackgroundColor: 'rgba(59, 130, 246, 1)',
+                hoverBorderColor: '#ffffff',
+                hoverBorderWidth: 3
+              }
+            },
+            interaction: {
+              intersect: false,
+              mode: 'index'
+            }
+          }
+        })
+      } catch (error) {
+        // Fallback: show a simple text message
+        this.$refs.chartCanvas.style.display = 'none'
+        const fallback = document.createElement('div')
+        fallback.innerHTML = `
+          <div style="text-align: center; padding: 2rem; color: #6b7280;">
+            <p>Chart.js not available. Install chart.js to display charts:</p>
+            <code>npm install chart.js</code>
+            <br><br>
+            <div style="background: #f3f4f6; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+              Sample Sales Data:<br>
+              Oct: ₱1,200 | Nov: ₱1,150<br>
+              Dec: ₱1,300 | Jan: ₱1,450
+            </div>
+          </div>
+        `
+        this.$refs.chartCanvas.parentNode.appendChild(fallback)
+      }
+    },
+    async loadProductsData() {
+      try {
+        // Use initializeProducts for cleaner initial data loading
+        await this.initializeProducts()
+      } catch (error) {
+        console.error('Failed to load products data:', error)
+        // Fallback to fetchProducts if initializeProducts fails
+        try {
+          await this.fetchProducts()
+        } catch (fallbackError) {
+          console.error('Fallback fetchProducts also failed:', fallbackError)
+          // The error is already handled by the useProducts composable
+          // and will be reflected in the productsError reactive variable
+        }
+      }
+    },
+    async loadSalesData() {
+      try {
+        // Calculate last month's date range for reference
+        const now = new Date()
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0) // Last day of previous month
+        
+        // Format dates for API (YYYY-MM-DD format)
+        const startDate = startOfLastMonth.toISOString().split('T')[0]
+        const endDate = endOfLastMonth.toISOString().split('T')[0]
+        
+        
+        // Load the last month's sales count
+        await this.loadTotalSalesCount(startDate, endDate)
+        const lastMonthCount = this.totalSalesCount
+        
+        // Load all-time count for comparison
+        await this.loadTotalSalesCountAllTime()
+        const allTimeCount = this.totalSalesCount
+        
+        // Use all-time count if last month shows 0, otherwise use last month
+        if (lastMonthCount > 0) {
+          this.totalSalesCount = lastMonthCount
+          this.isShowingAllTimeSales = false
+        } else {
+          this.totalSalesCount = allTimeCount
+          this.isShowingAllTimeSales = true
+        }
+        
+        // Also load profit data with the same date range
+        await this.loadTotalProfit(startDate, endDate)
+        const lastMonthProfit = this.totalProfit
 
-    // (⛔ Chart methods unchanged — skipped for brevity)
-    handleTargetSalesClick() {},
-
-    getTimeBasedChartData() { /* unchanged */ },
-    aggregateSalesDataByTime() { /* unchanged */ },
-    loadTimeBasedSalesData() { /* unchanged */ },
-    aggregateSalesByTimePeriod() { /* unchanged */ },
-    getMonthlyChartData() { /* unchanged */ },
-    updateChartWithMonthlyData() { /* unchanged */ },
-    loadChartDataOnly() { /* unchanged */ },
-    updateChart() { /* unchanged */ },
-    onFrequencyChangeHandler() { /* unchanged */ },
-    initChart() { /* unchanged */ },
-
-    async loadProductsData() { /* unchanged */ },
-    async loadSalesData() { /* unchanged */ },
+        // Load all-time profit for comparison
+        await this.loadTotalProfitAllTime()
+        const allTimeProfit = this.totalProfit
+        
+        // Use all-time profit if last month shows 0, otherwise use last month
+        if (lastMonthProfit > 0) {
+          // Restore the last month profit value
+          this.totalProfit = lastMonthProfit
+          this.isShowingAllTimeProfit = false
+        } else {
+          // Keep the all-time profit value (already set)
+          this.isShowingAllTimeProfit = true
+        }
+        
+        // Load current month's revenue (separate from the last month date range used for sales/profit)
+        await this.loadCurrentMonthIncome()
+        
+        // Set the current month period for the subtitle
+        const currentDate = new Date()
+        const currentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+        this.currentMonthPeriod = currentMonth.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long'
+        })
+        
+        
+      } catch (error) {
+        console.error('Failed to load sales data:', error)
+      }
+    }
   },
-
   async mounted() {
+    // Load products and sales data when component mounts
     await Promise.all([
       this.loadProductsData(),
       this.loadSalesData()
     ])
-
-    // 🔥 Start polling notifications
-    this.startNotificationPolling()
-
-    // Chart init kept exactly as-is
+    
+    // Initialize chart after a short delay to ensure DOM is ready
     this.$nextTick(() => {
       setTimeout(async () => {
         try {
           await this.initChart()
-          console.log('📊 Chart initialized successfully')
-
+          
+          // Load chart data only after chart is properly initialized and monthly income is available
           setTimeout(() => {
             if (this.chart && this.monthlyIncome && this.salesSelectedFrequency === 'monthly') {
-              console.log('📊 Loading initial chart data with simple method...')
               try {
                 this.updateChartWithMonthlyData()
               } catch (error) {
                 console.error('Failed to load chart data after init:', error)
               }
             }
-          }, 500)
+          }, 500) // Longer delay to ensure chart is fully ready
         } catch (error) {
           console.error('Failed to initialize chart:', error)
         }
-      }, 200)
+      }, 200) // Longer initial delay
     })
   }
 }
 </script>
-
 
 <style scoped>
 .dashboard {

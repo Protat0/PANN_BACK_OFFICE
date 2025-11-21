@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue'
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -9,7 +9,7 @@ const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+  const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
@@ -99,7 +99,7 @@ export function useOrdersHistory() {
             totalAmount: totalCost,
             status: orderStatus,
             items: batches.map(batch => ({
-              name: batch.product_name || batch.product_id || 'Unknown Product',
+              name: batch.product_name || batch.name || 'Unknown Product',
               product_name: batch.product_name || 'Unknown Product',
               product_id: batch.product_id,
               quantity: batch.quantity_received,
@@ -248,6 +248,43 @@ export function useOrdersHistory() {
         console.warn('Failed to fetch batches for orders history:', batchesError)
         allBatches = []
       }
+
+      // Fetch product details to enrich batches with product names/category info
+      const productMap = {}
+      try {
+        const productsResponse = await api.get('/products/', { params: { per_page: 1000 } })
+        const productsPayload = productsResponse.data?.products ||
+          productsResponse.data?.data ||
+          productsResponse.data
+
+        if (Array.isArray(productsPayload)) {
+          productsPayload.forEach(product => {
+            const productId = product._id || product.id
+            if (!productId) return
+            productMap[productId] = {
+              name: product.product_name || product.name || 'Unknown Product',
+              categoryId: product.category_id || '',
+              categoryName: product.category_name || '',
+              subcategoryName: product.subcategory_name || ''
+            }
+          })
+        }
+      } catch (productsError) {
+        console.warn('Failed to fetch products for orders history:', productsError)
+      }
+
+      // Enrich batches with product information
+      allBatches = allBatches.map(batch => {
+        const productInfo = productMap[batch.product_id] || {}
+        return {
+          ...batch,
+          product_name: batch.product_name || productInfo.name || 'Unknown Product',
+          name: batch.name || productInfo.name || 'Unknown Product',
+          category_id: batch.category_id || productInfo.categoryId || '',
+          category_name: batch.category_name || productInfo.categoryName || '',
+          subcategory_name: batch.subcategory_name || productInfo.subcategoryName || ''
+        }
+      })
       
       // Group batches by supplier_id (same logic as SupplierDetails.vue)
       const batchesBySupplier = {}
@@ -267,8 +304,6 @@ export function useOrdersHistory() {
         batches: batchesBySupplier[supplier._id] || []
       }))
       
-      console.log('Orders fetched from suppliers:', allOrders.value.length)
-      console.log('Total batches:', allBatches.length)
       
     } catch (err) {
       error.value = err.response?.data?.error || 'Failed to fetch orders history'

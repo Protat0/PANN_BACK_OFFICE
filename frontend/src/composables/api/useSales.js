@@ -160,24 +160,16 @@ export function useSales() {
    */
   const fetchProductCostPrices = async (productIds) => {
     try {
-      console.log('📦 fetchProductCostPrices called with productIds:', productIds.slice(0, 5), '... (showing first 5)')
-      
       // Filter out product IDs we don't have cached
       const missingIds = productIds.filter(id => !productCostCache.value.has(id))
-      console.log('📦 Missing product IDs that need to be fetched:', missingIds.slice(0, 5), '... (showing first 5)')
-      console.log('📦 Current cache size:', productCostCache.value.size)
       
       if (missingIds.length === 0) {
-        console.log('📦 All product cost prices already cached')
         return
       }
-      
-      console.log(`📦 Fetching cost prices for ${missingIds.length} missing products`)
       
       // Fetch all products to get their cost prices
       const response = await apiProductsService.getAllProducts({ limit: 10000 })
       const products = response.data || []
-      console.log('📦 Fetched products from API:', products.length)
       
       // Cache all product cost prices for future use
       let cachedCount = 0
@@ -187,13 +179,6 @@ export function useSales() {
           cachedCount++
         }
       })
-      
-      console.log(`📦 Cached cost prices for ${cachedCount} products (${missingIds.length} were missing)`)
-      console.log('📦 Final cache size:', productCostCache.value.size)
-      
-      // Debug: Show a few entries from the cache
-      const sampleEntries = Array.from(productCostCache.value.entries()).slice(0, 3)
-      console.log('📦 Sample cache entries:', sampleEntries)
       
     } catch (error) {
       console.warn('Failed to fetch product cost prices:', error)
@@ -285,8 +270,6 @@ export function useSales() {
         const defaultStart = new Date(defaultYear, 9, 1) // October 1st
         start_date = formatDateForAPI(defaultStart)
     }
-    
-    console.log(`📅 ${frequency} date range:`, { start_date, end_date })
     
     return { start_date, end_date }
   }
@@ -468,9 +451,6 @@ export function useSales() {
         return
       }
       
-      console.log('📊 Fetching sales data with date range:', dateRange)
-      console.log('📅 Frequency:', selectedFrequency.value)
-      
       // Use the improved API method with proper date filtering
       const response = await salesDisplayService.getSalesByItem(
         dateRange.start_date, 
@@ -478,8 +458,6 @@ export function useSales() {
         false // exclude voided transactions by default
       )
 
-      console.log('📦 Raw API response:', response)
-      
       let data = []
       
       // Handle different response formats
@@ -493,8 +471,6 @@ export function useSales() {
         console.warn('⚠️ Unexpected API response format:', response)
         data = []
       }
-
-      console.log('📈 Processed data for table:', data)
 
       // Store all data and update pagination
       allSalesByItemRows.value = data
@@ -520,9 +496,6 @@ export function useSales() {
       // Reset to first page and update displayed data
       salesByItemPagination.value.current_page = 1
       updateSalesByItemPageData()
-
-      console.log('🎯 Final table rows:', salesByItemRows.value)
-      console.log('📄 Pagination info:', salesByItemPagination.value)
 
       // Update connection health on success
       connectionLost.value = false
@@ -567,8 +540,6 @@ export function useSales() {
         dateRange = { start_date: startDate, end_date: endDate }
       }
       
-      console.log('📊 Fetching total sales count (items sold) with date range:', dateRange)
-      
       // First, let's try to get the actual sales by item data to count total items sold
       try {
         // Use the same service that provides the SalesByItem table data
@@ -578,8 +549,6 @@ export function useSales() {
           false // exclude voided transactions
         )
 
-        console.log('📦 Sales by item API response:', response)
-        
         let data = []
         
         // Handle different response formats
@@ -599,13 +568,6 @@ export function useSales() {
         })
 
         totalSalesCount.value = totalItemsSold
-        console.log('✅ Total items sold count:', totalSalesCount.value, 'from', data.length, 'products, with date filter:', dateRange)
-        
-        // Debug: Show breakdown of items sold
-        console.log('🔍 Items sold breakdown:', data.map(item => ({
-          product: item.product_name || item.name,
-          items_sold: item.items_sold || 0
-        })))
         
         return totalSalesCount.value
         
@@ -616,11 +578,9 @@ export function useSales() {
       // Fallback: Try to get total count from sales statistics (but this counts transactions, not items)
       try {
         const statsResponse = await salesAPIService.getSalesStatistics(dateRange || {})
-        console.log('📊 Fallback - Full stats API response:', statsResponse)
         
         if (statsResponse?.total_transactions !== undefined) {
           totalSalesCount.value = statsResponse.total_transactions
-          console.log('⚠️ Using transaction count as fallback (not items sold):', totalSalesCount.value, 'with date filter:', dateRange)
           return totalSalesCount.value
         } else {
           console.warn('⚠️ Stats API response missing total_transactions field:', statsResponse)
@@ -652,7 +612,6 @@ export function useSales() {
         }
         
         totalSalesCount.value = count
-        console.log('⚠️ Final fallback - Using invoice count (not items sold):', totalSalesCount.value)
         return totalSalesCount.value
         
       } catch (invoicesError) {
@@ -679,8 +638,6 @@ export function useSales() {
       salesStatsLoading.value = true
       salesStatsError.value = null
       
-      console.log('📊 Fetching total sales count (items sold) for ALL TIME (no date filter)')
-      
       // First, get the actual sales by item data to count total items sold
       try {
         // Use the same service that provides the SalesByItem table data - no date filter
@@ -690,8 +647,6 @@ export function useSales() {
           false // exclude voided transactions
         )
 
-        console.log('📦 Sales by item API response (all time):', response)
-        
         let data = []
         
         // Handle different response formats
@@ -711,13 +666,6 @@ export function useSales() {
         })
 
         totalSalesCount.value = totalItemsSold
-        console.log('✅ Total items sold count (ALL TIME):', totalSalesCount.value, 'from', data.length, 'products')
-        
-        // Debug: Show breakdown of items sold
-        console.log('🔍 Items sold breakdown (all time):', data.map(item => ({
-          product: item.product_name || item.name,
-          items_sold: item.items_sold || 0
-        })))
         
         return totalSalesCount.value
         
@@ -728,11 +676,9 @@ export function useSales() {
       // Fallback: Try to get total count from sales statistics (but this counts transactions, not items)
       try {
         const statsResponse = await salesAPIService.getSalesStatistics({})
-        console.log('📊 Fallback - Full stats API response (all time):', statsResponse)
         
         if (statsResponse?.total_transactions !== undefined) {
           totalSalesCount.value = statsResponse.total_transactions
-          console.log('⚠️ Using transaction count as fallback (not items sold) ALL TIME:', totalSalesCount.value)
           return totalSalesCount.value
         } else {
           console.warn('⚠️ Stats API response missing total_transactions field:', statsResponse)
@@ -758,7 +704,6 @@ export function useSales() {
         }
         
         totalSalesCount.value = count
-        console.log('⚠️ Final fallback - Using invoice count (not items sold) ALL TIME:', totalSalesCount.value)
         return totalSalesCount.value
         
       } catch (invoicesError) {
@@ -791,8 +736,6 @@ export function useSales() {
         dateRange = { start_date: startDate, end_date: endDate }
       }
       
-      console.log('💰 Fetching total profit with date range:', dateRange)
-      
       // Get the actual sales by item data to calculate total profit
       try {
         // Use the same service that provides the SalesByItem table data
@@ -802,8 +745,6 @@ export function useSales() {
           false // exclude voided transactions
         )
 
-        console.log('💰 Sales by item API response for profit:', response)
-        
         let data = []
         
         // Handle different response formats
@@ -815,12 +756,8 @@ export function useSales() {
           data = response.results
         }
 
-        console.log('🔍 Sample sales data item structure:', data[0] ? Object.keys(data[0]) : 'No data')
-        console.log('🔍 First few sales items:', data.slice(0, 2))
-
         // First, fetch cost prices for all products in the sales data
         const productIds = data.map(item => item.id || item._id || item.product_id).filter(Boolean)
-        console.log('🔍 Product IDs extracted from sales data:', productIds.slice(0, 5))
         if (productIds.length > 0) {
           await fetchProductCostPrices(productIds)
         }
@@ -857,34 +794,6 @@ export function useSales() {
         })
 
         totalProfit.value = calculatedProfit
-        console.log('✅ Total profit calculated:', totalProfit.value, 'from', data.length, 'products, with date filter:', dateRange)
-        console.log('💰 Total revenue (for comparison):', totalRevenue)
-        
-        // Debug: Show breakdown of profit by product
-        console.log('💰 Profit breakdown:', data.map(item => {
-          const itemTotalSales = parseFloat(item.total_sales) || 0
-          const itemsSold = parseInt(item.items_sold) || 0
-          const productId = item.id || item._id || item.product_id
-          
-          // Use the same logic as the calculation above
-          let costPrice = parseFloat(item.cost_price) || 0
-          if (costPrice === 0 && productId) {
-            costPrice = getProductCostPrice(productId)
-          }
-          
-          const itemCosts = costPrice * itemsSold
-          const itemProfit = itemTotalSales - itemCosts
-          
-          return {
-            product: item.product_name || item.name || 'Unknown',
-            product_id: productId,
-            revenue: itemTotalSales,
-            cost_price: costPrice,
-            items_sold: itemsSold,
-            total_costs: itemCosts,
-            profit: itemProfit
-          }
-        }))
         
         return totalProfit.value
         
@@ -895,11 +804,9 @@ export function useSales() {
       // Fallback: Try to get profit from sales statistics API
       try {
         const statsResponse = await salesAPIService.getSalesStatistics(dateRange || {})
-        console.log('💰 Fallback - Stats API response for profit:', statsResponse)
         
         if (statsResponse?.total_sales !== undefined) {
           totalProfit.value = parseFloat(statsResponse.total_sales) || 0
-          console.log('✅ Total profit from stats API:', totalProfit.value, 'with date filter:', dateRange)
           return totalProfit.value
         } else {
           console.warn('⚠️ Stats API response missing total_sales field:', statsResponse)
@@ -910,7 +817,6 @@ export function useSales() {
       
       // If no fallback worked, set profit to 0
       totalProfit.value = 0
-      console.log('⚠️ Could not calculate profit, setting to 0')
       return totalProfit.value
       
     } catch (err) {
@@ -932,8 +838,6 @@ export function useSales() {
       profitLoading.value = true
       profitError.value = null
       
-      console.log('💰 Fetching total profit for ALL TIME (no date filter)')
-      
       // Get the actual sales by item data to calculate total profit
       try {
         // Use the same service that provides the SalesByItem table data - no date filter
@@ -943,8 +847,6 @@ export function useSales() {
           false // exclude voided transactions
         )
 
-        console.log('💰 Sales by item API response (all time) for profit:', response)
-        
         let data = []
         
         // Handle different response formats
@@ -956,12 +858,8 @@ export function useSales() {
           data = response.results
         }
 
-        console.log('🔍 Sample sales data item structure (all time):', data[0] ? Object.keys(data[0]) : 'No data')
-        console.log('🔍 First few sales items (all time):', data.slice(0, 2))
-
         // First, fetch cost prices for all products in the sales data
         const productIds = data.map(item => item.id || item._id || item.product_id).filter(Boolean)
-        console.log('🔍 Product IDs extracted from sales data (all time):', productIds.slice(0, 5))
         if (productIds.length > 0) {
           await fetchProductCostPrices(productIds)
         }
@@ -998,34 +896,6 @@ export function useSales() {
         })
 
         totalProfit.value = calculatedProfit
-        console.log('✅ Total profit (ALL TIME) calculated:', totalProfit.value, 'from', data.length, 'products')
-        console.log('💰 Total revenue (all time, for comparison):', totalRevenue)
-        
-        // Debug: Show breakdown of profit by product
-        console.log('💰 Profit breakdown (all time):', data.map(item => {
-          const itemTotalSales = parseFloat(item.total_sales) || 0
-          const itemsSold = parseInt(item.items_sold) || 0
-          const productId = item.id || item._id || item.product_id
-          
-          // Use the same logic as the calculation above
-          let costPrice = parseFloat(item.cost_price) || 0
-          if (costPrice === 0 && productId) {
-            costPrice = getProductCostPrice(productId)
-          }
-          
-          const itemCosts = costPrice * itemsSold
-          const itemProfit = itemTotalSales - itemCosts
-          
-          return {
-            product: item.product_name || item.name || 'Unknown',
-            product_id: productId,
-            revenue: itemTotalSales,
-            cost_price: costPrice,
-            items_sold: itemsSold,
-            total_costs: itemCosts,
-            profit: itemProfit
-          }
-        }))
         
         return totalProfit.value
         
@@ -1036,11 +906,9 @@ export function useSales() {
       // Fallback: Try to get profit from sales statistics API
       try {
         const statsResponse = await salesAPIService.getSalesStatistics({})
-        console.log('💰 Fallback - Stats API response (all time) for profit:', statsResponse)
         
         if (statsResponse?.total_sales !== undefined) {
           totalProfit.value = parseFloat(statsResponse.total_sales) || 0
-          console.log('✅ Total profit (ALL TIME) from stats API:', totalProfit.value)
           return totalProfit.value
         } else {
           console.warn('⚠️ Stats API response missing total_sales field:', statsResponse)
@@ -1051,7 +919,6 @@ export function useSales() {
       
       // If no fallback worked, set profit to 0
       totalProfit.value = 0
-      console.log('⚠️ Could not calculate profit (all time), setting to 0')
       return totalProfit.value
       
     } catch (err) {
@@ -1079,8 +946,6 @@ export function useSales() {
         dateRange = { start_date: startDate, end_date: endDate }
       }
       
-      console.log('💵 Fetching monthly revenue with date range:', dateRange)
-      
       // Get the actual sales by item data to calculate total revenue
       try {
         // Use the same service that provides the SalesByItem table data
@@ -1090,8 +955,6 @@ export function useSales() {
           false // exclude voided transactions
         )
 
-        console.log('💵 Sales by item API response for revenue:', response)
-        
         let data = []
         
         // Handle different response formats
@@ -1112,13 +975,6 @@ export function useSales() {
         })
 
         monthlyIncome.value = calculatedRevenue
-        console.log('✅ Monthly revenue calculated:', monthlyIncome.value, 'from', data.length, 'products, with date filter:', dateRange)
-        
-        // Debug: Show breakdown of revenue by product
-        console.log('💵 Revenue breakdown:', data.map(item => ({
-          product: item.product_name || item.name || 'Unknown',
-          total_sales: item.total_sales || 0
-        })))
         
         return monthlyIncome.value
         
@@ -1129,11 +985,9 @@ export function useSales() {
       // Fallback: Try to get revenue from sales statistics API
       try {
         const statsResponse = await salesAPIService.getSalesStatistics(dateRange || {})
-        console.log('💵 Fallback - Stats API response for revenue:', statsResponse)
         
         if (statsResponse?.total_sales !== undefined) {
           monthlyIncome.value = parseFloat(statsResponse.total_sales) || 0
-          console.log('✅ Monthly revenue from stats API:', monthlyIncome.value, 'with date filter:', dateRange)
           return monthlyIncome.value
         } else {
           console.warn('⚠️ Stats API response missing total_sales field:', statsResponse)
@@ -1144,7 +998,6 @@ export function useSales() {
       
       // If no fallback worked, set revenue to 0
       monthlyIncome.value = 0
-      console.log('⚠️ Could not calculate monthly revenue, setting to 0')
       return monthlyIncome.value
       
     } catch (err) {
@@ -1172,8 +1025,6 @@ export function useSales() {
       
       const startDate = startOfCurrentMonth.toISOString().split('T')[0]
       const endDate = endOfCurrentMonth.toISOString().split('T')[0]
-      
-      console.log('💵 Fetching current month revenue for:', { startDate, endDate })
       
       return await loadMonthlyIncome(startDate, endDate)
       

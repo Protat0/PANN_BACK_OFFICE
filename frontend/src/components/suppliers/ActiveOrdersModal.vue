@@ -159,15 +159,13 @@ export default {
       return item.name || 
              item.product_name || 
              item.productName || 
-             item.product_id || 
-             item.productId || 
              'Unknown Product'
     },
 
     getProductId(item) {
       // Try multiple possible fields for product ID
-      return item.product_id || 
-             item.productId || 
+      return item.productId || 
+             item.product_id || 
              item.id || 
              'N/A'
     },

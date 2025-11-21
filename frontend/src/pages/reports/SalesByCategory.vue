@@ -8,7 +8,7 @@
       <div class="LC-SBC">
         <div class="LCL1">
           <h1>Top Categories</h1>
-          <h3>Net Sales</h3>
+          <h3 style="margin-left: 75px;">Net Sales</h3>
         </div>
         
         <!-- Loading state for top categories -->
@@ -20,15 +20,23 @@
         <!-- Top categories list -->
         <ul v-else-if="topItems && topItems.length > 0" class="LCL2">
           <li v-for="(item, index) in topItems" :key="index" class="list-item">
-            <span class="item-name" style="font-weight:bold; font-size: 25px;">{{ item.name }}</span>
-            <span class="item-price" style="color:green; font-size: 15px;">{{ item.price }}</span>
+            <div class="category-info">
+              <span class="item-name">{{ item.name }}</span>
+              <div v-if="item.trend" class="trend-indicator" :class="item.trend">
+                <i :class="getTrendIcon(item.trend)"></i>
+                <span v-if="item.sales_growth_percent" class="trend-percent">
+                  {{ Math.abs(item.sales_growth_percent) }}%
+                </span>
+              </div>
+            </div>
+            <span class="item-price">{{ item.price }}</span>
           </li>
         </ul>
         
         <!-- Empty state for top categories -->
         <div v-else class="empty-state-small">
           <p>No category data available</p>
-          <button @click="getTopItems" class="btn btn-sm btn-primary">Retry Loading</button>
+          <button @click="loadAllCategoryData" class="btn btn-sm btn-primary">Retry Loading</button>
         </div>
       </div>
       
@@ -63,9 +71,25 @@
       <div class="transaction-header">
         <div class="header-left">
           <h1>Category Analysis</h1>
+          <!--  <div class="date-range-info">
+            <i class="bi bi-calendar-range"></i>
+            {{ dateRangeDisplay }}
+          </div>-->
         </div>
         <div class="header-actions">
-          <!-- Auto-refresh status and controls (same as logs page) -->
+          <!-- View Toggle -->
+          <div class="view-toggle">
+            <button 
+              class="btn btn-sm" 
+              :class="showTrends ? 'btn-primary' : 'btn-outline-primary'"
+              @click="toggleTrends"
+            >
+              <i class="bi bi-graph-up"></i>
+              {{ showTrends ? 'Hide Trends' : 'Show Trends' }}
+            </button>
+          </div>
+
+          <!-- Auto-refresh status and controls -->
           <div class="auto-refresh-status">
             <i class="bi bi-arrow-repeat text-success" :class="{ 'spinning': loading }"></i>
             <span class="status-text">
@@ -83,7 +107,7 @@
             </button>
           </div>
           
-          <!-- Connection health indicator (same as logs page) -->
+          <!-- Connection health indicator -->
           <div class="connection-indicator" :class="getConnectionStatus()">
             <i :class="getConnectionIcon()"></i>
             <span class="connection-text">{{ getConnectionText() }}</span>
@@ -114,23 +138,46 @@
           <thead>
             <tr>
               <th scope="col">Category</th>
-              <th scope="col">Description</th>
-              <th scope="col">Sub-Categories</th>
-              <th scope="col">Total Items Sold</th>
-              <th scope="col">Total Net Sales</th>
-              <th scope="col"># of Products</th>
+              <th scope="col" style="text-align: center">Total Items Sold</th>
+              <th scope="col" style="text-align: center">Total Sales</th>
+              <th scope="col" style="text-align: center"># of Products</th>
+              <th scope="col" style="text-align: center">Transactions</th>
+              <th scope="col" v-if="showTrends" style="text-align: center">Trend</th>
+              <th scope="col" v-if="showTrends" style="text-align: center">Avg per Transaction</th>
             </tr>
           </thead>
           <tbody class="table-group-divider">
             <tr v-for="category in categories" :key="category.id || category._id">
-              <td class="category-name">{{ category.name || category.category_name }}</td>
-              <td class="category-description">{{ category.description || 'N/A' }}</td>
-              <td class="sub-categories">{{ formatSubCategories(category.sub_categories) }}</td>
+              <td class="category-name">
+                <span>{{ category.name || category.category_name }}</span>
+                <button 
+                  v-if="category.category_id" 
+                  @click="viewCategoryDetails(category)"
+                  class="btn btn-sm btn-outline-info ms-2"
+                  title="View Details"
+                >
+                  <i class="bi bi-eye"></i>
+                </button>
+              </td>
               <td class="items-sold">{{ formatNumber(category.total_items_sold) }}</td>
-              <td class="net-sales">
-                <span class="total-amount">{{ formatCurrency(category.total_net_sales || 0) }}</span>
+              <td class="net-sales" style="text-align: center">
+                <span class="total-amount" >{{ formatCurrency(category.total_sales || 0) }}</span>
               </td>
               <td class="product-count">{{ category.product_count || 0 }}</td>
+              <td class="transaction-count">{{ formatNumber(category.transaction_count) }}</td>
+              <td v-if="showTrends" class="trend-cell">
+                <div v-if="category.trend" class="trend-indicator" :class="category.trend">
+                  <i :class="getTrendIcon(category.trend)"></i>
+                  <span v-if="category.sales_growth_percent" class="trend-percent">
+                    {{ Math.abs(category.sales_growth_percent) }}%
+                  </span>
+                  <span v-else class="trend-text">{{ category.trend }}</span>
+                </div>
+                <span v-else class="text-muted">-</span>
+              </td>
+              <td v-if="showTrends" class="avg-transaction" style="text-align: center">
+                {{ formatCurrency(category.avg_sale_per_transaction) }}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -139,7 +186,7 @@
         <div v-if="categories.length === 0 && !loading" class="empty-state">
           <i class="bi bi-grid" style="font-size: 3rem; color: #6b7280;"></i>
           <p>No categories found for this time period</p>
-          <button class="btn btn-primary" @click="refreshData">
+          <button class="btn btn-primary" @click="loadAllCategoryData">
             <i class="bi bi-arrow-clockwise"></i> Refresh Data
           </button>
         </div>
@@ -150,27 +197,25 @@
 
 <script>
 import PieChartView from '@/components/PieChartView.vue';
-import CategoryService from '@/services/apiCategory';
+import categoryDisplayService from '@/services/apiSalesByCategory';
 
 export default {
   name: 'SalesByCategory',
   components: {
     PieChartView
   },
-  
-  // ====================================================================
-  // COMPONENT DATA
-  // ====================================================================
+
   data() {
     return {
-      // Loading states
       loading: false,
       loadingTopItems: false,
       loadingChart: false,
-      
-      // Chart and analytics with date filtering
+      error: null,
+
       selectedFrequency: 'monthly',
-      currentDateRange: null, // Track current date range for display
+      currentDateRange: null,
+      showTrends: false,
+
       topItems: [],
       chartData: {
         labels: ['Loading...'],
@@ -182,403 +227,154 @@ export default {
           borderWidth: 1
         }]
       },
-      
-      // Category data
+
       categories: [],
 
+      // Auto-refresh
       autoRefreshEnabled: true,
-      autoRefreshInterval: 30000, // 30 seconds
-      baseRefreshInterval: 30000,
+      autoRefreshInterval: 30000,
       autoRefreshTimer: null,
       countdown: 30,
       countdownTimer: null,
-      
-      // Connection health tracking
+
+      // Connection tracking
       connectionLost: false,
       consecutiveErrors: 0,
-      lastSuccessfulLoad: null,
-      
-      // Smart refresh rate tracking
-      recentActivity: [],
+      lastSuccessfulLoad: null
     };
   },
 
-  // ====================================================================
-  // COMPUTED PROPERTIES
-  // ====================================================================
   computed: {
-    /**
-     * Format date range for display
-     */
     dateRangeDisplay() {
-      if (!this.currentDateRange) return '';
-      
-      const startDate = new Date(this.currentDateRange.start_date);
-      const endDate = new Date(this.currentDateRange.end_date);
-      
-      const options = { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
-      };
-      
-      return `${startDate.toLocaleDateString('en-US', options)} - ${endDate.toLocaleDateString('en-US', options)}`;
+      if (!this.currentDateRange) return 'Select date range';
+      const start = new Date(this.currentDateRange.start_date);
+      const end = new Date(this.currentDateRange.end_date);
+      const opts = { year: 'numeric', month: 'short', day: 'numeric' };
+      return `${start.toLocaleDateString('en-US', opts)} - ${end.toLocaleDateString('en-US', opts)}`;
     }
   },
-  
-  // ====================================================================
-  // LIFECYCLE HOOKS
-  // ====================================================================
+
   async mounted() {
     try {
       await this.loadAllCategoryData();
-
-      // Start auto-refresh
-      if (this.autoRefreshEnabled) {
-        this.startAutoRefresh();
-      }
-    } catch (error) {
-      console.error("Category data loading failed:", error);
+      if (this.autoRefreshEnabled) this.startAutoRefresh();
+    } catch (err) {
+      console.error('❌ Error on mount:', err);
     }
   },
 
-beforeUnmount() {
-  this.stopAutoRefresh();
-},
-  
-  // ====================================================================
-  // METHODS
-  // ====================================================================
+  beforeUnmount() {
+    this.stopAutoRefresh();
+  },
+
   methods: {
-    // ================================================================
-    // DATA LOADING METHODS
-    // ================================================================
-    
-    /**
-     * Load all category data - SIMPLIFIED: No period filtering for top items
-     */
+    // =========================================================
+    // CORE DATA FETCHING
+    // =========================================================
     async loadAllCategoryData() {
       try {
-        this.loading = true;
-        this.loadingTopItems = true;
-        this.loadingChart = true;
+        this.loading = this.loadingTopItems = this.loadingChart = true;
+        const range = this.calculateDateRange(this.selectedFrequency);
+        this.currentDateRange = range;
 
-        if (!CategoryService?.CategoryData) {
-          throw new Error("CategoryData method not found in CategoryService");
-        }
-        
-        // Call basic API (no date filtering for initial load)
-        let response;
-        try {
-          response = await CategoryService.CategoryData();
-        } catch (error) {
-          console.error("Error calling CategoryService:", error);
-          throw error;
-        }
-        
-        // Extract categories from response
-        let categoryData = this.extractCategoryData(response);
-        
-        if (categoryData && categoryData.length > 0) {
-          // Process all data for initial load (top items and table use all data)
-          await this.processCategoryData(categoryData);
-          
-          // Separately update chart with period-specific data
-          await this.updateChartWithCurrentFrequency();
-        } else {
-          this.setFallbackData();
-        }
-        
-        // ✅ CONNECTION HEALTH TRACKING - Move this to success block
+        // 1️⃣ Fetch all category data (table + chart)
+        const allCategories = await categoryDisplayService.getSalesByCategory(
+          range.start_date, 
+          range.end_date,
+          false, // include_voided
+          this.showTrends // include_trends
+        );
+
+        // 2️⃣ Fetch top categories (top list + chart)
+        const topCategories = await categoryDisplayService.getTopCategories(
+          range.start_date, 
+          range.end_date, 
+          5
+        );
+
+        // 3️⃣ Process data
+        this.processCategoryData(allCategories);
+        this.updateChartData(topCategories.slice(0, 6));
+        this.updateTopItems(topCategories);
+
+        // ✅ Connection OK
         this.connectionLost = false;
         this.consecutiveErrors = 0;
         this.lastSuccessfulLoad = Date.now();
-
       } catch (error) {
-        console.error("❌ Error loading category data:", error);
-        
-        // Handle connection errors
+        console.error('❌ Error loading category data:', error);
         this.consecutiveErrors++;
-
-        if (this.consecutiveErrors >= 3) {
-          this.connectionLost = true;
-        }
-
+        if (this.consecutiveErrors >= 3) this.connectionLost = true;
         this.setFallbackData();
       } finally {
-        this.loading = false;
-        this.loadingTopItems = false;
+        this.loading = this.loadingTopItems = this.loadingChart = false;
+      }
+    },
+
+    async onFrequencyChange() {
+      this.loadingChart = true;
+      try {
+        const range = this.calculateDateRange(this.selectedFrequency);
+        const topCategories = await categoryDisplayService.getTopCategories(
+          range.start_date, 
+          range.end_date, 
+          6
+        );
+        this.updateChartData(topCategories);
+        this.currentDateRange = range;
+      } catch (error) {
+        console.error('❌ Error updating chart:', error);
+        this.setDefaultChartData();
+      } finally {
         this.loadingChart = false;
       }
     },
 
-    /**
-     * Update chart with current frequency (separate from top items and table)
-     */
-    async updateChartWithCurrentFrequency() {
-      try {
-        const dateRange = this.calculateDateRange(this.selectedFrequency);
-        this.currentDateRange = dateRange;
-        
-        // Try to get period-specific data for chart
-        const requestParams = {
-          start_date: dateRange.start_date,
-          end_date: dateRange.end_date,
-          frequency: this.selectedFrequency
-        };
-        
-        let response;
-        try {
-          response = await CategoryService.CategoryData(requestParams);
-        } catch (apiError) {
-          // If API doesn't support date filtering, use client-side filtering
-          response = await CategoryService.CategoryData();
-        }
-        
-        let chartData = this.extractCategoryData(response);
-        
-        if (chartData && chartData.length > 0) {
-          // Apply client-side filtering if API doesn't support it
-          if (!response?.date_filter_applied) {
-            chartData = this.filterCategoriesByDate(chartData, dateRange);
-          }
-
-          // Update ONLY the chart
-          this.updateChartData(chartData.slice(0, 6));
-        } else {
-          // Update chart label at minimum
-          if (this.chartData.datasets[0]) {
-            this.chartData.datasets[0].label = `Category Sales (${this.selectedFrequency})`;
-          }
-        }
-
-      } catch (error) {
-        // Chart will use the default data
-      }
+    toggleTrends() {
+      this.showTrends = !this.showTrends;
+      this.loadAllCategoryData();
     },
 
-    /**
-     * Extract category data from various response formats
-     */
-    extractCategoryData(response) {
-      let categoryData = [];
-
-      // Try different response structures
-      if (response?.data?.data && Array.isArray(response.data.data)) {
-        categoryData = response.data.data;
-      } else if (response?.data?.items && Array.isArray(response.data.items)) {
-        categoryData = response.data.items;
-      } else if (Array.isArray(response?.data)) {
-        categoryData = response.data;
-      } else if (Array.isArray(response)) {
-        categoryData = response;
-      } else if (response?.success && response?.data) {
-        // Handle success wrapper
-        if (Array.isArray(response.data)) {
-          categoryData = response.data;
-        } else if (response.data.categories && Array.isArray(response.data.categories)) {
-          categoryData = response.data.categories;
-        }
-      }
-
-      return categoryData;
+    // =========================================================
+    // DATA PROCESSING
+    // =========================================================
+    processCategoryData(data) {
+      this.categories = (data || []).map((cat, i) => ({
+        id: cat.category_id || i,
+        category_id: cat.category_id,
+        name: cat.category_name || 'Unknown Category',
+        total_items_sold: cat.total_items_sold || 0,
+        total_sales: cat.total_sales || 0,
+        product_count: cat.product_count || 0,
+        transaction_count: cat.transaction_count || 0,
+        avg_sale_per_transaction: cat.avg_sale_per_transaction || 0,
+        avg_items_per_transaction: cat.avg_items_per_transaction || 0,
+        sales_growth_percent: cat.sales_growth_percent,
+        trend: cat.trend
+      }));
     },
 
-    /**
-     * Client-side filtering by date range (fallback)
-     */
-    filterCategoriesByDate(categories, dateRange) {
-      
-      const startDate = new Date(dateRange.start_date);
-      const endDate = new Date(dateRange.end_date);
-      
-      const filteredCategories = categories.filter(category => {
-        // Use date_created, last_updated, or any available date field
-        const categoryDate = new Date(
-          category.date_created || 
-          category.last_updated || 
-          category.created_at ||
-          category.updated_at
-        );
-
-        if (isNaN(categoryDate.getTime())) {
-          // If no valid date, include in results (don't exclude due to missing dates)
-          return true;
-        }
-
-        const isInRange = categoryDate >= startDate && categoryDate <= endDate;
-
-        return isInRange;
-      });
-
-      // If filtering results in empty data, show message but keep some data for display
-      if (filteredCategories.length === 0) {
-        // Return the most recent categories instead of empty results
-        return categories.slice(0, 10);
-      }
-
-      return filteredCategories;
+    updateTopItems(categories) {
+      this.topItems = categories.map(cat => ({
+        name: cat.category_name || 'Unknown',
+        price: this.formatCurrency(cat.total_sales),
+        trend: cat.trend,
+        sales_growth_percent: cat.sales_growth_percent
+      }));
     },
 
-    /**
-     * Process category data for all components
-     */
-    async processCategoryData(categoryData) {
-      
-     // 1. Process for Top Categories List (top 5) - SORTED BY HIGHEST SALES
-    this.topItems = categoryData
-      .sort((a, b) => {
-        // Get sales amount for category A
-        const salesA = a.total_sales || 
-                      a.total_net_sales || 
-                      a.total_amount || 
-                      a.revenue || 
-                      a.sales || 0;
-        
-        // Get sales amount for category B
-        const salesB = b.total_sales || 
-                      b.total_net_sales || 
-                      b.total_amount || 
-                      b.revenue || 
-                      b.sales || 0;
-        
-        // Sort in descending order (highest first)
-        return salesB - salesA;
-      })
-      .slice(0, 5) // Take top 5 after sorting
-      .map((category, index) => {
-        return {
-          name: category.category_name || 
-                category.name || 
-                category.item_name || 
-                `Category ${index + 1}`,
-          price: this.formatCurrency(
-            category.total_sales || 
-            category.total_net_sales || 
-            category.total_amount || 
-            category.revenue || 
-            category.sales || 
-            0
-          )
-        };
-      });
-
-      // 2. Process for Chart Data (top 6 for better visualization)
-      this.updateChartData(categoryData.slice(0, 6));
-
-      // 3. Process for Category Table (all categories)
-      this.categories = categoryData.map((category, index) => {
-        
-        // Calculate product count from subcategories
-        const productCount = category.subcategories ? category.subcategories.reduce((total, sub) => total + (sub.product_count || 0), 0) : 0;
-        
-         return {
-            id: category._id || category.id || index,
-            name: category.category_name || category.name || `Category ${index + 1}`,
-            category_name: category.category_name || category.name,
-            description: category.description || 'No description available',
-            sub_categories: category.subcategories || category.sub_categories || [],
-            total_items_sold: category.total_quantity_sold || 
-                            category.total_items_sold || 
-                            category.items_sold || 
-                            category.quantity || 0,
-            total_net_sales: category.total_sales || 
-                            category.total_net_sales || 
-                            category.total_amount || 
-                            category.net_sales || 
-                            category.revenue || 0,
-            product_count: productCount // Now correctly sums subcategory product counts
-          };
-        });
-    },
-
-    /**
-     * Set fallback data when API fails
-     */
-    setFallbackData() {
-      // Fallback top items
-      this.topItems = [
-        { name: 'Noodles', price: '₱15,234.21' },
-        { name: 'Drinks', price: '₱5,789.50' },
-        { name: 'Toppings', price: '₱4,520.75' },
-        { name: 'Snacks', price: '₱3,821.25' }
-      ];
-      
-      // Fallback chart data
-      this.setDefaultChartData();
-      
-      // Fallback table data
-      this.categories = [
-        {
-          id: 1,
-          name: 'Noodles',
-          description: 'Various noodle dishes',
-          sub_categories: ['Ramen', 'Udon', 'Soba'],
-          total_items_sold: 450,
-          total_net_sales: 15234.21,
-          product_count: 12
-        },
-        {
-          id: 2,
-          name: 'Drinks',
-          description: 'Beverages and drinks',
-          sub_categories: ['Hot', 'Cold', 'Alcoholic'],
-          total_items_sold: 320,
-          total_net_sales: 5789.50,
-          product_count: 8
-        },
-        {
-          id: 3,
-          name: 'Toppings',
-          description: 'Additional toppings',
-          sub_categories: ['Meat', 'Vegetables', 'Sauce'],
-          total_items_sold: 280,
-          total_net_sales: 4520.75,
-          product_count: 15
-        },
-        {
-          id: 4,
-          name: 'Snacks',
-          description: 'Light snacks and appetizers',
-          sub_categories: ['Sweet', 'Savory'],
-          total_items_sold: 180,
-          total_net_sales: 3821.25,
-          product_count: 6
-        }
-      ];
-    },
-
-    /**
-     * Legacy method for retry button
-     */
-    async getTopItems() {
-      await this.loadAllCategoryData();
-    },
-
-    // ================================================================
-    // CHART METHODS
-    // ================================================================
-    
-    /**
-     * Update chart data with category response
-     */
     updateChartData(categories) {
       if (!categories || categories.length === 0) {
         this.setDefaultChartData();
         return;
       }
-      
+
       const colors = this.generateChartColors(categories.length);
-      
       this.chartData = {
-        labels: categories.map(category => 
-          category.category_name || category.name || 'Unknown Category'
-        ),
+        labels: categories.map(c => c.category_name || 'Unknown'),
         datasets: [{
           label: `Category Sales (${this.selectedFrequency})`,
-          data: categories.map(category => 
-            category.total_sales || category.total_net_sales || category.total_amount || 0
-          ),
+          data: categories.map(c => c.total_sales || 0),
           backgroundColor: colors.background,
           borderColor: colors.border,
           borderWidth: 1
@@ -586,328 +382,216 @@ beforeUnmount() {
       };
     },
 
-    /**
-     * Generate colors for chart
-     */
     generateChartColors(count) {
-      const baseColors = [
-        '#ef4444', '#3b82f6', '#eab308', '#22c55e', '#8b5cf6',
-        '#f59e0b', '#10b981', '#6366f1', '#f97316', '#84cc16'
+      const base = [
+        '#ef4444', '#3b82f6', '#eab308', '#22c55e',
+        '#8b5cf6', '#f59e0b', '#10b981', '#6366f1', '#f97316', '#84cc16'
       ];
-      
-      const borderColors = [
-        '#dc2626', '#2563eb', '#ca8a04', '#16a34a', '#7c3aed',
-        '#d97706', '#059669', '#4f46e5', '#ea580c', '#65a30d'
+      const border = [
+        '#dc2626', '#2563eb', '#ca8a04', '#16a34a',
+        '#7c3aed', '#d97706', '#059669', '#4f46e5', '#ea580c', '#65a30d'
       ];
-      
-      const background = [];
-      const border = [];
-      
-      for (let i = 0; i < count; i++) {
-        background.push(baseColors[i % baseColors.length]);
-        border.push(borderColors[i % borderColors.length]);
-      }
-      
-      return { background, border };
+      return {
+        background: Array.from({ length: count }, (_, i) => base[i % base.length]),
+        border: Array.from({ length: count }, (_, i) => border[i % border.length])
+      };
     },
 
-    /**
-     * Set default chart data
-     */
+    getTrendIcon(trend) {
+      switch (trend) {
+        case 'up': return 'bi bi-arrow-up-circle-fill text-success';
+        case 'down': return 'bi bi-arrow-down-circle-fill text-danger';
+        case 'new': return 'bi bi-star-fill text-warning';
+        default: return 'bi bi-dash-circle text-muted';
+      }
+    },
+
+    setFallbackData() {
+      this.topItems = [
+        { name: 'Noodles', price: '₱15,234.21', trend: 'up', sales_growth_percent: 12.5 },
+        { name: 'Drinks', price: '₱5,789.50', trend: 'down', sales_growth_percent: -3.2 },
+        { name: 'Snacks', price: '₱3,821.25', trend: 'up', sales_growth_percent: 5.7 }
+      ];
+      this.setDefaultChartData();
+      this.categories = [
+        { 
+          id: 1, 
+          name: 'Noodles', 
+          total_items_sold: 450, 
+          total_sales: 15234.21, 
+          product_count: 12,
+          transaction_count: 89,
+          avg_sale_per_transaction: 171.17,
+          trend: 'up',
+          sales_growth_percent: 12.5
+        },
+        { 
+          id: 2, 
+          name: 'Drinks', 
+          total_items_sold: 320, 
+          total_sales: 5789.50, 
+          product_count: 8,
+          transaction_count: 156,
+          avg_sale_per_transaction: 37.11,
+          trend: 'down',
+          sales_growth_percent: -3.2
+        }
+      ];
+    },
+
     setDefaultChartData() {
       this.chartData = {
-        labels: ['Noodles', 'Drinks', 'Toppings', 'Snacks'],
+        labels: ['Noodles', 'Drinks', 'Snacks'],
         datasets: [{
           label: `Category Sales (${this.selectedFrequency})`,
-          data: [15234.21, 5789.50, 4520.75, 3821.25],
-          backgroundColor: ['#ef4444', '#3b82f6', '#eab308', '#22c55e'],
-          borderColor: ['#dc2626', '#2563eb', '#ca8a04', '#16a34a'],
+          data: [15234.21, 5789.50, 3821.25],
+          backgroundColor: ['#ef4444', '#3b82f6', '#22c55e'],
+          borderColor: ['#dc2626', '#2563eb', '#16a34a'],
           borderWidth: 1
         }]
       };
     },
 
-    /**
-     * Calculate date range based on frequency
-     */
+    // =========================================================
+    // UTILITIES
+    // =========================================================
     calculateDateRange(frequency) {
       const now = new Date();
-      const end_date = now.toISOString().split('T')[0]; // Today
+      const end_date = this.formatDateForAPI(now);
       let start_date;
       
       switch (frequency) {
         case 'daily':
-          // Last 30 days for daily view
-          start_date = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000))
-            .toISOString().split('T')[0];
+          // Last 30 days
+          const dailyDate = new Date(now);
+          dailyDate.setDate(dailyDate.getDate() - 30);
+          start_date = this.formatDateForAPI(dailyDate);
           break;
-          
         case 'weekly':
-          // Last 12 weeks for weekly view
-          start_date = new Date(now.getTime() - (12 * 7 * 24 * 60 * 60 * 1000))
-            .toISOString().split('T')[0];
+          // Last 12 weeks
+          const weeklyDate = new Date(now);
+          weeklyDate.setDate(weeklyDate.getDate() - (12 * 7));
+          start_date = this.formatDateForAPI(weeklyDate);
           break;
-          
         case 'monthly':
-          // Last 12 months for monthly view
-          const monthsAgo = new Date(now);
-          monthsAgo.setMonth(monthsAgo.getMonth() - 12);
-          start_date = monthsAgo.toISOString().split('T')[0];
+          // Last 12 months
+          const monthlyDate = new Date(now);
+          monthlyDate.setMonth(monthlyDate.getMonth() - 12);
+          start_date = this.formatDateForAPI(monthlyDate);
           break;
-          
         case 'yearly':
-          // Last 5 years for yearly view
-          const yearsAgo = new Date(now);
-          yearsAgo.setFullYear(yearsAgo.getFullYear() - 5);
-          start_date = yearsAgo.toISOString().split('T')[0];
+          // Last 3 years (consistent with SalesByItem)
+          const yearlyDate = new Date(now);
+          yearlyDate.setFullYear(yearlyDate.getFullYear() - 3);
+          start_date = this.formatDateForAPI(yearlyDate);
           break;
-          
         default:
-          // Default to last 3 months
+          // Default to last 30 days
           const defaultDate = new Date(now);
-          defaultDate.setMonth(defaultDate.getMonth() - 3);
-          start_date = defaultDate.toISOString().split('T')[0];
+          defaultDate.setDate(defaultDate.getDate() - 30);
+          start_date = this.formatDateForAPI(defaultDate);
       }
       
       return { start_date, end_date };
     },
 
-    /**
-     * Handle frequency change - UPDATED: Only affects chart
-     */
-    async onFrequencyChange() {
-      // Show loading state for chart only
-      this.loadingChart = true;
-
-      try {
-        // Calculate new date range
-        const dateRange = this.calculateDateRange(this.selectedFrequency);
-        this.currentDateRange = dateRange;
-        
-        // Call API with date parameters for chart data only
-        const requestParams = {
-          start_date: dateRange.start_date,
-          end_date: dateRange.end_date,
-          frequency: this.selectedFrequency
-        };
-        
-        let response;
-        try {
-          response = await CategoryService.CategoryData(requestParams);
-        } catch (apiError) {
-          response = await CategoryService.CategoryData();
-        }
-        
-        // Extract and filter data for chart only
-        let categoryData = this.extractCategoryData(response);
-        
-        if (categoryData && categoryData.length > 0) {
-          // Apply client-side filtering if needed
-          if (!response?.date_filter_applied) {
-            categoryData = this.filterCategoriesByDate(categoryData, dateRange);
-          }
-
-          // Update ONLY the chart (NOT top items or table)
-          this.updateChartData(categoryData.slice(0, 6));
-        } else {
-          // Update chart label at minimum
-          if (this.chartData.datasets[0]) {
-            this.chartData.datasets[0].label = `Category Sales (${this.selectedFrequency})`;
-          }
-        }
-        
-      } catch (error) {
-        console.error("❌ Error updating chart for frequency change:", error);
-        // Just update the label if reload fails
-        if (this.chartData.datasets[0]) {
-          this.chartData.datasets[0].label = `Category Sales (${this.selectedFrequency})`;
-        }
-      } finally {
-        this.loadingChart = false;
+    formatDateForAPI(date) {
+      if (!(date instanceof Date)) {
+        date = new Date(date);
       }
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     },
 
-    /**
-     * Update only top items and chart (separate from table)
-     */
-    updateTopItemsAndChart(categoryData) {
-      // 1. Update Top Categories List (top 5) with period data
-      this.topItems = categoryData.slice(0, 5).map((category, index) => ({
-        name: category.category_name || 
-              category.name || 
-              category.item_name || 
-              `Category ${index + 1}`,
-        price: this.formatCurrency(
-          category.total_sales || 
-          category.total_net_sales || 
-          category.total_amount || 
-          category.revenue || 
-          category.sales || 
-          0
-        )
-      }));
-
-      // 2. Update Chart Data with period data
-      this.updateChartData(categoryData.slice(0, 6));
-
-      // Note: Table data remains unchanged - shows all categories
-    },
-
-    /**
-     * Refresh all data
-     */
-    async refreshData() {
-      await this.loadAllCategoryData();
-    },
-
-    // ================================================================
-    // FORMATTING METHODS
-    // ================================================================
-    
-    /**
-     * Format currency amount
-     */
     formatCurrency(amount) {
-      let numericAmount = amount;
-      
-      if (typeof amount === 'string') {
-        numericAmount = parseFloat(amount);
-      }
-      
-      if (typeof numericAmount !== 'number' || isNaN(numericAmount)) {
-        numericAmount = 0;
-      }
-      
-      return `₱${numericAmount.toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      })}`;
+      let num = parseFloat(amount) || 0;
+      return `₱${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     },
 
-    /**
-     * Format number with commas
-     */
-    formatNumber(number) {
-      let numericValue = number;
-      
-      if (typeof number === 'string') {
-        numericValue = parseFloat(number);
-      }
-      
-      if (typeof numericValue !== 'number' || isNaN(numericValue)) {
-        return '0';
-      }
-      
-      return numericValue.toLocaleString('en-US');
+    formatNumber(num) {
+      return parseInt(num) || 0;
     },
 
-    /**
-     * Format sub-categories for display
-     */
-    formatSubCategories(subCategories) {
-      if (!subCategories || !Array.isArray(subCategories)) {
-        return 'None';
-      }
-      
-      if (subCategories.length === 0) {
-        return 'None';
-      }
-      
-      // Handle subcategories with name property vs simple strings
-      const categoryNames = subCategories.map(sub => {
-        if (typeof sub === 'object' && sub.name) {
-          return sub.name;
-        }
-        return sub.toString();
+    viewCategoryDetails(category) {
+      // You can implement a modal or navigation to detailed view
+      this.$notify({
+        title: 'Category Details',
+        message: `Detailed view for ${category.name} would open here`,
+        type: 'info'
       });
-      
-      if (categoryNames.length <= 3) {
-        return categoryNames.join(', ');
-      }
-      
-      return `${categoryNames.slice(0, 3).join(', ')} +${categoryNames.length - 3} more`;
     },
 
-    // ============ AUTO-REFRESH SYSTEM ============
+    // =========================================================
+    // AUTO REFRESH
+    // =========================================================
     toggleAutoRefresh() {
-      if (this.autoRefreshEnabled) {
-        this.autoRefreshEnabled = false
-        this.stopAutoRefresh()
-      } else {
-        this.autoRefreshEnabled = true
-        this.startAutoRefresh()
-      }
+      this.autoRefreshEnabled = !this.autoRefreshEnabled;
+      if (this.autoRefreshEnabled) this.startAutoRefresh();
+      else this.stopAutoRefresh();
     },
-  
+
     startAutoRefresh() {
-      this.stopAutoRefresh() // Clear any existing timers
-      
-      // Start countdown
-      this.countdown = this.autoRefreshInterval / 1000
+      this.stopAutoRefresh();
+      this.countdown = this.autoRefreshInterval / 1000;
       this.countdownTimer = setInterval(() => {
-        this.countdown--
-        if (this.countdown <= 0) {
-          this.countdown = this.autoRefreshInterval / 1000
-        }
-      }, 1000)
-      
-      // Start auto-refresh timer
+        this.countdown--;
+        if (this.countdown <= 0) this.countdown = this.autoRefreshInterval / 1000;
+      }, 1000);
+
       this.autoRefreshTimer = setInterval(() => {
-        this.loadAllCategoryData() // Use your existing refresh method
-      }, this.autoRefreshInterval)
+        this.loadAllCategoryData();
+      }, this.autoRefreshInterval);
     },
 
     stopAutoRefresh() {
-      if (this.autoRefreshTimer) {
-        clearInterval(this.autoRefreshTimer)
-        this.autoRefreshTimer = null
-      }
-
-      if (this.countdownTimer) {
-        clearInterval(this.countdownTimer)
-        this.countdownTimer = null
-      }
+      if (this.autoRefreshTimer) clearInterval(this.autoRefreshTimer);
+      if (this.countdownTimer) clearInterval(this.countdownTimer);
+      this.autoRefreshTimer = null;
+      this.countdownTimer = null;
     },
 
-    // Emergency reconnect method
     async emergencyReconnect() {
-      this.consecutiveErrors = 0
-      this.connectionLost = false
-      await this.loadAllCategoryData()
-
+      this.consecutiveErrors = 0;
+      this.connectionLost = false;
+      await this.loadAllCategoryData();
       if (!this.autoRefreshEnabled) {
-        this.autoRefreshEnabled = true
-        this.startAutoRefresh()
+        this.autoRefreshEnabled = true;
+        this.startAutoRefresh();
       }
     },
 
-    // Connection status methods
+    // =========================================================
+    // CONNECTION STATUS HELPERS
+    // =========================================================
     getConnectionStatus() {
-      if (this.connectionLost) return 'connection-lost'
-      if (this.consecutiveErrors > 0) return 'connection-unstable'
-      if (this.lastSuccessfulLoad && (Date.now() - this.lastSuccessfulLoad < 60000)) return 'connection-good'
-      return 'connection-unknown'
+      if (this.connectionLost) return 'connection-lost';
+      if (this.consecutiveErrors > 0) return 'connection-unstable';
+      if (this.lastSuccessfulLoad && Date.now() - this.lastSuccessfulLoad < 60000)
+        return 'connection-good';
+      return 'connection-unknown';
     },
 
     getConnectionIcon() {
       switch (this.getConnectionStatus()) {
-        case 'connection-good': return 'bi bi-wifi text-success'
-        case 'connection-unstable': return 'bi bi-wifi-1 text-warning'
-        case 'connection-lost': return 'bi bi-wifi-off text-danger'
-        default: return 'bi bi-wifi text-muted'
+        case 'connection-good': return 'bi bi-wifi text-success';
+        case 'connection-unstable': return 'bi bi-wifi-1 text-warning';
+        case 'connection-lost': return 'bi bi-wifi-off text-danger';
+        default: return 'bi bi-wifi text-muted';
       }
     },
 
     getConnectionText() {
       switch (this.getConnectionStatus()) {
-        case 'connection-good': return 'Connected'
-        case 'connection-unstable': return 'Unstable'
-        case 'connection-lost': return 'Connection Lost'
-        default: return 'Connecting...'
+        case 'connection-good': return 'Connected';
+        case 'connection-unstable': return 'Unstable';
+        case 'connection-lost': return 'Connection Lost';
+        default: return 'Connecting...';
       }
     }
   }
-}
+};
 </script>
 
 <style scoped>
@@ -981,15 +665,16 @@ beforeUnmount() {
 .list-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   color: black;
-  margin-bottom: 8px;
-  height: 30px;
-  padding: 0 10px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  min-height: 50px;
 }
 
 .item-name {
   font-weight: 500;
+  font-size: 16px;
 }
 
 .item-price {
@@ -1143,6 +828,8 @@ beforeUnmount() {
 }
 
 .category-name {
+  display: flex;
+  align-items: center;
   font-weight: 600;
   color: #374151;
 }
@@ -1485,6 +1172,55 @@ beforeUnmount() {
   .connection-indicator {
     order: -1;
   }
+}
+
+.category-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.trend-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.trend-indicator.up {
+  color: #16a34a;
+}
+
+.trend-indicator.down {
+  color: #dc2626;
+}
+
+.trend-indicator.new {
+  color: #d97706;
+}
+
+.trend-percent {
+  font-weight: 500;
+}
+
+.trend-cell .trend-indicator {
+  justify-content: center;
+}
+
+.view-toggle {
+  margin-right: 1rem;
+}
+
+.avg-transaction {
+  text-align: right;
+  font-weight: 500;
+  color: #374151;
+}
+
+.transaction-count {
+  text-align: center;
+  font-weight: 500;
 }
 
 </style>

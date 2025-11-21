@@ -78,19 +78,23 @@ class SupplierService:
             'details': details or {}
         }
     
-    def validate_supplier_data(self, supplier_data):
+    def validate_supplier_data(self, supplier_data, is_partial_update=False):
         """Validate supplier data before creation/update"""
-        required_fields = ['supplier_name']
+        # For partial updates (e.g., only updating isFavorite), skip required field checks
+        if not is_partial_update:
+            required_fields = ['supplier_name']
+            
+            for field in required_fields:
+                if not supplier_data.get(field):
+                    raise ValueError(f"Required field '{field}' is missing or empty")
         
-        for field in required_fields:
-            if not supplier_data.get(field):
-                raise ValueError(f"Required field '{field}' is missing or empty")
-        
+        # Validate email if provided
         if supplier_data.get('email'):
             email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
             if not re.match(email_pattern, supplier_data['email']):
                 raise ValueError("Invalid email format")
         
+        # Validate phone number if provided
         if supplier_data.get('phone_number'):
             phone = supplier_data['phone_number'].strip()
             if len(phone) < 10:
@@ -429,7 +433,9 @@ class SupplierService:
             if not existing_supplier:
                 raise Exception(f"Supplier with ID {supplier_id} not found or is deleted")
             
-            self.validate_supplier_data(supplier_data)
+            # Check if this is a partial update (only non-required fields)
+            is_partial = 'supplier_name' not in supplier_data
+            self.validate_supplier_data(supplier_data, is_partial_update=is_partial)
             
             if 'supplier_name' in supplier_data:
                 existing_name = self.supplier_collection.find_one({

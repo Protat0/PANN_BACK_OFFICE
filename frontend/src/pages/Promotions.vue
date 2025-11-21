@@ -536,7 +536,6 @@ const getStatusBadgeClass = (status) => {
 
 // ✅ Lifecycle
 onMounted(async () => {
-  console.log('🚀 Promotions page mounted, fetching promotions...')
   await fetchPromotions()
 })
 </script>

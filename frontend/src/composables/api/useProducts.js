@@ -363,6 +363,8 @@ const bulkDeleteProducts = async (productIds, hardDelete = false) => {
     }
   }
 
+  
+
   // ================ PRODUCT-CATEGORY RELATIONSHIP MANAGEMENT ================
 
   const moveProductToCategory = async (productId, newCategoryId, newSubcategoryName = null) => {
@@ -748,6 +750,15 @@ const bulkDeleteProducts = async (productIds, hardDelete = false) => {
     }
   }
 
+  const exportProductDetails = async (productId) => {
+    try {
+      await apiProductsService.exportProductDetails(productId);
+    } catch (err) {
+      console.error('❌ Export product details failed:', err);
+      throw err;
+    }
+  }
+
   // ================ UTILITY METHODS ================
 
   const searchProducts = async (query) => {
@@ -863,6 +874,7 @@ const bulkDeleteProducts = async (productIds, hardDelete = false) => {
 
     // Validation
     checkSkuExists,
+    exportProductDetails,
 
     // CRUD Operations
     fetchProducts,

@@ -110,9 +110,9 @@
       <div class="sidebar-column">
         <!-- Product Image -->
         <div class="card-theme p-3 text-center">
-          <div v-if="currentProduct.image" class="image-wrapper">
+          <div v-if="currentProduct.image_url" class="image-wrapper">
             <img 
-              :src="currentProduct.image" 
+              :src="currentProduct.image_url" 
               :alt="currentProduct.product_name"
               class="product-image"
             />

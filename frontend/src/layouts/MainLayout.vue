@@ -129,7 +129,11 @@ export default {
         return 'Product Details'
       }
       
-      return titles[this.$route.path] || 'Product Details'
+      if (this.$route.path.startsWith('/suppliers/') && this.$route.path !== '/suppliers/orders') {
+        return 'Supplier Details'
+      }
+      
+      return titles[this.$route.path] || 'Dashboard'
     },
     userInfo() {
       // Try both possible storage keys for backward compatibility

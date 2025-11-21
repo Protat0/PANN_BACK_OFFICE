@@ -95,15 +95,6 @@
                   </div>
                 </button>
                 
-                <button class="dropdown-item" @click="handleBulkAdd">
-                  <div class="d-flex align-items-center gap-3">
-                    <Package :size="16" class="text-accent" />
-                    <div>
-                      <div class="fw-semibold">Bulk Entry</div>
-                      <small class="text-tertiary-medium">Add multiple products (5-20 items)</small>
-                    </div>
-                  </div>
-                </button>
                 
                 <button class="dropdown-item" @click="handleImport">
                   <div class="d-flex align-items-center gap-3">

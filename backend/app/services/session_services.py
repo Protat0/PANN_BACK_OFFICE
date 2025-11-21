@@ -117,13 +117,12 @@ class SessionLogService:
                 "priority": "info"
             })
             
-            # Prepare metadata
+            # Prepare metadata (removed ip_address)
             metadata = {
                 "session_id": session_id,
                 "username": username,
                 "action_type": action_type,
                 "branch_id": session_data.get("branch_id", "N/A"),
-                "ip_address": session_data.get("ip_address", "Unknown"),
                 "timestamp": datetime.utcnow().isoformat()
             }
             
@@ -230,8 +229,6 @@ class SessionLogService:
                 "logout_time": None,
                 "session_duration": None,
                 "status": "active",
-                "ip_address": user_data.get("ip_address"),
-                "user_agent": user_data.get("user_agent"),
                 "source": "auth_service"
             }
 
@@ -811,8 +808,7 @@ class SessionLogService:
                         "total_sessions": {"$sum": 1},
                         "total_duration": {"$sum": "$session_duration"},
                         "first_session": {"$min": "$login_time"},
-                        "last_session": {"$max": "$login_time"},
-                        "unique_ips": {"$addToSet": "$ip_address"}
+                        "last_session": {"$max": "$login_time"}
                     }
                 },
                 {
@@ -1064,10 +1060,11 @@ class SessionLogService:
     def _export_sessions_to_csv(self, sessions_data, export_path):
         """Export session data to CSV file"""
         try:
+            # Removed 'ip_address' and 'user_agent' from fieldnames
             fieldnames = [
                 'session_id', 'user_id', 'username', 'branch_id',
                 'login_time', 'logout_time', 'session_duration', 'status',
-                'ip_address', 'user_agent', 'logout_reason', 'source'
+                'logout_reason', 'source'
             ]
             
             with open(export_path, 'w', newline='', encoding='utf-8') as csvfile:
@@ -1087,8 +1084,6 @@ class SessionLogService:
                         'logout_time': session.get('logout_time').isoformat() if session.get('logout_time') else '',
                         'session_duration': session.get('session_duration', ''),
                         'status': session.get('status', ''),
-                        'ip_address': session.get('ip_address', ''),
-                        'user_agent': session.get('user_agent', ''),
                         'logout_reason': session.get('logout_reason', ''),
                         'source': session.get('source', '')
                     }
@@ -1262,7 +1257,6 @@ class SessionDisplayService:
                         "login_time": safe_log.get('login_time'),
                         "logout_time": safe_log.get('logout_time'),
                         "branch_id": safe_log.get('branch_id', 'N/A'),
-                        "ip_address": str(safe_log.get('ip_address', '')) if safe_log.get('ip_address') else None,
                         "logout_reason": str(safe_log.get('logout_reason', '')) if safe_log.get('logout_reason') else None
                     }
                     
@@ -1413,7 +1407,6 @@ class SessionDisplayService:
                     "duration": clean_session.get("session_duration"),
                     "status": clean_session.get("status"),
                     "branch_id": clean_session.get("branch_id"),
-                    "ip_address": clean_session.get("ip_address"),
                     "logout_reason": clean_session.get("logout_reason")
                 })
             

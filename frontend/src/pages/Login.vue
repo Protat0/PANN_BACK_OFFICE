@@ -45,14 +45,14 @@
                 />
               </div>
 
-              <!-- Error Message -->
-              <div v-if="error" class="error-message">
-                {{ error }}
-              </div>
-
               <!-- Success Message -->
               <div v-if="successMessage" class="success-message">
                 {{ successMessage }}
+              </div>
+
+              <!-- Failure Message -->
+              <div v-if="failureMessage" class="failure-message">
+                {{ failureMessage }}
               </div>
 
               <!-- Login Button -->
@@ -140,6 +140,7 @@ watch(authError, (newError) => {
 
 // Enhanced login handler with debugging
 const handleLogin = async () => {
+  // Clear previous messages
   successMessage.value = null
   localError.value = null
   
@@ -176,6 +177,9 @@ const handleLogin = async () => {
 }
 
 const handleLoginSuccess = async () => {
+  // Clear any previous errors
+  failureMessage.value = null
+  
   // Wait a bit more for reactivity to settle
   await new Promise(resolve => setTimeout(resolve, 100))
 
@@ -363,6 +367,16 @@ onMounted(() => {
   background-color: #f0fdf4;
   border: 1px solid #bbf7d0;
   color: #16a34a;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.failure-message {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
   padding: 0.75rem;
   border-radius: 0.5rem;
   font-size: 0.875rem;

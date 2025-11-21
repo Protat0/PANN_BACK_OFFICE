@@ -1,5 +1,5 @@
 <template>
-  <div class="container-fluid pt-2 pb-4 suppliers-page">
+  <div class="container-fluid pt-2 pb-4 suppliers-page surface-secondary">
     <!-- Page Title -->
     <div class="mb-3">
       <h1 class="h3 fw-semibold text-primary-dark mb-0">Supplier Management</h1>
@@ -70,53 +70,15 @@
         <div class="action-row">
           <!-- Left Side: Main Actions (Always visible when no selection) -->
           <div v-if="suppliersComposable.selectedSuppliers?.value?.length === 0" class="d-flex gap-2">
-            <!-- Add Suppliers Dropdown -->
-            <div class="dropdown" ref="addDropdownRef">
-              <button 
-                class="btn btn-success btn-sm btn-with-icon-sm dropdown-toggle"
-                type="button"
-                @click="toggleAddDropdown"
-                :class="{ 'active': showAddDropdown }"
-              >
-                <Plus :size="14" />
-                ADD SUPPLIER
-              </button>
-              
-              <div 
-                class="dropdown-menu custom-dropdown-menu" 
-                :class="{ 'show': showAddDropdown }"
-              >
-                <button class="dropdown-item custom-dropdown-item" @click="handleSingleSupplier">
-                  <div class="d-flex align-items-center gap-3">
-                    <Plus :size="16" class="text-primary" />
-                    <div>
-                      <div class="fw-semibold">Single Supplier</div>
-                      <small class="text-muted">Add one supplier manually</small>
-                    </div>
-                  </div>
-                </button>
-                
-                <button class="dropdown-item custom-dropdown-item" @click="handleBulkAdd">
-                  <div class="d-flex align-items-center gap-3">
-                    <Building :size="16" class="text-primary" />
-                    <div>
-                      <div class="fw-semibold">Bulk Entry</div>
-                      <small class="text-muted">Add multiple suppliers (5-20 items)</small>
-                    </div>
-                  </div>
-                </button>
-                
-                <button class="dropdown-item custom-dropdown-item" @click="handleImport">
-                  <div class="d-flex align-items-center gap-3">
-                    <FileText :size="16" class="text-primary" />
-                    <div>
-                      <div class="fw-semibold">Import File</div>
-                      <small class="text-muted">Upload CSV/Excel (20+ items)</small>
-                    </div>
-                  </div>
-                </button>
-              </div>
-            </div>
+            <!-- Add Supplier Button -->
+            <button 
+              class="btn btn-success btn-sm btn-with-icon-sm"
+              type="button"
+              @click="handleSingleSupplier"
+            >
+              <Plus :size="14" />
+              ADD SUPPLIER
+            </button>
 
             <button 
               class="btn btn-outline-secondary btn-sm"
@@ -219,6 +181,7 @@
           :supplier="supplier"
           :is-selected="suppliersComposable.selectedSuppliers?.value?.includes(supplier.id) || false"
           @toggle-select="toggleSupplierSelection"
+          @toggle-favorite="handleToggleFavorite"
           @edit="formComposable.editSupplier"
           @view="viewSupplier"
           @create-order="createOrder"
@@ -330,10 +293,8 @@ import { onMounted, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   Plus, 
-  Download, 
   RefreshCw,
-  Building, 
-  FileText,
+  Building,
   Trash2,
   Search,
   X
@@ -348,6 +309,7 @@ import { useBulkSuppliers } from '@/composables/ui/suppliers/useBulkSuppliers'
 import { useImportSuppliers } from '@/composables/ui/suppliers/useImportSuppliers'
 import { useCreateOrder } from '@/composables/ui/suppliers/useCreateOrder'
 import { useSupplierReports } from '@/composables/ui/suppliers/useSupplierReports'
+import { useToast } from '@/composables/ui/useToast'
 
 // Components
 import CardTemplate from '@/components/common/CardTemplate.vue'
@@ -364,10 +326,8 @@ export default {
   name: 'Suppliers',
   components: {
     Plus,
-    Download,
     RefreshCw,
     Building,
-    FileText,
     Trash2,
     Search,
     X,
@@ -391,12 +351,11 @@ export default {
     const importComposable = useImportSuppliers()
     const createOrderComposable = useCreateOrder()
     const reportsComposable = useSupplierReports()
+    const { success, error: showError } = useToast()
     const router = useRouter()
 
     // Local reactive state for UI
-    const showAddDropdown = ref(false)
     const searchMode = ref(false)
-    const addDropdownRef = ref(null)
     const searchInputRef = ref(null)
     
     // Active orders modal data
@@ -410,8 +369,6 @@ export default {
         await suppliersComposable.fetchSuppliers()
         await reportsComposable.refreshReports()
 
-        // Add click outside listener
-        document.addEventListener('click', handleClickOutside)
       } catch (error) {
         console.error('Error fetching suppliers:', error)
       }
@@ -424,26 +381,7 @@ export default {
       }
     })
 
-    // Cleanup
-    const cleanup = () => {
-      document.removeEventListener('click', handleClickOutside)
-    }
-
     // Methods
-    const handleClickOutside = (event) => {
-      if (addDropdownRef.value && !addDropdownRef.value.contains(event.target)) {
-        showAddDropdown.value = false
-      }
-    }
-
-    const toggleAddDropdown = (event) => {
-      event.stopPropagation()
-      showAddDropdown.value = !showAddDropdown.value
-    }
-
-    const closeAddDropdown = () => {
-      showAddDropdown.value = false
-    }
 
     const toggleSearchMode = () => {
       searchMode.value = !searchMode.value
@@ -484,16 +422,8 @@ export default {
       searchMode.value = false
     }
 
-    const handleSingleSupplier = (event) => {
-      if (event) event.stopPropagation()
+    const handleSingleSupplier = () => {
       formComposable.showAddSupplierModal()
-      closeAddDropdown()
-    }
-    
-    const handleBulkAdd = (event) => {
-      event.stopPropagation()
-      bulkComposable.openBulkModal() 
-      closeAddDropdown()
     }
 
     const handleBulkSave = (newSuppliers) => {
@@ -511,11 +441,6 @@ export default {
       }
     }
     
-    const handleImport = (event) => {
-      if (event) event.stopPropagation()
-      importComposable.openImportModal()
-      closeAddDropdown()
-    }
 
     const toggleSupplierSelection = (supplierId) => {
       const selectedSuppliers = suppliersComposable.selectedSuppliers?.value || []
@@ -525,6 +450,18 @@ export default {
         selectedSuppliers.splice(index, 1)
       } else {
         selectedSuppliers.push(supplierId)
+      }
+    }
+
+    const handleToggleFavorite = async (supplier) => {
+      const result = await suppliersComposable.toggleFavorite(supplier)
+      
+      if (result.success) {
+        // Show success toast
+        success(`${supplier.name} ${supplier.isFavorite ? 'added to' : 'removed from'} favorites`)
+      } else if (result.error) {
+        // Show error toast
+        showError(result.error)
       }
     }
 
@@ -652,18 +589,15 @@ export default {
       reportsComposable,
       
       // Local state
-      showAddDropdown,
       searchMode,
-      addDropdownRef,
       searchInputRef,
       activeOrdersForModal,
       activeOrdersLoading,
       
       // Methods
       handleSingleSupplier,
-      handleBulkAdd,
-      handleImport,
       toggleSupplierSelection,
+      handleToggleFavorite,
       viewSupplier,
       createOrder,
       handleOrderSave,
@@ -674,13 +608,10 @@ export default {
       showActiveOrdersReport,
       showTopSuppliersReport,
       handleViewAllOrders,
-      toggleAddDropdown,
-      closeAddDropdown,
       toggleSearchMode,
       clearSearch,
       applyFilters,
-      clearFilters,
-      cleanup
+      clearFilters
     }
   }
 }
@@ -692,7 +623,7 @@ export default {
 @import '@/assets/styles/buttons.css';
 
 .suppliers-page {
-  background-color: var(--neutral-light);
+  background-color: var(--surface-secondary);
   min-height: 100vh;
 }
 
@@ -710,17 +641,18 @@ export default {
 
 /* Action Bar Container */
 .action-bar-container {
-  background: white;
+  background-color: var(--surface-elevated);
   border-radius: 0.75rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-secondary);
   overflow: visible;
   position: relative;
   z-index: 1000;
 }
 
 .action-bar-controls {
-  border-bottom: 1px solid var(--neutral);
-  background-color: white;
+  border-bottom: 1px solid var(--border-primary);
+  background-color: var(--surface-elevated);
   position: relative;
   z-index: 1001;
 }
@@ -742,7 +674,7 @@ export default {
 .filter-label {
   font-size: 0.75rem;
   font-weight: 500;
-  color: var(--tertiary-medium);
+  color: var(--text-tertiary);
   margin-bottom: 0.25rem;
   display: block;
 }
@@ -772,9 +704,10 @@ export default {
 
 .custom-dropdown-menu {
   min-width: 280px;
-  border: 1px solid var(--neutral);
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-primary);
   border-radius: 0.75rem;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-xl);
   animation: dropdownSlide 0.2s ease;
   z-index: 1200 !important;
   position: absolute !important;
@@ -801,8 +734,10 @@ export default {
 
 .custom-dropdown-item {
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--neutral-light);
+  border-bottom: 1px solid var(--border-primary);
+  background: transparent;
   transition: all 0.2s ease;
+  color: var(--text-secondary);
 }
 
 .custom-dropdown-item:last-child {
@@ -810,7 +745,8 @@ export default {
 }
 
 .custom-dropdown-item:hover {
-  background-color: var(--primary-light);
+  background-color: var(--state-hover);
+  color: var(--text-primary);
 }
 
 /* Button States */
@@ -830,8 +766,8 @@ export default {
 /* Form controls focus states */
 .form-select:focus,
 .form-control:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 0.2rem rgba(160, 123, 227, 0.25);
 }
 
 /* Responsive adjustments */

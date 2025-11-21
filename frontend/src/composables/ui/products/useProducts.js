@@ -3,9 +3,11 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import productsApiService from '@/services/apiProducts.js'
 import categoryApiService from '@/services/apiCategory.js'
 import { useRouter } from 'vue-router'
+import { useToast } from '@/composables/ui/useToast'
 
 export function useProducts() {
   const router = useRouter()
+  const { success: showSuccess, error: showError } = useToast()
   
   // State
   const products = ref([])
@@ -222,12 +224,15 @@ export function useProducts() {
         await productsApiService.deleteProduct(productId)
       }
       
-      successMessage.value = `Successfully deleted ${selectedProducts.value.length} product(s)`
+      const message = `Successfully deleted ${selectedProducts.value.length} product(s)`
+      successMessage.value = message
       selectedProducts.value = []
       await fetchProducts()
+      showSuccess(message)
     } catch (err) {
       console.error('Error deleting products:', err)
       error.value = `Failed to delete products: ${err.message}`
+      showError(`Failed to delete products: ${err.message}`)
     } finally {
       loading.value = false
     }
@@ -243,8 +248,10 @@ export function useProducts() {
     
     try {
       await productsApiService.deleteProduct(product._id)
-      successMessage.value = `Product "${product.product_name}" deleted successfully`
+      const message = `Product "${product.product_name}" deleted successfully`
+      successMessage.value = message
       await fetchProducts()
+      showSuccess(message)
       
       setTimeout(() => {
         successMessage.value = null
@@ -252,6 +259,7 @@ export function useProducts() {
     } catch (err) {
       console.error('Error deleting product:', err)
       error.value = `Failed to delete product: ${err.message}`
+      showError(`Failed to delete product: ${err.message}`)
     }
   }
   
@@ -264,8 +272,10 @@ export function useProducts() {
     
     try {
       await productsApiService.updateProduct(product._id, { status: newStatus })
-      successMessage.value = `Product "${product.product_name}" ${action}d successfully`
+      const message = `Product "${product.product_name}" ${action}d successfully`
+      successMessage.value = message
       await fetchProducts()
+      showSuccess(message)
       
       setTimeout(() => {
         successMessage.value = null
@@ -273,6 +283,7 @@ export function useProducts() {
     } catch (err) {
       console.error('Error updating product status:', err)
       error.value = `Failed to ${action} product: ${err.message}`
+      showError(`Failed to ${action} product: ${err.message}`)
     }
   }
   
@@ -509,6 +520,7 @@ export function useProducts() {
   const handleProductSuccess = (result) => {
     successMessage.value = result.message
     fetchProducts()
+    showSuccess(result.message)
     
     setTimeout(() => {
       successMessage.value = null
@@ -518,6 +530,7 @@ export function useProducts() {
   const handleStockUpdateSuccess = (result) => {
     successMessage.value = result.message
     fetchProducts()
+    showSuccess(result.message)
     
     setTimeout(() => {
       successMessage.value = null
@@ -525,8 +538,10 @@ export function useProducts() {
   }
   
   const handleImportSuccess = (result) => {
-    successMessage.value = `Import completed! ${result.totalSuccessful || 0} products imported successfully.`
+    const message = `Import completed! ${result.totalSuccessful || 0} products imported successfully.`
+    successMessage.value = message
     fetchProducts()
+    showSuccess(message)
     
     setTimeout(() => {
       successMessage.value = null
@@ -534,7 +549,9 @@ export function useProducts() {
   }
   
   const handleImportError = (err) => {
-    error.value = `Import failed: ${err.message || 'An unexpected error occurred'}`
+    const message = `Import failed: ${err.message || 'An unexpected error occurred'}`
+    error.value = message
+    showError(message)
     
     setTimeout(() => {
       error.value = null

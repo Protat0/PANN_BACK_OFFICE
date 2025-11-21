@@ -1,16 +1,16 @@
 <template>
-  <div v-if="show" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-      <div class="modal-content modern-modal">
+  <Teleport to="body">
+    <div v-if="show" class="modal-overlay" @click="handleOverlayClick">
+      <div class="modal-content modern-modal" @click.stop>
         <!-- Modal Header -->
-        <div class="modal-header border-0 pb-0">
+        <div class="modal-header">
           <div class="d-flex align-items-center">
             <div class="modal-icon me-3">
               <FileText :size="24" />
             </div>
-            <div>
-              <h4 class="modal-title mb-1">Receipt Details</h4>
-              <p class="text-muted mb-0 small">
+            <div class="modal-heading">
+              <h4 class="modal-title mb-1">Order Details</h4>
+              <p class="modal-subtitle mb-0">
                 Order ID: <strong>{{ receipt?.id }}</strong>
               </p>
             </div>
@@ -31,9 +31,9 @@
               <div class="card-body">
                 <div class="row">
                   <div class="col-md-6">
-                    <h6 class="text-muted mb-3">Receipt Information</h6>
+                    <h6 class="text-muted mb-3">Order Information</h6>
                     <div class="info-row">
-                      <span class="label">Receipt ID:</span>
+                      <span class="label">Order ID:</span>
                       <strong>{{ receipt.id }}</strong>
                     </div>
                     <div class="info-row">
@@ -172,18 +172,18 @@
         </div>
 
         <!-- Modal Footer -->
-        <div class="modal-footer border-0">
+        <div class="modal-footer border-0 pt-4">
           <button type="button" class="btn btn-outline-secondary" @click="handleClose">
             Close
           </button>
-          <button type="button" class="btn btn-primary" @click="printReceipt">
+          <!--<button type="button" class="btn btn-primary" @click="printReceipt">
             <Printer :size="16" class="me-1" />
             Print Receipt
-          </button>
+          </button> -->
         </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <script>
@@ -213,6 +213,12 @@ export default {
     
     function handleClose() {
       emit('close')
+    }
+
+    function handleOverlayClick(event) {
+      if (event.target === event.currentTarget) {
+        handleClose()
+      }
     }
     
     function formatDate(dateString) {
@@ -282,6 +288,7 @@ export default {
     
     return {
       handleClose,
+      handleOverlayClick,
       formatDate,
       formatCurrency,
       getStatusClass,
@@ -302,6 +309,11 @@ export default {
   border-radius: 16px;
   border: none;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  width: min(960px, 90vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .modal-icon {
@@ -316,19 +328,56 @@ export default {
 }
 
 .modal-header {
-  padding: 2rem 2rem 1rem 2rem;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  padding: 1.5rem 1.75rem 0.9rem 1.75rem;
+  background: linear-gradient(135deg, var(--surface-tertiary), var(--surface-secondary));
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
 .modal-body {
-  padding: 1.5rem 2rem;
-  max-height: 70vh;
+  padding: 1.5rem 1.75rem;
+  max-height: calc(90vh - 220px);
   overflow-y: auto;
+  background-color: var(--surface-elevated);
+}
+
+.modal-footer {
+  padding: 1.25rem 1.75rem 1.75rem 1.75rem;
+  background-color: var(--surface-tertiary);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  z-index: 9999 !important;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .receipt-header {
-  border: 2px solid var(--neutral-medium);
+  border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 12px;
+  background-color: var(--surface-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.dark-theme .receipt-header {
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-md);
 }
 
 .info-row {
@@ -336,7 +385,7 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0;
-  border-bottom: 1px solid var(--neutral-light);
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .info-row:last-child {
@@ -344,8 +393,18 @@ export default {
 }
 
 .info-row .label {
-  color: var(--tertiary-medium);
+  color: var(--text-secondary);
   font-size: 0.875rem;
+}
+
+.card h6,
+.card .card-header h6 {
+  color: var(--text-primary) !important;
+}
+
+.card .text-muted,
+.card-header .text-muted {
+  color: var(--text-secondary) !important;
 }
 
 code {
@@ -353,12 +412,103 @@ code {
   font-size: 0.875rem;
 }
 
+.card {
+  background-color: var(--surface-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.dark-theme .card {
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-md);
+}
+
+.card-header {
+  background-color: var(--surface-tertiary) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.15) !important;
+  color: var(--text-primary);
+}
+
+.dark-theme .card-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+.dark-theme .table thead th {
+  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.card-body {
+  background-color: var(--surface-primary);
+  color: var(--text-secondary);
+}
+
+.bg-light,
+.table-light {
+  background-color: var(--surface-tertiary) !important;
+  color: var(--text-primary) !important;
+}
+
+.card-body h6 {
+  color: var(--text-primary);
+}
+
 .table thead th {
   font-weight: 600;
   font-size: 0.875rem;
+  background-color: var(--surface-tertiary);
+  color: var(--text-primary);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.18);
+  border-top: 1px solid rgba(0, 0, 0, 0.18);
 }
 
 .table tbody td {
   vertical-align: middle;
+  color: var(--text-secondary);
+  background-color: var(--surface-primary);
+}
+
+.dark-theme .table tbody tr {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.table tfoot td {
+  background-color: var(--surface-tertiary);
+  color: var(--text-primary);
+  border-top: 1px solid var(--border-primary);
+}
+
+.modal-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.modal-title {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+.modal-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  letter-spacing: 0.01em;
+}
+
+.modal-header .btn-close {
+  opacity: 0.7;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.modal-header .btn-close:hover {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.dark-theme .modal-header .btn-close {
+  filter: invert(1);
 }
 </style>

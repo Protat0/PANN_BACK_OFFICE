@@ -482,7 +482,6 @@ export default {
 
   watch: {
     shouldShowDraftContent(newValue) {
-      console.log('Draft content should show:', newValue)
     }
   },
 

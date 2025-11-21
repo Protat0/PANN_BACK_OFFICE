@@ -624,11 +624,6 @@ const savePromotion = async () => {
     if (result?.success) {
       showSuccess('✅ Promotion created successfully!')
       emit('promotion-saved', { action: 'add', data: result.promotion })
-      
-      // ✅ Make sure to stop loading BEFORE closing
-      setLoading(false)
-      handleClose()  // Close immediately after success
-      return
     } else {
       let errorMsg = result?.message || 'Failed to create promotion'
       if (result?.errors?.length > 0) {
@@ -639,8 +634,9 @@ const savePromotion = async () => {
   } catch (err) {
     setError(err.message || 'Error creating promotion')
   } finally {
-    // ✅ Ensure loading stops if we didn’t stop it earlier
-    if (isLoading.value) setLoading(false)
+    setLoading(false)
+    // ✅ Move handleClose here so it runs when isLoading = false
+    if (!error.value) handleClose()
   }
 }
 
