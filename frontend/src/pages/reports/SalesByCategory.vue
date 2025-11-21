@@ -259,7 +259,7 @@ export default {
       await this.loadAllCategoryData();
       if (this.autoRefreshEnabled) this.startAutoRefresh();
     } catch (err) {
-      console.error('❌ Error on mount:', err);
+      // Error on mount
     }
   },
 
@@ -302,7 +302,6 @@ export default {
         this.consecutiveErrors = 0;
         this.lastSuccessfulLoad = Date.now();
       } catch (error) {
-        console.error('❌ Error loading category data:', error);
         this.consecutiveErrors++;
         if (this.consecutiveErrors >= 3) this.connectionLost = true;
         this.setFallbackData();
@@ -313,20 +312,37 @@ export default {
 
     async onFrequencyChange() {
       this.loadingChart = true;
+      this.loadingTopItems = true;
+      this.loading = true;
       try {
         const range = this.calculateDateRange(this.selectedFrequency);
+        this.currentDateRange = range;
+        
+        // Fetch all category data for the new date range
+        const allCategories = await categoryDisplayService.getSalesByCategory(
+          range.start_date, 
+          range.end_date,
+          false, // include_voided
+          this.showTrends // include_trends
+        );
+        
+        // Fetch top categories for chart and top list
         const topCategories = await categoryDisplayService.getTopCategories(
           range.start_date, 
           range.end_date, 
           6
         );
+        
+        // Update all data
+        this.processCategoryData(allCategories);
         this.updateChartData(topCategories);
-        this.currentDateRange = range;
+        this.updateTopItems(topCategories);
       } catch (error) {
-        console.error('❌ Error updating chart:', error);
         this.setDefaultChartData();
       } finally {
         this.loadingChart = false;
+        this.loadingTopItems = false;
+        this.loading = false;
       }
     },
 

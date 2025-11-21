@@ -51,8 +51,8 @@
               </div>
 
               <!-- Failure Message -->
-              <div v-if="failureMessage" class="failure-message">
-                {{ failureMessage }}
+              <div v-if="error" class="failure-message">
+                {{ error }}
               </div>
 
               <!-- Login Button -->
@@ -178,7 +178,7 @@ const handleLogin = async () => {
 
 const handleLoginSuccess = async () => {
   // Clear any previous errors
-  failureMessage.value = null
+  localError.value = null
   
   // Wait a bit more for reactivity to settle
   await new Promise(resolve => setTimeout(resolve, 100))

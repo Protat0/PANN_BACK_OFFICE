@@ -7,6 +7,7 @@ class SalesByCategoryService:
     def __init__(self):
         self.db = db_manager.get_database()
         self.sales_collection = self.db.sales
+        self.sales_log_collection = self.db.sales_log  # ✅ Added missing collection
         self.online_transactions_collection = self.db.online_transactions
         self.products_collection = self.db.products
         self.categories_collection = self.db.category
@@ -37,16 +38,37 @@ class SalesByCategoryService:
             if not include_voided:
                 query_filter["status"] = {"$ne": "voided"}
 
-            # 🔍 Fetch all sales data (POS + Online)
+            # 🔍 Fetch all sales data (POS + Sales Log + Online)
             pos_sales = list(self.sales_collection.find(query_filter))
+            sales_log_sales = list(self.sales_log_collection.find(query_filter))
             online_sales = list(self.online_transactions_collection.find(query_filter))
-            all_sales = pos_sales + online_sales
             
-            print(f"📊 Found {len(pos_sales)} POS sales and {len(online_sales)} online sales in range")
+            # Normalize sales_log format to match POS format
+            normalized_sales_log = []
+            for sale in sales_log_sales:
+                # Convert item_list to items format
+                items = []
+                for item in sale.get('item_list', []):
+                    items.append({
+                        'product_id': item.get('item_code', ''),
+                        'product_name': item.get('item_name', ''),
+                        'quantity': item.get('quantity', 0),
+                        'price': item.get('unit_price', 0),
+                        'subtotal': item.get('total_price', 0) or (item.get('unit_price', 0) * item.get('quantity', 0)),
+                        'unit': item.get('unit_of_measure', 'pc')
+                    })
+                # Create normalized sale
+                normalized_sale = sale.copy()
+                normalized_sale['items'] = items
+                normalized_sales_log.append(normalized_sale)
+            
+            all_sales = pos_sales + normalized_sales_log + online_sales
+            
+            print(f"📊 Found {len(pos_sales)} POS sales, {len(sales_log_sales)} sales_log sales, and {len(online_sales)} online sales in range")
 
-            # Fetch all products and categories once
-            products = list(self.products_collection.find({}))
-            categories = list(self.categories_collection.find({}))
+            # Fetch all products and categories once (exclude deleted)
+            products = list(self.products_collection.find({'isDeleted': {'$ne': True}}))
+            categories = list(self.categories_collection.find({'isDeleted': {'$ne': True}}))
 
             # 🔗 Build lookup maps with proper ID handling
             product_id_to_category = {}
@@ -71,35 +93,54 @@ class SalesByCategoryService:
             })
 
             # 🧩 Accumulate sales per category from all transactions
+            # Track unique transactions per category for accurate counting
+            category_transactions = defaultdict(set)  # category_id -> set of transaction IDs
+            
             for sale in all_sales:
                 # Skip voided entries unless explicitly allowed
                 if not include_voided and sale.get("status") == "voided":
                     continue
+                
+                # Get transaction ID for unique counting
+                transaction_id = str(sale.get("_id", ""))
+                
+                # Handle both 'items' (POS format) and 'item_list' (sales_log format)
+                items = sale.get("items", [])
+                if not items and sale.get("item_list"):
+                    # Convert item_list to items format if needed
+                    items = []
+                    for item in sale.get("item_list", []):
+                        items.append({
+                            'product_id': item.get('item_code', item.get('product_id', '')),
+                            'quantity': item.get('quantity', 0),
+                            'subtotal': item.get('total_price', 0) or (item.get('unit_price', 0) * item.get('quantity', 0)),
+                            'price': item.get('unit_price', 0)
+                        })
 
-                for item in sale.get("items", []):
-                    product_id = str(item.get("product_id"))
-                    quantity = item.get("quantity", 0)
-                    subtotal = item.get("subtotal", 0.0)
+                for item in items:
+                    # Handle both product_id (POS) and item_code (sales_log)
+                    product_id = str(item.get("product_id") or item.get("item_code", ""))
+                    if not product_id:
+                        continue
+                        
+                    quantity = float(item.get("quantity", 0))
+                    # Calculate subtotal: prefer subtotal, then total_price, then price * quantity
+                    subtotal = float(
+                        item.get("subtotal") or 
+                        item.get("total_price") or 
+                        (item.get("price", 0) * quantity) or
+                        (item.get("unit_price", 0) * quantity)
+                    )
 
                     category_id = product_id_to_category.get(product_id)
                     if not category_id:
                         continue
 
                     category_aggregate[category_id]["total_sales"] += subtotal
-                    category_aggregate[category_id]["total_items_sold"] += quantity
+                    category_aggregate[category_id]["total_items_sold"] += int(quantity)
                     category_aggregate[category_id]["product_count"].add(product_id)
-
-            # Count transactions per category
-            for sale in all_sales:
-                if not include_voided and sale.get("status") == "voided":
-                    continue
-                    
-                for item in sale.get("items", []):
-                    product_id = str(item.get("product_id"))
-                    category_id = product_id_to_category.get(product_id)
-                    if category_id:
-                        category_aggregate[category_id]["transaction_count"] += 1
-                        break  # Count transaction only once per category
+                    # Track unique transactions per category
+                    category_transactions[category_id].add(transaction_id)
 
             # 🧾 Build final results with enhanced metrics
             results = []
@@ -108,7 +149,8 @@ class SalesByCategoryService:
                 total_sales = round(data["total_sales"], 2)
                 total_items = data["total_items_sold"]
                 product_count = len(data["product_count"])
-                transaction_count = data["transaction_count"]
+                # Use unique transaction count from the set
+                transaction_count = len(category_transactions.get(category_id, set()))
                 
                 # Calculate averages
                 avg_sale_per_transaction = round(total_sales / transaction_count, 2) if transaction_count > 0 else 0

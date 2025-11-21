@@ -297,6 +297,47 @@ class SalesAPIService {
     }
   }
 
+  /**
+   * Get recent sales transactions
+   * @param {Object} params - Query parameters (limit, etc.)
+   * @returns {Promise<Object>} Recent sales transactions
+   */
+  async getRecentSales(params = {}) {
+    try {
+      const queryParams = {
+        limit: params.limit || 20,
+        ...params
+      };
+      const response = await api.get('/sales/recent/', { params: queryParams });
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error('Error fetching recent sales:', error);
+      this.handleError(error);
+    }
+  }
+
+  /**
+   * Get sales by period (daily, weekly, monthly)
+   * @param {Object} params - Query parameters (start_date, end_date, period: 'daily'|'weekly'|'monthly', source, etc.)
+   * @returns {Promise<Object>} Sales data grouped by period
+   */
+  async getSalesByPeriod(params = {}) {
+    try {
+      if (!params.start_date || !params.end_date) {
+        throw new Error('start_date and end_date are required');
+      }
+      const queryParams = {
+        period: params.period || 'monthly',
+        ...params
+      };
+      const response = await api.get('/sales-report/by-period/', { params: queryParams });
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error('Error fetching sales by period:', error);
+      this.handleError(error);
+    }
+  }
+
   // ====================================================================
   // BULK IMPORT OPERATIONS - CSV ONLY
   // ====================================================================

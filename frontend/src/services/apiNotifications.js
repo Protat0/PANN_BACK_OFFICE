@@ -2,6 +2,19 @@ import { api } from './api.js';
 
 class NotificationsAPI {
 
+  // Get recent notifications
+  async getRecent(params = {}) {
+    try {
+      const response = await api.get('/notifications/recent/', {
+        params: { limit: 10, ...params }
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching recent notifications:", error);
+      throw error;
+    }
+  }
+
   // Get ALL notifications (active + archived)
   async DisplayNotifs(params = {}) {
     try {

@@ -45,18 +45,34 @@
 
     <!-- User Profile Section -->
     <div class="user-profile" v-if="!isCollapsed">
-      <div class="profile-card">
+      <router-link 
+        to="/profile" 
+        class="profile-card"
+        :class="{ 'active': isActiveRoute('/profile') }"
+      >
         <div class="profile-avatar">
           <User :size="20" class="text-accent" />
         </div>
         <div class="profile-info">
-          <span class="profile-name">My Profile</span>
-          <small class="profile-role">Administrator</small>
+          <span class="profile-name">{{ userName }}</span>
+          <small class="profile-role">{{ userRole }}</small>
         </div>
-       <!-- <button class="btn btn-icon-only btn-xs profile-settings">
-          <Settings :size="14" />
-        </button>-->
-      </div>
+        <div class="nav-indicator" v-if="isActiveRoute('/profile')"></div>
+      </router-link>
+    </div>
+    
+    <!-- User Profile Section - Collapsed -->
+    <div class="user-profile" v-else>
+      <router-link 
+        to="/profile" 
+        class="profile-card profile-card-collapsed"
+        :class="{ 'active': isActiveRoute('/profile') }"
+        title="My Profile"
+      >
+        <div class="profile-avatar">
+          <User :size="20" class="text-accent" />
+        </div>
+      </router-link>
     </div>
 
     <!-- Navigation Menu -->
@@ -231,6 +247,7 @@
 
 <script>
 import apiService from '../services/api.js'
+import { useAuth } from '@/composables/auth/useAuth.js'
 import { 
   LayoutDashboard,
   Package,
@@ -274,12 +291,32 @@ export default {
     FolderOpen,
     FileText
   },
+  setup() {
+    const { user } = useAuth()
+    return { user }
+  },
   data() {
     return {
       isCollapsed: false,
       showInventorySubmenu: false,
       showReportsSubmenu: false,
       isLoggingOut: false
+    }
+  },
+  computed: {
+    userRole() {
+      if (this.user) {
+        const userData = this.user.user_data || this.user
+        return userData?.role || 'Administrator'
+      }
+      return 'Administrator'
+    },
+    userName() {
+      if (this.user) {
+        const userData = this.user.user_data || this.user
+        return userData?.full_name || userData?.name || 'My Profile'
+      }
+      return 'My Profile'
     }
   },
   methods: {
@@ -580,10 +617,27 @@ export default {
   background-color: var(--surface-secondary);
   border: 1px solid var(--border-primary);
   transition: all 0.3s ease;
+  text-decoration: none;
+  cursor: pointer;
+  position: relative;
 }
 
 .profile-card:hover {
   background-color: var(--state-hover);
+  transform: translateX(2px);
+  border-color: var(--border-accent);
+}
+
+.profile-card.active {
+  color: var(--text-inverse);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  background: linear-gradient(135deg, var(--secondary), var(--secondary-dark));
+  border-color: var(--secondary-dark);
+}
+
+.profile-card-collapsed {
+  justify-content: center;
+  padding: 0.75rem;
 }
 
 .profile-avatar {
