@@ -282,27 +282,37 @@ const handleSearchClear = () => {
   applyFilters()
 }
 
+
 const handlePageChange = (page) => {
   fetchUsers({ page, ...getFilterParams() })
 }
 
 const getFilterParams = () => {
   const params = {}
-  
+
   if (roleFilter.value !== 'all') {
-    params.status = roleFilter.value
+    params.role = roleFilter.value   // ✅ correct now
   }
-  
+
   if (statusFilter.value !== 'all') {
     params.status = statusFilter.value
   }
-  
+
+  if (searchQuery.value.trim() !== '') {
+    params.search = searchQuery.value.trim() // ✅ SEND search to backend
+  }
+
   return params
 }
 
+
 const applyFilters = async () => {
-  await fetchUsers({ page: 1, ...getFilterParams() })
+  await fetchUsers({
+    page: 1,
+    ...getFilterParams()
+  })
 }
+
 
 const toggleSelectAll = (event) => {
   if (event.target.checked) {

@@ -222,6 +222,7 @@ const {
 } = usePromotions()
 
 const { success: showSuccess, error: showError } = useToast()
+const searchDebounce = ref(null)
 
 // ✅ Local State
 const addPromoModal = ref(null)
@@ -300,15 +301,25 @@ const handleFilterChange = (filterKey, value) => {
   fetchPromotions()
 }
 
+
 const handleSearchInput = (value) => {
   setSearchQuery(value)
-  fetchPromotions()
+
+  if (searchDebounce.value) clearTimeout(searchDebounce.value)
+
+  searchDebounce.value = setTimeout(() => {
+    fetchPromotions()
+  }, 300)
 }
 
 const handleSearchClear = () => {
   setSearchQuery('')
+
+  if (searchDebounce.value) clearTimeout(searchDebounce.value)
+
   fetchPromotions()
 }
+
 
 const toggleSelectAll = (event) => {
   if (event.target.checked) {
@@ -318,10 +329,12 @@ const toggleSelectAll = (event) => {
   }
 }
 
+
 const handlePageChange = (page) => {
   setPage(page)
   fetchPromotions()
 }
+
 
 const refreshPromotions = async () => {
   clearSelection()

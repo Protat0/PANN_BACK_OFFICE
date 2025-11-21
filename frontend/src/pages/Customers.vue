@@ -241,9 +241,9 @@ import ActionBar from '@/components/common/ActionBar.vue'
 import AddCustomerModal from '@/components/customers/AddCustomerModal.vue'
 import DeleteConfirmationModal from '@/components/common/DeleteConfirmationModal.vue'
 
-// =====================
-// COMPOSABLE HOOKS
-// =====================
+/* ================================================================
+   COMPOSABLE HOOKS
+================================================================ */
 const {
   customers,
   isLoading,
@@ -251,6 +251,7 @@ const {
   statistics,
   totalCustomers,
   hasCustomers,
+  pagination,             // MUST EXIST IN COMPOSABLE
   fetchCustomers,
   fetchStatistics,
   deleteCustomer: deleteCustomerAPI,
@@ -259,59 +260,31 @@ const {
   exportCustomers
 } = useCustomers()
 
-// =====================
-// REACTIVE STATE
-// =====================
+/* ================================================================
+   STATE
+================================================================ */
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
+
 const exporting = ref(false)
 const searchValue = ref('')
+let searchDebounce = null
 
-// Modal references
 const customerModal = ref(null)
 const deleteModalElement = ref(null)
 const deleteModalInstance = ref(null)
+
 const modalMode = ref('create')
 const selectedCustomer = ref(null)
 const customerToDelete = ref(null)
 const deletingCustomerId = ref(null)
 
-// ActionBar selections
+/* Selected items */
 const selectedCustomers = ref([])
 
-// =====================
-// TABLE & FILTER CONFIG
-// =====================
-const addOptions = ref([
-  {
-    key: 'single',
-    icon: 'Plus',
-    title: 'Add Customer',
-    description: 'Add one customer manually'
-  },
-  {
-    key: 'import',
-    icon: 'Upload',
-    title: 'Import Customers',
-    description: 'Upload CSV/Excel file'
-  },
-  {
-    key: 'template',
-    icon: 'FileText',
-    title: 'Download Template',
-    description: 'Download CSV import template'
-  }
-])
-
-const selectionActions = ref([
-  {
-    key: 'delete',
-    icon: 'Trash2',
-    label: 'DELETE',
-    buttonClass: 'btn-delete'
-  }
-])
-
+/* ================================================================
+   FILTERS FOR ACTION BAR
+================================================================ */
 const filters = ref([
   {
     key: 'status',
@@ -336,18 +309,32 @@ const filters = ref([
   }
 ])
 
-// =====================
-// COMPUTED PROPERTIES
-// =====================
-const paginatedCustomers = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage.value
-  const end = start + itemsPerPage.value
-  return customers.value.slice(start, end)
-})
+/* ================================================================
+   FULL PARAM BUILDER (Search + Filters + Pagination)
+================================================================ */
+const getFetchParams = () => {
+  const params = {
+    search: searchValue.value || '',
+    page: currentPage.value,
+    limit: itemsPerPage.value
+  }
 
-// =====================
-// HELPER FUNCTIONS
-// =====================
+  const statusFilter = filters.value.find(f => f.key === 'status')
+  if (statusFilter && statusFilter.value !== 'all') {
+    params.status = statusFilter.value
+  }
+
+  const pointsFilter = filters.value.find(f => f.key === 'points')
+  if (pointsFilter && pointsFilter.value !== 'all') {
+    params.points = pointsFilter.value
+  }
+
+  return params
+}
+
+/* ================================================================
+   TABLE FORMATTING
+================================================================ */
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A'
   try {
@@ -361,22 +348,54 @@ const formatDate = (dateString) => {
   }
 }
 
-// =====================
-// CORE HANDLERS
-// =====================
+/* ================================================================
+   CORE HANDLERS
+================================================================ */
 const handleRetry = async () => {
   clearError()
-  await fetchCustomers()
+  await fetchCustomers(getFetchParams())
 }
 
-const handlePageChange = (page) => {
+const handlePageChange = async (page) => {
   currentPage.value = page
+  await fetchCustomers(getFetchParams())
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-// =====================
-// IMPORT / EXPORT / TEMPLATE
-// =====================
+/* ================================================================
+   SEARCH HANDLERS (with debounce)
+================================================================ */
+const handleSearchInput = (value) => {
+  searchValue.value = value
+
+  if (searchDebounce) clearTimeout(searchDebounce)
+
+  searchDebounce = setTimeout(async () => {
+    currentPage.value = 1
+    await fetchCustomers(getFetchParams())
+  }, 300)
+}
+
+const handleSearchClear = async () => {
+  searchValue.value = ''
+  currentPage.value = 1
+  await fetchCustomers(getFetchParams())
+}
+
+/* ================================================================
+   FILTER HANDLER
+================================================================ */
+const handleFilterChange = async (filterKey, value) => {
+  const filter = filters.value.find(f => f.key === filterKey)
+  if (filter) filter.value = value
+
+  currentPage.value = 1
+  await fetchCustomers(getFetchParams())
+}
+
+/* ================================================================
+   IMPORT / EXPORT
+================================================================ */
 const handleImport = async (event) => {
   const file = event.target.files[0]
   if (!file) return
@@ -384,7 +403,7 @@ const handleImport = async (event) => {
     isLoading.value = true
     await importCustomers(file)
     alert('✅ Customers imported successfully!')
-    await fetchCustomers()
+    await fetchCustomers(getFetchParams())
   } catch (err) {
     alert('❌ Import failed: ' + err.message)
   } finally {
@@ -413,53 +432,24 @@ janedoe,Jane Doe,jane@example.com,09181112222,50,inactive
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)
   link.download = 'customer_import_template.csv'
-  document.body.appendChild(link)
   link.click()
   link.remove()
 }
 
-// =====================
-// ACTION BAR EVENTS
-// =====================
-const handleAddAction = (actionKey) => {
-  switch (actionKey) {
-    case 'single':
-      openAddCustomerModal()
-      break
-    case 'import':
-      document.getElementById('customer-import')?.click()
-      break
-    case 'template':
-      downloadTemplate()
-      break
-  }
+/* ================================================================
+   ACTION BAR EVENTS
+================================================================ */
+const handleAddAction = (key) => {
+  if (key === 'single') openAddCustomerModal()
+  if (key === 'import') document.getElementById('customer-import')?.click()
+  if (key === 'template') downloadTemplate()
 }
 
-const handleSelectionAction = (actionKey, selectedItems) => {
-  switch (actionKey) {
-    case 'delete':
-      break
-  }
-}
+const handleSelectionAction = (key, items) => {}
 
-const handleFilterChange = (filterKey, value) => {
-  const filter = filters.value.find(f => f.key === filterKey)
-  if (filter) filter.value = value
-}
-
-const handleSearchInput = async (value) => {
-  searchValue.value = value
-}
-
-const handleSearchClear = async () => {
-  searchValue.value = ''
-  await fetchCustomers()
-  currentPage.value = 1
-}
-
-// =====================
-// MODAL LOGIC
-// =====================
+/* ================================================================
+   MODALS
+================================================================ */
 const openAddCustomerModal = () => {
   modalMode.value = 'create'
   selectedCustomer.value = null
@@ -484,17 +474,13 @@ const handleModalClose = () => {
 }
 
 const handleModalSuccess = async () => {
-  try {
-    await fetchCustomers()
-    if (modalMode.value === 'create') currentPage.value = 1
-  } catch (error) {
-    console.error('Failed to refresh customer list:', error)
-  }
+  await fetchCustomers(getFetchParams())
+  currentPage.value = 1
 }
 
-// =====================
-// DELETE CUSTOMER LOGIC
-// =====================
+/* ================================================================
+   DELETE CUSTOMER LOGIC
+================================================================ */
 const openDeleteModal = (customer) => {
   customerToDelete.value = customer
   deleteModalInstance.value?.show()
@@ -508,37 +494,33 @@ const closeDeleteModal = () => {
 const confirmDelete = async () => {
   if (!customerToDelete.value) return
   try {
-    deletingCustomerId.value = customerToDelete.value._id || customerToDelete.value.customer_id
+    deletingCustomerId.value = customerToDelete.value._id
     await deleteCustomerAPI(deletingCustomerId.value)
     closeDeleteModal()
+    await fetchCustomers(getFetchParams())
+  } catch (err) {
+    console.error('Delete failed:', err)
+  } finally {
     deletingCustomerId.value = null
-  } catch (error) {
-    console.error('Failed to delete customer:', error)
   }
 }
 
-const deleteCustomer = (customer) => {
-  openDeleteModal(customer)
-}
-
-// =====================
-// INITIALIZATION
-// =====================
+/* ================================================================
+   INITIALIZATION
+================================================================ */
 onMounted(async () => {
-  try {
-    await Promise.all([fetchCustomers(), fetchStatistics()])
+  await fetchStatistics()
+  await fetchCustomers(getFetchParams())
 
-    if (deleteModalElement.value) {
-      deleteModalInstance.value = new Modal(deleteModalElement.value)
-      deleteModalElement.value.addEventListener('hidden.bs.modal', () => {
-        customerToDelete.value = null
-      })
-    }
-  } catch (err) {
-    console.error('Failed to initialize customers page:', err)
+  if (deleteModalElement.value) {
+    deleteModalInstance.value = new Modal(deleteModalElement.value)
+    deleteModalElement.value.addEventListener('hidden.bs.modal', () => {
+      customerToDelete.value = null
+    })
   }
 })
 </script>
+
 
 
 

@@ -1031,6 +1031,7 @@ export default {
   align-items: center;
   justify-content: center;
   padding: 0 0.75rem;
+  margin-top: 5px;
 }
 
 .state-active {
@@ -1068,4 +1069,25 @@ export default {
     padding: 0.875rem 1rem;
   }
 }
+
+/* Make search button + filters perfectly aligned */
+.filters-row,
+.search-container,
+.filter-group {
+  display: flex;
+  align-items: center !important; /* forces vertical alignment */
+}
+
+/* Ensure search button container does not stretch */
+.search-container {
+  min-width: unset !important;
+  width: auto !important;
+}
+
+/* Optional: small spacing cleanup */
+.filters-row {
+  gap: 1rem;
+}
+
+
 </style>
