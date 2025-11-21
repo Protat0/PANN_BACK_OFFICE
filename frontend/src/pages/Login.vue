@@ -79,7 +79,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/auth/useAuth.js'
 
@@ -92,7 +92,7 @@ const {
   token,
   isAuthenticated,
   isLoading, 
-  error 
+  error: authError 
 } = useAuth()
 
 // Form data
@@ -102,18 +102,59 @@ const loginForm = ref({
 })
 
 const successMessage = ref(null)
+const localError = ref(null)
+
+// Computed - combine local error with auth error
+const error = computed(() => localError.value || authError.value)
 
 // Computed
 const apiBaseUrl = computed(() => import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1')
 const isDev = computed(() => import.meta.env.DEV)
 
+// Clear error when user starts typing
+watch(() => loginForm.value.email, () => {
+  if (localError.value) {
+    localError.value = null
+  }
+})
+
+watch(() => loginForm.value.password, () => {
+  if (localError.value) {
+    localError.value = null
+  }
+})
+
+// Watch for auth errors and sync to local error for better control
+watch(authError, (newError) => {
+  if (newError) {
+    // Format error message to be more user-friendly
+    if (newError.includes('Invalid email') || newError.includes('Invalid password') || newError.includes('email or password')) {
+      localError.value = 'Invalid email or password. Please check your credentials and try again.'
+    } else if (newError.includes('Network') || newError.includes('timeout')) {
+      localError.value = 'Network error. Please check your connection and try again.'
+    } else {
+      localError.value = newError
+    }
+  }
+})
+
 // Enhanced login handler with debugging
 const handleLogin = async () => {
   successMessage.value = null
+  localError.value = null
   
   try {
+    // Client-side validation
     if (!loginForm.value.email || !loginForm.value.password) {
-      throw new Error('Please fill in all fields')
+      localError.value = 'Please fill in all fields'
+      return
+    }
+
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(loginForm.value.email)) {
+      localError.value = 'Please enter a valid email address'
+      return
     }
 
     const success = await login(loginForm.value.email, loginForm.value.password)
@@ -121,14 +162,16 @@ const handleLogin = async () => {
     if (success) {
       await handleLoginSuccess()
     } else {
-      console.error('LOGIN PAGE: Login failed, no success result')
+      // If login returns false, check if there's an auth error
+      // If not, set a generic error message
+      if (!authError.value) {
+        localError.value = 'Invalid email or password. Please try again.'
+      }
     }
   } catch (err) {
     console.error('LOGIN PAGE: Login exception:', err)
-    console.error('LOGIN PAGE: Exception details:', {
-      message: err.message,
-      stack: err.stack
-    })
+    // Set error message from exception or use a default
+    localError.value = err.message || 'Invalid email or password. Please try again.'
   }
 }
 
