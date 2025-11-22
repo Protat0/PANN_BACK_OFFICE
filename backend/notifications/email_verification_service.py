@@ -293,38 +293,39 @@ class EmailVerificationService:
             
             logger.info(f"Found user for verification: {email}, _id: {user.get('_id')}, _id type: {type(user.get('_id'))}")
             
-            # Special case: Update email_verified for this specific account only
-            # This is an exception to the "no database changes" rule for testing purposes
-            TEST_ACCOUNT_EMAIL = 'ngjameswinston@gmail.com'
+            # Update email_verified status in database for all users
             email_verified_status = user.get('email_verified', False)
             
-            if email == TEST_ACCOUNT_EMAIL:
-                try:
-                    # Update email_verified status for this test account only
-                    user_id_for_update = user.get('_id')
-                    update_result = self.user_collection.update_one(
-                        {'_id': user_id_for_update},
-                        {
-                            '$set': {
-                                'email_verified': True,
-                                'email_verified_at': datetime.now(timezone.utc),
-                                'last_updated': datetime.now(timezone.utc)
-                            }
+            try:
+                # Update email_verified status for the user
+                user_id_for_update = user.get('_id')
+                logger.info(f"Attempting to update email_verified for user_id: {user_id_for_update}, email: {email}")
+                
+                update_result = self.user_collection.update_one(
+                    {'_id': user_id_for_update},
+                    {
+                        '$set': {
+                            'email_verified': True,
+                            'email_verified_at': datetime.now(timezone.utc),
+                            'last_updated': datetime.now(timezone.utc)
                         }
-                    )
+                    }
+                )
+                
+                logger.info(f"Update result - matched: {update_result.matched_count}, modified: {update_result.modified_count}")
+                
+                if update_result.modified_count > 0:
+                    logger.info(f"✅ Successfully updated email_verified=True for user: {email} (ID: {user_id_for_update})")
+                    email_verified_status = True
+                elif update_result.matched_count > 0:
+                    # User already verified
+                    logger.info(f"✅ User already verified (no change needed): {email} (ID: {user_id_for_update})")
+                    email_verified_status = True
+                else:
+                    logger.warning(f"⚠️ Update failed - no document matched for user_id: {user_id_for_update}, email: {email}")
                     
-                    if update_result.modified_count > 0:
-                        logger.info(f"Updated email_verified status for test account: {email}")
-                        email_verified_status = True
-                    elif update_result.matched_count > 0:
-                        logger.info(f"Test account already verified: {email}")
-                        email_verified_status = True
-                except Exception as update_error:
-                    logger.warning(f"Could not update email_verified for test account: {update_error}")
-            else:
-                # For other accounts, don't modify the database
-                # Email verification is tracked via JWT tokens only
-                logger.info(f"Email verified (no DB update) for: {email}")
+            except Exception as update_error:
+                logger.error(f"❌ Exception updating email_verified for user {email}: {update_error}", exc_info=True)
             
             logger.info(f"Email verified successfully for: {email}")
             

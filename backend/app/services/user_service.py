@@ -177,7 +177,9 @@ class UserService:
                 'date_created': now,
                 'last_updated': now,
                 'status': user_data.get('status', 'active'),
-                'isDeleted': False 
+                'isDeleted': False,
+                'email_verified': False  # Default to unverified, will be set to True when verified
+                # email_verified_at will be set when email is verified via email_verification_service
             })
             
             # Insert user (no need for ObjectId conversion)
