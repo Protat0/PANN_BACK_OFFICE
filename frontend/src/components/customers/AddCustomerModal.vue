@@ -1,74 +1,72 @@
 <template>
-  <!-- Modal Backdrop -->
   <div 
     v-if="isVisible" 
     class="modal-backdrop"
     @click="handleBackdropClick"
   >
-    <!-- Modal Container -->
-    <div 
-      class="modal-container"
-      @click.stop
-    >
+    <div class="modal-container" @click.stop>
+
       <!-- Modal Header -->
       <div class="modal-header d-flex justify-content-between align-items-center">
         <h3 class="text-primary mb-0 fw-semibold">
           {{ getModalTitle() }}
         </h3>
 
-        <!-- Right-side buttons -->
-        <div class="d-flex align-items-center gap-2">
-          <!-- ✅ Purple Edit button beside Close -->
-  
-          <button 
-            class="btn-close"
-            @click="closeModal"
-            :disabled="isLoading"
-            aria-label="Close"
-          >
-            <X :size="20" />
-          </button>
-        </div>
+        <button 
+          class="btn-close"
+          @click="closeModal"
+          :disabled="isLoading"
+        >
+          <X :size="20" />
+        </button>
       </div>
-
 
       <!-- Modal Body -->
       <div class="modal-body">
-        <!-- Error Message -->
+
+        <!-- Error -->
         <div v-if="error" class="status-error mb-4">
-          <div class="d-flex align-items-center gap-2">
-            <AlertTriangle :size="16" />
-            <span class="text-status-error fw-medium">{{ error }}</span>
-          </div>
+          <AlertTriangle :size="16" />
+          <span class="text-status-error fw-medium">{{ error }}</span>
         </div>
 
-        <!-- Customer Information -->
         <form @submit.prevent="handleSubmit">
-          <!-- Username -->
+
+          <!-- USERNAME -->
           <div class="mb-4">
             <label class="form-label text-secondary fw-medium mb-2">
               Username <span class="text-error">*</span>
             </label>
+
+            <!-- Editable only when creating -->
             <input
+              v-if="currentMode !== 'view'"
               v-model="form.username"
               type="text"
               class="form-control"
               placeholder="Enter unique username"
               required
-              :disabled="isLoading || currentMode === 'edit'"
+              :disabled="isLoading || currentMode !== 'create'"
             />
+
+            <!-- View mode -->
+            <div v-else class="form-control-plaintext text-primary fw-medium">
+              {{ form.username }}
+            </div>
+
             <small class="form-text text-tertiary-medium">
-              {{ currentMode === 'edit' ? 'Username cannot be changed' : 'Username must be unique and cannot be changed later' }}
+              {{ currentMode === 'create' ? 'Username cannot be changed later' : 'Username cannot be changed' }}
             </small>
           </div>
 
-          <!-- Full Name -->
+          <!-- FULL NAME -->
           <div class="mb-4">
             <label class="form-label text-secondary fw-medium mb-2">
-              Full Name <span v-if="mode !== 'view'" class="text-error">*</span>
+              Full Name <span v-if="currentMode !== 'view'" class="text-error">*</span>
             </label>
+
             <input
-              v-if="mode !== 'view'"
+              v-if="currentMode !== 'view'"
               v-model="form.full_name"
               type="text"
               class="form-control"
@@ -81,13 +79,14 @@
             </div>
           </div>
 
-          <!-- Email -->
+          <!-- EMAIL -->
           <div class="mb-4">
             <label class="form-label text-secondary fw-medium mb-2">
-              Email Address <span v-if="mode !== 'view'" class="text-error">*</span>
+              Email Address <span v-if="currentMode !== 'view'" class="text-error">*</span>
             </label>
+
             <input
-              v-if="mode !== 'view'"
+              v-if="currentMode !== 'view'"
               v-model="form.email"
               type="email"
               class="form-control"
@@ -99,12 +98,12 @@
               {{ form.email || 'Not provided' }}
             </div>
           </div>
-
           <!-- Password (for new customers) -->
           <div v-if="currentMode === 'create'" class="mb-4">
             <label class="form-label text-secondary fw-medium mb-2">
               Password <span class="text-error">*</span>
             </label>
+
             <input
               v-model="form.password"
               type="password"
@@ -114,14 +113,16 @@
               minlength="6"
               :disabled="isLoading"
             />
+
             <small class="form-text text-tertiary-medium">
               Minimum 6 characters
             </small>
           </div>
 
-          <!-- Change Password Section (for editing customers) -->
+
+          <!-- PASSWORD (edit mode with toggle) -->
           <div v-if="currentMode === 'edit'" class="mb-4">
-            <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="d-flex justify-content-between mb-2">
               <label class="form-label text-secondary fw-medium mb-0">
                 Password
               </label>
@@ -134,8 +135,7 @@
                 {{ showPasswordFields ? 'Cancel Password Change' : 'Change Password' }}
               </button>
             </div>
-            
-            <!-- Password Change Fields -->
+
             <div v-if="showPasswordFields" class="password-change-section">
               <div class="mb-3">
                 <input
@@ -144,11 +144,7 @@
                   class="form-control"
                   placeholder="Enter new password"
                   minlength="6"
-                  :disabled="isLoading"
                 />
-                <small class="form-text text-tertiary-medium">
-                  Minimum 6 characters
-                </small>
               </div>
               <div>
                 <input
@@ -157,98 +153,89 @@
                   class="form-control"
                   placeholder="Confirm new password"
                   :class="{ 'is-invalid': passwordMismatch }"
-                  :disabled="isLoading"
                 />
                 <div v-if="passwordMismatch" class="invalid-feedback d-block">
                   Passwords do not match
                 </div>
               </div>
             </div>
-            
-            <small v-else class="form-text text-tertiary-medium">
-              Click "Change Password" to update customer's password
+
+            <small v-else class="form-text">
+              Click “Change Password” to update this customer’s password.
             </small>
           </div>
 
-          <!-- Phone -->
+          <!-- PHONE -->
           <div class="mb-4">
-            <label class="form-label text-secondary fw-medium mb-2">
-              Phone Number
-            </label>
+            <label class="form-label text-secondary fw-medium mb-2">Phone Number</label>
             <input
-              v-if="mode !== 'view'"
+              v-if="currentMode !== 'view'"
               v-model="form.phone"
               type="tel"
               class="form-control"
               placeholder="+1 (555) 123-4567"
-              :disabled="isLoading"
             />
             <div v-else class="form-control-plaintext text-secondary">
               {{ form.phone || 'Not provided' }}
             </div>
           </div>
 
-          <!-- Delivery Address -->
+          <!-- DELIVERY ADDRESS -->
           <div class="mb-4">
-            <label class="form-label text-secondary fw-medium mb-2">
-              Delivery Address
-            </label>
-            <div class="address-fields">
-              <div class="row g-2">
-                <div class="col-12">
-                  <input
-                    v-model="form.delivery_address.street"
-                    type="text"
-                    class="form-control mb-2"
-                    placeholder="Street address"
-                    :disabled="isLoading || currentMode === 'view'"
-                  />
-                </div>
-                <div class="col-6">
-                  <input
-                    v-model="form.delivery_address.city"
-                    type="text"
-                    class="form-control"
-                    placeholder="City"
-                    :disabled="isLoading || currentMode === 'view'"
-                  />
-                </div>
-                <div class="col-6">
-                  <input
-                    v-model="form.delivery_address.barangay"
-                    type="text"
-                    class="form-control"
-                    placeholder="Barangay"
-                    :disabled="isLoading || currentMode === 'view'"
-                  />
-                </div>
-                <div class="col-6">
-                  <input
-                    v-model="form.delivery_address.postal_code"
-                    type="text"
-                    class="form-control"
-                    placeholder="Postal code"
-                    :disabled="isLoading || currentMode === 'view'"
-                  />
-                </div>
+            <label class="form-label text-secondary fw-medium mb-2">Delivery Address</label>
+            <div class="row g-2">
+              <div class="col-12">
+                <input
+                  v-model="form.delivery_address.street"
+                  type="text"
+                  class="form-control"
+                  placeholder="Street address"
+                  :disabled="currentMode === 'view'"
+                />
+              </div>
+              <div class="col-6">
+                <input
+                  v-model="form.delivery_address.city"
+                  type="text"
+                  class="form-control"
+                  placeholder="City"
+                  :disabled="currentMode === 'view'"
+                />
+              </div>
+              <div class="col-6">
+                <input
+                  v-model="form.delivery_address.barangay"
+                  type="text"
+                  class="form-control"
+                  placeholder="Barangay"
+                  :disabled="currentMode === 'view'"
+                />
+              </div>
+              <div class="col-6">
+                <input
+                  v-model="form.delivery_address.postal_code"
+                  type="text"
+                  class="form-control"
+                  placeholder="Postal code"
+                  :disabled="currentMode === 'view'"
+                />
               </div>
             </div>
           </div>
 
-          <!-- Loyalty Points -->
-          <div v-if="mode !== 'create'" class="mb-4">
-            <label class="form-label text-secondary fw-medium mb-2">
-              Loyalty Points
-            </label>
+          <!-- LOYALTY POINTS -->
+          <div v-if="currentMode !== 'create'" class="mb-4">
+            <label class="form-label">Loyalty Points</label>
+
             <input
-              v-if="mode === 'edit'"
+              v-if="currentMode === 'edit'"
               v-model.number="form.loyalty_points"
               type="number"
-              min="0"
               class="form-control"
+              min="0"
               placeholder="0"
-              :disabled="isLoading"
             />
+
             <div v-else class="form-control-plaintext">
               <span class="badge bg-success text-inverse fw-medium">
                 {{ form.loyalty_points || 0 }} points
@@ -256,78 +243,61 @@
             </div>
           </div>
 
-          <!-- Status -->
-          <div v-if="mode !== 'create'" class="mb-4">
-            <label class="form-label text-secondary fw-medium mb-2">
-              Status
-            </label>
+          <!-- STATUS -->
+          <div v-if="currentMode !== 'create'" class="mb-4">
+            <label>Status</label>
+
             <select
-              v-if="mode === 'edit'"
+              v-if="currentMode === 'edit'"
               v-model="form.status"
               class="form-select"
-              :disabled="isLoading"
             >
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
+
             <div v-else class="form-control-plaintext">
-              <span 
-                class="badge fw-medium"
-                :class="form.status === 'active' ? 'bg-success text-inverse' : 'surface-tertiary text-tertiary border-theme'"
-              >
-                {{ form.status || 'active' }}
+              <span class="badge bg-success text-inverse fw-medium">
+                {{ form.status }}
               </span>
             </div>
           </div>
 
-          <!-- Date Created (view mode only) -->
-          <div v-if="mode === 'view'" class="mb-4">
-            <label class="form-label text-secondary fw-medium mb-2">
-              Date Created
-            </label>
-            <div class="form-control-plaintext text-tertiary small">
-              {{ formatDate(customer?.date_created) }}
-            </div>
-          </div>
         </form>
       </div>
 
-      <!-- Modal Footer -->
+      <!-- FOOTER -->
       <div class="modal-footer">
-        <div class="d-flex justify-content-end gap-3">
-            <button 
-            v-if="mode === 'view'"
-            class="btn btn-edit btn-sm d-flex align-items-center gap-1"
-            @click="switchToEditMode"
-            :disabled="isLoading"
-          >
-            <Edit :size="16" />
-            Edit
-          </button>
 
-          <button
-            type="button"
-            class="btn btn-cancel"
-            @click="closeModal"
-            :disabled="isLoading"
-          >
-            {{ mode === 'view' ? 'Close' : 'Cancel' }}
-          </button>
-          <button
-            v-if="mode !== 'view'"
-            type="button"
-            class="btn btn-submit btn-with-icon"
-            @click="handleSubmit"
-            :disabled="isLoading || !isFormValid"
-          >
-            <div v-if="isLoading" class="spinner-border spinner-border-sm me-2"></div>
-            {{ isLoading ? 'Saving...' : (mode === 'edit' ? 'Update Customer' : 'Add Customer') }}
-          </button>
-        </div>
+        <!-- VIEW MODE → shows Edit button -->
+        <button 
+          v-if="currentMode === 'view'"
+          class="btn btn-edit btn-sm"
+          @click="switchToEditMode"
+        >
+          <Edit :size="16" /> Edit
+        </button>
+
+        <button class="btn btn-cancel" @click="closeModal" :disabled="isLoading">
+          {{ currentMode === 'view' ? 'Close' : 'Cancel' }}
+        </button>
+
+        <button
+          v-if="currentMode !== 'view'"
+          class="btn btn-submit btn-with-icon"
+          @click="handleSubmit"
+          :disabled="isLoading || !isFormValid"
+        >
+          {{ isLoading ? 'Saving...' : (currentMode === 'edit' ? 'Update Customer' : 'Add Customer') }}
+        </button>
+
       </div>
+
     </div>
   </div>
 </template>
+
+
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
@@ -351,11 +321,14 @@ const props = defineProps({
 // Emits
 const emit = defineEmits(['close', 'success', 'mode-changed'])
 
-// Composables
+// Modal composable
 const { isVisible, isLoading, error, show, hide, setLoading, setError, clearError } = useModal()
 const { createCustomer, updateCustomer } = useCustomers()
 
-// Form data
+// internal mode state (used by template instead of props.mode)
+const currentMode = ref(props.mode)
+
+// form model
 const form = ref({
   username: '',
   full_name: '',
@@ -374,8 +347,7 @@ const form = ref({
   status: 'active'
 })
 
-// Local mode state for switching between view/edit
-const currentMode = ref(props.mode)
+// Flags
 const showPasswordFields = ref(false)
 
 // Computed
@@ -386,24 +358,23 @@ const passwordMismatch = computed(() => {
 })
 
 const isFormValid = computed(() => {
-  const hasRequiredFields = form.value.username.trim() && 
-                           form.value.full_name.trim() && 
-                           form.value.email.trim()
-  
-  // For create mode, password is required
+  const hasRequired = form.value.username.trim() &&
+                      form.value.full_name.trim() &&
+                      form.value.email.trim()
+
   if (currentMode.value === 'create') {
-    return hasRequiredFields && form.value.password.trim() && form.value.password.length >= 6
+    return hasRequired && form.value.password.trim().length >= 6
   }
-  
-  // For edit mode, if password change is enabled, validate passwords
+
   if (currentMode.value === 'edit' && showPasswordFields.value) {
-    const hasValidPassword = form.value.new_password && 
-                            form.value.new_password.length >= 6 &&
-                            form.value.new_password === form.value.confirm_password
-    return hasRequiredFields && hasValidPassword
+    const validPw =
+      form.value.new_password &&
+      form.value.new_password.length >= 6 &&
+      form.value.new_password === form.value.confirm_password
+    return hasRequired && validPw
   }
-  
-  return hasRequiredFields
+
+  return hasRequired
 })
 
 // Methods
@@ -425,33 +396,6 @@ const togglePasswordChange = () => {
   if (!showPasswordFields.value) {
     form.value.new_password = ''
     form.value.confirm_password = ''
-  }
-}
-
-const openModal = () => {
-  clearError()
-  showPasswordFields.value = false
-  currentMode.value = props.mode
-  if ((props.mode === 'edit' || props.mode === 'view') && props.customer) {
-    populateForm()
-  } else {
-    resetForm()
-  }
-  show()
-}
-
-const closeModal = () => {
-  if (!isLoading.value) {
-    showPasswordFields.value = false
-    currentMode.value = props.mode // Reset to original mode
-    hide()
-    emit('close')
-  }
-}
-
-const handleBackdropClick = () => {
-  if (!isLoading.value) {
-    closeModal()
   }
 }
 
@@ -477,24 +421,51 @@ const resetForm = () => {
 }
 
 const populateForm = () => {
-  if (props.customer) {
-    form.value = {
-      username: props.customer.username || '',
-      full_name: props.customer.full_name || '',
-      email: props.customer.email || '',
-      phone: props.customer.phone || '',
-      password: '', // Never populate password for security
-      new_password: '',
-      confirm_password: '',
-      delivery_address: {
-        street: props.customer.delivery_address?.street || '',
-        city: props.customer.delivery_address?.city || '',
-        barangay: props.customer.delivery_address?.barangay || '',
-        postal_code: props.customer.delivery_address?.postal_code || ''
-      },
-      loyalty_points: props.customer.loyalty_points || 0,
-      status: props.customer.status || 'active'
-    }
+  if (!props.customer) return
+
+  form.value = {
+    username: props.customer.username || '',
+    full_name: props.customer.full_name || '',
+    email: props.customer.email || '',
+    phone: props.customer.phone || '',
+    password: '',
+    new_password: '',
+    confirm_password: '',
+    delivery_address: {
+      street: props.customer.delivery_address?.street || '',
+      city: props.customer.delivery_address?.city || '',
+      barangay: props.customer.delivery_address?.barangay || '',
+      postal_code: props.customer.delivery_address?.postal_code || ''
+    },
+    loyalty_points: props.customer.loyalty_points || 0,
+    status: props.customer.status || 'active'
+  }
+}
+
+const openModal = () => {
+  clearError()
+  showPasswordFields.value = false
+  currentMode.value = props.mode
+
+  if (props.mode === 'edit' || props.mode === 'view') {
+    populateForm()
+  } else {
+    resetForm()
+  }
+
+  show()
+}
+
+const closeModal = () => {
+  if (isLoading.value) return
+  showPasswordFields.value = false
+  hide()
+  emit('close')
+}
+
+const handleBackdropClick = () => {
+  if (!isLoading.value) {
+    closeModal()
   }
 }
 
@@ -514,10 +485,10 @@ const formatDate = (dateString) => {
 }
 
 const handleSubmit = async () => {
-  if (!isFormValid.value || isLoading.value || currentMode.value === 'view') return
+  if (!isFormValid.value || isLoading.value) return;
 
-  setLoading(true)
-  clearError()
+  setLoading(true);
+  clearError();
 
   try {
     const customerData = {
@@ -526,63 +497,63 @@ const handleSubmit = async () => {
       email: form.value.email.trim(),
       phone: form.value.phone.trim(),
       delivery_address: form.value.delivery_address
+    };
+
+    if (currentMode.value === 'create') {
+      customerData.password = form.value.password;
     }
 
-    // For create mode, password is required
-    if (currentMode.value === 'create') {
-      customerData.password = form.value.password
-    } 
-    // For edit mode, only include password if changing it
-    else if (currentMode.value === 'edit') {
-      customerData.loyalty_points = form.value.loyalty_points
-      customerData.status = form.value.status
-      
-      // Include new password only if user chose to change it
+    if (currentMode.value === 'edit') {
+      customerData.loyalty_points = form.value.loyalty_points;
+      customerData.status = form.value.status;
+
       if (showPasswordFields.value && form.value.new_password) {
-        customerData.password = form.value.new_password
+        customerData.password = form.value.new_password;
       }
     }
 
-    let result
+    let result;
+
     if (currentMode.value === 'edit') {
-      const customerId = props.customer._id || props.customer.customer_id
-      result = await updateCustomer(customerId, customerData)
+      const id = props.customer._id || props.customer.customer_id;
+      result = await updateCustomer(id, customerData);
     } else {
-      result = await createCustomer(customerData)
+      result = await createCustomer(customerData);
     }
 
-    emit('success', result)
+    emit('success', result);
 
-    await nextTick()
+    // 💥 Add a VERY short delay to ensure UI updates before closing
+    setTimeout(() => {
+      closeModal();
+    }, 50);
 
-    resetForm()
-    closeModal()
-    
   } catch (err) {
-    setError(err.message || `Failed to ${currentMode.value === 'edit' ? 'update' : 'create'} customer`)
+    setError(err.message || `Failed to ${currentMode.value === 'edit' ? 'update' : 'create'} customer`);
   } finally {
-    setLoading(false)
+    setLoading(false);
   }
-}
+};
 
-// Watch for customer prop changes
+
+// Watchers
 watch(() => props.customer, () => {
   if ((props.mode === 'edit' || props.mode === 'view') && props.customer && isVisible.value) {
     populateForm()
   }
 })
 
-// Watch for mode prop changes
 watch(() => props.mode, (newMode) => {
   currentMode.value = newMode
 })
 
-// Expose methods for parent component
+// Expose
 defineExpose({
   openModal,
   closeModal
 })
 </script>
+
 
 <style scoped>
 /* All existing styles remain the same */

@@ -32,38 +32,45 @@ class PromotionListView(APIView):
     def get(self, request):
         """Get all promotions with filtering and pagination"""
         try:
-            # Extract query parameters
             filters = {}
+
+            # Mapping frontend → backend filters
             if request.GET.get('status'):
                 filters['status'] = request.GET.get('status')
+
             if request.GET.get('type'):
                 filters['type'] = request.GET.get('type')
+
             if request.GET.get('target_type'):
                 filters['target_type'] = request.GET.get('target_type')
+
             if request.GET.get('created_by'):
                 filters['created_by'] = request.GET.get('created_by')
-            
-            # Search functionality
-            if request.GET.get('q'):
-                filters['search_query'] = request.GET.get('q')
-            
-            # Date filtering
+
+            # Search should support ?search=
+            search_value = request.GET.get('search') or request.GET.get('q')
+            if search_value:
+                filters['search_query'] = search_value
+
+            # Date range
             if request.GET.get('date_from') and request.GET.get('date_to'):
                 try:
                     filters['date_from'] = datetime.fromisoformat(request.GET.get('date_from'))
                     filters['date_to'] = datetime.fromisoformat(request.GET.get('date_to'))
                 except ValueError:
                     return Response(
-                        {"error": "Invalid date format. Use ISO format (YYYY-MM-DD)"},
+                        {"error": "Invalid date format. Use ISO (YYYY-MM-DD)"},
                         status=status.HTTP_400_BAD_REQUEST
                     )
-            
-            # Pagination parameters
+
+            # Pagination
             page = int(request.GET.get('page', 1))
             limit = int(request.GET.get('limit', 20))
+
+            # Sorting
             sort_by = request.GET.get('sort_by', 'created_at')
             sort_order = request.GET.get('sort_order', 'desc')
-            
+
             result = self.promotion_service.get_all_promotions(
                 filters=filters,
                 page=page,
@@ -71,18 +78,19 @@ class PromotionListView(APIView):
                 sort_by=sort_by,
                 sort_order=sort_order
             )
-            
+
             if result['success']:
                 return Response(result, status=status.HTTP_200_OK)
             else:
                 return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-                
+
         except Exception as e:
             logger.error(f"Error in PromotionListView.get: {e}")
             return Response(
-                {"error": f"Error retrieving promotions: {str(e)}"}, 
+                {"error": f"Error retrieving promotions: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
     
     @require_authentication
     def post(self, request):

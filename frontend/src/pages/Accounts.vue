@@ -176,7 +176,9 @@ import ActionBar from '@/components/common/ActionBar.vue'
 import TableTemplate from '@/components/common/TableTemplate.vue'
 import AddAccountModal from '@/components/accounts/AddAccountModal.vue'
 
-// Composable
+/* -------------------------------------------
+   COMPOSABLES
+------------------------------------------- */
 const {
   users,
   loading,
@@ -188,10 +190,10 @@ const {
   deleteUser: deleteUserService
 } = useUsers()
 
-// Refs
+/* -------------------------------------------
+   CORE REFS
+------------------------------------------- */
 const accountModal = ref(null)
-
-// Local state
 const selectedUsers = ref([])
 const searchQuery = ref('')
 const roleFilter = ref('all')
@@ -199,11 +201,13 @@ const statusFilter = ref('all')
 const successMessage = ref(null)
 const exporting = ref(false)
 
-// Action Bar Configuration
+/* -------------------------------------------
+   ACTION BAR CONFIG (must be above handlers)
+------------------------------------------- */
 const addOptions = [
   {
     key: 'single',
-    icon: 'UserPlus',
+    icon: 'Plus',
     title: 'Add Single User',
     description: 'Create a new user account'
   }
@@ -218,6 +222,9 @@ const selectionActions = [
   }
 ]
 
+/* -------------------------------------------
+   FILTER CONFIGURATION
+------------------------------------------- */
 const filters = computed(() => [
   {
     key: 'role',
@@ -241,34 +248,51 @@ const filters = computed(() => [
   }
 ])
 
-// Computed
-const allSelected = computed(() => 
+/* -------------------------------------------
+   SELECTION COMPUTED
+------------------------------------------- */
+const allSelected = computed(() =>
   users.value.length > 0 && selectedUsers.value.length === users.value.length
 )
 
-const someSelected = computed(() => 
+const someSelected = computed(() =>
   selectedUsers.value.length > 0 && selectedUsers.value.length < users.value.length
 )
 
-// Methods
-const handleAddAction = (actionKey) => {
-  if (actionKey === 'single') {
-    openAddModal()
-  }
+/* -------------------------------------------
+   FILTER HELPERS
+------------------------------------------- */
+const getFilterParams = () => {
+  const params = {}
+
+  if (roleFilter.value !== 'all') params.role = roleFilter.value
+  if (statusFilter.value !== 'all') params.status = statusFilter.value
+  if (searchQuery.value.trim() !== '') params.search = searchQuery.value.trim()
+
+  return params
 }
 
-const handleSelectionAction = (actionKey) => {
-  if (actionKey === 'delete') {
-    deleteMultipleUsers()
-  }
+const applyFilters = async () => {
+  await fetchUsers({
+    page: 1,
+    ...getFilterParams()
+  })
+}
+
+/* -------------------------------------------
+   ACTION BAR HANDLERS
+------------------------------------------- */
+const handleAddAction = (key) => {
+  if (key === 'single') openAddModal()
+}
+
+const handleSelectionAction = (key) => {
+  if (key === 'delete') deleteMultipleUsers()
 }
 
 const handleFilterChange = (filterKey, value) => {
-  if (filterKey === 'role') {
-    roleFilter.value = value
-  } else if (filterKey === 'status') {
-    statusFilter.value = value
-  }
+  if (filterKey === 'role') roleFilter.value = value
+  if (filterKey === 'status') statusFilter.value = value
   applyFilters()
 }
 
@@ -282,58 +306,35 @@ const handleSearchClear = () => {
   applyFilters()
 }
 
-
+/* -------------------------------------------
+   PAGINATION
+------------------------------------------- */
 const handlePageChange = (page) => {
-  fetchUsers({ page, ...getFilterParams() })
-}
-
-const getFilterParams = () => {
-  const params = {}
-
-  if (roleFilter.value !== 'all') {
-    params.role = roleFilter.value   // ✅ correct now
-  }
-
-  if (statusFilter.value !== 'all') {
-    params.status = statusFilter.value
-  }
-
-  if (searchQuery.value.trim() !== '') {
-    params.search = searchQuery.value.trim() // ✅ SEND search to backend
-  }
-
-  return params
-}
-
-
-const applyFilters = async () => {
-  await fetchUsers({
-    page: 1,
+  fetchUsers({
+    page,
     ...getFilterParams()
   })
 }
 
-
-const toggleSelectAll = (event) => {
-  if (event.target.checked) {
+/* -------------------------------------------
+   SELECTION
+------------------------------------------- */
+const toggleSelectAll = (e) => {
+  if (e.target.checked) {
     selectedUsers.value = users.value.map(u => u._id)
   } else {
     selectedUsers.value = []
   }
 }
 
-// Modal Methods
-const openAddModal = () => {
-  accountModal.value?.show('add')
-}
+/* -------------------------------------------
+   MODAL METHODS
+------------------------------------------- */
+const openAddModal = () => accountModal.value?.show('add')
 
-const viewUser = (user) => {
-  accountModal.value?.show('view', user)
-}
+const viewUser = (user) => accountModal.value?.show('view', user)
 
-const editUser = (user) => {
-  accountModal.value?.show('edit', user)
-}
+const editUser = (user) => accountModal.value?.show('edit', user)
 
 const handleModalSubmit = async (userData, mode) => {
   try {
@@ -344,30 +345,26 @@ const handleModalSubmit = async (userData, mode) => {
       await createUser(userData)
       showSuccess('User created successfully')
     }
-    
-    await fetchUsers()
+    await applyFilters()
   } catch (err) {
-    console.error('Error saving user:', err)
-    throw err // Re-throw to let modal handle error display
+    console.error(err)
+    throw err
   }
 }
 
-const handleModalClose = () => {
-  // Optional: Add any cleanup logic here
-}
-
-// Delete Methods
+/* -------------------------------------------
+   DELETE METHODS
+------------------------------------------- */
 const deleteMultipleUsers = async () => {
   if (!confirm(`Delete ${selectedUsers.value.length} users?`)) return
-  
+
   try {
-    for (const userId of selectedUsers.value) {
-      await deleteUserService(userId)
+    for (const id of selectedUsers.value) {
+      await deleteUserService(id)
     }
-    
-    showSuccess(`Successfully deleted ${selectedUsers.value.length} users`)
+    showSuccess(`Deleted ${selectedUsers.value.length} users`)
     selectedUsers.value = []
-    await fetchUsers()
+    await applyFilters()
   } catch (err) {
     error.value = err.message
   }
@@ -375,22 +372,24 @@ const deleteMultipleUsers = async () => {
 
 const confirmDeleteUser = async (user) => {
   if (!confirm(`Delete user "${user.username}"?`)) return
-  
+
   try {
     await deleteUserService(user._id)
-    showSuccess(`User "${user.username}" deleted successfully`)
-    await fetchUsers()
+    showSuccess(`User "${user.username}" deleted`)
+    await applyFilters()
   } catch (err) {
     error.value = err.message
   }
 }
 
-// Export
+/* -------------------------------------------
+   EXPORT
+------------------------------------------- */
 const exportData = () => {
   exporting.value = true
-  
   try {
     const headers = ['ID', 'Username', 'Full Name', 'Email', 'Role', 'Status', 'Last Login']
+
     const csvContent = [
       headers.join(','),
       ...users.value.map(user => [
@@ -403,35 +402,43 @@ const exportData = () => {
         formatDate(user.last_login)
       ].join(','))
     ].join('\n')
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
+
     const a = document.createElement('a')
     a.href = url
     a.download = `users_${new Date().toISOString().split('T')[0]}.csv`
     a.click()
+
     URL.revokeObjectURL(url)
   } finally {
     exporting.value = false
   }
 }
 
-// Utilities
-const showSuccess = (message) => {
-  successMessage.value = message
+/* -------------------------------------------
+   UTILITIES
+------------------------------------------- */
+const showSuccess = (msg) => {
+  successMessage.value = msg
   setTimeout(() => successMessage.value = null, 3000)
 }
 
-const formatDate = (dateString) => {
-  if (!dateString) return 'Never'
-  return new Date(dateString).toLocaleString()
+const formatDate = (date) => {
+  if (!date) return 'Never'
+  return new Date(date).toLocaleString()
 }
 
-// Lifecycle
-onMounted(async () => {
-  await fetchUsers()
+/* -------------------------------------------
+   LIFECYCLE
+------------------------------------------- */
+onMounted(() => {
+  applyFilters()
 })
 </script>
+
+
 
 <style scoped>
 .accounts-page {

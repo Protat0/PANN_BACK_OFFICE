@@ -53,15 +53,15 @@
     />
 
     <!-- Table -->
-    <TableTemplate 
-      v-if="hasCustomers || isLoading"
-      :items-per-page="itemsPerPage"
-      :total-items="totalCustomers"
-      :current-page="currentPage"
-      :show-pagination="totalCustomers > itemsPerPage"
-      @page-changed="handlePageChange"
-      class="shadow-md"
-    >
+    <TableTemplate
+        v-if="hasCustomers || isLoading"
+        :items-per-page="itemsPerPage"
+        :total-items="totalCustomers"
+        :current-page="currentPage"
+        :show-pagination="totalCustomers > itemsPerPage"
+        @page-changed="handlePageChange"
+        class="shadow-md"
+      >
       <template #header>
         <tr>
           <th style="width: 150px;">Customer ID</th>
@@ -77,11 +77,7 @@
       </template>
 
       <template #body>
-        <tr
-          v-for="customer in paginatedCustomers"
-          :key="customer._id || customer.customer_id"
-          class="hover-surface transition-theme"
-        >
+         <tr v-for="customer in paginatedCustomers" :key="customer._id || customer.customer_id" class="hover-surface transition-theme">
           <td>
             <span class="badge surface-tertiary text-accent border-theme-subtle fw-medium"
               style="font-family: var(--font-mono, 'Courier New', monospace);">
@@ -241,9 +237,16 @@ import ActionBar from '@/components/common/ActionBar.vue'
 import AddCustomerModal from '@/components/customers/AddCustomerModal.vue'
 import DeleteConfirmationModal from '@/components/common/DeleteConfirmationModal.vue'
 
-/* ================================================================
-   COMPOSABLE HOOKS
-================================================================ */
+const addOptions = [
+  { key: 'single', icon: 'Plus', title: 'Add Customer', description: 'Add manually' },
+  { key: 'import', icon: 'Upload', title: 'Import Customers', description: 'Upload CSV/Excel' },
+  { key: 'template', icon: 'FileText', title: 'Download Template', description: 'For imports' }
+];
+
+
+// =====================
+// COMPOSABLE HOOKS
+// =====================
 const {
   customers,
   isLoading,
@@ -251,7 +254,6 @@ const {
   statistics,
   totalCustomers,
   hasCustomers,
-  pagination,             // MUST EXIST IN COMPOSABLE
   fetchCustomers,
   fetchStatistics,
   deleteCustomer: deleteCustomerAPI,
@@ -260,31 +262,25 @@ const {
   exportCustomers
 } = useCustomers()
 
-/* ================================================================
-   STATE
-================================================================ */
+// =====================
+// STATE & MODAL REFS
+// =====================
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
-
 const exporting = ref(false)
 const searchValue = ref('')
-let searchDebounce = null
-
 const customerModal = ref(null)
 const deleteModalElement = ref(null)
 const deleteModalInstance = ref(null)
-
 const modalMode = ref('create')
 const selectedCustomer = ref(null)
 const customerToDelete = ref(null)
 const deletingCustomerId = ref(null)
-
-/* Selected items */
 const selectedCustomers = ref([])
 
-/* ================================================================
-   FILTERS FOR ACTION BAR
-================================================================ */
+// =====================
+// FILTERS
+// =====================
 const filters = ref([
   {
     key: 'status',
@@ -309,93 +305,80 @@ const filters = ref([
   }
 ])
 
-/* ================================================================
-   FULL PARAM BUILDER (Search + Filters + Pagination)
-================================================================ */
-const getFetchParams = () => {
-  const params = {
-    search: searchValue.value || '',
-    page: currentPage.value,
-    limit: itemsPerPage.value
+// =====================
+// QUERY PARAM MAPPER
+// =====================
+const buildQueryParams = () => {
+  const params = {}
+  // status filter
+  const statusFilter = filters.value.find(f => f.key === 'status')?.value
+  if (statusFilter && statusFilter !== 'all') params.status = statusFilter
+  // points filter
+  const pointsFilter = filters.value.find(f => f.key === 'points')?.value
+  if (pointsFilter && pointsFilter !== 'all') {
+    if (pointsFilter === 'high') params.min_loyalty_points = 100
+    else if (pointsFilter === 'medium') {
+      params.min_loyalty_points = 50
+      params.max_loyalty_points = 99
+    } else if (pointsFilter === 'low') {
+      params.min_loyalty_points = 0
+      params.max_loyalty_points = 49
+    }
   }
-
-  const statusFilter = filters.value.find(f => f.key === 'status')
-  if (statusFilter && statusFilter.value !== 'all') {
-    params.status = statusFilter.value
-  }
-
-  const pointsFilter = filters.value.find(f => f.key === 'points')
-  if (pointsFilter && pointsFilter.value !== 'all') {
-    params.points = pointsFilter.value
-  }
-
+  // search
+  if (searchValue.value && searchValue.value.trim()) params.search = searchValue.value.trim()
+  // pagination
+  params.page = currentPage.value
+  params.limit = itemsPerPage.value
   return params
 }
 
-/* ================================================================
-   TABLE FORMATTING
-================================================================ */
+// =====================
+// TABLE DATA
+// =====================
+const paginatedCustomers = computed(() => customers.value) // backend returns correct page right away
+
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A'
   try {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    })
-  } catch {
-    return 'Invalid Date'
-  }
+    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch { return 'Invalid Date' }
 }
 
-/* ================================================================
-   CORE HANDLERS
-================================================================ */
+// =====================
+// CORE HANDLERS -- modified
+// =====================
 const handleRetry = async () => {
   clearError()
-  await fetchCustomers(getFetchParams())
+  await fetchCustomers(buildQueryParams())
 }
 
+// page change triggers new fetch
 const handlePageChange = async (page) => {
   currentPage.value = page
-  await fetchCustomers(getFetchParams())
+  await fetchCustomers(buildQueryParams())
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-/* ================================================================
-   SEARCH HANDLERS (with debounce)
-================================================================ */
-const handleSearchInput = (value) => {
+const handleFilterChange = async (filterKey, value) => {
+  const filter = filters.value.find(f => f.key === filterKey)
+  if (filter) filter.value = value
+  currentPage.value = 1
+  await fetchCustomers(buildQueryParams())
+}
+
+const handleSearchInput = async (value) => {
   searchValue.value = value
-
-  if (searchDebounce) clearTimeout(searchDebounce)
-
-  searchDebounce = setTimeout(async () => {
-    currentPage.value = 1
-    await fetchCustomers(getFetchParams())
-  }, 300)
+  currentPage.value = 1
+  await fetchCustomers(buildQueryParams())
 }
 
 const handleSearchClear = async () => {
   searchValue.value = ''
   currentPage.value = 1
-  await fetchCustomers(getFetchParams())
+  await fetchCustomers(buildQueryParams())
 }
 
-/* ================================================================
-   FILTER HANDLER
-================================================================ */
-const handleFilterChange = async (filterKey, value) => {
-  const filter = filters.value.find(f => f.key === filterKey)
-  if (filter) filter.value = value
-
-  currentPage.value = 1
-  await fetchCustomers(getFetchParams())
-}
-
-/* ================================================================
-   IMPORT / EXPORT
-================================================================ */
 const handleImport = async (event) => {
   const file = event.target.files[0]
   if (!file) return
@@ -403,7 +386,7 @@ const handleImport = async (event) => {
     isLoading.value = true
     await importCustomers(file)
     alert('✅ Customers imported successfully!')
-    await fetchCustomers(getFetchParams())
+    await fetchCustomers(buildQueryParams())
   } catch (err) {
     alert('❌ Import failed: ' + err.message)
   } finally {
@@ -424,104 +407,98 @@ const handleExport = async () => {
 }
 
 const downloadTemplate = () => {
-  const csvTemplate = `username,full_name,email,phone,loyalty_points,status
-johndoe,John Doe,john@example.com,09171234567,100,active
-janedoe,Jane Doe,jane@example.com,09181112222,50,inactive
-`
+  const csvTemplate = `username,full_name,email,phone,loyalty_points,status\njohndoe,John Doe,john@example.com,09171234567,100,active\njanedoe,Jane Doe,jane@example.com,09181112222,50,inactive\n`
   const blob = new Blob([csvTemplate], { type: 'text/csv' })
   const link = document.createElement('a')
   link.href = URL.createObjectURL(blob)
   link.download = 'customer_import_template.csv'
+  document.body.appendChild(link)
   link.click()
   link.remove()
 }
 
-/* ================================================================
-   ACTION BAR EVENTS
-================================================================ */
-const handleAddAction = (key) => {
-  if (key === 'single') openAddCustomerModal()
-  if (key === 'import') document.getElementById('customer-import')?.click()
-  if (key === 'template') downloadTemplate()
+const handleAddAction = (actionKey) => {
+  switch (actionKey) {
+    case 'single': openAddCustomerModal(); break
+    case 'import': document.getElementById('customer-import')?.click(); break
+    case 'template': downloadTemplate(); break
+  }
 }
 
-const handleSelectionAction = (key, items) => {}
+const handleSelectionAction = (actionKey, selectedItems) => {
+  switch (actionKey) {
+    case 'delete': break
+  }
+}
 
-/* ================================================================
-   MODALS
-================================================================ */
 const openAddCustomerModal = () => {
   modalMode.value = 'create'
   selectedCustomer.value = null
   customerModal.value?.openModal()
 }
-
 const openViewCustomerModal = (customer) => {
   modalMode.value = 'view'
   selectedCustomer.value = customer
   customerModal.value?.openModal()
 }
-
 const openEditCustomerModal = (customer) => {
   modalMode.value = 'edit'
   selectedCustomer.value = customer
   customerModal.value?.openModal()
 }
-
 const handleModalClose = () => {
   modalMode.value = 'create'
   selectedCustomer.value = null
 }
-
 const handleModalSuccess = async () => {
-  await fetchCustomers(getFetchParams())
-  currentPage.value = 1
+  try {
+    await fetchCustomers(buildQueryParams())
+    if (modalMode.value === 'create') currentPage.value = 1
+  } catch (error) {
+    console.error('Failed to refresh customer list:', error)
+  }
 }
 
-/* ================================================================
-   DELETE CUSTOMER LOGIC
-================================================================ */
+// delete
 const openDeleteModal = (customer) => {
   customerToDelete.value = customer
   deleteModalInstance.value?.show()
 }
-
 const closeDeleteModal = () => {
   customerToDelete.value = null
   deleteModalInstance.value?.hide()
 }
-
 const confirmDelete = async () => {
   if (!customerToDelete.value) return
   try {
-    deletingCustomerId.value = customerToDelete.value._id
+    deletingCustomerId.value = customerToDelete.value._id || customerToDelete.value.customer_id
     await deleteCustomerAPI(deletingCustomerId.value)
     closeDeleteModal()
-    await fetchCustomers(getFetchParams())
-  } catch (err) {
-    console.error('Delete failed:', err)
-  } finally {
     deletingCustomerId.value = null
+    await fetchCustomers(buildQueryParams())
+  } catch (error) {
+    console.error('Failed to delete customer:', error)
   }
 }
+const deleteCustomer = (customer) => {
+  openDeleteModal(customer)
+}
 
-/* ================================================================
-   INITIALIZATION
-================================================================ */
+// INIT
 onMounted(async () => {
-  await fetchStatistics()
-  await fetchCustomers(getFetchParams())
-
-  if (deleteModalElement.value) {
-    deleteModalInstance.value = new Modal(deleteModalElement.value)
-    deleteModalElement.value.addEventListener('hidden.bs.modal', () => {
-      customerToDelete.value = null
-    })
+  try {
+    await Promise.all([fetchCustomers(buildQueryParams()), fetchStatistics()])
+    if (deleteModalElement.value) {
+      deleteModalInstance.value = new Modal(deleteModalElement.value)
+      deleteModalElement.value.addEventListener('hidden.bs.modal', () => {
+        customerToDelete.value = null
+      })
+    }
+  } catch (err) {
+    console.error('Failed to initialize customers page:', err)
   }
 })
 </script>
-
-
 
 
 

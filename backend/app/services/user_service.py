@@ -220,31 +220,32 @@ class UserService:
             logger.error(f"Error creating user: {str(e)}")
             raise Exception(f"Error creating user: {str(e)}")
         
-    def get_users(self, page=1, limit=50, status=None, include_deleted=False, search=None):
+    def get_users(self, page=1, limit=50, status=None, role=None, include_deleted=False, search=None):
         try:
             query = {}
+
             if not include_deleted:
                 query['isDeleted'] = {'$ne': True}
+
             if status:
                 query['status'] = status
-                
-            # Only get users with string IDs (USER-#### format)
+
+            if role:
+                query['role'] = role
+
             query['_id'] = {'$regex': '^USER-'}
-            
-            # Add search functionality
+
             if search:
-                search_conditions = [
+                query['$or'] = [
                     {'username': {'$regex': search, '$options': 'i'}},
                     {'email': {'$regex': search, '$options': 'i'}},
-                    {'first_name': {'$regex': search, '$options': 'i'}},
-                    {'last_name': {'$regex': search, '$options': 'i'}}
+                    {'full_name': {'$regex': search, '$options': 'i'}}
                 ]
-                query['$or'] = search_conditions
-            
+
             skip = (page - 1) * limit
             users = list(self.collection.find(query).skip(skip).limit(limit))
             total = self.collection.count_documents(query)
-            
+
             return {
                 'users': users,
                 'total': total,
@@ -254,6 +255,7 @@ class UserService:
             }
         except Exception as e:
             raise Exception(f"Error getting users: {str(e)}")
+
     
     def get_user_by_id(self, user_id, include_deleted=False):
         """Get user by USER-#### ID"""

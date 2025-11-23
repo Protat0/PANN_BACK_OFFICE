@@ -40,38 +40,68 @@ class CustomerService:
     # CRUD OPERATIONS
     # ================================================================
     
-    def get_customers(self, page=1, limit=50, status=None, min_loyalty_points=None, include_deleted=False, sort_by=None):
-        """Get customers with pagination and filters - handles all customer queries"""
+    def get_customers(self, page=1, limit=50, status=None, min_loyalty_points=None, max_loyalty_points=None, include_deleted=False, sort_by=None, search=None):
+        """Get customers with pagination, search, and loyalty point range filtering"""
         try:
             query = {}
-            
-            # Build query filters
+
+            # ----------------------------------------------------
+            # BASIC FILTERS
+            # ----------------------------------------------------
             if not include_deleted:
                 query['isDeleted'] = {'$ne': True}
-            if status:
+
+            if status: 
                 query['status'] = status
-            if min_loyalty_points:
+
+            # ----------------------------------------------------
+            # LOYALTY POINT FILTERS (min / max)
+            # ----------------------------------------------------
+            if min_loyalty_points is not None:
                 query['loyalty_points'] = {'$gte': min_loyalty_points}
-            
-            # Handle sorting
-            sort_options = {}
+
+            if max_loyalty_points is not None:
+                query.setdefault('loyalty_points', {})
+                query['loyalty_points']['$lte'] = max_loyalty_points
+
+            # ----------------------------------------------------
+            # SEARCH FILTER
+            # ----------------------------------------------------
+            if search:
+                search_regex = {'$regex': search, '$options': 'i'}
+                query['$or'] = [
+                    {'full_name': search_regex},
+                    {'email': search_regex},
+                    {'username': search_regex},
+                    {'phone': search_regex},
+                ]
+
+            # ----------------------------------------------------
+            # SORTING
+            # ----------------------------------------------------
             if sort_by == 'loyalty_desc':
                 sort_options = [('loyalty_points', -1)]
-            elif sort_by == 'date_desc':
-                sort_options = [('date_created', -1)]
+            elif sort_by == 'date_asc':
+                sort_options = [('date_created', 1)]
             else:
-                sort_options = [('date_created', -1)]  # Default sort
-                
+                sort_options = [('date_created', -1)]  # default
+
+            # ----------------------------------------------------
+            # PAGINATION
+            # ----------------------------------------------------
             skip = (page - 1) * limit
-            
-            # Execute query with sorting
-            if sort_options:
-                customers = list(self.customer_collection.find(query).sort(sort_options).skip(skip).limit(limit))
-            else:
-                customers = list(self.customer_collection.find(query).skip(skip).limit(limit))
-                
+
+            customers_cursor = (
+                self.customer_collection
+                    .find(query)
+                    .sort(sort_options)
+                    .skip(skip)
+                    .limit(limit)
+            )
+
+            customers = list(customers_cursor)
             total = self.customer_collection.count_documents(query)
-            
+
             return {
                 'customers': customers,
                 'total': total,
@@ -81,11 +111,16 @@ class CustomerService:
                 'filters_applied': {
                     'status': status,
                     'min_loyalty_points': min_loyalty_points,
-                    'include_deleted': include_deleted
+                    'max_loyalty_points': max_loyalty_points,
+                    'include_deleted': include_deleted,
+                    'search': search
                 }
             }
+
         except Exception as e:
             raise Exception(f"Error getting customers: {str(e)}")
+
+
     
     def generate_customer_id(self):
         """Generate sequential CUST-##### format ID"""

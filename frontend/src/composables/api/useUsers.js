@@ -44,12 +44,13 @@ export function useUsers() {
         page: params.page || pagination.value.page,
         limit: params.limit || pagination.value.limit,
         status: params.status,
+        role: params.role,        // ✅ added role filter
+        search: params.search,    // ✅ added search filter
         include_deleted: params.include_deleted || false
       })
 
       users.value = response.users || []
 
-      // Update pagination
       pagination.value = {
         page: response.page || 1,
         limit: response.limit || 50,
@@ -66,6 +67,7 @@ export function useUsers() {
       loading.value = false
     }
   }
+
 
   /**
    * Fetch user by ID

@@ -24,38 +24,45 @@ class UserListView(APIView):
     def __init__(self):
         self.user_service = UserService()
     
-    
+    @require_authentication
     def get(self, request):
         """Get users with pagination and filters"""
         try:
             page = int(request.query_params.get('page', 1))
             limit = int(request.query_params.get('limit', 50))
+
             status_filter = request.query_params.get('status')
+            role_filter = request.query_params.get('role')
+            search_query = request.query_params.get('search')
             include_deleted = request.query_params.get('include_deleted', 'false').lower() == 'true'
-            
+
             # Only admins can view deleted users
             if include_deleted and request.current_user.get('role', '').lower() != 'admin':
                 return Response(
-                    {"error": "Admin permissions required to view deleted users"}, 
+                    {"error": "Admin permissions required to view deleted users"},
                     status=status.HTTP_403_FORBIDDEN
                 )
-            
+
             result = self.user_service.get_users(
-                page=page, 
-                limit=limit, 
-                status=status_filter, 
+                page=page,
+                limit=limit,
+                status=status_filter,
+                role=role_filter,
+                search=search_query,
                 include_deleted=include_deleted
             )
+
             return Response(result, status=status.HTTP_200_OK)
-            
+
         except Exception as e:
             logger.error(f"Error getting users: {e}")
             return Response(
-                {"error": str(e)}, 
+                {"error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-   
+
+    @require_authentication
     def post(self, request):
         """Create new user - Requires admin authentication"""
         try:

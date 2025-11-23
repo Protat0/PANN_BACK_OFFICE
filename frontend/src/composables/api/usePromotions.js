@@ -79,15 +79,22 @@ export function usePromotions() {
         limit: pagination.value.items_per_page
       }
 
+      // Discount type
       if (filters.value.discountType !== 'all') {
-        params.discount_type = filters.value.discountType
+        params.type = filters.value.discountType
       }
 
+      // Status
       if (filters.value.status !== 'all') {
         params.status = filters.value.status
       }
 
-      // ✔ FIXED — unified search parameter
+      // Target Type
+      if (filters.value.targetType !== 'all') {
+        params.target_type = filters.value.targetType
+      }
+
+      // Search
       if (searchQuery.value.trim()) {
         params.search = searchQuery.value.trim()
       }
@@ -110,6 +117,7 @@ export function usePromotions() {
       loading.value = false
     }
   }
+
 
   // =============================
   // CRUD OPERATIONS

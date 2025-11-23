@@ -938,41 +938,72 @@ class PromotionService:
     def get_all_promotions(self, filters=None, page=1, limit=20, sort_by='created_at', sort_order='desc'):
         """List promotions with filtering and pagination"""
         try:
-            # Build query
             query = {}
-            
+
             # Exclude deleted promotions by default
             if not filters or not filters.get('include_deleted'):
                 query['isDeleted'] = {'$ne': True}
-            
+
+            # ============================
+            # APPLY FILTERS
+            # ============================
             if filters:
-                # Add your existing filter logic here...
-                pass
-                
-            # Calculate pagination
+
+                # Filter by status (active, inactive, expired)
+                if filters.get('status') and filters['status'] != 'all':
+                    query['status'] = filters['status']
+
+                # Filter by type (percentage, fixed_amount, buy_x_get_y)
+                if filters.get('type') and filters['type'] != 'all':
+                    query['type'] = filters['type']
+
+                # Filter by target_type (supports both schemas)
+                if filters.get('target_type') and filters['target_type'] != 'all':
+                    query['$or'] = [
+                        {'discount_config.target_type': filters['target_type']},
+                        {'target_type': filters['target_type']}
+                    ]
+
+                # Filter by creator
+                if filters.get('created_by'):
+                    query['created_by'] = filters['created_by']
+
+                # Search by name
+                if filters.get('search_query'):
+                    query['name'] = {
+                        '$regex': filters['search_query'],
+                        '$options': 'i'
+                    }
+
+                # Filter by created_at range
+                if filters.get('date_from') and filters.get('date_to'):
+                    query['created_at'] = {
+                        '$gte': filters['date_from'],
+                        '$lte': filters['date_to']
+                    }
+
+            # ============================
+            # Pagination + Sorting
+            # ============================
             skip = (page - 1) * limit
-            
-            # Sort configuration
             sort_direction = -1 if sort_order.lower() == 'desc' else 1
-            
-            # Execute query
-            promotions = list(self.collection.find(query)
-                            .sort(sort_by, sort_direction)
-                            .skip(skip)
-                            .limit(limit))
-            
-            # **SERIALIZE ALL PROMOTIONS BEFORE RETURNING**
-            serialized_promotions = []
-            for promotion in promotions:
-                serialized_promotions.append(self._serialize_promotion_data(promotion))
-            
-            # Get total count for pagination
+
+            promotions = list(
+                self.collection.find(query)
+                .sort(sort_by, sort_direction)
+                .skip(skip)
+                .limit(limit)
+            )
+
+            # Serialize promotions
+            serialized = [self._serialize_promotion_data(p) for p in promotions]
+
             total_count = self.collection.count_documents(query)
             total_pages = (total_count + limit - 1) // limit
-            
+
             return {
                 'success': True,
-                'promotions': serialized_promotions,  # Use serialized data
+                'promotions': serialized,
                 'pagination': {
                     'current_page': page,
                     'total_pages': total_pages,
@@ -981,10 +1012,14 @@ class PromotionService:
                     'has_previous': page > 1
                 }
             }
-            
+
         except Exception as e:
             logger.error(f"Error getting promotions: {e}")
-            return {'success': False, 'message': f'Error retrieving promotions: {str(e)}'}
+            return {
+                'success': False,
+                'message': f'Error retrieving promotions: {str(e)}'
+            }
+
     
     def _serialize_promotion_data(self, promotion):
         """Convert MongoDB ObjectIds to strings for JSON serialization"""

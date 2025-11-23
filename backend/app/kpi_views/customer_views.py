@@ -186,35 +186,41 @@ class CustomerListView(APIView):
     def __init__(self):
         self.customer_service = CustomerService()
 
-    @require_admin  
+     
     def get(self, request):
-        """Get customers with pagination and filters - Admin only"""
         try:
             page = int(request.query_params.get('page', 1))
             limit = int(request.query_params.get('limit', 50))
             status_filter = request.query_params.get('status')
             min_loyalty_points = request.query_params.get('min_loyalty_points')
+            max_loyalty_points = request.query_params.get('max_loyalty_points')  # NEW
             include_deleted = request.query_params.get('include_deleted', 'false').lower() == 'true'
             sort_by = request.query_params.get('sort_by')
-            
+            search = request.query_params.get('search')
+
             if min_loyalty_points:
                 min_loyalty_points = int(min_loyalty_points)
-            
+
+            if max_loyalty_points:
+                max_loyalty_points = int(max_loyalty_points)  # NEW
+
             result = self.customer_service.get_customers(
                 page=page,
                 limit=limit,
                 status=status_filter,
                 min_loyalty_points=min_loyalty_points,
+                max_loyalty_points=max_loyalty_points,  # NEW
                 include_deleted=include_deleted,
-                sort_by=sort_by
+                sort_by=sort_by,
+                search=search
             )
+
             return Response(result, status=status.HTTP_200_OK)
+
         except Exception as e:
             logger.error(f"Error getting customers: {e}")
-            return Response(
-                {"error": str(e)}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     
     @require_authentication
     def post(self, request):
