@@ -349,32 +349,31 @@ const handleSinglePromo = () => {
 
 const exportData = async () => {
   exporting.value = true
-  
+
   try {
-    const exportFilters = {}
-    if (filters.value.discountType !== 'all') {
-      exportFilters.discount_type = filters.value.discountType
+    // Optional: apply filtering logic here if needed
+    const data = promotions.value
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error('No data available for export.')
     }
-    if (filters.value.status !== 'all') {
-      exportFilters.status = filters.value.status
-    }
-    
-    // Basic export to JSON for now
-    const dataToExport = {
-      promotions: promotions.value,
-      filters: exportFilters,
-      exported_at: new Date().toISOString(),
-      total_count: pagination.value.total_items
-    }
-    
-    const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' })
+    const keys = Object.keys(data[0])
+    const csvRows = [
+      keys.join(','), // header
+      ...data.map(row =>
+        keys.map(key =>
+          `"${row[key] !== undefined ? String(row[key]).replace(/"/g, '""') : ''}"`
+        ).join(',')
+      )
+    ]
+    const csvContent = csvRows.join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `promotions_${new Date().toISOString().split('T')[0]}.json`
+    link.download = `promotions_${new Date().toISOString().split('T')[0]}.csv`
     link.click()
     window.URL.revokeObjectURL(url)
-    
+
     showSuccess('✅ Export completed successfully!')
   } catch (err) {
     console.error('Export error:', err)

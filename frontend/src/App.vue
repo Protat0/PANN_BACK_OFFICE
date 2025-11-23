@@ -1,6 +1,6 @@
 <template>
   <div id="app">
-    <!-- This will show either Login page or the main app based on authentication -->
+    <!-- Renders the current page -->
     <router-view />
   </div>
 </template>
@@ -8,8 +8,13 @@
 <script>
 export default {
   name: 'App',
+
+  // ❌ This block causes redirect loops and breaks refresh behavior
+  // ❌ Also conflicts with router guards
+  // ❌ We hide it but keep it in case you need to reference later
+
+  /*
   mounted() {
-    // Check authentication status when app loads
     this.checkAuthStatus()
   },
   methods: {
@@ -28,6 +33,7 @@ export default {
       }
     }
   }
+  */
 }
 </script>
 
