@@ -1579,5 +1579,74 @@ class CategoryService:
         except Exception as e:
             logger.error(f"Error moving product to category: {e}")
             raise Exception(f"Error moving product to category: {str(e)}")
+    
+    def bulk_move_products_to_category(self, product_ids, new_category_id, new_subcategory_name=None, current_user=None):
+        """Bulk move multiple products to a different category/subcategory"""
+        try:
+            logger.info(f"Bulk moving {len(product_ids)} products to category {new_category_id}")
+            
+            # Validate the target category exists
+            target_category = self.get_category_by_id(new_category_id)
+            if not target_category:
+                raise ValueError(f"Target category {new_category_id} not found")
+            
+            # If no subcategory specified, use "None" as default (matching single move behavior)
+            if not new_subcategory_name:
+                new_subcategory_name = "None"
+            
+            # Validate subcategory exists in target category
+            subcategories = target_category.get('sub_categories', [])
+            subcategory_exists = any(
+                sub.get('name') == new_subcategory_name 
+                for sub in subcategories
+            )
+            
+            if not subcategory_exists:
+                raise ValueError(f"Subcategory '{new_subcategory_name}' not found in category {new_category_id}")
+            
+            # Bulk update products directly in database
+            result = self.product_collection.update_many(
+                {
+                    '_id': {'$in': product_ids},
+                    'isDeleted': {'$ne': True}
+                },
+                {
+                    '$set': {
+                        'category_id': new_category_id,
+                        'subcategory_name': new_subcategory_name,
+                        'updated_at': datetime.utcnow(),
+                        'last_updated': datetime.utcnow()
+                    }
+                }
+            )
+            
+            moved_count = result.modified_count
+            
+            if moved_count > 0:
+                logger.info(f"Bulk moved {moved_count} products to category {new_category_id} > {new_subcategory_name}")
+                
+                # Audit logging
+                if current_user and self.audit_service:
+                    try:
+                        self.audit_service.log_action(
+                            action='bulk_move',
+                            resource_type='products',
+                            resource_id=f"{moved_count}_products",
+                            user_id=current_user.get('user_id') or current_user.get('username', 'unknown'),
+                            changes={
+                                'target_category': new_category_id,
+                                'target_subcategory': new_subcategory_name,
+                                'products_moved': moved_count,
+                                'product_ids': product_ids
+                            }
+                        )
+                    except Exception as audit_error:
+                        logger.warning(f"Audit logging failed for bulk move: {audit_error}")
+            
+            return moved_count
+            
+        except Exception as e:
+            logger.error(f"Error bulk moving products to category: {e}")
+            raise Exception(f"Error bulk moving products to category: {str(e)}")
             
     
