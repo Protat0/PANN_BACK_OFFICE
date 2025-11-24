@@ -1013,8 +1013,8 @@ export default {
 /* ====================================================================== */
 .LCL1 {
   display: flex;
-  align-items: baseline;
-  gap: 250px;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .LCL1 h1, .LCL1 h3 {
@@ -1052,7 +1052,7 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: black;
+  width: 100%;
   margin-bottom: 8px;
   height: 30px;
   padding: 0 10px;
@@ -1060,10 +1060,12 @@ export default {
 
 .item-name {
   font-weight: 500;
+  flex: 1;
 }
 
 .item-price {
   font-weight: bold;
+  white-space: nowrap;
 }
 
 /* ====================================================================== */

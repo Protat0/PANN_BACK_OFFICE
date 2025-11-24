@@ -8,7 +8,7 @@
       <div class="LC-SBC">
         <div class="LCL1">
           <h1>Top Categories</h1>
-          <h3 style="margin-left: 75px;">Net Sales</h3>
+          <h3>Net Sales</h3>
         </div>
         
         <!-- Loading state for top categories -->
@@ -643,8 +643,8 @@ export default {
 /* ====================================================================== */
 .LCL1 {
   display: flex;
-  align-items: baseline;
-  gap: 250px;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .LCL1 h1, .LCL1 h3 {
@@ -675,26 +675,28 @@ export default {
 .LCL2 li {
   color: black;
   height: 30px;
-  margin-bottom: 20px;
+   margin-bottom: 15px;
 }
 
 .list-item {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  color: black;
-  margin-bottom: 12px;
-  padding: 8px 10px;
-  min-height: 50px;
+  align-items: center;
+  padding: 0 10px;
+  height: 30px;
 }
 
 .item-name {
-  font-weight: 500;
-  font-size: 16px;
+  font-size: 25px;
+  font-weight: bold;
+  color: black;
 }
 
 .item-price {
+  font-size: 15px;
   font-weight: bold;
+  color: green;
+  white-space: nowrap;
 }
 
 /* ====================================================================== */
@@ -1192,8 +1194,8 @@ export default {
 
 .category-info {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
+  gap: 6px;
 }
 
 .trend-indicator {

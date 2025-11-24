@@ -517,6 +517,15 @@ class ApiProductsService {
       errors
     }
   }
+  
+  async getAllSuppliers() {
+    try {
+      const response = await api.get(`/suppliers/`)
+      return this.handleResponse(response)
+    } catch (error) {
+      this.handleError(error)
+    }
+  }
 
   
 }

@@ -98,6 +98,7 @@
             v-if="activeTab === 'Overview'"
             :key="`overview-${id}`"
             :product-id="id"
+            ref="overviewRef"
             @adjust-stock="handleStockAdjustment"
             @change-image="handleImageUpload"
             @reorder="handleReorder"
@@ -192,6 +193,7 @@ export default {
     const successMessage = ref('')
     const isInitialized = ref(false)
     const visitedTabs = ref(new Set(['Overview'])) // Track which tabs have been visited
+    const overviewRef = ref(null)
 
     // Check if a tab has been visited
     const hasVisitedTab = (tab) => {
@@ -251,21 +253,26 @@ export default {
     }
 
 
-    const handleModalSuccess = async (result) => {
-      if (result?.message) {
-        successMessage.value = result.message
-        setTimeout(() => {
-          successMessage.value = ''
-        }, 3000)
-      }
-      
-      // Refresh product data after modal success
-      try {
-        await fetchProductById(props.id)
-      } catch (err) {
-        console.error('❌ Failed to refresh product after modal:', err)
-      }
+   const handleModalSuccess = async (result) => {
+    if (result?.message) {
+      successMessage.value = result.message
+      setTimeout(() => {
+        successMessage.value = ''
+      }, 3000)
     }
+    
+    try {
+      // Optional: still refresh the product data
+      await fetchProductById(props.id)
+    } catch (err) {
+      console.error('❌ Failed to refresh product after modal:', err)
+    }
+
+    // 🔥 Hard refresh the current route (page-level refresh)
+    router.go(0)
+  }
+
+
 
     const setActiveTab = (tab) => {
       activeTab.value = tab
@@ -313,7 +320,7 @@ export default {
       // Template refs
       addProductModal,
       stockUpdateModal,
-      
+      overviewRef,
       // Methods
       setActiveTab,
       hasVisitedTab,

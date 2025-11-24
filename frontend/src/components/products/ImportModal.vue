@@ -425,7 +425,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { 
   Upload, FileSpreadsheet, AlertTriangle, Check, CheckCircle, 
   RefreshCw, Eye, Plus, Package, XCircle, Info
@@ -473,6 +473,13 @@ export default {
         return validateOnly.value ? 'Validating...' : 'Importing...'
       }
       return validateOnly.value ? 'Validate File' : 'Import Products'
+    })
+
+    // ✅ Prevent auto-import UI showing when switching modes
+    watch(validateOnly, (value) => {
+      if (!value) {
+        importResults.value = null
+      }
     })
 
     const downloadTemplate = async (fileType) => {
@@ -565,13 +572,16 @@ export default {
       resetForm()
     }
 
+    // ✅ FULLY FIXED VERSION — separate validation and import
     const handleImport = async () => {
       if (!selectedFile.value || !canImport.value) return
 
       try {
         isUploading.value = true
         uploadProgress.value = 0
-        uploadStatus.value = 'Preparing file...'
+        uploadStatus.value = validateOnly.value
+          ? 'Validating file...'
+          : 'Importing products...'
 
         const progressInterval = setInterval(() => {
           if (uploadProgress.value < 85) {
@@ -580,8 +590,13 @@ export default {
           }
         }, 300)
 
-        const result = await apiProductsService.importProducts(selectedFile.value, validateOnly.value)
-        
+        let result
+        if (validateOnly.value) {
+          result = await apiProductsService.importProducts(selectedFile.value, true)
+        } else {
+          result = await apiProductsService.importProducts(selectedFile.value, false)
+        }
+
         clearInterval(progressInterval)
         uploadProgress.value = 100
 
@@ -600,6 +615,7 @@ export default {
               batchesCreated: processedResult.batchesCreated
             })
           }
+
         } else {
           uploadStatus.value = validateOnly.value ? 'Validation failed' : 'Import completed with issues'
           uploadProgress.value = 0
@@ -639,7 +655,7 @@ export default {
       }
     }
 
-    // ✅ ONLY THIS FUNCTION WAS CHANGED
+    // unchanged
     const parseImportResult = (result) => {
       if (!result) {
         return {
@@ -654,26 +670,21 @@ export default {
       }
 
       const data = result.results || result
-
-      // ✅ FIXED: Handle both validation mode and import mode
       let errors = []
       let totalProcessed = 0
       let totalSuccessful = 0
       let totalFailed = 0
 
       if (validateOnly.value) {
-        // Validation mode
         errors = data.errors || []
         totalProcessed = data.total_rows || 0
         totalSuccessful = data.valid_products || 0
         totalFailed = errors.length
       } else {
-        // Import mode
         totalProcessed = data.total_rows || 0
         totalSuccessful = data.successful || 0
         totalFailed = data.failed || 0
         
-        // Extract error messages from failed_details
         const failedDetails = data.failed_details || []
         errors = failedDetails.map(f => `${f.product}: ${f.error}`)
       }
@@ -798,6 +809,7 @@ export default {
   }
 }
 </script>
+
 
 <style scoped>
 .modal-header {

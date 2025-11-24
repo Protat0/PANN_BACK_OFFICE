@@ -16,112 +16,86 @@
 
     <!-- Content -->
     <template v-else-if="currentProduct">
-      <!-- Left Column - Product Details (2/3 width) -->
+      <!-- Left Column -->
       <div class="details-column">
-        <!-- Primary Details -->
         <div class="card-theme p-4">
           <h3 class="text-primary mb-3">Primary Details</h3>
-          
+
           <div class="row mb-3">
             <div class="col-6">
-              <div class="mb-2">
-                <small class="text-tertiary d-block">Product Name</small>
-                <span class="text-secondary">{{ currentProduct.product_name }}</span>
-              </div>
+              <small class="text-tertiary d-block">Product Name</small>
+              <span class="text-secondary">{{ currentProduct.product_name }}</span>
             </div>
             <div class="col-6">
-              <div class="mb-2">
-                <small class="text-tertiary d-block">SKU</small>
-                <span class="text-secondary">{{ currentProduct.SKU || 'N/A' }}</span>
-              </div>
+              <small class="text-tertiary d-block">SKU</small>
+              <span class="text-secondary">{{ currentProduct.SKU || 'N/A' }}</span>
             </div>
           </div>
-          
+
           <div class="row mb-3">
             <div class="col-6">
-              <div class="mb-2">
-                <small class="text-tertiary d-block">Category</small>
-                <span class="text-secondary">{{ categoryName }}</span>
-              </div>
+              <small class="text-tertiary d-block">Category</small>
+              <span class="text-secondary">{{ categoryName }}</span>
             </div>
             <div class="col-6">
-              <div class="mb-2">
-                <small class="text-tertiary d-block">Subcategory</small>
-                <span class="text-secondary">{{ currentProduct.subcategory_name || 'General' }}</span>
-              </div>
+              <small class="text-tertiary d-block">Subcategory</small>
+              <span class="text-secondary">{{ currentProduct.subcategory_name || 'General' }}</span>
             </div>
           </div>
-          
+
           <div class="row mb-3">
             <div class="col-6">
-              <div class="mb-2">
-                <small class="text-tertiary d-block">Threshold Value</small>
-                <span class="text-secondary">{{ currentProduct.low_stock_threshold || 0 }}</span>
-              </div>
+              <small class="text-tertiary d-block">Threshold Value</small>
+              <span class="text-secondary">{{ currentProduct.low_stock_threshold || 0 }}</span>
             </div>
             <div class="col-6">
-              <div class="mb-2">
-                <small class="text-tertiary d-block">Expiry Date</small>
-                <span class="text-secondary">{{ formatDate(nearestExpiryDate) }}</span>
-              </div>
+              <small class="text-tertiary d-block">Expiry Date</small>
+              <span class="text-secondary">{{ formatDate(nearestExpiryDate) }}</span>
             </div>
           </div>
-          
+
           <div class="row">
             <div class="col-6">
-              <div class="mb-2">
-                <small class="text-tertiary d-block">Created</small>
-                <span class="text-secondary">{{ formatDate(currentProduct.createdAt) }}</span>
-              </div>
+              <small class="text-tertiary d-block">Created</small>
+              <span class="text-secondary">{{ formatDate(currentProduct.createdAt) }}</span>
             </div>
             <div class="col-6">
-              <div class="mb-2">
-                <small class="text-tertiary d-block">Status</small>
-                <span :class="getStatusBadgeClass(currentProduct.status)">
-                  {{ formatStatus(currentProduct.status) }}
-                </span>
-              </div>
+              <small class="text-tertiary d-block">Status</small>
+              <span :class="getStatusBadgeClass(currentProduct.status)">
+                {{ formatStatus(currentProduct.status) }}
+              </span>
             </div>
           </div>
         </div>
 
-        <!-- Supplier Details -->
         <div class="card-theme p-4">
           <h3 class="text-primary mb-3">Supplier Details</h3>
-          
+
           <div class="row">
             <div class="col-6">
-              <div class="mb-2">
-                <small class="text-tertiary d-block">Supplier Name</small>
-                <span class="text-secondary">{{ supplierName }}</span>
-              </div>
+              <small class="text-tertiary d-block">Supplier Name</small>
+              <span class="text-secondary">{{ supplierName }}</span>
             </div>
             <div class="col-6">
-              <div class="mb-2">
-                <small class="text-tertiary d-block">Barcode</small>
-                <span class="text-secondary">{{ currentProduct.barcode || 'No barcode' }}</span>
-              </div>
+              <small class="text-tertiary d-block">Barcode</small>
+              <span class="text-secondary">{{ currentProduct.barcode || 'No barcode' }}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Right Column - Image & Stock Info (1/3 width) -->
+      <!-- Sidebar -->
       <div class="sidebar-column">
-        <!-- Product Image -->
         <div class="card-theme p-3 text-center">
           <div v-if="currentProduct.image_url" class="image-wrapper">
-            <img 
-              :src="currentProduct.image_url" 
-              :alt="currentProduct.product_name"
-              class="product-image"
-            />
+            <img :src="currentProduct.image_url" :alt="currentProduct.product_name" class="product-image" />
           </div>
           <div v-else class="image-placeholder">
             <Package :size="48" class="opacity-50" />
             <p class="text-tertiary-medium mt-2 mb-0">{{ currentProduct.product_name }}</p>
           </div>
-          <button 
+
+          <button
             class="btn btn-sm btn-outline-primary mt-3 w-100"
             @click="$emit('change-image')"
           >
@@ -129,65 +103,66 @@
           </button>
         </div>
 
-        <!-- Stock Information -->
         <div class="card-theme p-4 position-relative">
           <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="text-primary mb-0">Stock Information</h5>
-            <button 
-              class="btn btn-sm btn-edit"
-              @click="$emit('adjust-stock')"
-              title="Adjust Stock"
-            >
+            <button class="btn btn-sm btn-edit" @click="$emit('adjust-stock')">
               Adjust Stock
             </button>
           </div>
-          
+
           <div class="d-flex justify-content-between align-items-center mb-2">
             <small class="text-tertiary">Current Stock</small>
             <span :class="getStockClass(currentStock)" class="fw-semibold fs-5">
               {{ currentStock }}
             </span>
           </div>
-          
-          <div class="d-flex justify-content-between align-items-center mb-2">
+
+          <div class="mb-2 d-flex justify-content-between">
             <small class="text-tertiary">Low Stock Threshold</small>
-            <span class="text-secondary fw-semibold">{{ currentProduct.low_stock_threshold || 10 }}</span>
+            <span class="text-secondary fw-semibold">
+              {{ currentProduct.low_stock_threshold || 10 }}
+            </span>
           </div>
-          
-          <div class="d-flex justify-content-between align-items-center mb-2">
+
+          <div class="mb-2 d-flex justify-content-between">
             <small class="text-tertiary">Cost Price</small>
-            <span class="text-secondary fw-semibold">₱{{ formatPrice(averageCostPrice) }}</span>
+            <span class="text-secondary fw-semibold">
+              ₱{{ formatPrice(averageCostPrice) }}
+            </span>
           </div>
-          
-          <div class="d-flex justify-content-between align-items-center mb-2">
+
+          <div class="mb-2 d-flex justify-content-between">
             <small class="text-tertiary">Selling Price</small>
             <div class="d-flex flex-column align-items-end">
               <span v-if="hasActivePromotion" class="text-tertiary text-decoration-line-through small">
                 ₱{{ formatPrice(currentProduct.selling_price) }}
               </span>
-              <span class="text-secondary fw-semibold">₱{{ formatPrice(effectiveSellingPrice) }}</span>
+              <span class="text-secondary fw-semibold">
+                ₱{{ formatPrice(effectiveSellingPrice) }}
+              </span>
             </div>
           </div>
-          
-          <!-- Active Promotion Badge -->
+
           <div v-if="hasActivePromotion" class="promotion-badge mb-2">
             <CheckCircle :size="14" class="me-1" />
             {{ activePromotion.name }}
           </div>
-          
-          <div class="d-flex justify-content-between align-items-center mb-2">
+
+          <div class="mb-2 d-flex justify-content-between">
             <small class="text-tertiary">Profit Margin</small>
             <span :class="profitMarginClass" class="fw-semibold">
               {{ profitMargin }}%
             </span>
           </div>
-          
+
           <div class="d-flex justify-content-between align-items-center">
             <small class="text-tertiary">Unit Type</small>
-            <span class="text-accent fw-semibold">{{ currentProduct.unit || 'bottle' }}</span>
+            <span class="text-accent fw-semibold">
+              {{ currentProduct.unit || 'bottle' }}
+            </span>
           </div>
 
-          <!-- Stock Alert -->
           <div v-if="isLowStock" class="alert alert-warning mt-3 mb-0 py-2">
             <div class="d-flex align-items-center">
               <AlertTriangle :size="16" class="me-2" />
@@ -198,7 +173,7 @@
       </div>
     </template>
 
-    <!-- No Product Found -->
+    <!-- Not Found -->
     <div v-else class="text-center py-5" style="grid-column: 1 / -1;">
       <Package :size="64" class="opacity-50 mb-3" />
       <h5 class="text-tertiary">Product not found</h5>
@@ -216,299 +191,197 @@ import { Package, CheckCircle, AlertTriangle } from 'lucide-vue-next'
 
 export default {
   name: 'ProductOverview',
-  components: {
-    Package,
-    CheckCircle,
-    AlertTriangle
-  },
+  components: { Package, CheckCircle, AlertTriangle },
   props: {
-    productId: {
-      type: String,
-      required: true
-    }
+    productId: { type: String, required: true }
   },
   emits: ['adjust-stock', 'change-image', 'reorder', 'view-history'],
   setup(props) {
-    // ================ COMPOSABLES ================
-    
-    const { 
-      currentProduct,
-      loading: productLoading,
-      error: productError,
-      fetchProductById
-    } = useProducts()
-    
-    const {
-      batches,
-      loading: batchLoading,
-      error: batchError,
-      fetchBatchesByProduct
-    } = useBatches()
-    
-    const {
-      currentCategory,
-      fetchCategoryById
-    } = useCategories()
-    
-    // ================ LOCAL STATE ================
-    
+
+    // ===================== COMPOSABLES =====================
+
+    const { currentProduct, loading: productLoading, error: productError, fetchProductById } = useProducts()
+    const { batches, loading: batchLoading, error: batchError, fetchBatchesByProduct } = useBatches()
+    const { currentCategory, fetchCategoryById } = useCategories()
+
     const activePromotion = ref(null)
-    const isInitialized = ref(false)
-    
-    // ================ COMPUTED - LOADING & ERRORS ================
-    
-    const isLoading = computed(() => 
-      productLoading.value || batchLoading.value
-    )
-    
+
+    // ===================== LOADING & ERRORS =====================
+
+    const isLoading = computed(() => productLoading.value || batchLoading.value)
+
     const errorMessage = computed(() => {
-      if (productError.value && !productError.value.includes('aborted')) {
-        return productError.value
-      }
-      if (batchError.value && !batchError.value.includes('aborted')) {
-        return batchError.value
-      }
+      if (productError.value && !productError.value.includes('aborted')) return productError.value
+      if (batchError.value && !batchError.value.includes('aborted')) return batchError.value
       return null
     })
-    
-    // ================ COMPUTED - STOCK CALCULATIONS ================
-    
+
+    // ===================== STOCK =====================
+
     const currentStock = computed(() => {
-      const activeBatches = batches.value.filter(batch => batch.status === 'active')
-      return activeBatches.reduce((sum, batch) => sum + (batch.quantity_remaining || 0), 0)
+      const activeBatches = batches.value.filter(b => b.status === 'active')
+      return activeBatches.reduce((sum, b) => sum + (b.quantity_remaining || 0), 0)
     })
-    
-    // ================ COMPUTED - PRICING ================
-    
+
+    // ===================== PRICING =====================
+
     const averageCostPrice = computed(() => {
       const activeBatches = batches.value.filter(b => b.status === 'active')
-      
+
       if (activeBatches.length === 0 || currentStock.value === 0) {
-        const sortedBatches = [...batches.value].sort((a, b) => 
-          new Date(b.date_received) - new Date(a.date_received)
-        )
-        return sortedBatches[0]?.cost_price || currentProduct.value?.cost_price || 0
+        const sorted = [...batches.value].sort((a, b) => new Date(b.date_received) - new Date(a.date_received))
+        return sorted[0]?.cost_price || currentProduct.value?.cost_price || 0
       }
-      
-      const totalCost = activeBatches.reduce((sum, batch) => {
-        return sum + ((batch.cost_price || 0) * (batch.quantity_remaining || 0))
-      }, 0)
-      
+
+      const totalCost = activeBatches.reduce((sum, b) => sum + ((b.cost_price || 0) * (b.quantity_remaining || 0)), 0)
       return totalCost / currentStock.value
     })
-    
+
     const hasActivePromotion = computed(() => activePromotion.value !== null)
-    
+
     const effectiveSellingPrice = computed(() => {
-      const basePrice = currentProduct.value?.selling_price || 0
-      
-      if (hasActivePromotion.value && activePromotion.value.discount_percentage) {
-        const discount = (basePrice * activePromotion.value.discount_percentage) / 100
-        return basePrice - discount
-      }
-      
-      return basePrice
+      const base = currentProduct.value?.selling_price || 0
+      if (hasActivePromotion.value && activePromotion.value.discount_percentage)
+        return base - (base * activePromotion.value.discount_percentage) / 100
+      return base
     })
-    
+
     const profitMargin = computed(() => {
-      if (averageCostPrice.value === 0 || effectiveSellingPrice.value === 0) {
-        return '0.00'
-      }
-      
-      const profit = effectiveSellingPrice.value - averageCostPrice.value
-      const margin = (profit / effectiveSellingPrice.value) * 100
-      
-      return margin.toFixed(2)
+      if (!effectiveSellingPrice.value || !averageCostPrice.value) return '0.00'
+      const p = effectiveSellingPrice.value - averageCostPrice.value
+      return ((p / effectiveSellingPrice.value) * 100).toFixed(2)
     })
-    
+
     const profitMarginClass = computed(() => {
       const margin = parseFloat(profitMargin.value)
       if (margin < 0) return 'text-error'
       if (margin < 10) return 'text-warning'
       return 'text-success'
     })
-    
-    // ================ COMPUTED - BATCH INFO ================
-    
+
+    // ===================== BATCH INFO =====================
+
     const nearestExpiryDate = computed(() => {
-      const activeBatches = batches.value.filter(b => 
-        b.status === 'active' && b.expiry_date
-      )
-      
-      if (activeBatches.length === 0) return null
-      
-      const sorted = [...activeBatches].sort((a, b) => 
-        new Date(a.expiry_date) - new Date(b.expiry_date)
-      )
-      
-      return sorted[0]?.expiry_date
+      const active = batches.value.filter(b => b.status === 'active' && b.expiry_date)
+      if (!active.length) return null
+      return [...active].sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date))[0]?.expiry_date
     })
-    
-    // ================ COMPUTED - SUPPLIER INFO ================
-    
+
+    // ===================== SUPPLIER =====================
+
     const supplierName = computed(() => {
-      if (batches.value.length === 0) return 'No supplier specified'
-      
-      const sorted = [...batches.value].sort((a, b) => 
-        new Date(b.date_received) - new Date(a.date_received)
-      )
-      
-      const supplier = sorted[0]?.supplier_id
-      return supplier?.supplier_name || 'No supplier specified'
+      if (!batches.value.length) return 'No supplier specified'
+      const sorted = [...batches.value].sort((a, b) => new Date(b.date_received) - new Date(a.date_received))
+      return sorted[0]?.supplier_id?.supplier_name || 'No supplier specified'
     })
-    
-    // ================ COMPUTED - CATEGORY INFO ================
-    
+
+    // ===================== CATEGORY =====================
+
     const categoryName = computed(() => {
       if (!currentProduct.value?.category_id) return 'Uncategorized'
       return currentCategory.value?.category_name || currentProduct.value.category_id
     })
-    
-    // ================ COMPUTED - STATUS CHECKS ================
-    
+
+    // ===================== STATUS =====================
+
     const isLowStock = computed(() => {
       const threshold = currentProduct.value?.low_stock_threshold || 0
       return currentStock.value > 0 && currentStock.value <= threshold
     })
-    
-    // ================ METHODS - FORMATTING ================
-    
-    const formatPrice = (price) => {
-      return parseFloat(price || 0).toFixed(2)
+
+    // ===================== METHODS =====================
+
+    const formatPrice = price => parseFloat(price || 0).toFixed(2)
+
+    const formatDate = dateStr => {
+      if (!dateStr) return 'N/A'
+      return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
     }
-    
-    const formatDate = (dateString) => {
-      if (!dateString) return 'N/A'
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      })
-    }
-    
-    const formatStatus = (status) => {
-      if (!status) return 'Unknown'
-      return status.charAt(0).toUpperCase() + status.slice(1)
-    }
-    
-    // ================ METHODS - STYLING ================
-    
-    const getStatusBadgeClass = (status) => {
-      const statusClasses = {
-        'active': 'badge bg-success',
-        'inactive': 'badge bg-secondary',
-        'discontinued': 'badge bg-danger'
-      }
-      return statusClasses[status] || 'badge bg-secondary'
-    }
-    
-    const getStockClass = (stock) => {
+
+    const formatStatus = s => (!s ? 'Unknown' : s.charAt(0).toUpperCase() + s.slice(1))
+
+    const getStatusBadgeClass = s => ({
+      active: 'badge bg-success',
+      inactive: 'badge bg-secondary',
+      discontinued: 'badge bg-danger'
+    }[s] || 'badge bg-secondary')
+
+    const getStockClass = stock => {
       const threshold = currentProduct.value?.low_stock_threshold || 0
-      
       if (stock === 0) return 'text-error'
       if (stock <= threshold) return 'text-warning'
       return 'text-success'
     }
-    
-    // ================ METHODS - DATA LOADING ================
-    
+
+    // ===================== DATA LOADING =====================
+
     const loadProductData = async () => {
-      if (!props.productId || isInitialized.value) return
-      
+      if (!props.productId) return
+
       try {
-        const [productResult, batchesResult] = await Promise.allSettled([
+        await Promise.allSettled([
           fetchProductById(props.productId),
           fetchBatchesByProduct(props.productId)
         ])
-        
+
         if (currentProduct.value?.category_id) {
-          fetchCategoryById(currentProduct.value.category_id).catch(() => {
-            // Silently handle category fetch errors
-          })
+          fetchCategoryById(currentProduct.value.category_id).catch(() => {})
         }
-        
-        checkActivePromotions()
-        isInitialized.value = true
+
+        activePromotion.value = currentProduct.value?.active_promotion || null
+
       } catch (err) {
-        // Error is handled by composables and displayed via errorMessage computed
+        // Errors handled elsewhere
       }
     }
-    
-    const retryLoad = () => {
-      isInitialized.value = false
-      loadProductData()
-    }
-    
-    const checkActivePromotions = () => {
-      activePromotion.value = currentProduct.value?.active_promotion || null
-    }
-    
-    // ================ LIFECYCLE ================
-    
-    let productIdWatcher = null
-    
+
+    const retryLoad = () => loadProductData()
+
     onMounted(() => {
-      if (props.productId) {
-        loadProductData()
-      }
+      if (props.productId) loadProductData()
     })
-    
-    onBeforeUnmount(() => {
-      if (productIdWatcher) {
-        productIdWatcher()
-      }
-    })
-    
-    productIdWatcher = watch(
+
+    // Re-fetch when productId changes
+    watch(
       () => props.productId,
-      (newId, oldId) => {
-        if (newId && newId !== oldId) {
-          isInitialized.value = false
-          loadProductData()
-        }
-      }
+      () => loadProductData()
     )
-    
+
     return {
       // State
       currentProduct,
       batches,
       currentCategory,
       activePromotion,
-      
-      // Loading & Errors
+
+      // Loading
       isLoading,
       errorMessage,
-      
-      // Stock
+
+      // Stock & Pricing
       currentStock,
-      
-      // Pricing
       averageCostPrice,
       effectiveSellingPrice,
       profitMargin,
       profitMarginClass,
       hasActivePromotion,
-      
-      // Batch Info
+
+      // Info
       nearestExpiryDate,
-      
-      // Supplier
       supplierName,
-      
-      // Category
       categoryName,
-      
-      // Status
       isLowStock,
-      
+
       // Methods
       formatPrice,
       formatDate,
       formatStatus,
       getStatusBadgeClass,
       getStockClass,
-      retryLoad
+      retryLoad,
+
+      // Expose reload function
+      loadProductData
     }
   }
 }

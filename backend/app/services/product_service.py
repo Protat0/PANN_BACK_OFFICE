@@ -946,21 +946,28 @@ class ProductService:
             raise Exception(f"Error getting low stock products: {str(e)}")
     
     def get_products_by_category(self, category_id, subcategory_name=None):
-        """Get products by category and optionally by subcategory"""
+        """
+        Returns full product details (with correct stock values)
+        using the same engine as get_all_products().
+        Ensures Category Details and Export show correct data.
+        """
         try:
-            query = {
-                'category_id': category_id,
-                'isDeleted': {'$ne': True}
-            }
-            
+            # Apply filters
+            filters = {"category_id": category_id}
+
             if subcategory_name:
-                query['subcategory_name'] = subcategory_name
-            
-            products = list(self.product_collection.find(query))
-            return products
-        
+                filters["subcategory_name"] = subcategory_name
+
+            # Reuse get_all_products() to ensure full computed product data
+            # Including: stock, total_stock, thresholds, status, etc.
+            full_products = self.get_all_products(filters=filters, include_deleted=False)
+
+            return full_products
+
         except Exception as e:
-            raise Exception(f"Error getting products by category: {str(e)}")
+            raise Exception(f"Error getting full products by category: {str(e)}")
+
+
     
     def get_expiring_products(self, days_ahead=30):
         """Get products with expiring batches within specified days"""
@@ -1238,8 +1245,7 @@ class ProductService:
     def import_products_from_file(self, file_path, file_type='csv', validate_only=False):
         """
         Import products from CSV or Excel file with detailed validation
-        Now uses category_name instead of category_id
-        Subcategory is OPTIONAL - products can be imported without subcategory
+        Supplier removed entirely from import
         """
         try:
             # Read file based on type
@@ -1250,12 +1256,13 @@ class ProductService:
             else:
                 raise ValueError(f"Unsupported file type: {file_type}")
             
-            # ✅ FIXED: subcategory_name is now optional
+            # Required + optional columns (supplier removed)
             required_columns = ['product_name', 'selling_price', 'category_name']
-            optional_columns = ['subcategory_name', 'SKU', 'supplier_id', 'stock', 'cost_price', 'low_stock_threshold', 
-                            'unit', 'status', 'barcode', 'description', 'expiry_date']
+            optional_columns = ['subcategory_name', 'SKU', 'stock', 'cost_price',
+                                'low_stock_threshold', 'unit', 'status', 'barcode',
+                                'description', 'expiry_date']
             
-            # Check for missing required columns
+            # Check missing required
             missing_columns = [col for col in required_columns if col not in df.columns]
             if missing_columns:
                 raise ValueError(
@@ -1263,7 +1270,6 @@ class ProductService:
                     f"Required columns are: {', '.join(required_columns)}"
                 )
             
-            # Validate each row
             validation_errors = []
             valid_products = []
             skipped_products = []
@@ -1273,27 +1279,30 @@ class ProductService:
                 row_num = index + 2
                 errors = []
                 
-                # Validate required fields
+                # Required fields
                 if pd.isna(row.get('product_name')) or not str(row.get('product_name')).strip():
                     errors.append(f"Row {row_num}: Product name is required")
                 
                 if pd.isna(row.get('selling_price')) or row.get('selling_price') <= 0:
                     errors.append(f"Row {row_num}: Selling price must be greater than 0")
                 
-                # Validate category_name (REQUIRED)
+                # Category logic
                 category_name_raw = row.get('category_name', '')
                 category_name = str(category_name_raw).strip() if not pd.isna(category_name_raw) else ''
                 
                 if not category_name:
                     errors.append(f"Row {row_num}: Category name is required")
                 
-                # ✅ FIXED: Subcategory is now OPTIONAL - default to None if blank
                 subcategory_name_raw = row.get('subcategory_name', '')
-                subcategory_name = str(subcategory_name_raw).strip() if not pd.isna(subcategory_name_raw) and str(subcategory_name_raw).strip() else None
+                subcategory_name = (
+                    str(subcategory_name_raw).strip()
+                    if not pd.isna(subcategory_name_raw) and str(subcategory_name_raw).strip()
+                    else None
+                )
                 
-                # Look up category using correct collection name
                 category = None
                 category_id = None
+                
                 if category_name:
                     category = self.db.category.find_one({
                         'category_name': category_name,
@@ -1301,7 +1310,6 @@ class ProductService:
                     })
                     
                     if not category:
-                        # Track missing category
                         if category_name not in missing_categories:
                             missing_categories[category_name] = set()
                         if subcategory_name:
@@ -1310,25 +1318,25 @@ class ProductService:
                     else:
                         category_id = str(category['_id'])
                         
-                        # ✅ FIXED: Only validate subcategory if one was provided
-                        if subcategory_name and category:
+                        # Validate subcategory only if provided
+                        if subcategory_name:
                             subcategories = category.get('sub_categories', [])
-                            
-                            # Handle both list of strings and list of dicts
-                            subcategory_names = []
+                            subcat_names = []
                             for subcat in subcategories:
                                 if isinstance(subcat, dict) and 'name' in subcat:
-                                    subcategory_names.append(subcat['name'])
+                                    subcat_names.append(subcat['name'])
                                 elif isinstance(subcat, str):
-                                    subcategory_names.append(subcat)
+                                    subcat_names.append(subcat)
                             
-                            if subcategory_name not in subcategory_names:
+                            if subcategory_name not in subcat_names:
                                 if category_name not in missing_categories:
                                     missing_categories[category_name] = set()
                                 missing_categories[category_name].add(subcategory_name)
-                                errors.append(f"Row {row_num}: Subcategory '{subcategory_name}' not found under category '{category_name}'")
+                                errors.append(
+                                    f"Row {row_num}: Subcategory '{subcategory_name}' not found under category '{category_name}'"
+                                )
                 
-                # Validate stock and cost_price relationship
+                # Stock/cost/expiry validation
                 stock = row.get('stock', 0)
                 cost_price = row.get('cost_price', 0)
                 expiry_date = row.get('expiry_date')
@@ -1340,85 +1348,82 @@ class ProductService:
                     if pd.isna(expiry_date) or not str(expiry_date).strip():
                         errors.append(f"Row {row_num}: Expiry date is required when stock is provided")
                 
-                # Validate numeric fields
+                # Numeric checks
                 try:
                     if not pd.isna(row.get('selling_price')):
                         float(row['selling_price'])
-                except (ValueError, TypeError):
+                except:
                     errors.append(f"Row {row_num}: Selling price must be a valid number")
                 
                 try:
                     if not pd.isna(row.get('cost_price')):
                         float(row['cost_price'])
-                except (ValueError, TypeError):
+                except:
                     errors.append(f"Row {row_num}: Cost price must be a valid number")
                 
                 try:
                     if not pd.isna(row.get('stock')):
                         int(row['stock'])
-                except (ValueError, TypeError):
+                except:
                     errors.append(f"Row {row_num}: Stock must be a valid integer")
                 
                 try:
                     if not pd.isna(row.get('low_stock_threshold')):
                         int(row['low_stock_threshold'])
-                except (ValueError, TypeError):
+                except:
                     errors.append(f"Row {row_num}: Low stock threshold must be a valid integer")
                 
+                # Add errors and continue
                 if errors:
                     validation_errors.extend(errors)
-                else:
-                    # ✅ FIXED: Build product data - subcategory is optional
-                    product_data = {
-                        'product_name': str(row['product_name']).strip(),
-                        'selling_price': float(row['selling_price']),
-                        'category_id': category_id,
-                    }
-                    
-                    # ✅ FIXED: Only add subcategory if provided
-                    if subcategory_name:
-                        product_data['subcategory_name'] = subcategory_name
-                    
-                    # Add other optional fields
-                    if not pd.isna(row.get('SKU')):
-                        product_data['SKU'] = str(row['SKU']).strip()
-                    
-                    if not pd.isna(row.get('supplier_id')):
-                        product_data['supplier_id'] = str(row['supplier_id']).strip()
-                    
-                    if not pd.isna(row.get('stock')):
-                        product_data['stock'] = int(row['stock'])
-                    
-                    if not pd.isna(row.get('cost_price')):
-                        product_data['cost_price'] = float(row['cost_price'])
-                    
-                    if not pd.isna(row.get('low_stock_threshold')):
-                        product_data['low_stock_threshold'] = int(row['low_stock_threshold'])
-                    
-                    if not pd.isna(row.get('unit')):
-                        product_data['unit'] = str(row['unit']).strip()
-                    
-                    if not pd.isna(row.get('status')):
-                        product_data['status'] = str(row['status']).strip()
-                    
-                    if not pd.isna(row.get('barcode')):
-                        product_data['barcode'] = str(row['barcode']).strip()
-                    
-                    if not pd.isna(row.get('description')):
-                        product_data['description'] = str(row['description']).strip()
-                    
-                    if not pd.isna(row.get('expiry_date')):
-                        product_data['expiry_date'] = str(row['expiry_date']).strip()
-                    
-                    valid_products.append(product_data)
+                    continue
+                
+                # Build product data (supplier removed)
+                product_data = {
+                    'product_name': str(row['product_name']).strip(),
+                    'selling_price': float(row['selling_price']),
+                    'category_id': category_id,
+                }
+                
+                if subcategory_name:
+                    product_data['subcategory_name'] = subcategory_name
+                
+                if not pd.isna(row.get('SKU')):
+                    product_data['SKU'] = str(row['SKU']).strip()
+                
+                if not pd.isna(row.get('stock')):
+                    product_data['stock'] = int(row['stock'])
+                
+                if not pd.isna(row.get('cost_price')):
+                    product_data['cost_price'] = float(row['cost_price'])
+                
+                if not pd.isna(row.get('low_stock_threshold')):
+                    product_data['low_stock_threshold'] = int(row['low_stock_threshold'])
+                
+                if not pd.isna(row.get('unit')):
+                    product_data['unit'] = str(row['unit']).strip()
+                
+                if not pd.isna(row.get('status')):
+                    product_data['status'] = str(row['status']).strip()
+                
+                if not pd.isna(row.get('barcode')):
+                    product_data['barcode'] = str(row['barcode']).strip()
+                
+                if not pd.isna(row.get('description')):
+                    product_data['description'] = str(row['description']).strip()
+                
+                if not pd.isna(row.get('expiry_date')):
+                    product_data['expiry_date'] = str(row['expiry_date']).strip()
+                
+                valid_products.append(product_data)
             
-            # Convert missing_categories set to list for JSON serialization
+            # Missing categories summary
             missing_categories_list = [
                 {'category_name': cat, 'subcategories': list(subcats)}
                 for cat, subcats in missing_categories.items()
             ]
             
-            # If validation only, return results with missing categories
+            # Validation mode
             if validate_only:
                 return {
                     'valid': len(validation_errors) == 0 and len(missing_categories) == 0,
@@ -1429,7 +1434,7 @@ class ProductService:
                     'message': 'Validation completed' if not validation_errors else 'Validation failed'
                 }
             
-            # If there are validation errors, don't proceed with import
+            # Stop import if validation errors
             if validation_errors:
                 return {
                     'success': False,
@@ -1440,13 +1445,12 @@ class ProductService:
                     'message': f'Import failed: {len(validation_errors)} validation error(s) found'
                 }
             
-            # Proceed with import
+            # Import process
             successful = []
             failed = []
             
             for product_data in valid_products:
                 try:
-                    # Check if SKU exists (if SKU is provided)
                     if 'SKU' in product_data:
                         existing = self.db.products.find_one({
                             'SKU': product_data['SKU'],
@@ -1459,19 +1463,13 @@ class ProductService:
                             })
                             continue
                     
-                    # Create product
                     new_product = self.create_product(product_data)
                     successful.append(new_product)
-                    
-                    logger.info(f"✅ Successfully created: {product_data['product_name']}")
-                    
+                
                 except Exception as e:
-                    error_msg = str(e)
-                    logger.error(f"❌ FAILED to create '{product_data.get('product_name', 'Unknown')}': {error_msg}")
-                    
                     failed.append({
                         'product': product_data.get('product_name', 'Unknown'),
-                        'error': error_msg
+                        'error': str(e)
                     })
             
             return {
@@ -1485,24 +1483,23 @@ class ProductService:
                 'missing_categories': missing_categories_list,
                 'message': f'Import completed: {len(successful)} created, {len(failed)} failed, {len(skipped_products)} skipped'
             }
-            
+        
         except Exception as e:
             raise Exception(f"Import failed: {str(e)}")
-                
+
+
     def generate_import_template(self, file_type='csv'):
-        """Generate a template file for product import with dropdowns for Excel"""
+        """Generate a template file for product import without supplier column"""
         try:
             import pandas as pd
             from openpyxl import load_workbook
             from openpyxl.worksheet.datavalidation import DataValidation
             
-            # Define template columns - UPDATED: category_id → category_name
             template_data = {
                 'product_name': ['Sample Noodle 1', 'Sample Drink 1'],
                 'SKU': ['NOOD-SAMP-001', 'DRIN-SAMP-001'],
                 'category_name': ['Noodles', 'Drinks'],
                 'subcategory_name': ['Instant', 'Beverages'],
-                'supplier_id': ['supplier_name_or_id', 'supplier_name_or_id'],
                 'stock': [100, 50],
                 'low_stock_threshold': [10, 5],
                 'cost_price': [15.00, 25.00],
@@ -1515,70 +1512,55 @@ class ProductService:
             df = pd.DataFrame(template_data)
             
             if file_type.lower() == 'csv':
-                # CSV: Simple template without dropdowns
                 template_path = 'product_import_template.csv'
                 df.to_csv(template_path, index=False)
-                
+            
             elif file_type.lower() == 'xlsx':
-                # Excel: Template with dropdowns
                 template_path = 'product_import_template.xlsx'
                 df.to_excel(template_path, index=False, engine='openpyxl')
                 
-                # Add dropdowns for category_name and subcategory_name
                 wb = load_workbook(template_path)
                 ws = wb.active
                 
-                # ✅ FIXED: Use correct collection name 'category' (singular)
                 categories = list(self.db.category.find(
                     {'isDeleted': False},
-                    {'category_name': 1, 'sub_categories': 1}  # ✅ FIXED: sub_categories (with underscore)
+                    {'category_name': 1, 'sub_categories': 1}
                 ))
                 
-                # Extract category names for dropdown
                 category_names = [cat['category_name'] for cat in categories]
                 
-                # ✅ FIXED: Extract subcategories from 'sub_categories' field (with underscore)
-                all_subcategories = set()
+                # Extract all unique subcategories
+                subcategory_values = set()
                 for cat in categories:
-                    subcats = cat.get('sub_categories', [])  # ✅ FIXED: sub_categories
-                    if isinstance(subcats, list):
-                        for subcat in subcats:
-                            if isinstance(subcat, dict) and 'name' in subcat:
-                                all_subcategories.add(subcat['name'])
-                            elif isinstance(subcat, str):
-                                all_subcategories.add(subcat)
+                    subcats = cat.get('sub_categories', [])
+                    for subcat in subcats:
+                        if isinstance(subcat, dict) and 'name' in subcat:
+                            subcategory_values.add(subcat['name'])
+                        elif isinstance(subcat, str):
+                            subcategory_values.add(subcat)
                 
-                subcategory_names = sorted(list(all_subcategories))
+                subcategory_list = sorted(list(subcategory_values))
                 
-                # Create dropdown validation for category_name (Column C)
+                # Category dropdown
                 if category_names:
-                    category_dropdown = DataValidation(
+                    dv = DataValidation(
                         type="list",
-                        formula1=f'"{",".join(category_names)}"',
-                        allow_blank=False,
-                        showErrorMessage=True,
-                        errorTitle='Invalid Category',
-                        error='Please select a valid category from the list'
+                        formula1=f'"{",".join(category_names)}"'
                     )
-                    ws.add_data_validation(category_dropdown)
-                    category_dropdown.add('C2:C1000')
+                    ws.add_data_validation(dv)
+                    dv.add('C2:C1000')
                 
-                # Create dropdown validation for subcategory_name (Column D)
-                if subcategory_names:
-                    subcategory_dropdown = DataValidation(
+                # Subcategory dropdown
+                if subcategory_list:
+                    dv2 = DataValidation(
                         type="list",
-                        formula1=f'"{",".join(subcategory_names)}"',
-                        allow_blank=False,
-                        showErrorMessage=True,
-                        errorTitle='Invalid Subcategory',
-                        error='Please select a valid subcategory from the list'
+                        formula1=f'"{",".join(subcategory_list)}"'
                     )
-                    ws.add_data_validation(subcategory_dropdown)
-                    subcategory_dropdown.add('D2:D1000')
+                    ws.add_data_validation(dv2)
+                    dv2.add('D2:D1000')
                 
-                # Save the workbook with dropdowns
                 wb.save(template_path)
-                
+            
             else:
                 raise ValueError(f"Unsupported template type: {file_type}")
             
@@ -1586,6 +1568,7 @@ class ProductService:
             
         except Exception as e:
             raise Exception(f"Error generating import template: {str(e)}")
+
         
     @staticmethod
     def bulk_delete_products(product_ids, hard_delete=False):

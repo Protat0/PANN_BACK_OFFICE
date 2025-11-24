@@ -214,8 +214,8 @@
                 </select>
             </td>
             <td class="text-center">
-              <span :class="getStockClass(product.stock)">
-                {{ product.stock || 0 }}
+              <span :class="getStockClass(product.total_stock )">
+                {{ product.total_stock  || 0 }}
               </span>
             </td>
             <td class="text-end fw-medium text-secondary">
@@ -535,18 +535,76 @@ export default {
 
     const exportFilteredProducts = async () => {
       try {
-        isExporting.value = true
-        const filters = {
-          category_id: categoryId.value,
-          subcategory_name: subcategoryFilter.value || undefined
+        isExporting.value = true;
+
+        const productsToExport = filteredProducts.value;
+
+        if (productsToExport.length === 0) {
+          alert("No products to export.");
+          return;
         }
-        await exportProducts(filters)
+
+        // CSV Columns
+        const headers = [
+          "Product ID",
+          "Product Name",
+          "Category",
+          "Subcategory",
+          "Price",
+          "Stock",
+          "Status",
+          "Created At",
+          "Last Updated"
+        ];
+
+        // Convert to CSV rows
+        const rows = productsToExport.map(product => [
+          product._id,
+          `"${product.product_name}"`,
+          `"${currentCategory.value.category_name}"`,
+          `"${product.subcategory_name || 'None'}"`,
+
+          // PRICE
+          product.selling_price ?? product.price ?? "",
+
+          // STOCK — use total_stock
+          product.total_stock ?? 0,
+
+          // STATUS
+          product.status,
+
+          // DATES (backend uses created_at / updated_at)
+          formatDate(product.created_at),
+          formatDate(product.updated_at)
+        ]);
+
+        // Build CSV
+        const csvContent = [
+          headers.join(","),
+          ...rows.map(row => row.join(","))
+        ].join("\n");
+
+        // Download
+        const blob = new Blob([csvContent], { type: "text/csv" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `products_category_${currentCategory.value.category_name}_${new Date()
+          .toISOString()
+          .split("T")[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+
       } catch (error) {
-        console.error('Export failed:', error)
+        console.error("Export failed:", error);
       } finally {
-        isExporting.value = false
+        isExporting.value = false;
       }
     }
+
+
 
     const getExportButtonText = () => `Export (${filteredProducts.value.length})`
 
