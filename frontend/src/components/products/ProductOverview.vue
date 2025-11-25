@@ -267,12 +267,24 @@ export default {
       return [...active].sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date))[0]?.expiry_date
     })
 
-    // ===================== SUPPLIER =====================
+    // ===================== SUPPLIER (FIXED) =====================
 
     const supplierName = computed(() => {
       if (!batches.value.length) return 'No supplier specified'
-      const sorted = [...batches.value].sort((a, b) => new Date(b.date_received) - new Date(a.date_received))
-      return sorted[0]?.supplier_id?.supplier_name || 'No supplier specified'
+
+      const sorted = [...batches.value].sort(
+        (a, b) => new Date(b.date_received) - new Date(a.date_received)
+      )
+
+      const sup = sorted[0]?.supplier_id
+
+      // FIX: supplier_id is a STRING — not an object
+      if (typeof sup === 'string') {
+        return sup // show supplier ID
+      }
+
+      // If backend later returns populated object
+      return sup?.supplier_name || 'No supplier specified'
     })
 
     // ===================== CATEGORY =====================
@@ -313,6 +325,7 @@ export default {
       return 'text-success'
     }
 
+
     // ===================== DATA LOADING =====================
 
     const loadProductData = async () => {
@@ -330,9 +343,7 @@ export default {
 
         activePromotion.value = currentProduct.value?.active_promotion || null
 
-      } catch (err) {
-        // Errors handled elsewhere
-      }
+      } catch (err) {}
     }
 
     const retryLoad = () => loadProductData()
@@ -341,7 +352,6 @@ export default {
       if (props.productId) loadProductData()
     })
 
-    // Re-fetch when productId changes
     watch(
       () => props.productId,
       () => loadProductData()
@@ -380,12 +390,12 @@ export default {
       getStockClass,
       retryLoad,
 
-      // Expose reload function
       loadProductData
     }
   }
 }
 </script>
+
 
 <style scoped>
 .overview-container {
