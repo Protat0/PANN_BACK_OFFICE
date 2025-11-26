@@ -95,8 +95,10 @@
         <li class="nav-item">
           <button 
             class="nav-link nav-button"
-            :class="{ 'active': showInventorySubmenu }"
+            :class="{ 'active': showInventorySubmenu || isInventoryRoute() }"
             @click="toggleInventorySubmenu"
+            @mouseenter="handleInventoryHover(true)"
+            @mouseleave="handleInventoryHover(false)"
           >
             <Package :size="18" class="nav-icon" />
             <span class="nav-text" v-if="!isCollapsed">Inventory</span>
@@ -109,26 +111,47 @@
           </button>
           
           <!-- Inventory Submenu -->
-          <ul class="nav-submenu" v-if="showInventorySubmenu && !isCollapsed">
+          <transition name="fade-slide">
+            <ul 
+              class="nav-submenu"
+              v-if="shouldShowInventorySubmenu"
+              :class="{ 'submenu-floating': isCollapsed }"
+              @mouseenter="handleInventoryHover(true)"
+              @mouseleave="handleInventoryHover(false)"
+              :style="collapsedSubmenuStyle"
+            >
             <li class="nav-subitem">
-              <router-link to="/products" class="nav-sublink">
+              <router-link 
+                to="/products" 
+                class="nav-sublink"
+                :class="{ 'active-sub': isActiveRoute('/products') }"
+              >
                 <Box :size="16" class="nav-subicon" />
                 Products
               </router-link>
             </li>
             <li class="nav-subitem">
-              <router-link to="/categories" class="nav-sublink">
+              <router-link 
+                to="/categories" 
+                class="nav-sublink"
+                :class="{ 'active-sub': isActiveRoute('/categories') }"
+              >
                 <FolderOpen :size="16" class="nav-subicon" />
                 Categories
               </router-link>
             </li>
             <li class="nav-subitem">
-              <router-link to="/logs" class="nav-sublink">
+              <router-link 
+                to="/logs" 
+                class="nav-sublink"
+                :class="{ 'active-sub': isActiveRoute('/logs') }"
+              >
                 <FileText :size="16" class="nav-subicon" />
                 Logs
               </router-link>
             </li>
-          </ul>
+            </ul>
+          </transition>
         </li>
 
         <!-- Suppliers -->
@@ -174,8 +197,10 @@
         <li class="nav-item">
           <button 
             class="nav-link nav-button"
-            :class="{ 'active': showReportsSubmenu }"
+            :class="{ 'active': showReportsSubmenu || isReportsRoute() }"
             @click="toggleReportsSubmenu"
+            @mouseenter="handleReportsHover(true)"
+            @mouseleave="handleReportsHover(false)"
           >
             <BarChart3 :size="18" class="nav-icon" />
             <span class="nav-text" v-if="!isCollapsed">Reports</span>
@@ -188,20 +213,37 @@
           </button>
           
           <!-- Reports Submenu -->
-          <ul class="nav-submenu" v-if="showReportsSubmenu && !isCollapsed">
+          <transition name="fade-slide">
+            <ul 
+              class="nav-submenu" 
+              v-if="shouldShowReportsSubmenu"
+              :class="{ 'submenu-floating': isCollapsed }"
+              @mouseenter="handleReportsHover(true)"
+              @mouseleave="handleReportsHover(false)"
+              :style="collapsedSubmenuStyle"
+            >
             <li class="nav-subitem">
-              <router-link to="/salesbyitem" class="nav-sublink">
+              <router-link 
+                to="/salesbyitem" 
+                class="nav-sublink"
+                :class="{ 'active-sub': isActiveRoute('/salesbyitem') }"
+              >
                 <TrendingUp :size="16" class="nav-subicon" />
                 Sales By Items
               </router-link>
             </li>
             <li class="nav-subitem">
-              <router-link to="/salesbycategory" class="nav-sublink">
+              <router-link 
+                to="/salesbycategory" 
+                class="nav-sublink"
+                :class="{ 'active-sub': isActiveRoute('/salesbycategory') }"
+              >
                 <PieChart :size="16" class="nav-subicon" />
                 Sales By Categories
               </router-link>
             </li>
-          </ul>
+            </ul>
+          </transition>
         </li>
 
         <!-- Customers -->
@@ -269,6 +311,9 @@ import {
   FileText
 } from 'lucide-vue-next'
 
+const inventoryRoutePrefixes = ['/inventory', '/products', '/categories', '/logs']
+const reportsRoutePrefixes = ['/salesbyitem', '/salesbycategory', '/reports']
+
 export default {
   name: 'ModernSidebar',
   components: {
@@ -300,6 +345,8 @@ export default {
       isCollapsed: false,
       showInventorySubmenu: false,
       showReportsSubmenu: false,
+      inventoryHover: false,
+      reportsHover: false,
       isLoggingOut: false
     }
   },
@@ -317,6 +364,28 @@ export default {
         return userData?.full_name || userData?.name || 'My Profile'
       }
       return 'My Profile'
+    },
+    shouldShowInventorySubmenu() {
+      if (this.isCollapsed) {
+        return this.inventoryHover
+      }
+      return this.showInventorySubmenu
+    },
+    shouldShowReportsSubmenu() {
+      if (this.isCollapsed) {
+        return this.reportsHover
+      }
+      return this.showReportsSubmenu
+    },
+    collapsedSubmenuStyle() {
+      if (!this.isCollapsed) {
+        return {}
+      }
+      return {
+        position: 'absolute',
+        left: '70px',
+        top: '0'
+      }
     }
   },
   methods: {
@@ -327,15 +396,42 @@ export default {
     },
     
     toggleInventorySubmenu() {
+      if (this.isCollapsed) return
       this.showInventorySubmenu = !this.showInventorySubmenu
     },
     
     toggleReportsSubmenu() {
+      if (this.isCollapsed) return
       this.showReportsSubmenu = !this.showReportsSubmenu
     },
     
     isActiveRoute(route) {
       return this.$route.path.startsWith(route)
+    },
+
+    isInventoryRoute() {
+      return inventoryRoutePrefixes.some(prefix => this.$route.path.startsWith(prefix))
+    },
+
+    isReportsRoute() {
+      return reportsRoutePrefixes.some(prefix => this.$route.path.startsWith(prefix))
+    },
+
+    handleInventoryHover(state) {
+      if (this.isCollapsed) {
+        this.inventoryHover = state
+      }
+    },
+
+    handleReportsHover(state) {
+      if (this.isCollapsed) {
+        this.reportsHover = state
+      }
+    },
+
+    syncSubmenusWithRoute() {
+      this.showInventorySubmenu = this.isInventoryRoute()
+      this.showReportsSubmenu = this.isReportsRoute()
     },
     
     async handleLogout() {
@@ -461,12 +557,19 @@ export default {
       // Emit initial state to parent
       this.$emit('sidebar-toggled', this.isCollapsed)
     }
+    this.syncSubmenusWithRoute()
   },
   
   watch: {
     isCollapsed(newValue) {
       // Save collapsed state to localStorage
       localStorage.setItem('sidebar-collapsed', JSON.stringify(newValue))
+    },
+    '$route.path': {
+      immediate: true,
+      handler() {
+        this.syncSubmenusWithRoute()
+      }
     }
   }
 }
@@ -692,8 +795,12 @@ export default {
   flex: 1;
   padding: 1rem 0;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: visible;
 }
+.sidebar-container.collapsed .sidebar-nav {
+  overflow: visible;
+}
+
 
 .nav-list {
   list-style: none;
@@ -806,6 +913,13 @@ export default {
   color: var(--text-accent);
 }
 
+.nav-sublink.active-sub {
+  background-color: var(--surface-secondary);
+  color: var(--text-primary);
+  font-weight: 600;
+  border: 1px solid var(--border-accent);
+}
+
 .nav-subicon {
   flex-shrink: 0;
 }
@@ -886,20 +1000,45 @@ export default {
    RESPONSIVE DESIGN
    ========================================================================== */
 
-@media (max-width: 768px) {
-  .sidebar-container {
-    transform: translateX(-100%);
-  }
-  
-  .sidebar-container.mobile-open {
-    transform: translateX(0);
-  }
-  
-  .sidebar-container.collapsed {
-    width: 280px;
-  }
+.submenu-floating {
+  position: absolute;
+  left: 36px;
+  top: 0;
+  background-color: var(--surface-primary);
+  border: 1px solid var(--border-primary);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  z-index: 10000;
+  min-width: 180px;
 }
 
+.sidebar-container.collapsed .nav-item {
+  position: relative;
+}
+
+.sidebar-container.collapsed .submenu-floating {
+  display: block;
+}
+
+.sidebar-container.collapsed .nav-submenu {
+  display: none;
+}
+
+.sidebar-container.collapsed .nav-submenu.submenu-floating {
+  display: block;
+}
+
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.fade-slide-enter-from,
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(5px);
+}
 /* ==========================================================================
    SCROLLBAR STYLING - SEMANTIC
    ========================================================================== */

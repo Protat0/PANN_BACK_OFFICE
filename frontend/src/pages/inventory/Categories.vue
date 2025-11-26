@@ -117,8 +117,10 @@
         class="col-6 col-md-3"
       >
         <CardTemplate
+          class="category-card"
+          :class="{ 'category-card--inactive': isCategoryInactive(category) }"
           size="md"
-          border-color="primary"
+          :border-color="getCategoryBorderColor(category)"
           border-position="start"
           :title="category.category_name"
           :subtitle="getCategorySubtitle(category)"
@@ -126,20 +128,30 @@
           clickable
         >
           <template #content>
-            <div class="d-flex justify-content-between align-items-center mb-2">
-              <div>
-                <div class="text-primary fw-bold h5 mb-1">
-                  {{ getProductCount(category) }}
+            <div 
+              v-if="isCategoryInactive(category)" 
+              class="category-status-chip"
+              aria-label="Category inactive"
+            >
+              <AlertTriangle :size="12" />
+              Inactive
+            </div>
+            <div class="category-card-content">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div>
+                  <div class="text-primary fw-bold h5 mb-1">
+                    {{ getProductCount(category) }}
+                  </div>
+                  <small class="text-tertiary-medium">Products</small>
                 </div>
-                <small class="text-tertiary-medium">Products</small>
-              </div>
-              <div class="category-icon surface-primary-light rounded-circle p-2">
-                <Package :size="20" class="text-status-primary" />
+                <div class="category-icon surface-primary-light rounded-circle p-2">
+                  <Package :size="20" class="text-status-primary" />
+                </div>
               </div>
             </div>
 
             <!-- Action buttons -->
-            <div class="d-flex gap-1 mt-2">
+            <div class="d-flex gap-1 mt-2 category-card-actions">
               <button 
                 class="btn btn-view btn-sm"
                 @click.stop="viewCategory(category._id)"
@@ -259,6 +271,12 @@ export default {
     }
 
     // Computed properties
+    const isCategoryInactive = (category) => category?.status === 'inactive'
+
+    const getCategoryBorderColor = (category) => (
+      isCategoryInactive(category) ? 'neutral' : 'primary'
+    )
+
     const getCategorySubtitle = (category) => {
       const subcategoryCount = category.sub_categories?.length || 0
       return `${subcategoryCount} subcategories`
@@ -353,6 +371,8 @@ export default {
       // Local computed
       getCategorySubtitle,
       getProductCount,
+      isCategoryInactive,
+      getCategoryBorderColor,
       getUncategorizedCount,
       
       // Local methods
@@ -492,6 +512,49 @@ export default {
   justify-content: center;
   width: 44px;
   height: 44px;
+}
+
+.category-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.category-card-content,
+.category-card-actions {
+  position: relative;
+  z-index: 1;
+}
+
+.category-card--inactive .category-card-content {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+.category-card--inactive .category-card-actions {
+  filter: none;
+  opacity: 1;
+}
+
+.category-card--inactive .category-icon {
+  background-color: rgba(130, 130, 130, 0.18);
+}
+
+.category-status-chip {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 999px;
+  background-color: rgba(110, 110, 110, 0.18);
+  color: var(--text-secondary, #5f5f5f);
+  border: 1px solid rgba(110, 110, 110, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .state-active {

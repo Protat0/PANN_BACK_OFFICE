@@ -1,11 +1,18 @@
 <template>
   <!-- Modal -->
-  <div class="modal fade" id="addCategoryModal" tabindex="-1" aria-labelledby="addCategoryModalLabel" aria-hidden="true">
+  <div 
+    class="modal fade" 
+    id="addCategoryModal" 
+    tabindex="-1" 
+    aria-labelledby="addCategoryModalLabel" 
+    aria-hidden="true"
+    ref="modal"
+  >
     <div class="modal-dialog modal-lg">
-      <div class="modal-content">
+      <div class="modal-content surface-card border-theme shadow-lg">
         <!-- Modal Header -->
-        <div class="modal-header">
-          <h5 class="modal-title text-primary-dark fw-bold" id="addCategoryModalLabel">
+        <div class="modal-header surface-secondary border-theme">
+          <h5 class="modal-title text-primary fw-bold" id="addCategoryModalLabel">
             <Package :size="20" class="me-2" />
             {{ isEditMode ? 'Edit Category' : 'Add New Category' }}
           </h5>
@@ -13,7 +20,7 @@
         </div>
 
         <!-- Modal Body -->
-        <div class="modal-body">
+        <div class="modal-body surface-primary">
           <form @submit.prevent="handleSubmit">
             <!-- Category Name -->
             <div class="mb-3">
@@ -22,7 +29,7 @@
               </label>
               <input 
                 type="text" 
-                class="form-control" 
+                class="form-control input-theme" 
                 id="categoryName"
                 v-model="formData.category_name"
                 placeholder="Enter category name (e.g., Noodles)"
@@ -39,7 +46,7 @@
                 Description
               </label>
               <textarea 
-                class="form-control" 
+                class="form-control input-theme" 
                 id="description"
                 v-model="formData.description"
                 rows="3"
@@ -56,7 +63,7 @@
                 Status <span class="text-danger">*</span>
               </label>
               <select 
-                class="form-select" 
+                class="form-select input-theme" 
                 id="status"
                 v-model="formData.status"
                 required
@@ -90,14 +97,14 @@
                 <div 
                   v-for="(subCategory, index) in formData.sub_categories" 
                   :key="index"
-                  class="sub-category-item card mb-2"
+                  class="sub-category-item card surface-secondary border-theme mb-2"
                 >
                   <div class="card-body py-2">
                     <div class="row g-2 align-items-center">
                       <div class="col-8">
                         <input 
                           type="text" 
-                          class="form-control form-control-sm" 
+                          class="form-control form-control-sm input-theme" 
                           v-model="subCategory.name"
                           placeholder="Sub-category name"
                         />
@@ -105,7 +112,7 @@
                       <div class="col-2">
                         <input 
                           type="text" 
-                          class="form-control form-control-sm" 
+                          class="form-control form-control-sm input-theme" 
                           v-model="subCategory.description"
                           placeholder="Description (optional)"
                         />
@@ -125,7 +132,7 @@
               </div>
               
               <!-- Empty State -->
-              <div v-else class="text-center py-3 bg-neutral-light rounded">
+              <div v-else class="text-center py-3 surface-tertiary rounded border-theme">
                 <Package :size="24" class="text-tertiary-medium mb-2" />
                 <p class="text-tertiary-medium mb-0 small">
                   No sub-categories added yet. Click "Add Sub-Category" to create one.
@@ -144,7 +151,7 @@
                 
                 <!-- Image Preview (if exists) -->
                 <div v-if="imagePreview" class="mb-3">
-                  <div class="image-preview-container bg-neutral-light rounded p-3 text-center">
+                  <div class="image-preview-container surface-tertiary rounded p-3 text-center border-theme">
                     <img 
                       :src="imagePreview" 
                       alt="Category preview" 
@@ -152,7 +159,7 @@
                       style="max-height: 120px;" 
                     />
                     <br>
-                    <small v-if="hasExistingImage" class="text-muted">Current image</small>
+                    <small v-if="hasExistingImage" class="text-tertiary-medium">Current image</small>
                     <small v-else class="text-success">New image selected</small>
                     <br>
                     <button 
@@ -167,21 +174,21 @@
                 </div>
                 
                 <!-- File Input (always visible) -->
-                <div class="category-image-upload">
-                  <div class="image-upload-container bg-neutral-light rounded p-4 text-center">
+                <div class="category-image-upload border-theme">
+                  <div class="image-upload-container surface-tertiary rounded p-4 text-center">
                     <Package :size="32" class="text-tertiary-medium mb-2" />
                     <p class="text-tertiary-medium mb-2">
                       {{ imagePreview ? 'Change image' : 'Upload category image' }}
                     </p>
                     <input 
                       type="file" 
-                      class="form-control" 
+                      class="form-control input-theme" 
                       accept="image/*"
                       @change="handleImageUpload"
                       ref="imageInput"
                       :key="'imageInput-' + (isEditMode ? editingCategoryId : 'new')"
                     />
-                    <small class="text-muted mt-2 d-block">
+                    <small class="text-tertiary-medium mt-2 d-block">
                       Maximum file size: 5MB. Supported formats: JPEG, PNG, GIF, WebP
                     </small>
                   </div>
@@ -191,7 +198,7 @@
         </div>
 
         <!-- Modal Footer -->
-        <div class="modal-footer">
+        <div class="modal-footer surface-secondary border-theme">
           <button type="button" class="btn btn-cancel btn-sm" data-bs-dismiss="modal">
             Cancel
           </button>
@@ -216,6 +223,35 @@ import { useCategories } from '@/composables/api/useCategories'
 
 export default {
   name: 'AddCategoryModal',
+  
+  mounted() {
+    const modalElement = this.$refs.modal
+    if (modalElement && typeof window !== 'undefined' && window.bootstrap?.Modal) {
+      this.modalInstance = new window.bootstrap.Modal(modalElement, {
+        backdrop: 'static',
+        keyboard: true
+      })
+      this.modalHiddenHandler = () => {
+        this.resetForm()
+      }
+      modalElement.addEventListener('hidden.bs.modal', this.modalHiddenHandler)
+    }
+  },
+
+  beforeUnmount() {
+    if (this.modalInstance) {
+      this.modalInstance.hide()
+      if (typeof this.modalInstance.dispose === 'function') {
+        this.modalInstance.dispose()
+      }
+      this.modalInstance = null
+    }
+    const modalElement = this.$refs.modal
+    if (modalElement && this.modalHiddenHandler) {
+      modalElement.removeEventListener('hidden.bs.modal', this.modalHiddenHandler)
+    }
+  },
+
   setup() {
     const {
       createCategory,
@@ -234,6 +270,8 @@ export default {
   
   data() {
     return {
+      modalInstance: null,
+      modalHiddenHandler: null,
       isEditMode: false,
       editingCategoryId: null,
       isLoading: false,
@@ -444,27 +482,18 @@ export default {
     },
 
     showModal() {
-      const modalElement = document.getElementById('addCategoryModal')
-      if (modalElement) {
-        if (typeof bootstrap !== 'undefined') {
-          const modal = new bootstrap.Modal(modalElement)
-          modal.show()
-        } else {
-          console.error('Bootstrap is not available')
-        }
+      if (this.modalInstance) {
+        this.modalInstance.show()
       } else {
-        console.error('Modal element not found')
+        console.error('Modal instance not initialized')
       }
     },
     
     closeModal() {
-      try {
-        const modal = bootstrap.Modal.getInstance(document.getElementById('addCategoryModal'))
-        if (modal) {
-          modal.hide()
-        }
-      } catch (error) {
-        console.error('Error closing modal:', error)
+      if (this.modalInstance) {
+        this.modalInstance.hide()
+      } else {
+        console.error('Modal instance not initialized')
       }
     },
     
@@ -485,64 +514,15 @@ export default {
 </script>
 
 <style scoped>
-.text-primary-dark {
-  color: var(--primary-dark) !important;
-}
-
-.text-tertiary-dark {
-  color: var(--tertiary-dark) !important;
-}
-
-.text-tertiary-medium {
-  color: var(--tertiary-medium) !important;
-}
-
-.bg-neutral-light {
-  background-color: var(--neutral-light) !important;
-}
-
-/* Modal styling */
-.modal-content {
-  border-radius: 0.75rem;
-  border: 1px solid var(--neutral);
-}
-
-.modal-header {
-  border-bottom: 1px solid var(--neutral-light);
-  background-color: var(--neutral-light);
-}
-
-.modal-footer {
-  border-top: 1px solid var(--neutral-light);
-  background-color: var(--neutral-light);
-}
-
-/* Form styling */
-.form-control:focus,
-.form-select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
-}
-
-/* Sub-category items */
-.sub-category-item {
-  border: 1px solid var(--neutral-light);
-  border-radius: 0.5rem;
-}
-
-.sub-category-item .card-body {
-  background-color: var(--neutral-light);
-}
-
-/* Image upload styling */
 .category-image-upload {
-  border: 2px dashed var(--neutral);
+  border: 2px dashed var(--border-secondary);
   border-radius: 0.75rem;
+  background-color: var(--surface-tertiary);
   transition: border-color 0.3s ease;
 }
 
 .category-image-upload:hover {
-  border-color: var(--primary);
+  border-color: var(--border-accent);
 }
 
 .image-preview-container {
@@ -552,13 +532,15 @@ export default {
   justify-content: center;
 }
 
-/* Button disabled state */
+.sub-categories-list .card {
+  border-radius: 0.5rem;
+}
+
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-/* Loading spinner */
 .spinner-border-sm {
   width: 0.875rem;
   height: 0.875rem;

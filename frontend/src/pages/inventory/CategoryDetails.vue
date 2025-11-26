@@ -153,6 +153,7 @@
 
       <!-- Products Table -->
       <DataTable
+        class="category-details-table"
         :total-items="filteredProducts.length"
         :current-page="currentPage"
         :items-per-page="itemsPerPage"
@@ -249,7 +250,12 @@
             <p class="text-tertiary mb-3">
               {{ subcategoryFilter ? `No products found in "${subcategoryFilter}" subcategory` : 'No products found in this category' }}
             </p>
-            <button class="btn btn-add btn-with-icon" v-if="!subcategoryFilter">
+            <button 
+              class="btn btn-add btn-with-icon" 
+              v-if="!subcategoryFilter"
+              @click="openMoveFromUncategorizedModal"
+              :disabled="moveProductLoading || bulkMoveLoading"
+            >
               <Plus :size="16" />
               Add First Product
             </button>
@@ -261,6 +267,13 @@
     <!-- Modals -->
     <AddCategoryModal ref="editCategoryModal" @category-updated="onCategoryUpdated" />
     <AddSubcategoryModal ref="addSubcategoryModal" @subcategory-added="onSubcategoryAdded" />
+    <MoveFromUncategorizedModal
+      ref="moveFromUncategorizedModal"
+      :target-category-id="currentCategory?._id"
+      :target-category-name="currentCategory?.category_name"
+      :subcategories="currentCategory?.sub_categories || []"
+      @products-moved="handleProductsMoved"
+    />
   </div>
 </template>
 
@@ -270,6 +283,7 @@ import { useRoute } from 'vue-router'
 import DataTable from '@/components/common/TableTemplate.vue'
 import AddSubcategoryModal from '@/components/categories/AddSubCategoryModal.vue'
 import AddCategoryModal from '@/components/categories/AddCategoryModal.vue'
+import MoveFromUncategorizedModal from '@/components/categories/MoveFromUncategorizedModal.vue'
 import { useCategories } from '@/composables/api/useCategories'
 import { useProducts } from '@/composables/api/useProducts'
 
@@ -278,7 +292,8 @@ export default {
   components: {
     DataTable,
     AddCategoryModal,
-    AddSubcategoryModal
+    AddSubcategoryModal,
+    MoveFromUncategorizedModal
   },
   
   setup() {
@@ -313,6 +328,7 @@ export default {
     const categoryId = ref(null)
     const editCategoryModal = ref(null)
     const addSubcategoryModal = ref(null)
+    const moveFromUncategorizedModal = ref(null)
 
     // Computed properties
     const loading = computed(() => categoriesLoading.value || productsLoading.value)
@@ -500,6 +516,18 @@ export default {
       }
     }
 
+    const openMoveFromUncategorizedModal = () => {
+      if (moveFromUncategorizedModal.value && currentCategory.value?._id) {
+        moveFromUncategorizedModal.value.openModal()
+      }
+    }
+
+    const handleProductsMoved = async () => {
+      if (categoryId.value) {
+        await loadCategoryData(categoryId.value)
+      }
+    }
+
     // Utility methods
     const formatPrice = (price) => parseFloat(price || 0).toFixed(2)
 
@@ -625,12 +653,13 @@ export default {
       filteredProducts, paginatedProducts, isAllSelected, isIndeterminate,
       
       // Refs
-      editCategoryModal, addSubcategoryModal,
+      editCategoryModal, addSubcategoryModal, moveFromUncategorizedModal,
 
       // Methods
       handleRetryLoad, applyFilter, handlePageChange, toggleSelectAll,
       handleUpdateProductSubcategory, removeProductFromCategory, removeSelectedFromCategory,
       handleEditCategory, handleAddSubCategory, onCategoryUpdated, onSubcategoryAdded,
+      openMoveFromUncategorizedModal, handleProductsMoved,
       
       // Utility methods
       formatPrice, formatDate, getStatusClass, getStockClass, getSubcategoryProductCount,
@@ -691,6 +720,36 @@ export default {
 
 .breadcrumb-item a:hover {
   text-decoration: underline;
+}
+
+.category-details-table :deep(.table-responsive) {
+  overflow-x: hidden !important;
+  overflow-y: visible;
+}
+
+.category-details-table :deep(.data-table) {
+  min-width: 0;
+  width: 100%;
+}
+
+.category-details-table :deep(th),
+.category-details-table :deep(td) {
+  word-break: break-word;
+}
+
+.category-details-table :deep(.table-header-sticky) {
+  overflow: hidden;
+  scrollbar-width: none;
+}
+
+.category-details-table :deep(.table-header-sticky::-webkit-scrollbar) {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .category-details-table :deep(.data-table) {
+    min-width: 0;
+  }
 }
 
 @media (max-width: 768px) {

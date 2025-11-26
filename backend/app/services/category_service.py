@@ -9,6 +9,9 @@ from notifications.services import notification_service
 logger = logging.getLogger(__name__)
 
 class CategoryService:
+    VALID_CATEGORY_PREFIXES = ('CTGY-', 'UNCTGRY-', 'UNGTY-')
+    UNCATEGORIZED_ID_CANDIDATES = ['UNCTGRY-001', 'UNGTY-001']
+
     def __init__(self):
         """Initialize CategoryService with string-based architecture"""
         self.db = db_manager.get_database()
@@ -23,13 +26,20 @@ class CategoryService:
     # UTILITY METHODS
     # ================================================================
 
+    def _is_valid_category_id(self, category_id):
+        """Allow CTGY-* plus legacy uncategorized IDs"""
+        return isinstance(category_id, str) and category_id.startswith(self.VALID_CATEGORY_PREFIXES)
+
     def ensure_uncategorized_category_exists(self):
         """Ensure an 'Uncategorized' category exists, create if not"""
         try:
             # Check if uncategorized category already exists
             uncategorized = self.collection.find_one({
-                '_id': 'UNCTGRY-001',
-                'isDeleted': {'$ne': True}
+                'isDeleted': {'$ne': True},
+                '$or': [
+                    {'_id': {'$in': self.UNCATEGORIZED_ID_CANDIDATES}},
+                    {'category_name': re.compile(r'^uncategorized$', re.IGNORECASE)}
+                ]
             })
             
             if uncategorized:
@@ -492,7 +502,7 @@ class CategoryService:
     def get_category_by_id(self, category_id, include_deleted=False):
         """Get category by string ID with product counts added to subcategories"""
         try:
-            if not category_id or not category_id.startswith('CTGY-'):
+            if not self._is_valid_category_id(category_id):
                 return None
 
             query = {'_id': category_id}  # Use _id instead of category_id
@@ -521,7 +531,7 @@ class CategoryService:
             if current_user:
                 logger.info(f"Updated by: {current_user['username']}")
             
-            if not category_id or not category_id.startswith('CTGY-'):
+            if not self._is_valid_category_id(category_id):
                 return None
             
             # Get current category data for audit - USE _id instead of category_id
@@ -598,7 +608,7 @@ class CategoryService:
             if current_user:
                 logger.info(f"Deleted by: {current_user['username']}")
             
-            if not category_id or not category_id.startswith('CTGY-'):
+            if not self._is_valid_category_id(category_id):
                 return False
             
             # Get category data before deletion (only active categories) - USE _id
@@ -659,7 +669,7 @@ class CategoryService:
             if current_user:
                 logger.info(f"Restored by: {current_user['username']}")
             
-            if not category_id or not category_id.startswith('CTGY-'):
+            if not self._is_valid_category_id(category_id):
                 return False
             
             # Find deleted category using string ID
@@ -725,7 +735,7 @@ class CategoryService:
             if current_user:
                 logger.info(f"Deleted by: {current_user['username']}")
             
-            if not category_id or not category_id.startswith('CTGY-'):
+            if not self._is_valid_category_id(category_id):
                 return False
             
             # Get category data before permanent deletion
@@ -829,7 +839,7 @@ class CategoryService:
         try:
             logger.info(f"Adding product '{product_identifier}' to subcategory '{subcategory_name}' in category {category_id}")
             
-            if not category_id or not category_id.startswith('CTGY-'):
+            if not self._is_valid_category_id(category_id):
                 raise ValueError("Invalid category ID")
             
             if not subcategory_name or not subcategory_name.strip():
@@ -953,7 +963,7 @@ class CategoryService:
         try:
             logger.info(f"Removing product '{product_identifier}' from subcategory '{subcategory_name}' in category {category_id}")
             
-            if not category_id or not category_id.startswith('CTGY-'):
+            if not self._is_valid_category_id(category_id):
                 raise ValueError("Invalid category ID")
             
             if not subcategory_name or not subcategory_name.strip():
@@ -1084,7 +1094,7 @@ class CategoryService:
             if current_user:
                 logger.info(f"Added by: {current_user['username']}")
             
-            if not category_id or not category_id.startswith('CTGY-'):
+            if not self._is_valid_category_id(category_id):
                 return False
             
             # Validate subcategory data
@@ -1146,7 +1156,7 @@ class CategoryService:
         try:
             logger.info(f"Removing subcategory '{subcategory_name}' from category {category_id}")
             
-            if not category_id or not category_id.startswith('CTGY-'):
+            if not self._is_valid_category_id(category_id):
                 return False
             
             # Check if category exists and is not deleted
@@ -1202,7 +1212,7 @@ class CategoryService:
     def get_subcategories(self, category_id):
         """Get all subcategories for a specific category"""
         try:
-            if not category_id or not category_id.startswith('CTGY-'):
+            if not self._is_valid_category_id(category_id):
                 return []
             
             category = self.collection.find_one(
@@ -1222,7 +1232,7 @@ class CategoryService:
     def get_subcategory_products_with_details(self, category_id, subcategory_name):
         """Get products in subcategory with full product details (ID + Name format)"""
         try:
-            if not category_id or not category_id.startswith('CTGY-'):
+            if not self._is_valid_category_id(category_id):
                 return []
                 
             category = self.collection.find_one({'category_id': category_id})
@@ -1311,7 +1321,9 @@ class CategoryService:
     def get_category_delete_info(self, category_id):
         """Get information about a category before deletion"""
         try:
-            if not category_id or not category_id.startswith('CTGY-'):
+            if not self._is_valid_category_id(category_id):
+            if not self._is_valid_category_id(category_id):
+            if not self._is_valid_category_id(category_id):
                 return None
             
             category = self.collection.find_one({'category_id': category_id})
@@ -1358,7 +1370,7 @@ class CategoryService:
             
             for category_id in category_ids:
                 try:
-                    if not category_id.startswith('CTGY-'):
+                    if not self._is_valid_category_id(category_id):
                         failed_count += 1
                         errors.append(f"Invalid category ID: {category_id}")
                         continue
@@ -1395,7 +1407,7 @@ class CategoryService:
             logger.info(f"Bulk updating {len(category_ids)} categories to status: {new_status}")
             
             # Filter valid category IDs
-            valid_ids = [cid for cid in category_ids if cid.startswith('CTGY-')]
+            valid_ids = [cid for cid in category_ids if self._is_valid_category_id(cid)]
             
             result = self.collection.update_many(
                 {
@@ -1435,7 +1447,7 @@ class CategoryService:
     def _get_subcategory_product_ids(self, category_id, subcategory_name):
         """Get all product IDs in a specific subcategory (string format only)"""
         try:
-            if not category_id or not category_id.startswith('CTGY-'):
+            if not self._is_valid_category_id(category_id):
                 return []
                 
             category = self.collection.find_one({'category_id': category_id})
@@ -1460,7 +1472,7 @@ class CategoryService:
         try:
             logger.info(f"Moving product {product_id} to 'None' subcategory in category {category_id}")
             
-            if not product_id.startswith('PROD-') or not category_id.startswith('CTGY-'):
+            if not product_id.startswith('PROD-') or not self._is_valid_category_id(category_id):
                 raise ValueError("Invalid product or category ID format")
             
             # Get product details
