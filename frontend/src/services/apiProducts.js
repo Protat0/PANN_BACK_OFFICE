@@ -230,9 +230,14 @@ class ApiProductsService {
 
   // ================ PRODUCT REPORTS ================
 
-  async getLowStockProducts(branchId = null) {
+  async getLowStockProducts(options = null) {
     try {
-      const params = branchId ? { branch_id: branchId } : {}
+      let params = {}
+      if (typeof options === 'object' && options !== null) {
+        params = { ...options }
+      } else if (options) {
+        params = { branch_id: options }
+      }
       const response = await api.get(`${this.basePath}/reports/low-stock/`, { params })
       return this.handleResponse(response)
     } catch (error) {
@@ -240,9 +245,16 @@ class ApiProductsService {
     }
   }
 
-  async getExpiringProducts(daysAhead = 30) {
+  async getExpiringProducts(options = 30) {
     try {
-      const params = { days_ahead: daysAhead }
+      let params = {}
+      if (typeof options === 'number') {
+        params.days_ahead = options
+      } else if (typeof options === 'object' && options !== null) {
+        params = { days_ahead: 30, ...options }
+      } else {
+        params.days_ahead = 30
+      }
       const response = await api.get(`${this.basePath}/reports/expiring/`, { params })
       return this.handleResponse(response)
     } catch (error) {

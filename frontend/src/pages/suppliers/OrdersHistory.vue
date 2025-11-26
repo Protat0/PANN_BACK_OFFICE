@@ -1,5 +1,5 @@
 <template>
-  <div class="container-fluid pt-2 pb-4 orders-history-page">
+  <div class="container-fluid pt-2 pb-4 orders-history-page surface-secondary">
     <!-- Page Title with Back Button -->
     <div class="d-flex align-items-center justify-content-between mb-4">
       <div class="d-flex align-items-center">
@@ -8,8 +8,8 @@
           Back
         </button>
         <div>
-          <h1 class="h3 fw-semibold text-primary-dark mb-0">Purchase Orders History</h1>
-          <p class="text-tertiary-medium mb-0" v-if="!loading">
+          <h1 class="h3 fw-semibold text-primary mb-0">Purchase Orders History</h1>
+          <p class="text-tertiary mb-0" v-if="!loading">
             {{ displayOrders?.length || 0 }} orders found
           </p>
         </div>
@@ -26,10 +26,10 @@
 
     <!-- Loading State -->
     <div v-if="loading" class="text-center py-5">
-      <div class="spinner-border text-primary" role="status">
+      <div class="spinner-border text-accent" role="status">
         <span class="visually-hidden">Loading...</span>
       </div>
-      <p class="mt-3 text-tertiary-medium">Loading orders...</p>
+      <p class="mt-3 text-tertiary">Loading orders...</p>
     </div>
 
     <!-- Error State -->
@@ -47,16 +47,16 @@
     </div>
 
     <!-- Filters Bar -->
-    <div v-if="!loading" class="card mb-3">
+    <div v-if="!loading" class="surface-card border-theme mb-3 rounded">
       <div class="card-body py-2">
         <div class="row align-items-center">
           <div class="col-md-8">
             <div class="d-flex gap-3 align-items-center flex-wrap">
               <!-- Status Filter -->
               <div class="d-flex align-items-center gap-2">
-                <label class="form-label mb-0 text-tertiary-dark fw-medium">Status:</label>
+                <label class="form-label mb-0 text-secondary fw-medium">Status:</label>
                 <select 
-                  class="form-select form-select-sm" 
+                  class="form-select form-select-sm input-theme" 
                   v-model="statusFilter" 
                   @change="applyFilters"
                   style="min-width: 130px;"
@@ -72,9 +72,9 @@
 
               <!-- Supplier Filter -->
               <div class="d-flex align-items-center gap-2">
-                <label class="form-label mb-0 text-tertiary-dark fw-medium">Supplier:</label>
+                <label class="form-label mb-0 text-secondary fw-medium">Supplier:</label>
                 <select 
-                  class="form-select form-select-sm" 
+                  class="form-select form-select-sm input-theme" 
                   v-model="supplierFilter" 
                   @change="applyFilters"
                   style="min-width: 150px;"
@@ -92,9 +92,9 @@
 
               <!-- Date Range Filter -->
               <div class="d-flex align-items-center gap-2">
-                <label class="form-label mb-0 text-tertiary-dark fw-medium">Period:</label>
+                <label class="form-label mb-0 text-secondary fw-medium">Period:</label>
                 <select 
-                  class="form-select form-select-sm" 
+                  class="form-select form-select-sm input-theme" 
                   v-model="dateFilter" 
                   @change="applyFilters"
                   style="min-width: 120px;"
@@ -112,12 +112,12 @@
           <div class="col-md-4">
             <!-- Search -->
             <div class="position-relative">
-              <Search :size="16" class="position-absolute top-50 start-0 translate-middle-y ms-3 text-tertiary-medium" />
+              <Search :size="16" class="position-absolute top-50 start-0 translate-middle-y ms-3 text-tertiary" />
               <input 
                 v-model="searchFilter" 
                 @input="applyFilters"
                 type="text" 
-                class="form-control form-control-sm ps-5"
+                class="form-control form-control-sm ps-5 input-theme"
                 placeholder="Search orders, suppliers..."
               />
               <button 
@@ -134,12 +134,12 @@
     </div>
 
     <!-- Orders Table -->
-    <div v-if="!loading" class="card">
-      <div class="card-header bg-primary-medium text-white">
+    <div v-if="!loading" class="surface-card border-theme rounded">
+      <div class="card-header surface-accent text-white border-theme">
         <div class="d-flex justify-content-between align-items-center">
           <h5 class="mb-0">Purchase Orders</h5>
           <div class="d-flex align-items-center gap-3">
-            <span class="badge bg-white text-primary">
+            <span class="badge bg-white text-accent">
               {{ displayOrders?.length || 0 }} orders
             </span>
             <button 
@@ -156,21 +156,21 @@
 
       <div class="table-responsive" v-if="displayOrders?.length > 0">
         <table class="table table-hover mb-0">
-          <thead class="table-light sticky-top">
+          <thead class="surface-tertiary sticky-top">
             <tr>
               <th style="width: 140px;">
-                <div class="d-flex align-items-center">
+                <div class="d-flex align-items-center text-secondary">
                   Order ID
-                  <ChevronUp :size="14" class="ms-1 text-tertiary-medium" />
+                  <ChevronUp :size="14" class="ms-1 text-tertiary" />
                 </div>
               </th>
-              <th style="width: 180px;">Supplier</th>
-              <th style="width: 110px;">Status</th>
-              <th style="width: 120px;">Order Date</th>
-              <th style="width: 120px;">Expected Delivery</th>
-              <th style="width: 100px;" class="text-end">Amount</th>
-              <th style="width: 80px;" class="text-center">Items</th>
-              <th style="width: 140px;" class="text-center">Actions</th>
+              <th style="width: 180px;" class="text-secondary">Supplier</th>
+              <th style="width: 110px;" class="text-secondary">Status</th>
+              <th style="width: 120px;" class="text-secondary">Order Date</th>
+              <th style="width: 120px;" class="text-secondary">Expected Delivery</th>
+              <th style="width: 100px;" class="text-end text-secondary">Amount</th>
+              <th style="width: 80px;" class="text-center text-secondary">Items</th>
+              <th style="width: 140px;" class="text-center text-secondary">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -181,14 +181,14 @@
             >
               <!-- Order ID -->
               <td>
-                <div class="fw-semibold text-primary">{{ order.id }}</div>
+                <div class="fw-semibold text-accent">{{ order.id }}</div>
               </td>
               
               <!-- Supplier -->
               <td>
                 <div>
-                  <div class="fw-medium text-tertiary-dark">{{ order.supplier }}</div>
-                  <small class="text-tertiary-medium">{{ order.supplierEmail }}</small>
+                  <div class="fw-medium text-primary">{{ order.supplier }}</div>
+                  <small class="text-tertiary">{{ order.supplierEmail }}</small>
                 </div>
               </td>
               
@@ -202,15 +202,15 @@
               <!-- Order Date -->
               <td>
                 <div>
-                  <div class="fw-medium">{{ formatDate(order.orderDate) }}</div>
-                  <small class="text-tertiary-medium">{{ getDaysAgo(order.orderDate) }}</small>
+                  <div class="fw-medium text-primary">{{ formatDate(order.orderDate) }}</div>
+                  <small class="text-tertiary">{{ getDaysAgo(order.orderDate) }}</small>
                 </div>
               </td>
               
               <!-- Expected Delivery -->
               <td>
                 <div>
-                  <div class="fw-medium">{{ formatDate(order.expectedDelivery) }}</div>
+                  <div class="fw-medium text-primary">{{ formatDate(order.expectedDelivery) }}</div>
                   <small :class="getDeliveryStatusClass(order)">
                     {{ getDeliveryStatus(order) }}
                   </small>
@@ -219,12 +219,12 @@
               
               <!-- Amount -->
               <td class="text-end">
-                <div class="fw-bold">₱{{ formatCurrency(order.totalAmount) }}</div>
+                <div class="fw-bold text-primary">₱{{ formatCurrency(order.totalAmount) }}</div>
               </td>
               
               <!-- Items Count -->
               <td class="text-center">
-                <span class="badge bg-light text-dark">
+                <span class="badge surface-tertiary text-primary border-theme">
                   {{ order.items?.length || 0 }}
                 </span>
               </td>
@@ -264,9 +264,9 @@
       <!-- Empty State -->
       <div v-if="displayOrders?.length === 0" class="text-center py-5">
         <div class="py-4">
-          <Package :size="48" class="text-tertiary-medium mb-3" />
-          <h5 class="text-tertiary-dark">No Orders Found</h5>
-          <p class="text-tertiary-medium mb-3">
+          <Package :size="48" class="text-tertiary mb-3" />
+          <h5 class="text-primary">No Orders Found</h5>
+          <p class="text-tertiary mb-3">
             {{ hasFilters ? 'No orders match your current filters.' : 'No purchase orders have been created yet.' }}
           </p>
           <div class="d-flex gap-2 justify-content-center">
@@ -279,9 +279,9 @@
       </div>
 
       <!-- Pagination -->
-      <div v-if="displayOrders?.length > itemsPerPage" class="card-footer">
+      <div v-if="displayOrders?.length > itemsPerPage" class="card-footer surface-secondary border-theme">
         <nav class="d-flex justify-content-between align-items-center">
-          <div class="text-tertiary-medium">
+          <div class="text-tertiary">
             Showing {{ startItem }}-{{ endItem }} of {{ displayOrders.length }} orders
           </div>
           <ul class="pagination pagination-sm mb-0">
@@ -311,9 +311,9 @@
     <!-- Order Details Modal -->
     <div v-if="showOrderModal" class="modal fade show" style="display: block;" tabindex="-1">
       <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
+        <div class="modal-content surface-card border-theme">
+          <div class="modal-header border-theme">
+            <h5 class="modal-title text-primary">
               <Package :size="20" class="me-2" />
               Order Details - {{ selectedOrder?.id }}
             </h5>
@@ -322,40 +322,40 @@
           <div class="modal-body">
             <div v-if="selectedOrder" class="row">
               <div class="col-md-6">
-                <h6 class="fw-bold">Order Information</h6>
-                <p><strong>Order ID:</strong> {{ selectedOrder.id }}</p>
-                <p><strong>Status:</strong> 
+                <h6 class="fw-bold text-primary">Order Information</h6>
+                <p class="text-secondary"><strong>Order ID:</strong> {{ selectedOrder.id }}</p>
+                <p class="text-secondary"><strong>Status:</strong> 
                   <span :class="getStatusBadgeClass(selectedOrder.status)" class="badge ms-1">
                     {{ getStatusText(selectedOrder.status) }}
                   </span>
                 </p>
-                <p><strong>Order Date:</strong> {{ formatDate(selectedOrder.orderDate) }}</p>
-                <p><strong>Expected Delivery:</strong> {{ formatDate(selectedOrder.expectedDelivery) }}</p>
-                <p><strong>Total Amount:</strong> <strong>₱{{ formatCurrency(selectedOrder.totalAmount) }}</strong></p>
+                <p class="text-secondary"><strong>Order Date:</strong> {{ formatDate(selectedOrder.orderDate) }}</p>
+                <p class="text-secondary"><strong>Expected Delivery:</strong> {{ formatDate(selectedOrder.expectedDelivery) }}</p>
+                <p class="text-secondary"><strong>Total Amount:</strong> <strong>₱{{ formatCurrency(selectedOrder.totalAmount) }}</strong></p>
               </div>
               <div class="col-md-6">
-                <h6 class="fw-bold">Supplier Information</h6>
-                <p><strong>Supplier:</strong> {{ selectedOrder.supplier }}</p>
-                <p><strong>Email:</strong> {{ selectedOrder.supplierEmail }}</p>
+                <h6 class="fw-bold text-primary">Supplier Information</h6>
+                <p class="text-secondary"><strong>Supplier:</strong> {{ selectedOrder.supplier }}</p>
+                <p class="text-secondary"><strong>Email:</strong> {{ selectedOrder.supplierEmail }}</p>
               </div>
               <div class="col-12 mt-3">
-                <h6 class="fw-bold">Items ({{ selectedOrder.items?.length || 0 }})</h6>
+                <h6 class="fw-bold text-primary">Items ({{ selectedOrder.items?.length || 0 }})</h6>
                 <div class="table-responsive">
                   <table class="table table-sm">
-                    <thead>
+                    <thead class="surface-tertiary">
                       <tr>
-                        <th>Item</th>
-                        <th>Quantity</th>
-                        <th>Unit Price</th>
-                        <th>Total</th>
+                        <th class="text-secondary">Item</th>
+                        <th class="text-secondary">Quantity</th>
+                        <th class="text-secondary">Unit Price</th>
+                        <th class="text-secondary">Total</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr v-for="(item, index) in selectedOrder.items" :key="index">
-                        <td>{{ item.name }}</td>
-                        <td>{{ item.quantity }}</td>
-                        <td>₱{{ formatCurrency(item.unitPrice) }}</td>
-                        <td>₱{{ formatCurrency(item.quantity * item.unitPrice) }}</td>
+                        <td class="text-primary">{{ item.name }}</td>
+                        <td class="text-primary">{{ item.quantity }}</td>
+                        <td class="text-primary">₱{{ formatCurrency(item.unitPrice) }}</td>
+                        <td class="text-primary">₱{{ formatCurrency(item.quantity * item.unitPrice) }}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -363,7 +363,7 @@
               </div>
             </div>
           </div>
-          <div class="modal-footer">
+          <div class="modal-footer border-theme surface-secondary">
             <button type="button" class="btn btn-secondary" @click="closeModal">Close</button>
             <button type="button" class="btn btn-outline-primary" @click="editOrder(selectedOrder)" :disabled="!canEditOrder(selectedOrder) && !canEditLimited(selectedOrder)">
               <Edit :size="16" class="me-1" />
@@ -1209,27 +1209,8 @@ export default {
 }
 </script>
 <style scoped>
-@import '@/assets/styles/colors.css';
-
 .orders-history-page {
-  background-color: var(--neutral-light);
   min-height: 100vh;
-}
-
-.text-primary-dark {
-  color: var(--primary-dark) !important;
-}
-
-.text-tertiary-dark {
-  color: var(--tertiary-dark) !important;
-}
-
-.text-tertiary-medium {
-  color: var(--tertiary-medium) !important;
-}
-
-.bg-primary-medium {
-  background-color: var(--primary-medium) !important;
 }
 
 .sticky-top {
@@ -1243,39 +1224,35 @@ export default {
 }
 
 .table th {
-  border-bottom: 2px solid var(--neutral);
+  border-bottom: 2px solid var(--border-primary);
   font-weight: 600;
   font-size: 0.875rem;
-  color: var(--tertiary-dark);
 }
 
 .table td {
   vertical-align: middle;
-  border-bottom: 1px solid var(--neutral-light);
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .table tbody tr:hover {
-  background-color: var(--neutral-light);
+  background-color: var(--state-hover);
 }
 
 .page-link {
-  color: var(--primary);
-  border-color: var(--neutral);
+  border-color: var(--border-primary);
 }
 
 .page-link:hover {
-  color: var(--primary-dark);
-  background-color: var(--primary-light);
-  border-color: var(--primary);
+  background-color: var(--state-hover);
+  border-color: var(--border-accent);
 }
 
 .page-item.active .page-link {
-  background-color: var(--primary);
-  border-color: var(--primary);
+  background-color: var(--accent);
+  border-color: var(--accent);
 }
 
 .page-item.disabled .page-link {
-  color: var(--tertiary-medium);
-  background-color: var(--neutral-light);
+  background-color: var(--surface-secondary);
 }
 </style>

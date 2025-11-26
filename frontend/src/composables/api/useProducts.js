@@ -76,15 +76,29 @@ export function useProducts() {
     return result
   })
 
+  const isTrackedStock = (product) => {
+    if (!product) return false
+    const stockField = product.total_stock ?? product.stock
+    return typeof stockField === 'number'
+  }
+
+  const lowStockItems = computed(() => products.value.filter(p => {
+    if (!isTrackedStock(p)) return false
+    const currentStock = p.total_stock ?? p.stock
+    const threshold = typeof p.low_stock_threshold === 'number' ? p.low_stock_threshold : 0
+    return currentStock > 0 && currentStock < threshold
+  }))
+
   const productStats = computed(() => ({
     total: products.value.length,
     active: products.value.filter(p => p.status === 'active').length,
     inactive: products.value.filter(p => p.status === 'inactive').length,
-    outOfStock: products.value.filter(p => (p.total_stock || p.stock) === 0).length,
-    lowStock: products.value.filter(p => {
-      const currentStock = p.total_stock || p.stock
-      return currentStock > 0 && currentStock <= p.low_stock_threshold
-    }).length
+    outOfStock: products.value.filter(p => {
+      if (!isTrackedStock(p)) return false
+      const currentStock = p.total_stock ?? p.stock
+      return currentStock === 0
+    }).length,
+    lowStock: lowStockItems.value.length
   }))
 
   const productsByCategory = computed(() => {

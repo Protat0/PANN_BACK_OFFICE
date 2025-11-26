@@ -107,7 +107,21 @@ export default {
   },
   computed: {
     currentPageTitle() {
-      const titles = {
+      if (this.$route.meta?.title) {
+        return this.$route.meta.title
+      }
+
+      const path = this.$route.path
+
+      if (path.startsWith('/products/') && path !== '/products/bulk') {
+        return 'Product Details'
+      }
+
+      if (path.startsWith('/suppliers/') && path !== '/suppliers/orders') {
+        return 'Supplier Details'
+      }
+
+      const fallbackTitles = {
         '/dashboard': 'Dashboard',
         '/accounts': 'User Accounts',
         '/customers': 'Customers',
@@ -124,16 +138,8 @@ export default {
         '/allNotifications': 'All Notifications',
         '/profile': 'User Profile'
       }
-      
-      if (this.$route.path.startsWith('/products/') && this.$route.path !== '/products/bulk') {
-        return 'Product Details'
-      }
-      
-      if (this.$route.path.startsWith('/suppliers/') && this.$route.path !== '/suppliers/orders') {
-        return 'Supplier Details'
-      }
-      
-      return titles[this.$route.path] || 'Dashboard'
+
+      return fallbackTitles[path] || 'Dashboard'
     },
     userInfo() {
       // Try both possible storage keys for backward compatibility

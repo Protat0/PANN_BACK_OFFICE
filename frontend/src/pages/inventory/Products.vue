@@ -10,8 +10,6 @@
           title="Low Stock"
           :value="productStats.lowStock"
           subtitle="Critical Items"
-          clickable
-          @click="showLowStockReport"
         />
       </div>
       <div class="col-6 col-md-3 mb-2">
@@ -22,8 +20,6 @@
           title="Expiring"
           :value="expiringCount"
           subtitle="30 Days"
-          clickable
-          @click="showExpiringReport"
         />
       </div>
       <div class="col-6 col-md-3 mb-2">
@@ -381,13 +377,6 @@
       @generate-barcode="generateProductBarcode"
     />
 
-    <ReportsModal
-      ref="reportsModal"
-      @view-product="viewProduct"
-      @edit-product="editProduct"
-      @restock-product="restockProduct"
-    />
-
     <ImportModal
       ref="importModal"
       @import-completed="handleImportSuccess"
@@ -410,7 +399,6 @@ import { useCategories } from '@/composables/api/useCategories'
 import AddProductModal from '@/components/products/AddProductModal.vue'
 import StockUpdateModal from '@/components/products/StockUpdateModal.vue'
 import ViewProductModal from '@/components/products/ViewProductModal.vue'
-import ReportsModal from '@/components/products/ReportsModal.vue'
 import DataTable from '@/components/common/TableTemplate.vue'
 import CardTemplate from '@/components/common/CardTemplate.vue'
 import ImportModal from '@/components/products/ImportModal.vue'
@@ -424,7 +412,6 @@ export default {
     ViewProductModal,
     ColumnFilterModal,
     ImportModal,
-    ReportsModal,
     DataTable,
     CardTemplate
   },
@@ -867,14 +854,6 @@ export default {
       this.$refs.stockUpdateModal?.openStock?.(product)
     },
 
-    async showLowStockReport() {
-      await this.$refs.reportsModal?.showLowStockModal?.()
-    },
-    
-    async showExpiringReport() {
-      await this.$refs.reportsModal?.showExpiringModal?.()
-    },
-    
     handleSingleProduct(event) {
       event?.stopPropagation()
       this.showAddProductModal()

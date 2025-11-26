@@ -1,12 +1,12 @@
 <template>
   <div
-    class="modal fade"
+    class="modal fade move-products-modal"
     id="moveFromUncategorizedModal"
     tabindex="-1"
     aria-hidden="true"
     ref="modal"
   >
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-dialog modal-xxl modal-dialog-scrollable modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
           <div>
@@ -373,10 +373,7 @@ export default {
 
         this.toast.success('Products moved successfully.')
         this.$emit('products-moved')
-
-        if (!this.products.length) {
-          this.closeModal()
-        }
+        this.closeModal()
       } catch (error) {
         console.error('Failed to move products:', error)
         this.toast.error(error.message || 'Failed to move products.')
@@ -423,6 +420,29 @@ export default {
 
 .search-field .input-group-text {
   background: var(--surface-secondary);
+}
+
+.move-products-modal .modal-dialog {
+  margin: 1.25rem auto;
+  width: calc(100% - 320px);
+  max-width: 1400px;
+}
+
+.move-products-modal.show {
+  display: flex !important;
+  justify-content: center;
+  align-items: center;
+  padding-left: 280px;
+}
+
+@media (max-width: 1200px) {
+  .move-products-modal.show {
+    padding-left: 0;
+  }
+  .move-products-modal .modal-dialog {
+    width: 95%;
+    max-width: 1000px;
+  }
 }
 </style>
 

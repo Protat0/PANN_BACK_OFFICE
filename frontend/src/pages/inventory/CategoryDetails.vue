@@ -138,6 +138,15 @@
               </button>
               
               <button 
+                class="btn btn-add btn-sm btn-with-icon-sm"
+                @click="openMoveFromUncategorizedModal"
+                :disabled="moveProductLoading || bulkMoveLoading"
+              >
+                <Plus :size="14" />
+                Add Products
+              </button>
+              
+              <button 
                 v-if="selectedProducts.length > 0"
                 class="btn btn-delete btn-sm btn-with-icon-sm" 
                 @click="removeSelectedFromCategory"

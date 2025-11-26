@@ -10,10 +10,10 @@
     @click.self="handleClose"
   >
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
-      <div class="modal-content">
+      <div class="modal-content surface-card border-theme">
         <!-- Modal Header -->
-        <div class="modal-header">
-          <h5 class="modal-title" id="addPromoModalLabel">{{ modalTitle }}</h5>
+        <div class="modal-header border-theme">
+          <h5 class="modal-title text-primary" id="addPromoModalLabel">{{ modalTitle }}</h5>
           <button type="button" class="btn-close" @click="handleClose" aria-label="Close"></button>
         </div>
         
@@ -42,10 +42,10 @@
             <form @submit.prevent="savePromotion">
               <div class="row">
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Promotion Name <span class="text-danger">*</span></label>
+                  <label class="form-label text-secondary">Promotion Name <span class="text-danger">*</span></label>
                   <input 
                     type="text" 
-                    class="form-control" 
+                    class="form-control input-theme" 
                     v-model="formData.promotion_name"
                     placeholder="Enter promotion name"
                     required
@@ -53,8 +53,8 @@
                 </div>
                 
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Discount Type <span class="text-danger">*</span></label>
-                  <select class="form-select" v-model="formData.discount_type" required>
+                  <label class="form-label text-secondary">Discount Type <span class="text-danger">*</span></label>
+                  <select class="form-select input-theme" v-model="formData.discount_type" required>
                     <option value="">Select discount type</option>
                     <option value="percentage">Percentage</option>
                     <option value="fixed_amount">Fixed Amount</option>
@@ -63,11 +63,11 @@
                 </div>
                 
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Discount Value <span class="text-danger">*</span></label>
+                  <label class="form-label text-secondary">Discount Value <span class="text-danger">*</span></label>
                   <div class="input-group">
                     <input 
                       type="number" 
-                      class="form-control" 
+                      class="form-control input-theme" 
                       v-model="formData.discount_value"
                       :placeholder="formData.discount_type === 'percentage' ? 'Enter percentage (e.g., 20)' : 'Enter amount (e.g., 50)'"
                       :min="formData.discount_type === 'percentage' ? 1 : 0"
@@ -75,15 +75,15 @@
                       step="0.01"
                       required
                     >
-                    <span class="input-group-text">
+                    <span class="input-group-text surface-tertiary border-theme text-secondary">
                       {{ formData.discount_type === 'percentage' ? '%' : '₱' }}
                     </span>
                   </div>
                 </div>
                 
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Status</label>
-                  <select class="form-select" v-model="formData.status">
+                  <label class="form-label text-secondary">Status</label>
+                  <select class="form-select input-theme" v-model="formData.status">
                     <option value="scheduled">Scheduled</option>
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
@@ -91,7 +91,7 @@
                 </div>
                 
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                  <label class="form-label text-secondary">Start Date <span class="text-danger">*</span></label>
                   <div class="date-picker-wrapper">
                     <VueDatePicker 
                       v-model="formData.start_date"
@@ -106,7 +106,7 @@
                 </div>
                 
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">End Date <span class="text-danger">*</span></label>
+                  <label class="form-label text-secondary">End Date <span class="text-danger">*</span></label>
                   <div class="date-picker-wrapper">
                     <VueDatePicker 
                       v-model="formData.end_date"
@@ -121,22 +121,22 @@
                 </div>
                 
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Usage Limit</label>
+                  <label class="form-label text-secondary">Usage Limit</label>
                   <input 
                     type="number" 
-                    class="form-control" 
+                    class="form-control input-theme" 
                     v-model="formData.usage_limit"
                     placeholder="Leave empty for unlimited"
                     min="1"
                     step="1"
                   >
-                  <small class="form-text text-muted">Maximum number of times this promotion can be used (optional)</small>
+                  <small class="form-text text-tertiary">Maximum number of times this promotion can be used (optional)</small>
                 </div>
                 
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Apply to Category <span class="text-danger">*</span></label>
+                  <label class="form-label text-secondary">Apply to Category <span class="text-danger">*</span></label>
                   <select 
-                    class="form-select" 
+                    class="form-select input-theme" 
                     v-model="formData.affected_category" 
                     :disabled="loadingCategories"
                     required
@@ -155,14 +155,14 @@
                 </div>
                 
                 <div class="col-12 mb-3">
-                  <label class="form-label">Description</label>
+                  <label class="form-label text-secondary">Description</label>
                   <textarea 
-                    class="form-control" 
+                    class="form-control input-theme" 
                     v-model="formData.description"
                     placeholder="Enter promotion description (optional)"
                     rows="3"
                   ></textarea>
-                  <small class="form-text text-muted">Add details about this promotion (optional)</small>
+                  <small class="form-text text-tertiary">Add details about this promotion (optional)</small>
                 </div>
               </div>
             </form>
@@ -173,10 +173,10 @@
             <form @submit.prevent="updatePromotion">
               <div class="row">
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Promotion Name <span class="text-danger">*</span></label>
+                  <label class="form-label text-secondary">Promotion Name <span class="text-danger">*</span></label>
                   <input 
                     type="text" 
-                    class="form-control" 
+                    class="form-control input-theme" 
                     v-model="formData.promotion_name"
                     placeholder="Enter promotion name"
                     required
@@ -184,9 +184,9 @@
                 </div>
                 
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Discount Type <span class="text-danger">*</span></label>
+                  <label class="form-label text-secondary">Discount Type <span class="text-danger">*</span></label>
                   <select 
-                    class="form-select" 
+                    class="form-select input-theme" 
                     v-model="formData.discount_type" 
                     :disabled="selectedPromotion?.status === 'active'"
                     required
@@ -202,11 +202,11 @@
                 </div>
                 
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Discount Value <span class="text-danger">*</span></label>
+                  <label class="form-label text-secondary">Discount Value <span class="text-danger">*</span></label>
                   <div class="input-group">
                     <input 
                       type="number" 
-                      class="form-control" 
+                      class="form-control input-theme" 
                       v-model="formData.discount_value"
                       :disabled="selectedPromotion?.status === 'active'"
                       :min="formData.discount_type === 'percentage' ? 1 : 0"
@@ -214,7 +214,7 @@
                       step="0.01"
                       required
                     >
-                    <span class="input-group-text">
+                    <span class="input-group-text surface-tertiary border-theme text-secondary">
                       {{ formData.discount_type === 'percentage' ? '%' : '₱' }}
                     </span>
                   </div>
@@ -224,8 +224,8 @@
                 </div>
                 
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Status</label>
-                  <select class="form-select" v-model="formData.status">
+                  <label class="form-label text-secondary">Status</label>
+                  <select class="form-select input-theme" v-model="formData.status">
                     <option value="scheduled">Scheduled</option>
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
@@ -234,7 +234,7 @@
                 </div>
                 
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                  <label class="form-label text-secondary">Start Date <span class="text-danger">*</span></label>
                   <div class="date-picker-wrapper">
                     <VueDatePicker 
                       v-model="formData.start_date"
@@ -249,7 +249,7 @@
                 </div>
                 
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">End Date <span class="text-danger">*</span></label>
+                  <label class="form-label text-secondary">End Date <span class="text-danger">*</span></label>
                   <div class="date-picker-wrapper">
                     <VueDatePicker 
                       v-model="formData.end_date"
@@ -264,22 +264,22 @@
                 </div>
                 
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Usage Limit</label>
+                  <label class="form-label text-secondary">Usage Limit</label>
                   <input 
                     type="number" 
-                    class="form-control" 
+                    class="form-control input-theme" 
                     v-model="formData.usage_limit"
                     placeholder="Leave empty for unlimited"
                     min="1"
                     step="1"
                   >
-                  <small class="form-text text-muted">Maximum number of times this promotion can be used (optional)</small>
+                  <small class="form-text text-tertiary">Maximum number of times this promotion can be used (optional)</small>
                 </div>
                 
                 <div class="col-md-6 mb-3">
-                  <label class="form-label">Apply to Category <span class="text-danger">*</span></label>
+                  <label class="form-label text-secondary">Apply to Category <span class="text-danger">*</span></label>
                   <select 
-                    class="form-select" 
+                    class="form-select input-theme" 
                     v-model="formData.affected_category" 
                     :disabled="loadingCategories || selectedPromotion?.status === 'active'"
                     required
@@ -301,14 +301,14 @@
                 </div>
                 
                 <div class="col-12 mb-3">
-                  <label class="form-label">Description</label>
+                  <label class="form-label text-secondary">Description</label>
                   <textarea 
-                    class="form-control" 
+                    class="form-control input-theme" 
                     v-model="formData.description"
                     placeholder="Enter promotion description (optional)"
                     rows="3"
                   ></textarea>
-                  <small class="form-text text-muted">Add details about this promotion (optional)</small>
+                  <small class="form-text text-tertiary">Add details about this promotion (optional)</small>
                 </div>
               </div>
             </form>
@@ -319,11 +319,11 @@
             <div class="promotion-details" v-if="selectedPromotion">
               <div class="row">
                 <div class="col-md-6 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">Promotion Name</label>
-                  <div class="form-control-plaintext">{{ selectedPromotion.promotion_name }}</div>
+                  <label class="form-label text-secondary fw-semibold">Promotion Name</label>
+                  <div class="form-control-plaintext text-primary">{{ selectedPromotion.promotion_name }}</div>
                 </div>
                 <div class="col-md-6 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">Discount Type</label>
+                  <label class="form-label text-secondary fw-semibold">Discount Type</label>
                   <div class="form-control-plaintext">
                     <span :class="getDiscountTypeBadgeClass(selectedPromotion.discount_type)" class="badge">
                       {{ formatDiscountType(selectedPromotion.discount_type) }}
@@ -331,11 +331,11 @@
                   </div>
                 </div>
                 <div class="col-md-6 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">Discount Value</label>
-                  <div class="form-control-plaintext">{{ formatDiscountValue(selectedPromotion.discount_value, selectedPromotion.discount_type) }}</div>
+                  <label class="form-label text-secondary fw-semibold">Discount Value</label>
+                  <div class="form-control-plaintext text-primary">{{ formatDiscountValue(selectedPromotion.discount_value, selectedPromotion.discount_type) }}</div>
                 </div>
                 <div class="col-md-6 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">Status</label>
+                  <label class="form-label text-secondary fw-semibold">Status</label>
                   <div class="form-control-plaintext">
                     <span :class="getStatusBadgeClass(selectedPromotion.status)" class="badge">
                       {{ formatStatus(selectedPromotion.status) }}
@@ -343,30 +343,30 @@
                   </div>
                 </div>
                 <div class="col-md-6 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">Start Date</label>
-                  <div class="form-control-plaintext">{{ formatDate(selectedPromotion.start_date) }}</div>
+                  <label class="form-label text-secondary fw-semibold">Start Date</label>
+                  <div class="form-control-plaintext text-primary">{{ formatDate(selectedPromotion.start_date) }}</div>
                 </div>
                 <div class="col-md-6 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">End Date</label>
-                  <div class="form-control-plaintext">{{ formatDate(selectedPromotion.end_date) }}</div>
+                  <label class="form-label text-secondary fw-semibold">End Date</label>
+                  <div class="form-control-plaintext text-primary">{{ formatDate(selectedPromotion.end_date) }}</div>
                 </div>
                 <div class="col-md-6 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">Usage Limit</label>
-                  <div class="form-control-plaintext">
+                  <label class="form-label text-secondary fw-semibold">Usage Limit</label>
+                  <div class="form-control-plaintext text-primary">
                     {{ selectedPromotion.usage_limit || 'Unlimited' }}
                   </div>
                 </div>
                 <div class="col-md-6 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">Current Usage</label>
-                  <div class="form-control-plaintext">
+                  <label class="form-label text-secondary fw-semibold">Current Usage</label>
+                  <div class="form-control-plaintext text-primary">
                     {{ selectedPromotion.current_usage || 0 }}
-                    <span v-if="selectedPromotion.usage_limit" class="text-muted">
+                    <span v-if="selectedPromotion.usage_limit" class="text-tertiary">
                       / {{ selectedPromotion.usage_limit }}
                     </span>
                   </div>
                 </div>
                 <div class="col-12 mb-3">
-                  <label class="form-label text-tertiary-dark fw-semibold">Applied to Category</label>
+                  <label class="form-label text-secondary fw-semibold">Applied to Category</label>
                   <div class="form-control-plaintext">
                     <span class="badge bg-info text-white">
                       {{ formatCategory(selectedPromotion.affected_category) }}
@@ -374,8 +374,8 @@
                   </div>
                 </div>
                 <div class="col-12 mb-3" v-if="selectedPromotion.description">
-                  <label class="form-label text-tertiary-dark fw-semibold">Description</label>
-                  <div class="form-control-plaintext">{{ selectedPromotion.description }}</div>
+                  <label class="form-label text-secondary fw-semibold">Description</label>
+                  <div class="form-control-plaintext text-primary">{{ selectedPromotion.description }}</div>
                 </div>
               </div>
             </div>
@@ -383,7 +383,7 @@
         </div>
         
         <!-- Modal Footer - Sticky -->
-        <div class="modal-footer">
+        <div class="modal-footer surface-secondary border-theme">
           <template v-if="mode === 'add'">
             <button type="button" class="btn btn-cancel" @click="handleClose" :disabled="isLoading">
               Cancel
@@ -779,7 +779,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* ... keep all existing styles unchanged ... */
 .modal {
   background-color: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
@@ -787,15 +786,13 @@ onMounted(() => {
 
 .modal-content {
   border-radius: 0.75rem;
-  border: none;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  border-width: 1px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
 }
 
 .modal-header {
-  border-bottom: 1px solid var(--neutral-light);
   padding: 1.5rem;
   flex-shrink: 0;
 }
@@ -803,7 +800,6 @@ onMounted(() => {
 .modal-title {
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--tertiary-dark);
 }
 
 .modal-body {
@@ -814,13 +810,11 @@ onMounted(() => {
 }
 
 .modal-footer {
-  border-top: 1px solid var(--neutral-light);
   padding: 1.5rem;
   gap: 0.5rem;
   flex-shrink: 0;
   position: sticky;
   bottom: 0;
-  background-color: white;
   z-index: 10;
 }
 
@@ -831,13 +825,11 @@ onMounted(() => {
 
 .form-label {
   font-weight: 500;
-  color: var(--tertiary-dark);
   margin-bottom: 0.5rem;
 }
 
 .form-control,
 .form-select {
-  border: 1px solid var(--neutral);
   border-radius: 0.5rem;
   padding: 0.625rem 0.875rem;
   font-size: 0.875rem;
@@ -846,26 +838,22 @@ onMounted(() => {
 
 .form-control:focus,
 .form-select:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 0.2rem rgba(115, 146, 226, 0.25);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.2rem var(--state-focus);
 }
 
 .form-control:disabled,
 .form-select:disabled {
-  background-color: #f5f5f5;
   cursor: not-allowed;
   opacity: 0.7;
 }
 
 .input-group-text {
-  background-color: var(--neutral-light);
-  border-color: var(--neutral);
-  color: var(--tertiary-dark);
   font-weight: 500;
 }
 
 .text-warning {
-  color: #ff9800 !important;
+  color: var(--warning) !important;
   font-size: 0.75rem;
   margin-top: 0.25rem;
   display: block;
@@ -875,6 +863,10 @@ onMounted(() => {
   width: 1rem;
   height: 1rem;
   border-width: 0.15em;
+}
+
+.form-control-plaintext {
+  padding: 0.625rem 0;
 }
 
 @media (max-width: 768px) {
