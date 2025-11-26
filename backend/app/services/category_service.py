@@ -1322,8 +1322,6 @@ class CategoryService:
         """Get information about a category before deletion"""
         try:
             if not self._is_valid_category_id(category_id):
-            if not self._is_valid_category_id(category_id):
-            if not self._is_valid_category_id(category_id):
                 return None
             
             category = self.collection.find_one({'category_id': category_id})
