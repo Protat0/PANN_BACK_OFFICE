@@ -1,5 +1,5 @@
 <template>
-  <div class="modal fade" :class="{ show: show }" :style="{ display: show ? 'block' : 'none' }" tabindex="-1">
+  <div class="modal fade" :class="{ show: show }" tabindex="-1">
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
@@ -223,20 +223,61 @@ export default {
   width: 100%;
   height: 100%;
   z-index: 1040;
+  pointer-events: auto;
+}
+
+.modal-backdrop:not(.show) {
+  display: none !important;
+  pointer-events: none;
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
 }
 
 .modal.show {
+  display: flex !important;
   z-index: 1055;
+}
+
+.modal:not(.show) {
+  display: none !important;
+  pointer-events: none;
 }
 
 .modal.show .modal-dialog {
   transform: none;
+  margin: 0;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-dialog {
+  position: relative;
+  width: auto;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 .modal-content {
   border-radius: 0.75rem;
   border: none;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-body {
+  overflow-y: auto;
+  max-height: calc(90vh - 140px);
 }
 
 .modal-header {
@@ -246,6 +287,8 @@ export default {
 
 .modal-body {
   padding: 1.5rem;
+  overflow-y: auto;
+  max-height: calc(90vh - 140px);
 }
 
 .modal-footer {

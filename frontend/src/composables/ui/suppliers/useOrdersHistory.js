@@ -120,34 +120,45 @@ export function useOrdersHistory() {
     return orders.sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate))
   })
 
+  const supplierOptions = computed(() => {
+    const uniqueNames = new Set()
+    const options = []
+
+    allSuppliers.value.forEach(supplier => {
+      const name = supplier.supplier_name || supplier.name
+      if (name && !uniqueNames.has(name)) {
+        uniqueNames.add(name)
+        options.push({
+          value: name,
+          label: name,
+          email: supplier.email || ''
+        })
+      }
+    })
+
+    return options.sort((a, b) => a.label.localeCompare(b.label))
+  })
+
   // Filtered orders
   const filteredOrders = computed(() => {
     let filtered = [...allOrders.value]
 
     if (filters.value.status !== 'all') {
-      // Map old status values to new ones
       const statusMap = {
-        'pending': 'Pending Delivery',
-        'confirmed': 'Partially Received',
-        'in_transit': 'Partially Received',
-        'delivered': 'Received',
-        'cancelled': 'Depleted'
+        'pending_delivery': 'Pending Delivery',
+        'partially_received': 'Partially Received',
+        'received': 'Received',
+        'depleted': 'Depleted',
+        'mixed_status': 'Mixed Status'
       }
-      const targetStatus = statusMap[filters.value.status] || filters.value.status
-      filtered = filtered.filter(order => order.status === targetStatus)
+      const targetStatus = statusMap[filters.value.status]
+      if (targetStatus) {
+        filtered = filtered.filter(order => order.status === targetStatus)
+      }
     }
 
     if (filters.value.supplier !== 'all') {
-      const supplierMap = {
-        'bravo_warehouse': 'Bravo Warehouse',
-        'john_doe_supplies': 'John Doe Supplies',
-        'san_juan_groups': 'San Juan Groups',
-        'bagatayam_inc': 'Bagatayam Inc.'
-      }
-      const supplierName = supplierMap[filters.value.supplier]
-      if (supplierName) {
-        filtered = filtered.filter(order => order.supplier === supplierName)
-      }
+      filtered = filtered.filter(order => order.supplier === filters.value.supplier)
     }
 
     if (filters.value.dateRange !== 'all') {
@@ -250,41 +261,114 @@ export function useOrdersHistory() {
       }
 
       // Fetch product details to enrich batches with product names/category info
+      // Note: Backend now enriches batches with product_name (including deleted products),
+      // but we still fetch products as a fallback and for additional category info
+      // IMPORTANT: Include deleted products because historical records (orders/receipts)
+      // need to show product names even if products have been soft-deleted
       const productMap = {}
       try {
-        const productsResponse = await api.get('/products/', { params: { per_page: 1000 } })
-        const productsPayload = productsResponse.data?.products ||
-          productsResponse.data?.data ||
-          productsResponse.data
-
-        if (Array.isArray(productsPayload)) {
-          productsPayload.forEach(product => {
-            const productId = product._id || product.id
-            if (!productId) return
-            productMap[productId] = {
-              name: product.product_name || product.name || 'Unknown Product',
-              categoryId: product.category_id || '',
-              categoryName: product.category_name || '',
-              subcategoryName: product.subcategory_name || ''
-            }
+        // Fetch all products with pagination handling (including deleted for historical data)
+        let allProducts = []
+        let page = 1
+        let hasMore = true
+        const perPage = 1000
+        
+        while (hasMore) {
+          const productsResponse = await api.get('/products/', { 
+            params: { 
+              page, 
+              per_page: perPage,
+              include_deleted: 'true' // Include deleted products for historical data integrity
+            } 
           })
+          
+          const productsPayload = productsResponse.data?.products ||
+            productsResponse.data?.data ||
+            productsResponse.data
+          
+          if (Array.isArray(productsPayload)) {
+            allProducts = allProducts.concat(productsPayload)
+            // Check if there are more pages
+            const pagination = productsResponse.data?.pagination
+            if (pagination) {
+              hasMore = page < pagination.total_pages
+            } else {
+              // If no pagination info, assume done if we got less than perPage
+              hasMore = productsPayload.length === perPage
+            }
+            page++
+          } else {
+            hasMore = false
+          }
         }
+        
+        // Build product map
+        allProducts.forEach(product => {
+          const productId = product._id || product.id
+          if (!productId) {
+            console.warn('Product missing ID:', product)
+            return
+          }
+          productMap[productId] = {
+            name: product.product_name || product.name || 'Unknown Product',
+            categoryId: product.category_id || '',
+            categoryName: product.category_name || '',
+            subcategoryName: product.subcategory_name || ''
+          }
+        })
+        
+        console.log(`[OrdersHistory] Fetched ${allProducts.length} products for enrichment`)
       } catch (productsError) {
-        console.warn('Failed to fetch products for orders history:', productsError)
+        console.error('[OrdersHistory] Failed to fetch products for enrichment:', productsError)
       }
 
       // Enrich batches with product information
+      // Prefer backend-enriched product_name, fallback to productMap lookup
+      const batchesWithoutProductName = []
       allBatches = allBatches.map(batch => {
-        const productInfo = productMap[batch.product_id] || {}
+        const productId = batch.product_id
+        const productInfo = productId ? productMap[productId] : null
+        
+        // Determine product name - prioritize backend-enriched name
+        let productName = batch.product_name || batch.name
+        if (!productName && productInfo) {
+          productName = productInfo.name
+        }
+        if (!productName && productId) {
+          productName = 'Unknown Product'
+          // Track batches missing product names for debugging
+          if (!batchesWithoutProductName.find(b => b.product_id === productId)) {
+            batchesWithoutProductName.push({
+              batch_id: batch._id,
+              product_id: productId,
+              reason: productInfo ? 'Product name field missing' : 'Product not found in database'
+            })
+          }
+        }
+        if (!productName) {
+          productName = 'Unknown Product'
+          console.warn(`[OrdersHistory] Batch ${batch._id} has no product_id`)
+        }
+        
         return {
           ...batch,
-          product_name: batch.product_name || productInfo.name || 'Unknown Product',
-          name: batch.name || productInfo.name || 'Unknown Product',
-          category_id: batch.category_id || productInfo.categoryId || '',
-          category_name: batch.category_name || productInfo.categoryName || '',
-          subcategory_name: batch.subcategory_name || productInfo.subcategoryName || ''
+          product_name: productName,
+          name: productName, // Ensure name field is also set
+          category_id: batch.category_id || productInfo?.categoryId || '',
+          category_name: batch.category_name || productInfo?.categoryName || '',
+          subcategory_name: batch.subcategory_name || productInfo?.subcategoryName || ''
         }
       })
+      
+      // Log batches with missing product names for debugging
+      if (batchesWithoutProductName.length > 0) {
+        const missingProductIds = [...new Set(batchesWithoutProductName.map(b => b.product_id))]
+        console.warn(`[OrdersHistory] ${batchesWithoutProductName.length} batches have missing product names`)
+        console.warn(`[OrdersHistory] Missing product IDs:`, missingProductIds)
+        console.warn(`[OrdersHistory] Detailed batch info:`, batchesWithoutProductName)
+        console.warn(`[OrdersHistory] Total products in productMap:`, Object.keys(productMap).length)
+        console.warn(`[OrdersHistory] Sample productMap keys (first 10):`, Object.keys(productMap).slice(0, 10))
+      }
       
       // Group batches by supplier_id (same logic as SupplierDetails.vue)
       const batchesBySupplier = {}
@@ -361,6 +445,7 @@ export function useOrdersHistory() {
     filters,
     allOrders,
     filteredOrders,
+    supplierOptions,
     totalOrders,
     activeOrdersCount,
     deliveredOrdersCount,

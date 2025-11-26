@@ -644,13 +644,41 @@ const savePromotion = async () => {
 const updatePromotion = async () => {
   if (!validateForm()) return
   
+  let shouldClose = false
   try {
     setLoading(true)
+    
+    // Helper: normalize values so comparisons don't fail because of type differences
+    const normalizeForComparison = (key, value) => {
+      if (value === undefined || value === null) return value
+      
+      // Numeric fields may be bound as strings by inputs
+      if (['discount_value', 'usage_limit'].includes(key)) {
+        const numericValue = Number(value)
+        return Number.isNaN(numericValue) ? value : numericValue
+      }
+      
+      // Date fields can be Date objects or strings – compare as ISO strings
+      if (['start_date', 'end_date'].includes(key)) {
+        const dateValue = value instanceof Date ? value : new Date(value)
+        return Number.isNaN(dateValue?.getTime()) ? value : dateValue.toISOString()
+      }
+      
+      // Arrays (e.g., target_ids) – compare by JSON string
+      if (Array.isArray(value)) {
+        return JSON.stringify(value)
+      }
+      
+      return value
+    }
     
     // Only send changed fields
     const changedFields = {}
     Object.keys(formData.value).forEach(key => {
-      if (formData.value[key] !== selectedPromotion.value[key]) {
+      const newValue = normalizeForComparison(key, formData.value[key])
+      const oldValue = normalizeForComparison(key, selectedPromotion.value[key])
+      
+      if (newValue !== oldValue) {
         changedFields[key] = formData.value[key]
       }
     })
@@ -673,7 +701,7 @@ const updatePromotion = async () => {
         id: selectedPromotion.value.promotion_id,
         data: result.promotion
       })
-      handleClose()
+      shouldClose = true
     } else {
       let errorMsg = result?.message || 'Failed to update promotion'
       if (result?.errors?.length > 0) {
@@ -688,6 +716,9 @@ const updatePromotion = async () => {
     setError(err.message || 'Error updating promotion')
   } finally {
     setLoading(false)
+    if (shouldClose && !error.value) {
+      handleClose()
+    }
   }
 }
 

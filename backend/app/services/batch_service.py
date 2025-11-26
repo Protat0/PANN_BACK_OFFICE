@@ -480,8 +480,14 @@ class BatchService:
     # BATCH QUERIES AND REPORTING
     # ================================================================
     
-    def get_all_batches(self, filters=None):
-        """Get all batches with optional filters"""
+    def get_all_batches(self, filters=None, enrich_with_product=True):
+        """
+        Get all batches with optional filters and optional product enrichment.
+        
+        Note: Product enrichment includes DELETED products (isDeleted=True) because
+        we need to display product names in historical records (orders, receipts, etc.)
+        even if the product has been deleted from the catalog.
+        """
         try:
             query = {}
             
@@ -501,9 +507,166 @@ class BatchService:
                     query['expiry_date'] = {'$lte': future_date}
             
             batches = list(self.batch_collection.find(query).sort('expiry_date', 1))
+            
+            # Enrich batches with product information if requested
+            # IMPORTANT: Includes deleted products for historical data integrity
+            if enrich_with_product and batches:
+                # Get unique product IDs
+                product_ids = list(set([b.get('product_id') for b in batches if b.get('product_id')]))
+                
+                # Fetch all products at once
+                products = {}
+                if product_ids:
+                    # Log for debugging
+                    logger.debug(f"Enriching {len(batches)} batches with {len(product_ids)} unique product IDs: {product_ids[:5]}...")
+                    
+                    # Try to find products - handle both _id and product_id fields
+                    # Products may use _id as the PROD-##### string OR have a separate product_id field
+                    found_products = []
+                    
+                    # Strategy 1: Look up by _id (assuming _id = PROD-#####)
+                    # IMPORTANT: Include deleted products - historical records (orders/receipts) need product names
+                    # even if products are soft-deleted from the catalog
+                    product_docs = list(self.product_collection.find(
+                        {
+                            '_id': {'$in': product_ids},
+                            # Explicitly NOT filtering by isDeleted - include ALL products (active + deleted)
+                            # This ensures historical purchase orders and receipts show correct product names
+                        },
+                        {'_id': 1, 'product_id': 1, 'product_name': 1, 'name': 1, 'category_id': 1, 'category_name': 1, 'subcategory_name': 1, 'isDeleted': 1}
+                    ))
+                    
+                    for product in product_docs:
+                        # Store using _id
+                        product_key = str(product['_id'])
+                        products[product_key] = product
+                        products[product['_id']] = product
+                        # Also store using product_id if it exists and is different
+                        if 'product_id' in product and product['product_id'] != product['_id']:
+                            products[str(product['product_id'])] = product
+                            products[product['product_id']] = product
+                        found_products.append(product_key)
+                    
+                    # Strategy 2: For missing products, try looking up by product_id field
+                    missing_product_ids = [pid for pid in product_ids if str(pid) not in found_products and pid not in found_products]
+                    if missing_product_ids:
+                        logger.warning(f"Products not found by _id, trying product_id field for: {missing_product_ids[:10]}")
+                        product_docs_by_product_id = list(self.product_collection.find(
+                            {
+                                'product_id': {'$in': missing_product_ids},
+                                # Include deleted products for historical data integrity
+                            },
+                            {'_id': 1, 'product_id': 1, 'product_name': 1, 'name': 1, 'category_id': 1, 'category_name': 1, 'subcategory_name': 1, 'isDeleted': 1}
+                        ))
+                        
+                        for product in product_docs_by_product_id:
+                            product_id_val = product.get('product_id') or str(product['_id'])
+                            product_key = str(product_id_val)
+                            products[product_key] = product
+                            products[product_id_val] = product
+                            # Also store by _id
+                            products[str(product['_id'])] = product
+                            products[product['_id']] = product
+                            if str(product_id_val) in missing_product_ids:
+                                found_products.append(product_key)
+                        
+                        # Update missing list after second attempt
+                        still_missing = [pid for pid in missing_product_ids if str(pid) not in found_products and pid not in found_products]
+                        if still_missing:
+                            logger.warning(f"Products still not found after both lookup methods for IDs: {still_missing[:5]}")
+                            # Try individual direct lookups as last resort
+                            for missing_id in still_missing[:5]:
+                                try:
+                                    # Try _id - include deleted products for historical records
+                                    product = self.product_collection.find_one({'_id': missing_id})
+                                    if not product:
+                                        # Try product_id field - include deleted products
+                                        product = self.product_collection.find_one({'product_id': missing_id})
+                                    if product:
+                                        product_key = str(missing_id)
+                                        products[product_key] = product
+                                        products[missing_id] = product
+                                        is_deleted = product.get('isDeleted', False)
+                                        logger.info(f"Found product {missing_id} with individual lookup (isDeleted: {is_deleted})")
+                                    else:
+                                        # Log detailed info about what we tried
+                                        logger.warning(f"Product {missing_id} not found with individual lookup. Checking database...")
+                                        # Check if ANY product with similar ID exists
+                                        similar = list(self.product_collection.find(
+                                            {'$or': [
+                                                {'_id': {'$regex': str(missing_id)[:8]}},
+                                                {'product_id': {'$regex': str(missing_id)[:8]}}
+                                            ]}
+                                        ).limit(3))
+                                        if similar:
+                                            logger.warning(f"Found similar products: {[(str(p.get('_id')), p.get('product_id'), p.get('product_name')) for p in similar]}")
+                                except Exception as e:
+                                    logger.debug(f"Failed individual lookup for product {missing_id}: {e}")
+                
+                # Enrich batches with product information
+                enriched_batches = []
+                for batch in batches:
+                    batch_data = batch.copy() if isinstance(batch, dict) else dict(batch)
+                    product_id = batch_data.get('product_id')
+                    
+                    # Try to find product using different key formats
+                    product = None
+                    if product_id:
+                        # Try direct match
+                        if product_id in products:
+                            product = products[product_id]
+                        # Try string conversion
+                        elif str(product_id) in products:
+                            product = products[str(product_id)]
+                        # Try with ObjectId conversion if it's a string that looks like ObjectId
+                        else:
+                            try:
+                                from bson import ObjectId
+                                if isinstance(product_id, str) and len(product_id) == 24:
+                                    obj_id = ObjectId(product_id)
+                                    if obj_id in products:
+                                        product = products[obj_id]
+                            except:
+                                pass
+                    
+                    if product:
+                        batch_data['product_name'] = product.get('product_name') or product.get('name') or 'Unknown Product'
+                        batch_data['category_id'] = batch_data.get('category_id') or product.get('category_id', '')
+                        batch_data['category_name'] = batch_data.get('category_name') or product.get('category_name', '')
+                        batch_data['subcategory_name'] = batch_data.get('subcategory_name') or product.get('subcategory_name', '')
+                        logger.debug(f"Enriched batch {batch_data.get('_id')} with product name: {batch_data['product_name']}")
+                    elif product_id and 'product_name' not in batch_data:
+                        # Product not found but product_id exists
+                        logger.warning(f"Product {product_id} (type: {type(product_id).__name__}) not found for batch {batch_data.get('_id')}. Batch product_id exists but product lookup failed.")
+                        # Try one more time with direct DB lookup
+                        try:
+                            direct_product = self.product_collection.find_one({'_id': product_id})
+                            if direct_product:
+                                batch_data['product_name'] = direct_product.get('product_name') or direct_product.get('name') or 'Unknown Product'
+                                batch_data['category_id'] = batch_data.get('category_id') or direct_product.get('category_id', '')
+                                batch_data['category_name'] = batch_data.get('category_name') or direct_product.get('category_name', '')
+                                batch_data['subcategory_name'] = batch_data.get('subcategory_name') or direct_product.get('subcategory_name', '')
+                                logger.info(f"Found product {product_id} with direct DB lookup for batch {batch_data.get('_id')}")
+                            else:
+                                batch_data['product_name'] = 'Unknown Product'
+                                logger.warning(f"Direct DB lookup also failed for product {product_id}")
+                        except Exception as e:
+                            logger.error(f"Error in direct DB lookup for product {product_id}: {e}")
+                            batch_data['product_name'] = 'Unknown Product'
+                    elif 'product_name' not in batch_data:
+                        # No product_id at all
+                        logger.warning(f"Batch {batch_data.get('_id')} has no product_id")
+                        batch_data['product_name'] = 'Unknown Product'
+                    # If product_name already exists in batch, keep it
+                    
+                    enriched_batches.append(batch_data)
+                
+                return enriched_batches
+            
             return batches
         
         except Exception as e:
+            logger.error(f"Error getting batches: {str(e)}")
             raise Exception(f"Error getting batches: {str(e)}")
 
     def get_batch_by_id(self, batch_id):

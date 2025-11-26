@@ -93,6 +93,71 @@ class PromotionApiService {
     return backendData;
   }
 
+  transformUpdateToBackend(frontendData = {}) {
+    const backendData = {};
+
+    const normalizeDate = (value) => {
+      if (!value) return value;
+      if (value instanceof Date) return value.toISOString();
+      const parsedDate = new Date(value);
+      return Number.isNaN(parsedDate.getTime()) ? value : parsedDate.toISOString();
+    };
+
+    const normalizeNumber = (value) => {
+      if (value === '' || value === null || value === undefined) return null;
+      const parsed = Number(value);
+      return Number.isNaN(parsed) ? value : parsed;
+    };
+
+    if (Object.prototype.hasOwnProperty.call(frontendData, 'promotion_name')) {
+      backendData.name = frontendData.promotion_name;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(frontendData, 'discount_type')) {
+      backendData.type = frontendData.discount_type;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(frontendData, 'discount_value')) {
+      const normalizedDiscount = normalizeNumber(frontendData.discount_value);
+      if (normalizedDiscount !== null) {
+        backendData.discount_value = normalizedDiscount;
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(frontendData, 'affected_category')) {
+      if (frontendData.affected_category === 'all') {
+        backendData.target_type = 'all';
+        backendData.target_ids = [];
+      } else {
+        backendData.target_type = 'categories';
+        backendData.target_ids = [frontendData.affected_category];
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(frontendData, 'start_date')) {
+      backendData.start_date = normalizeDate(frontendData.start_date);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(frontendData, 'end_date')) {
+      backendData.end_date = normalizeDate(frontendData.end_date);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(frontendData, 'description')) {
+      backendData.description = frontendData.description || '';
+    }
+
+    if (Object.prototype.hasOwnProperty.call(frontendData, 'usage_limit')) {
+      const normalizedUsageLimit = normalizeNumber(frontendData.usage_limit);
+      backendData.usage_limit = normalizedUsageLimit;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(frontendData, 'status')) {
+      backendData.status = frontendData.status;
+    }
+
+    return backendData;
+  }
+
   transformToFrontend(backendData) {
     let affectedCategory = 'all';
 
@@ -214,7 +279,7 @@ class PromotionApiService {
 
   async updatePromotion(promotionId, promotionData) {
     try {
-      const backendData = this.transformToBackend(promotionData);
+      const backendData = this.transformUpdateToBackend(promotionData);
       const response = await api.put(`/promotions/${promotionId}/`, backendData);
       const data = this.handleResponse(response);
 

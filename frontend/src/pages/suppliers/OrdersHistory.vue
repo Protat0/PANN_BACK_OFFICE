@@ -62,11 +62,11 @@
                   style="min-width: 130px;"
                 >
                   <option value="all">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="in_transit">In Transit</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="cancelled">Cancelled</option>
+                  <option value="pending_delivery">Pending Delivery</option>
+                  <option value="partially_received">Partially Received</option>
+                  <option value="received">Received</option>
+                  <option value="depleted">Depleted</option>
+                  <option value="mixed_status">Mixed Status</option>
                 </select>
               </div>
 
@@ -80,10 +80,13 @@
                   style="min-width: 150px;"
                 >
                   <option value="all">All Suppliers</option>
-                  <option value="bravo_warehouse">Bravo Warehouse</option>
-                  <option value="john_doe_supplies">John Doe Supplies</option>
-                  <option value="san_juan_groups">San Juan Groups</option>
-                  <option value="bagatayam_inc">Bagatayam Inc.</option>
+                  <option 
+                    v-for="supplier in supplierOptions" 
+                    :key="`supplier-${supplier.value}`" 
+                    :value="supplier.value"
+                  >
+                    {{ supplier.label }}
+                  </option>
                 </select>
               </div>
 
@@ -568,6 +571,12 @@ export default {
       return ordersComposable.filteredOrders.value || []
     })
 
+    const supplierOptions = computed(() => {
+      const source = ordersComposable.supplierOptions
+      if (!source) return []
+      return Array.isArray(source.value) ? source.value : source
+    })
+
     const paginatedOrders = computed(() => {
       if (!displayOrders.value?.length) return []
       const start = (currentPage.value - 1) * itemsPerPage.value
@@ -724,7 +733,277 @@ export default {
     }
 
     const downloadOrder = (order) => {
-      alert(`Downloading order ${order.id} as PDF...`)
+      try {
+        // Import jsPDF dynamically
+        import('jspdf').then(({ default: jsPDF }) => {
+          const doc = new jsPDF()
+          
+          // PDF Settings
+          const pageWidth = doc.internal.pageSize.getWidth()
+          const pageHeight = doc.internal.pageSize.getHeight()
+          const margin = 20
+          const maxWidth = pageWidth - (margin * 2)
+          let yPosition = margin
+          
+          // Helper function to add text and return new y position
+          const addTextLine = (text, x, y, maxWidth, fontSize = 10, fontWeight = 'normal', align = 'left') => {
+            doc.setFontSize(fontSize)
+            doc.setFont(undefined, fontWeight)
+            const lines = doc.splitTextToSize(String(text || 'N/A'), maxWidth)
+            doc.text(lines, x, y, { align })
+            return y + (lines.length * fontSize * 0.4)
+          }
+          
+          // Helper function to add horizontal line
+          const addHorizontalLine = (y) => {
+            doc.setLineWidth(0.5)
+            doc.setDrawColor(200, 200, 200)
+            doc.line(margin, y, pageWidth - margin, y)
+            return y + 8
+          }
+          
+          // Helper function to check if new page needed
+          const checkNewPage = (requiredHeight) => {
+            if (yPosition + requiredHeight > pageHeight - 30) {
+              doc.addPage()
+              yPosition = margin
+              return true
+            }
+            return false
+          }
+          
+          // Header Section
+          doc.setFillColor(59, 130, 246) // Blue color
+          doc.rect(0, 0, pageWidth, 45, 'F')
+          
+          doc.setTextColor(255, 255, 255)
+          doc.setFontSize(22)
+          doc.setFont(undefined, 'bold')
+          doc.text('PURCHASE ORDER', pageWidth / 2, 28, { align: 'center' })
+          
+          doc.setFontSize(11)
+          doc.text('PANNTECH POS & Inventory', pageWidth / 2, 38, { align: 'center' })
+          
+          // Reset text color
+          doc.setTextColor(0, 0, 0)
+          yPosition = 55
+          
+          // Order Information Section
+          doc.setFontSize(14)
+          doc.setFont(undefined, 'bold')
+          doc.text('Order Information', margin, yPosition)
+          yPosition += 8
+          
+          yPosition = addHorizontalLine(yPosition)
+          yPosition += 3
+          
+          // Order Details - Two column layout
+          doc.setFontSize(10)
+          const labelX = margin
+          const valueX = margin + 55
+          const lineSpacing = 7
+          
+          // Left column
+          doc.setFont(undefined, 'bold')
+          doc.text('Order ID:', labelX, yPosition)
+          doc.setFont(undefined, 'normal')
+          doc.text(String(order.id || 'N/A'), valueX, yPosition)
+          yPosition += lineSpacing
+          
+          doc.setFont(undefined, 'bold')
+          doc.text('Supplier:', labelX, yPosition)
+          doc.setFont(undefined, 'normal')
+          doc.text(String(order.supplier || 'N/A'), valueX, yPosition)
+          yPosition += lineSpacing
+          
+          doc.setFont(undefined, 'bold')
+          doc.text('Supplier Email:', labelX, yPosition)
+          doc.setFont(undefined, 'normal')
+          doc.text(String(order.supplierEmail || 'N/A'), valueX, yPosition)
+          yPosition += lineSpacing
+          
+          // Right column (if space allows)
+          let rightColumnY = yPosition - (lineSpacing * 3)
+          const rightLabelX = pageWidth / 2 + 10
+          const rightValueX = rightLabelX + 45
+          
+          doc.setFont(undefined, 'bold')
+          doc.text('Order Date:', rightLabelX, rightColumnY)
+          doc.setFont(undefined, 'normal')
+          doc.text(formatDate(order.orderDate), rightValueX, rightColumnY)
+          rightColumnY += lineSpacing
+          
+          doc.setFont(undefined, 'bold')
+          doc.text('Expected Delivery:', rightLabelX, rightColumnY)
+          doc.setFont(undefined, 'normal')
+          doc.text(formatDate(order.expectedDelivery), rightValueX, rightColumnY)
+          rightColumnY += lineSpacing
+          
+          doc.setFont(undefined, 'bold')
+          doc.text('Status:', rightLabelX, rightColumnY)
+          doc.setFont(undefined, 'normal')
+          doc.text(String(order.status || 'N/A'), rightValueX, rightColumnY)
+          
+          // Use the right column Y if it's further down
+          yPosition = Math.max(yPosition, rightColumnY) + lineSpacing
+          
+          yPosition = addHorizontalLine(yPosition)
+          yPosition += 8
+          
+          // Items Section
+          checkNewPage(30)
+          doc.setFontSize(14)
+          doc.setFont(undefined, 'bold')
+          doc.text('Order Items', margin, yPosition)
+          yPosition += 8
+          
+          yPosition = addHorizontalLine(yPosition)
+          yPosition += 3
+          
+          // Column positions (adjusted to fit within page width) - define before table
+          const colItem = margin + 3
+          const colQuantity = pageWidth - margin - 115  // Right-aligned, 115mm from right
+          const colUnitPrice = pageWidth - margin - 75  // Right-aligned, 75mm from right
+          const colTotal = pageWidth - margin  // Right-aligned at right margin
+          
+          // Table Header
+          checkNewPage(25)
+          doc.setFillColor(240, 240, 240)
+          doc.rect(margin, yPosition - 6, maxWidth, 10, 'F')
+          
+          doc.setFontSize(10)
+          doc.setFont(undefined, 'bold')
+          doc.setTextColor(0, 0, 0)
+          doc.text('Item', colItem, yPosition)
+          doc.text('Quantity', colQuantity, yPosition, { align: 'right' })
+          doc.text('Unit Price', colUnitPrice, yPosition, { align: 'right' })
+          doc.text('Total', colTotal, yPosition, { align: 'right' })
+          yPosition += 12
+          
+          // Items Table
+          doc.setFont(undefined, 'normal')
+          doc.setFontSize(9)
+          let itemsTotal = 0
+          
+          if (!order.items || order.items.length === 0) {
+            doc.text('No items in this order', margin + 3, yPosition)
+            yPosition += 10
+          } else {
+            order.items.forEach((item) => {
+              checkNewPage(15)
+              
+              const itemName = String(item.name || item.product_name || 'Unknown Product')
+              // Debug logging for Unknown Product
+              if (itemName === 'Unknown Product' && item.product_id) {
+                console.warn(`[PDF] Unknown Product detected for item:`, {
+                  product_id: item.product_id,
+                  name: item.name,
+                  product_name: item.product_name,
+                  fullItem: item
+                })
+              }
+              const quantity = parseFloat(item.quantity || 0)
+              const unitPrice = parseFloat(item.unitPrice || 0)
+              const itemTotal = quantity * unitPrice
+              itemsTotal += itemTotal
+              
+              // Wrap item name if needed - adjust max width to account for columns
+              const itemNameMaxWidth = colQuantity - colItem - 5
+              const itemNameLines = doc.splitTextToSize(itemName, itemNameMaxWidth)
+              const rowHeight = Math.max(itemNameLines.length * 4, 8)
+              
+              // Item name (first line)
+              doc.text(itemNameLines[0], colItem, yPosition)
+              
+              // Quantity - right aligned
+              doc.text(quantity.toString(), colQuantity, yPosition, { align: 'right' })
+              
+              // Unit Price - right aligned
+              doc.text(`₱${formatCurrency(unitPrice)}`, colUnitPrice, yPosition, { align: 'right' })
+              
+              // Total - right aligned
+              doc.text(`₱${formatCurrency(itemTotal)}`, colTotal, yPosition, { align: 'right' })
+              
+              // Additional lines of item name
+              if (itemNameLines.length > 1) {
+                for (let i = 1; i < itemNameLines.length; i++) {
+                  yPosition += 4
+                  doc.text(itemNameLines[i], margin + 3, yPosition)
+                }
+              }
+              
+              yPosition += rowHeight - (itemNameLines.length - 1) * 4 + 3
+              
+              // Product ID (small text below item)
+              if (item.product_id) {
+                doc.setFontSize(7)
+                doc.setTextColor(128, 128, 128)
+                doc.text(`ID: ${item.product_id}`, margin + 5, yPosition)
+                doc.setTextColor(0, 0, 0)
+                doc.setFontSize(9)
+                yPosition += 5
+              }
+            })
+          }
+          
+          yPosition += 5
+          yPosition = addHorizontalLine(yPosition)
+          yPosition += 8
+          
+          // Total Amount
+          checkNewPage(20)
+          doc.setFont(undefined, 'bold')
+          doc.setFontSize(12)
+          
+          const totalLabel = 'Total Amount:'
+          const finalTotal = order.totalAmount || itemsTotal
+          const totalValue = `₱${formatCurrency(finalTotal)}`
+          
+          // Position label from left
+          doc.text(totalLabel, margin, yPosition)
+          
+          // Position value aligned with the "Total" column (same position as table total column)
+          doc.setFontSize(14)
+          doc.text(totalValue, colTotal, yPosition, { align: 'right' })
+          
+          // Footer on all pages
+          const pageCount = doc.internal.getNumberOfPages()
+          for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i)
+            doc.setFontSize(8)
+            doc.setTextColor(128, 128, 128)
+            doc.setFont(undefined, 'normal')
+            doc.text(
+              `Page ${i} of ${pageCount}`,
+              pageWidth / 2,
+              pageHeight - 10,
+              { align: 'center' }
+            )
+            doc.text(
+              `Generated: ${new Date().toLocaleString('en-US', { 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })}`,
+              pageWidth - margin,
+              pageHeight - 10,
+              { align: 'right' }
+            )
+          }
+          
+          // Download PDF
+          const filename = `Purchase_Order_${order.id}_${new Date().toISOString().split('T')[0]}.pdf`
+          doc.save(filename)
+        }).catch((error) => {
+          console.error('Error generating PDF:', error)
+          alert('Failed to generate PDF. Please install jsPDF library: npm install jspdf')
+        })
+      } catch (error) {
+        console.error('Error downloading order:', error)
+        alert('Error downloading order PDF')
+      }
     }
 
     const exportOrders = () => {
@@ -890,6 +1169,7 @@ export default {
       showEditModal,
       editingOrder,
       displayOrders,
+      supplierOptions,
       paginatedOrders,
       totalPages,
       startItem,

@@ -16,6 +16,7 @@
     "axios": "^1.13.1",
     "bootstrap": "^5.3.7",
     "chart.js": "^4.5.0",
+    "jspdf": "^3.0.4",
     "lucide-vue-next": "^0.519.0",
     "pinia": "^3.0.1",
     "vue": "^3.5.13",

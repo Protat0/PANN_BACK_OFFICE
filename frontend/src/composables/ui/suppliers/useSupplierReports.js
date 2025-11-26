@@ -68,8 +68,16 @@ export function useSupplierReports() {
           
           // Only include active orders (same logic as SupplierCard.vue)
           if (orderStatus === 'Pending Delivery' || orderStatus === 'Partially Received') {
+            // Create order ID - try to extract from notes first, otherwise use date-based ID
+            let receiptId = `SR-${date.replace(/-/g, '')}`
+            const firstBatchNotes = batches[0].notes || ''
+            const receiptMatch = firstBatchNotes.match(/Receipt:\s*([^\|]+)/)
+            if (receiptMatch) {
+              receiptId = receiptMatch[1].trim()
+            }
+            
             orders.push({
-              id: `SR-${date.replace(/-/g, '')}`,
+              id: receiptId,
               supplier: supplier.supplier_name,
               supplierId: supplier._id,
               supplierEmail: supplier.email || 'N/A',
@@ -95,7 +103,7 @@ export function useSupplierReports() {
                 quantityRemaining: batch.quantity_remaining
               })),
               description: `Stock receipt with ${batches.length} item(s)`,
-              notes: batches[0].notes || ''
+              notes: firstBatchNotes
             })
           }
         })
@@ -441,38 +449,69 @@ export function useSupplierReports() {
         }
       })
       
-      // Get unique product IDs to fetch product names
+      // Get unique product IDs that don't already have product_name (backend now enriches batches)
       const uniqueProductIds = [...new Set(allBatches
-        .filter(b => b.product_id)
+        .filter(b => b.product_id && !b.product_name)
         .map(b => b.product_id)
       )]
       
-      // Fetch product names for all unique products
+      // Fetch product names only for batches missing product_name
+      // IMPORTANT: Include deleted products because historical records need product names
+      // even if products have been soft-deleted from the catalog
       const productNamesMap = {}
-      await Promise.all(
-        uniqueProductIds.map(async (productId) => {
-          try {
-            const productResponse = await api.get(`/products/${productId}/`, {
-              params: { include_deleted: true }
-            })
-            const product = productResponse.data?.data || productResponse.data
-            if (product && !product.isDeleted) {
-              productNamesMap[productId] = product.product_name || product.name || productId
+      if (uniqueProductIds.length > 0) {
+        console.log(`[SupplierReports] Fetching product names for ${uniqueProductIds.length} products missing names (including deleted)`)
+        await Promise.all(
+          uniqueProductIds.map(async (productId) => {
+            try {
+              const productResponse = await api.get(`/products/${productId}/`, {
+                params: { include_deleted: 'true' } // Include deleted for historical data
+              })
+              const product = productResponse.data?.data || productResponse.data
+              if (product) {
+                // Include deleted products - historical purchase orders/receipts need product names
+                productNamesMap[productId] = product.product_name || product.name || productId
+              }
+            } catch (err) {
+              console.warn(`[SupplierReports] Failed to fetch product name for ${productId}:`, err)
             }
-          } catch (err) {
-            console.warn(`Failed to fetch product name for ${productId}:`, err)
+          })
+        )
+      }
+      
+      // Enrich batches with product names (prefer backend-enriched, fallback to fetched)
+      const enrichedBatchesBySupplier = {}
+      const batchesWithMissingNames = []
+      Object.entries(batchesBySupplier).forEach(([supplierId, batches]) => {
+        enrichedBatchesBySupplier[supplierId] = batches.map(batch => {
+          // Prioritize backend-enriched product_name
+          let productName = batch.product_name || batch.name
+          
+          if (!productName && batch.product_id) {
+            productName = productNamesMap[batch.product_id]
+          }
+          
+          if (!productName) {
+            productName = 'Unknown Product'
+            if (batch.product_id) {
+              batchesWithMissingNames.push({
+                batch_id: batch._id,
+                product_id: batch.product_id
+              })
+            }
+          }
+          
+          return {
+            ...batch,
+            product_name: productName,
+            name: productName // Ensure name field is set
           }
         })
-      )
-      
-      // Enrich batches with product names
-      const enrichedBatchesBySupplier = {}
-      Object.entries(batchesBySupplier).forEach(([supplierId, batches]) => {
-        enrichedBatchesBySupplier[supplierId] = batches.map(batch => ({
-          ...batch,
-          product_name: batch.product_name || productNamesMap[batch.product_id] || batch.name || 'Unknown Product'
-        }))
       })
+      
+      if (batchesWithMissingNames.length > 0) {
+        console.warn(`[SupplierReports] ${batchesWithMissingNames.length} batches have missing product names:`, batchesWithMissingNames)
+      }
       
       // Enrich suppliers with their batches (now with product names)
       allSuppliers.value = backendSuppliers.map(supplier => ({

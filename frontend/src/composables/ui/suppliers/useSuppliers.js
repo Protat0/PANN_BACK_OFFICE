@@ -199,54 +199,18 @@ export function useSuppliers() {
           batchesByDate[dateKey].push(batch)
         })
         
-        // Enrich batches with product details
-        const enrichedBatchesByDate = {}
-        for (const [dateKey, batches] of Object.entries(batchesByDate)) {
-          enrichedBatchesByDate[dateKey] = await Promise.all(
-            batches.map(async (batch) => {
-              try {
-                if (batch.product_id) {
-                  const productResponse = await api.get(`/products/${batch.product_id}/`)
-                  
-                  const product = productResponse.data.data
-                  
-                  if (product) {
-                    const enrichedBatch = {
-                      ...batch,
-                      product_name: product.product_name || product.name || 'Unknown Product',
-                      category_id: product.category_id || '',
-                      category_name: product.category_name || '',
-                      subcategory_name: product.subcategory_name || ''
-                    }
-                    return enrichedBatch
-                  } else {
-                    console.warn(`⚠️ No product data returned for ${batch.product_id}`)
-                  }
-                } else {
-                  console.warn(`⚠️ No product_id found in batch:`, batch)
-                }
-                return batch
-              } catch (err) {
-                console.error(`❌ Failed to fetch product details for batch ${batch._id}:`, err)
-                console.error(`❌ Error details:`, err.response?.data || err.message)
-                return batch
-              }
-            })
-          )
-        }
-        
-        // Convert grouped batches to orders using enriched data
-        Object.entries(enrichedBatchesByDate).forEach(([date, enrichedBatches]) => {
-          const totalCost = enrichedBatches.reduce((sum, b) => sum + ((b.cost_price || 0) * (b.quantity_received || 0)), 0)
+        // Convert grouped batches to orders using existing enriched data
+        Object.entries(batchesByDate).forEach(([date, groupedBatches]) => {
+          const totalCost = groupedBatches.reduce((sum, b) => sum + ((b.cost_price || 0) * (b.quantity_received || 0)), 0)
           
           let receiptId = `SR-${date.replace(/-/g, '')}`
-          const firstBatchNotes = enrichedBatches[0].notes || ''
+          const firstBatchNotes = groupedBatches[0].notes || ''
           const receiptMatch = firstBatchNotes.match(/Receipt:\s*([^\|]+)/)
           if (receiptMatch) {
             receiptId = receiptMatch[1].trim()
           }
           
-          const firstBatch = enrichedBatches[0]
+          const firstBatch = groupedBatches[0]
           const expectedDate = firstBatch.expected_delivery_date ? 
             (typeof firstBatch.expected_delivery_date === 'string' ? firstBatch.expected_delivery_date.split('T')[0] : new Date(firstBatch.expected_delivery_date).toISOString().split('T')[0]) : 
             date
@@ -255,10 +219,10 @@ export function useSuppliers() {
             null
           
           // Determine order status
-          const allPending = enrichedBatches.every(b => b.status === 'pending')
-          const allActive = enrichedBatches.every(b => b.status === 'active')
-          const allInactive = enrichedBatches.every(b => b.status === 'inactive')
-          const hasPending = enrichedBatches.some(b => b.status === 'pending')
+          const allPending = groupedBatches.every(b => b.status === 'pending')
+          const allActive = groupedBatches.every(b => b.status === 'active')
+          const allInactive = groupedBatches.every(b => b.status === 'inactive')
+          const hasPending = groupedBatches.some(b => b.status === 'pending')
           
           let orderStatus
           if (allPending) orderStatus = 'Pending Delivery'
@@ -279,7 +243,7 @@ export function useSuppliers() {
               deliveredDate: receivedDate,
               totalAmount: totalCost,
               status: orderStatus,
-              items: enrichedBatches.map(batch => {
+              items: groupedBatches.map(batch => {
                 const item = {
                   name: batch.product_name || batch.name || 'Unknown Product',
                   product_name: batch.product_name || batch.name || 'Unknown Product',
@@ -410,6 +374,98 @@ export function useSuppliers() {
         }
       } catch (batchesError) {
         console.warn('Failed to fetch batches:', batchesError)
+      }
+
+      // Fetch products once to build a lookup map for enrichment
+      // Note: Backend now enriches batches with product_name, but we fetch products
+      // as fallback and for additional category info
+      let productsMap = {}
+      try {
+        // Fetch all products with pagination handling
+        let allProducts = []
+        let page = 1
+        let hasMore = true
+        const perPage = 1000
+        
+        while (hasMore) {
+          const productsResponse = await api.get('/products/', { 
+            params: { page, per_page: perPage } 
+          })
+          
+          const productsPayload = productsResponse.data?.products ||
+            productsResponse.data?.data ||
+            productsResponse.data
+          
+          if (Array.isArray(productsPayload)) {
+            allProducts = allProducts.concat(productsPayload)
+            // Check if there are more pages
+            const pagination = productsResponse.data?.pagination
+            if (pagination) {
+              hasMore = page < pagination.total_pages
+            } else {
+              hasMore = productsPayload.length === perPage
+            }
+            page++
+          } else {
+            hasMore = false
+          }
+        }
+        
+        // Build products map
+        allProducts.forEach(product => {
+          const productId = product._id || product.id
+          if (!productId) {
+            console.warn('[useSuppliers] Product missing ID:', product)
+            return
+          }
+          productsMap[productId] = {
+            name: product.product_name || product.name || 'Unknown Product',
+            categoryId: product.category_id || '',
+            categoryName: product.category_name || '',
+            subcategoryName: product.subcategory_name || ''
+          }
+        })
+        
+        console.log(`[useSuppliers] Fetched ${allProducts.length} products for enrichment`)
+      } catch (productsError) {
+        console.error('[useSuppliers] Failed to fetch products for enrichment:', productsError)
+      }
+
+      // Enrich batches with product data (prioritize backend-enriched product_name)
+      const batchesWithMissingNames = []
+      fetchedBatches = fetchedBatches.map(batch => {
+        const productId = batch.product_id
+        const productInfo = productId ? productsMap[productId] : null
+        
+        // Determine product name - prioritize backend-enriched
+        let productName = batch.product_name || batch.name
+        if (!productName && productInfo) {
+          productName = productInfo.name
+        }
+        if (!productName && productId) {
+          productName = 'Unknown Product'
+          batchesWithMissingNames.push({
+            batch_id: batch._id,
+            product_id: productId
+          })
+        }
+        if (!productName) {
+          productName = 'Unknown Product'
+          console.warn(`[useSuppliers] Batch ${batch._id} has no product_id`)
+        }
+        
+        return {
+          ...batch,
+          product_name: productName,
+          name: productName, // Ensure name field is set
+          category_id: batch.category_id || productInfo?.categoryId || '',
+          category_name: batch.category_name || productInfo?.categoryName || '',
+          subcategory_name: batch.subcategory_name || productInfo?.subcategoryName || ''
+        }
+      })
+      
+      if (batchesWithMissingNames.length > 0) {
+        console.warn(`[useSuppliers] ${batchesWithMissingNames.length} batches have missing product names:`, batchesWithMissingNames)
       }
       
       allBatches.value = fetchedBatches

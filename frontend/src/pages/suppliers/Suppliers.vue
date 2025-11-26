@@ -223,8 +223,8 @@
     <!-- Active Orders Modal -->
      <ActiveOrdersModal
       :show="reportsComposable.showActiveOrdersModal.value"
-      :orders="activeOrdersForModal"
-      :loading="activeOrdersLoading"
+      :orders="reportsComposable.activeOrders.value"
+      :loading="reportsComposable.loading.value"
       @close="reportsComposable.closeActiveOrdersModal"
     />
 
@@ -358,11 +358,6 @@ export default {
     const searchMode = ref(false)
     const searchInputRef = ref(null)
     
-    // Active orders modal data
-    const activeOrdersForModal = ref([])
-    const activeOrdersLoading = ref(false)
-
-
     // Load suppliers on mount
     onMounted(async () => {
       try {
@@ -371,13 +366,6 @@ export default {
 
       } catch (error) {
         console.error('Error fetching suppliers:', error)
-      }
-    })
-
-    // Watch for modal opening to load active orders
-    watch(() => reportsComposable.showActiveOrdersModal.value, (isOpen) => {
-      if (isOpen) {
-        loadActiveOrdersForModal()
       }
     })
 
@@ -562,19 +550,6 @@ export default {
       router.push(route)
     }
 
-    // Load active orders for modal
-    const loadActiveOrdersForModal = async () => {
-      activeOrdersLoading.value = true
-      try {
-        const orders = await suppliersComposable.getActiveOrdersForModal()
-        activeOrdersForModal.value = orders
-      } catch (error) {
-        console.error('Error loading active orders:', error)
-        activeOrdersForModal.value = []
-      } finally {
-        activeOrdersLoading.value = false
-      }
-    }
 
 
     return {
@@ -591,8 +566,6 @@ export default {
       // Local state
       searchMode,
       searchInputRef,
-      activeOrdersForModal,
-      activeOrdersLoading,
       
       // Methods
       handleSingleSupplier,
