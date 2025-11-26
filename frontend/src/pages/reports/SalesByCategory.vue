@@ -647,17 +647,18 @@ export default {
   align-items: center;
 }
 
-.LCL1 h1, .LCL1 h3 {
+.LCL1 h1,
+.LCL1 h3 {
   margin: 0;
 }
 
 .LCL1 h3 {
-  color: grey;
+  color: var(--text-secondary);
   font-size: 20px;
 }
 
 .LCL1 h1 {
-  color: black;
+  color: var(--text-primary);
   font-size: 29px;
   font-weight: bold;
 }
@@ -673,9 +674,9 @@ export default {
 }
 
 .LCL2 li {
-  color: black;
+  color: var(--text-primary);
   height: 30px;
-   margin-bottom: 15px;
+  margin-bottom: 15px;
 }
 
 .list-item {
@@ -689,7 +690,7 @@ export default {
 .item-name {
   font-size: 25px;
   font-weight: bold;
-  color: black;
+  color: var(--text-primary);
 }
 
 .item-price {
@@ -703,7 +704,7 @@ export default {
 /* CHART SECTION */
 /* ====================================================================== */
 .RC-SBC {
-  color: black;
+  color: var(--text-primary);
 }
 
 .RC-SBC h1 {
@@ -727,7 +728,7 @@ export default {
   border-radius: 6px;
   background-color: white;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-muted);
   cursor: pointer;
 }
 
@@ -756,14 +757,14 @@ export default {
 
 .chart-loading p {
   margin-top: 10px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 /* ====================================================================== */
 /* CATEGORY ANALYSIS SECTION */
 /* ====================================================================== */
 .BottomContainer {
-  color: black;
+  color: var(--text-primary);
   width: 100%;
   margin-top: 40px;
 }
@@ -780,10 +781,11 @@ export default {
 .header-left h1 {
   margin: 0 0 4px 0;
   font-weight: bold;
+  color: var(--text-primary);
 }
 
 .date-range-info {
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -849,11 +851,11 @@ export default {
   display: flex;
   align-items: center;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-primary);
 }
 
 .category-description {
-  color: #6b7280;
+  color: var(--text-muted);
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -862,14 +864,15 @@ export default {
 
 .sub-categories {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--text-muted);
   max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.items-sold, .product-count {
+.items-sold,
+.product-count {
   text-align: center;
   font-weight: 500;
 }
@@ -897,7 +900,7 @@ export default {
 
 .loading-state p {
   margin-top: 16px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .loading-state-small {
@@ -911,7 +914,7 @@ export default {
 
 .loading-state-small p {
   margin-top: 8px;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .spinner-border-sm {
@@ -933,8 +936,12 @@ export default {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .empty-state {
@@ -948,7 +955,7 @@ export default {
 
 .empty-state p {
   margin: 16px 0;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 16px;
 }
 
@@ -963,7 +970,7 @@ export default {
 
 .empty-state-small p {
   margin: 8px 0;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 /* ====================================================================== */
@@ -1002,7 +1009,7 @@ export default {
 }
 
 .text-muted {
-  color: #6b7280 !important;
+  color: var(--text-muted) !important;
 }
 
 /* ====================================================================== */
@@ -1013,45 +1020,45 @@ export default {
     grid-template-columns: 1fr;
     height: auto;
   }
-  
+
   .divider {
     display: none;
   }
-  
+
   .LCL1 {
     gap: 20px;
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .chart-container {
     width: 100%;
     height: 300px;
   }
-  
+
   .transaction-header {
     flex-direction: column;
     gap: 16px;
     align-items: flex-start;
   }
-  
+
   .header-actions {
     width: 100%;
     justify-content: flex-end;
   }
-  
+
   .table-container {
     overflow-x: auto;
   }
-  
+
   .table {
     min-width: 800px;
   }
-  
+
   .category-description {
     max-width: 150px;
   }
-  
+
   .sub-categories {
     max-width: 120px;
   }
@@ -1061,24 +1068,24 @@ export default {
   .LCL1 {
     gap: 10px;
   }
-  
+
   .chart-header h1 {
     font-size: 24px;
   }
-  
+
   .table {
     min-width: 600px;
   }
-  
+
   .btn {
     padding: 6px 12px;
     font-size: 13px;
   }
-  
+
   .header-left h1 {
     font-size: 24px;
   }
-  
+
   .date-range-info {
     font-size: 12px;
   }
@@ -1174,8 +1181,12 @@ export default {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Responsive adjustments */
@@ -1233,7 +1244,7 @@ export default {
 .avg-transaction {
   text-align: right;
   font-weight: 500;
-  color: #374151;
+  color: var(--text-primary);
 }
 
 .transaction-count {

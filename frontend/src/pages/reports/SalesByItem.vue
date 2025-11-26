@@ -19,16 +19,26 @@
         
         <!-- Top items list -->
         <ul v-else-if="topItems && topItems.length > 0" class="LCL2">
-          <li v-for="(item, index) in topItems" :key="index" class="list-item">
-            <span class="item-name" style="font-weight:bold; font-size: 25px;">{{ item.name }}</span>
-            <span class="item-price" style="color:green; font-size: 15px;">{{ item.price }}</span>
+          <li
+            v-for="(item, index) in topItems"
+            :key="index"
+            class="list-item"
+          >
+            <span class="item-name">
+              {{ item.name }}
+            </span>
+            <span class="item-price">
+              {{ item.price }}
+            </span>
           </li>
         </ul>
         
         <!-- Empty state for top items -->
         <div v-else class="empty-state-small">
           <p>No top items data available</p>
-          <button @click="loadAllData" class="btn btn-sm btn-primary">Retry Loading</button>
+          <button @click="loadAllData" class="btn btn-sm btn-primary">
+            Retry Loading
+          </button>
         </div>
       </div>
       
@@ -38,11 +48,15 @@
       <div class="RC-SBI">
         <div class="chart-header">
           <h1>Sales Chart</h1>
-          <select v-model="selectedFrequency" @change="onFrequencyChange" class="frequency-dropdown">
-            <option value="daily">Daily <!--(Last 30 Days) --></option>
-            <option value="weekly">Weekly <!--(Last 12 Weeks)--></option>
-            <option value="monthly">Monthly <!--(Last 12 Months) --></option>
-            <option value="yearly">Yearly <!--( (Last 3 Years)--></option>
+          <select
+            v-model="selectedFrequency"
+            @change="onFrequencyChange"
+            class="frequency-dropdown"
+          >
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
           </select>
         </div>
         <div class="chart-container">
@@ -50,7 +64,11 @@
             <div class="spinner-border text-primary"></div>
             <p>Loading chart data...</p>
           </div>
-          <BarChart v-else :chartData="chartData" :selectedFrequency="selectedFrequency" />
+          <BarChart
+            v-else
+            :chartData="chartData"
+            :selectedFrequency="selectedFrequency"
+          />
         </div>
       </div>
     </div>
@@ -63,14 +81,23 @@
       <div class="transaction-header">
         <div class="header-left">
           <h1>Sales by Item</h1>
-          
+          <div class="date-range-info" v-if="currentDateRange">
+            <i class="bi bi-calendar3"></i>
+            {{ dateRangeDisplay }}
+          </div>
         </div>
+
         <div class="header-actions">
           <!-- Auto-refresh status and controls -->
           <div class="auto-refresh-status">
-            <i class="bi bi-arrow-repeat text-success" :class="{ 'spinning': salesByItemLoading }"></i>
+            <i
+              class="bi bi-arrow-repeat text-success"
+              :class="{ 'spinning': salesByItemLoading }"
+            ></i>
             <span class="status-text">
-              <span v-if="autoRefreshEnabled">Updates in {{ countdown }}s</span>
+              <span v-if="autoRefreshEnabled">
+                Updates in {{ countdown }}s
+              </span>
               <span v-else>Auto-refresh disabled</span>
             </span>
             
@@ -85,7 +112,10 @@
           </div>
           
           <!-- Connection health indicator -->
-          <div class="connection-indicator" :class="getConnectionStatus()">
+          <div
+            class="connection-indicator"
+            :class="getConnectionStatus()"
+          >
             <i :class="getConnectionIcon()"></i>
             <span class="connection-text">{{ getConnectionText() }}</span>
           </div>
@@ -97,7 +127,10 @@
             @click="emergencyReconnect"
             :disabled="salesByItemLoading"
           >
-            <i class="bi bi-arrow-clockwise" :class="{ 'spinning': salesByItemLoading }"></i>
+            <i
+              class="bi bi-arrow-clockwise"
+              :class="{ 'spinning': salesByItemLoading }"
+            ></i>
             {{ salesByItemLoading ? 'Reconnecting...' : 'Reconnect' }}
           </button>
         </div>
@@ -119,8 +152,8 @@
               <th scope="col">Category</th>
               <th scope="col" style="text-align: center;">Stock</th>
               <th scope="col" style="text-align: center;">Items Sold</th>
-              <th scope="col" >Total Sales</th>
-              <th scope="col" >Unit Price</th>
+              <th scope="col">Total Sales</th>
+              <th scope="col">Unit Price</th>
               <th scope="col" style="text-align: center;">Actions</th>
             </tr>
           </thead>
@@ -130,23 +163,38 @@
                 {{ item.id }}
               </td>
               <td class="product-column">
-                <span :title="item.product">{{ item.product.length > 30 ? item.product.substring(0, 30) + '...' : item.product }}</span>
+                <span :title="item.product">
+                  {{
+                    item.product.length > 30
+                      ? item.product.substring(0, 30) + '...'
+                      : item.product
+                  }}
+                </span>
               </td>
               <td class="category-column">
-                <span class="badge badge-secondary">{{ item.category }}</span>
+                <span class="badge badge-secondary">
+                  {{ item.category }}
+                </span>
               </td>
               <td class="stock-column">
-                <span :class="{'low-stock': item.stock < 10, 'critical-stock': item.stock < 5}">
+                <span
+                  :class="{
+                    'low-stock': item.stock < 10,
+                    'critical-stock': item.stock < 5
+                  }"
+                >
                   {{ item.stock }} {{ item.unit }}
                 </span>
               </td>
               <td class="sold-column">
                 {{ item.items_sold }}
               </td>
-              <td class="sales-column" style="text-align: left;">
-                <span class="total-amount">{{ formatCurrency(item.total_sales) }}</span>
+              <td class="sales-column">
+                <span class="total-amount">
+                  {{ formatCurrency(item.total_sales) }}
+                </span>
               </td>
-              <td class="price-column" style="text-align: left;">
+              <td class="price-column">
                 {{ formatCurrency(item.selling_price) }}
               </td>
               <td class="actions-column">
@@ -156,7 +204,7 @@
                     @click="viewProductDetails(item)"
                     title="View Product Details"
                   >
-                    <Eye/>
+                    <Eye />
                   </button>
                 </div>
               </td>
@@ -165,8 +213,14 @@
         </table>
         
         <!-- Empty State -->
-        <div v-if="salesByItemRows.length === 0 && !salesByItemLoading" class="empty-state">
-          <i class="bi bi-receipt" style="font-size: 3rem; color: #6b7280;"></i>
+        <div
+          v-if="salesByItemRows.length === 0 && !salesByItemLoading"
+          class="empty-state"
+        >
+          <i
+            class="bi bi-receipt"
+            style="font-size: 3rem; color: var(--text-tertiary, #6b7280);"
+          ></i>
           <p>No sales data found for the selected time period</p>
           <button class="btn btn-primary" @click="loadAllData">
             <i class="bi bi-arrow-clockwise"></i> Refresh Data
@@ -174,12 +228,26 @@
         </div>
         
         <!-- Pagination for Sales by Item Table -->
-        <div v-if="showSalesByItemPagination" class="pagination-container">
+        <div
+          v-if="showSalesByItemPagination"
+          class="pagination-container"
+        >
           <div class="pagination-header">
             <div class="pagination-info-right">
               <span class="pagination-text">
-                Showing {{ ((salesByItemPagination.current_page - 1) * salesByItemPagination.page_size) + 1 }} 
-                to {{ Math.min(salesByItemPagination.current_page * salesByItemPagination.page_size, salesByItemPagination.total_records) }} 
+                Showing
+                {{
+                  ((salesByItemPagination.current_page - 1) *
+                    salesByItemPagination.page_size) + 1
+                }} 
+                to
+                {{
+                  Math.min(
+                    salesByItemPagination.current_page *
+                      salesByItemPagination.page_size,
+                    salesByItemPagination.total_records
+                  )
+                }} 
                 of {{ salesByItemPagination.total_records }} products
               </span>
               
@@ -203,7 +271,10 @@
 
           <nav aria-label="Sales by item pagination">
             <ul class="pagination pagination-sm justify-content-center">
-              <li class="page-item" :class="{ disabled: !salesByItemPagination.has_prev || salesByItemLoading }">
+              <li
+                class="page-item"
+                :class="{ disabled: !salesByItemPagination.has_prev || salesByItemLoading }"
+              >
                 <button 
                   class="page-link" 
                   @click="goToSalesByItemPage(salesByItemPagination.current_page - 1)"
@@ -229,7 +300,10 @@
                 </button>
               </li>
 
-              <li class="page-item" :class="{ disabled: !salesByItemPagination.has_next || salesByItemLoading }">
+              <li
+                class="page-item"
+                :class="{ disabled: !salesByItemPagination.has_next || salesByItemLoading }"
+              >
                 <button 
                   class="page-link" 
                   @click="goToSalesByItemPage(salesByItemPagination.current_page + 1)"
@@ -246,11 +320,17 @@
     </div>
 
     <!-- Product Details Modal -->
-    <div v-if="showProductModal" class="modal-overlay" @click="closeProductModal">
+    <div
+      v-if="showProductModal"
+      class="modal-overlay"
+      @click="closeProductModal"
+    >
       <div class="modal-content" @click.stop>
         <div class="modal-header">
           <h2>Product Details</h2>
-          <button class="modal-close" @click="closeProductModal">&times;</button>
+          <button class="modal-close" @click="closeProductModal">
+            &times;
+          </button>
         </div>
         
         <div class="modal-body">
@@ -259,19 +339,27 @@
               <h4>Product Information</h4>
               <div class="detail-row">
                 <strong>Product ID:</strong> 
-                <span class="detail-value">{{ selectedProductData.id }}</span>
+                <span class="detail-value">
+                  {{ selectedProductData.id }}
+                </span>
               </div>
               <div class="detail-row">
                 <strong>Product Name:</strong> 
-                <span class="detail-value">{{ selectedProductData.name }}</span>
+                <span class="detail-value">
+                  {{ selectedProductData.name }}
+                </span>
               </div>
               <div class="detail-row">
                 <strong>SKU:</strong> 
-                <span class="detail-value">{{ selectedProductData.sku }}</span>
+                <span class="detail-value">
+                  {{ selectedProductData.sku }}
+                </span>
               </div>
               <div class="detail-row">
                 <strong>Category:</strong> 
-                <span class="detail-value">{{ selectedProductData.category }}</span>
+                <span class="detail-value">
+                  {{ selectedProductData.category }}
+                </span>
               </div>
             </div>
 
@@ -279,35 +367,48 @@
               <h4>Inventory & Sales</h4>
               <div class="detail-row">
                 <strong>Stock:</strong> 
-                <span class="detail-value">{{ selectedProductData.stock }} {{ selectedProductData.unit }}</span>
+                <span class="detail-value">
+                  {{ selectedProductData.stock }} {{ selectedProductData.unit }}
+                </span>
               </div>
               <div class="detail-row">
                 <strong>Items Sold:</strong> 
-                <span class="detail-value">{{ selectedProductData.items_sold }}</span>
+                <span class="detail-value">
+                  {{ selectedProductData.items_sold }}
+                </span>
               </div>
               <div class="detail-row">
                 <strong>Unit Price:</strong> 
-                <span class="detail-value">{{ selectedProductData.selling_price }}</span>
+                <span class="detail-value">
+                  {{ selectedProductData.selling_price }}
+                </span>
               </div>
               <div class="detail-row">
                 <strong>Total Sales:</strong> 
-                <span class="detail-value total-highlight">{{ selectedProductData.total_sales }}</span>
+                <span class="detail-value total-highlight">
+                  {{ selectedProductData.total_sales }}
+                </span>
               </div>
               <div class="detail-row">
                 <strong>Taxable:</strong> 
-                <span class="detail-value">{{ selectedProductData.is_taxable }}</span>
+                <span class="detail-value">
+                  {{ selectedProductData.is_taxable }}
+                </span>
               </div>
             </div>
           </div>
         </div>
         
         <div class="modal-footer">
-          <button class="btn btn-secondary" @click="closeProductModal">Close</button>
+          <button class="btn btn-secondary" @click="closeProductModal">
+            Close
+          </button>
         </div>
       </div>
     </div>
   </div>
 </template>
+
 
 <script>
 import BarChart from '@/components/BarChart.vue';
@@ -1004,7 +1105,7 @@ export default {
 .divider {
   width: 2px;
   height: 100%;
-  background-color: #e5e7eb;
+  background-color: var(--border-primary);
   justify-self: center;
 }
 
@@ -1017,17 +1118,18 @@ export default {
   align-items: center;
 }
 
-.LCL1 h1, .LCL1 h3 {
+.LCL1 h1,
+.LCL1 h3 {
   margin: 0;
 }
 
 .LCL1 h3 {
-  color: grey;
+  color: var(--text-secondary);
   font-size: 20px;
 }
 
 .LCL1 h1 {
-  color: black;
+  color: var(--text-primary);
   font-size: 30px;
   font-weight: bold;
 }
@@ -1043,7 +1145,7 @@ export default {
 }
 
 .LCL2 li {
-  color: black;
+  color: var(--text-primary);
   height: 30px;
   margin-bottom: 20px;
 }
@@ -1059,20 +1161,24 @@ export default {
 }
 
 .item-name {
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 25px;
   flex: 1;
+  color: var(--text-primary);
 }
 
 .item-price {
   font-weight: bold;
   white-space: nowrap;
+  font-size: 15px;
+  color: var(--success, #16a34a);
 }
 
 /* ====================================================================== */
 /* CHART SECTION */
 /* ====================================================================== */
 .RC-SBI {
-  color: black;
+  color: var(--text-primary);
 }
 
 .RC-SBI h1 {
@@ -1092,24 +1198,23 @@ export default {
 
 .frequency-dropdown {
   padding: 8px 12px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-primary);
   border-radius: 6px;
-  background-color: white;
+  background-color: var(--surface-primary);
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-secondary);
   cursor: pointer;
 }
 
 .frequency-dropdown:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: var(--primary);
 }
 
 .chart-container {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 150px;
   width: 500px;
   height: 100%;
 }
@@ -1125,14 +1230,14 @@ export default {
 
 .chart-loading p {
   margin-top: 10px;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 /* ====================================================================== */
 /* TRANSACTION SECTION */
 /* ====================================================================== */
 .BottomContainer {
-  color: black;
+  color: var(--text-primary);
   width: 100%;
   margin-top: 40px;
 }
@@ -1143,7 +1248,7 @@ export default {
   align-items: center;
   margin-bottom: 20px;
   padding-bottom: 20px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .transaction-header h1 {
@@ -1176,7 +1281,7 @@ export default {
 /* TABLE STYLES */
 /* ====================================================================== */
 .table-container {
-  background: white;
+  background: var(--surface-primary);
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   overflow: hidden;
@@ -1188,51 +1293,34 @@ export default {
 }
 
 .table thead th {
-  background-color: #567cdc;
+  background-color: var(--primary);
   font-weight: 600;
-  color: white;
-  border-bottom: 2px solid #e5e7eb;
+  color: #ffffff;
+  border-bottom: 2px solid var(--border-primary);
   padding: 12px;
 }
 
 .table tbody td {
   padding: 12px;
   vertical-align: middle;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--border-secondary, #f3f4f6);
+  color: var(--text-primary);
 }
 
 .table tbody tr:hover {
-  background-color: #f9fafb;
+  background-color: var(--state-hover, #f9fafb);
 }
 
 .id-column {
   font-family: monospace;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-secondary);
   cursor: help;
-}
-
-.items-column {
-  max-width: 200px;
-}
-
-.items-list {
-  display: inline-block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-}
-
-.customer-column {
-  font-family: monospace;
-  font-size: 12px;
-  color: #6b7280;
 }
 
 .total-amount {
   font-weight: bold;
-  color: #059669;
+  color: var(--success, #059669);
 }
 
 .badge {
@@ -1240,15 +1328,33 @@ export default {
   padding: 4px 8px;
   border-radius: 12px;
   font-weight: 500;
-  color: white;
+  color: #ffffff;
 }
 
-.badge-success { background-color: #059669; }
-.badge-primary { background-color: #3b82f6; }
-.badge-info { background-color: #06b6d4; }
-.badge-warning { background-color: #eab308; color: #374151; }
-.badge-secondary { background-color: #6b7280; }
-.badge-dark { background-color: #374151; }
+.badge-success {
+  background-color: #059669;
+}
+
+.badge-primary {
+  background-color: #3b82f6;
+}
+
+.badge-info {
+  background-color: #06b6d4;
+}
+
+.badge-warning {
+  background-color: #eab308;
+  color: #374151;
+}
+
+.badge-secondary {
+  background-color: #6b7280;
+}
+
+.badge-dark {
+  background-color: #374151;
+}
 
 .action-buttons {
   display: flex;
@@ -1266,7 +1372,7 @@ export default {
 }
 
 .action-btn:hover:not(:disabled) {
-  background-color: #f3f4f6;
+  background-color: var(--state-hover, #f3f4f6);
 }
 
 .action-btn:disabled {
@@ -1288,7 +1394,7 @@ export default {
 
 .loading-state p {
   margin-top: 16px;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .loading-state-small {
@@ -1302,7 +1408,7 @@ export default {
 
 .loading-state-small p {
   margin-top: 8px;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .empty-state {
@@ -1316,7 +1422,7 @@ export default {
 
 .empty-state p {
   margin: 16px 0;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 16px;
 }
 
@@ -1331,7 +1437,7 @@ export default {
 
 .empty-state-small p {
   margin: 8px 0;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 /* ====================================================================== */
@@ -1339,8 +1445,8 @@ export default {
 /* ====================================================================== */
 .pagination-container {
   padding: 20px;
-  border-top: 1px solid #e5e7eb;
-  background-color: #f9fafb;
+  border-top: 1px solid var(--border-primary);
+  background-color: var(--surface-secondary, #f9fafb);
 }
 
 .pagination-header {
@@ -1357,7 +1463,7 @@ export default {
 }
 
 .pagination-text {
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 14px;
   text-align: right;
 }
@@ -1371,7 +1477,7 @@ export default {
 
 .page-size-selector label {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0;
   white-space: nowrap;
 }
@@ -1380,9 +1486,11 @@ export default {
   width: auto;
   min-width: 70px;
   padding: 4px 8px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--border-primary);
   border-radius: 4px;
   font-size: 13px;
+  background: var(--surface-primary);
+  color: var(--text-primary);
 }
 
 .pagination {
@@ -1399,37 +1507,37 @@ export default {
 }
 
 .page-link {
-  color: #6b7280;
-  border: 1px solid #d1d5db;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-primary);
   padding: 6px 12px;
   text-decoration: none;
-  background: white;
+  background: var(--surface-primary);
   cursor: pointer;
   border-radius: 4px;
   font-size: 14px;
 }
 
 .page-link:hover {
-  color: #374151;
-  background-color: #f3f4f6;
-  border-color: #d1d5db;
+  color: var(--text-primary);
+  background-color: var(--state-hover, #f3f4f6);
+  border-color: var(--border-primary);
 }
 
 .page-item.active .page-link {
-  background-color: #3b82f6;
-  border-color: #3b82f6;
-  color: white;
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
 }
 
 .page-item.disabled .page-link {
-  color: #9ca3af;
-  background-color: #f9fafb;
-  border-color: #e5e7eb;
+  color: var(--text-tertiary, #9ca3af);
+  background-color: var(--surface-secondary, #f9fafb);
+  border-color: var(--border-primary);
   cursor: not-allowed;
 }
 
 /* ====================================================================== */
-/* MODAL STYLES - ENHANCED */
+/* MODAL STYLES */
 /* ====================================================================== */
 .modal-overlay {
   position: fixed;
@@ -1438,7 +1546,7 @@ export default {
   right: 0;
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.5);
-  display: flex !important; /* Force display */
+  display: flex !important;
   justify-content: center;
   align-items: center;
   z-index: 9999;
@@ -1447,7 +1555,7 @@ export default {
 }
 
 .modal-content {
-  background: white;
+  background: var(--surface-primary);
   border-radius: 12px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   max-width: 600px;
@@ -1457,8 +1565,6 @@ export default {
   position: relative;
   z-index: 10000;
   animation: modalFadeIn 0.3s ease-out;
-  
-  /* Ensure modal is always visible when shown */
   opacity: 1 !important;
   visibility: visible !important;
   pointer-events: auto !important;
@@ -1480,15 +1586,16 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-primary);
   margin: 0;
 }
 
-.modal-header h2, .modal-header h3 {
+.modal-header h2,
+.modal-header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-primary);
 }
 
 .modal-close {
@@ -1496,7 +1603,7 @@ export default {
   border: none;
   font-size: 24px;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--text-secondary);
   padding: 0;
   width: 32px;
   height: 32px;
@@ -1508,7 +1615,7 @@ export default {
 }
 
 .modal-close:hover {
-  background-color: #f3f4f6;
+  background-color: var(--state-hover, #f3f4f6);
 }
 
 .modal-close:disabled {
@@ -1522,7 +1629,7 @@ export default {
 
 .modal-footer {
   padding: 16px 24px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border-primary);
   display: flex;
   justify-content: flex-end;
   gap: 12px;
@@ -1538,18 +1645,18 @@ export default {
 }
 
 .detail-section {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-primary);
   border-radius: 8px;
   padding: 16px;
-  background-color: #f9fafb;
+  background-color: var(--surface-secondary, #f9fafb);
 }
 
 .detail-section h4 {
   margin: 0 0 16px 0;
   font-size: 16px;
   font-weight: 600;
-  color: #374151;
-  border-bottom: 1px solid #e5e7eb;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-primary);
   padding-bottom: 8px;
 }
 
@@ -1558,7 +1665,7 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 8px 0;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--border-secondary, #f3f4f6);
 }
 
 .detail-row:last-child {
@@ -1567,66 +1674,25 @@ export default {
 
 .detail-row strong {
   min-width: 140px;
-  color: #374151;
+  color: var(--text-primary);
   font-weight: 500;
 }
 
 .detail-value {
-  color: #6b7280;
+  color: var(--text-secondary);
   text-align: right;
   max-width: 60%;
   word-wrap: break-word;
 }
 
 .detail-value.total-highlight {
-  color: #059669;
+  color: var(--success, #059669);
   font-weight: bold;
   font-size: 16px;
 }
 
-/* Item Breakdown Styles */
-.item-breakdown {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.item-breakdown h5 {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #374151;
-}
-
-.item-detail {
-  margin-bottom: 8px;
-}
-
-.item-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 8px;
-  background-color: #f9fafb;
-  border-radius: 4px;
-  border-left: 3px solid #3b82f6;
-}
-
-.item-detail-name {
-  font-weight: 500;
-  color: #374151;
-  flex: 1;
-}
-
-.item-detail-info {
-  font-size: 13px;
-  color: #6b7280;
-  font-family: monospace;
-  text-align: right;
-}
-
 /* ====================================================================== */
-/* IMPORT MODAL STYLES */
+/* IMPORT / PROGRESS UTILITIES */
 /* ====================================================================== */
 .progress-section {
   margin-bottom: 24px;
@@ -1641,25 +1707,25 @@ export default {
 
 .progress-info span {
   font-size: 14px;
-  color: #374151;
+  color: var(--text-primary);
 }
 
 .progress-percentage {
   font-weight: 600;
-  color: #3b82f6;
+  color: var(--primary);
 }
 
 .progress-bar {
   width: 100%;
   height: 8px;
-  background-color: #e5e7eb;
+  background-color: var(--border-primary);
   border-radius: 4px;
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
-  background-color: #3b82f6;
+  background-color: var(--primary);
   border-radius: 4px;
   transition: width 0.3s ease;
   background-image: linear-gradient(
@@ -1685,91 +1751,6 @@ export default {
   }
 }
 
-.import-results {
-  margin-top: 20px;
-}
-
-.import-results h4 {
-  margin: 0 0 16px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #374151;
-}
-
-.result-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.result-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  border-radius: 6px;
-  background-color: #f9fafb;
-  font-size: 14px;
-}
-
-.result-item.success {
-  background-color: #f0fdf4;
-  color: #166534;
-}
-
-.result-item.error {
-  background-color: #fef2f2;
-  color: #dc2626;
-}
-
-.warnings-section {
-  margin-top: 16px;
-}
-
-.warnings-section h5 {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #d97706;
-}
-
-.warnings-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.warnings-list li {
-  padding: 8px 12px;
-  background-color: #fffbeb;
-  border-left: 4px solid #f59e0b;
-  margin-bottom: 4px;
-  font-size: 13px;
-  color: #92400e;
-}
-
-.error-section {
-  margin-top: 20px;
-}
-
-.error-section h4 {
-  margin: 0 0 12px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #dc2626;
-}
-
-.error-message {
-  padding: 12px;
-  background-color: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 6px;
-  color: #dc2626;
-  font-size: 14px;
-  margin: 0;
-}
-
 /* ====================================================================== */
 /* BUTTON STYLES */
 /* ====================================================================== */
@@ -1792,35 +1773,35 @@ export default {
 }
 
 .btn-primary {
-  background-color: #3b82f6;
-  color: white;
+  background-color: var(--primary);
+  color: #ffffff;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: #2563eb;
+  background-color: var(--primary-dark, #2563eb);
 }
 
 .btn-secondary {
-  background-color: #6b7280;
-  color: white;
+  background-color: var(--secondary, #6b7280);
+  color: #ffffff;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background-color: #4b5563;
+  background-color: var(--secondary-dark, #4b5563);
 }
 
 .btn-success {
-  background-color: #10b981;
-  color: white;
+  background-color: var(--success, #10b981);
+  color: #ffffff;
 }
 
 .btn-success:hover:not(:disabled) {
-  background-color: #059669;
+  background-color: var(--success-dark, #059669);
 }
 
 .btn-warning {
   background-color: #f59e0b;
-  color: white;
+  color: #ffffff;
 }
 
 .btn-warning:hover:not(:disabled) {
@@ -1917,16 +1898,16 @@ export default {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  background: #f0fdf4;
+  background: var(--success-soft, #f0fdf4);
   padding: 0.75rem 1rem;
   border-radius: 0.5rem;
-  border: 1px solid #bbf7d0;
+  border: 1px solid var(--success-light, #bbf7d0);
   min-width: 280px;
 }
 
 .status-text {
   font-size: 0.875rem;
-  color: #16a34a;
+  color: var(--success-dark, #16a34a);
   font-weight: 500;
   flex: 1;
 }
@@ -1966,12 +1947,6 @@ export default {
   color: #64748b;
 }
 
-.btn-sm {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.8125rem;
-  border-radius: 0.25rem;
-}
-
 .btn-outline-secondary {
   color: #6c757d;
   border: 1px solid #6c757d;
@@ -2002,53 +1977,30 @@ export default {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  .auto-refresh-status {
-    flex-direction: column;
-    text-align: center;
-    gap: 0.25rem;
-    min-width: auto;
+  from {
+    transform: rotate(0deg);
   }
-
-  .connection-indicator {
-    order: -1;
-  }
-  
-  .header-actions {
-    flex-wrap: wrap;
-    gap: 0.5rem;
+  to {
+    transform: rotate(360deg);
   }
 }
 
+/* Extra helpers */
 .low-stock {
+  color: #d97706;
+  font-weight: bold;
+}
+
+.critical-stock {
   color: #dc2626;
   font-weight: bold;
+  background-color: #fef2f2;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .product-column {
   font-weight: 500;
-}
-
-.category-column .badge {
-  font-size: 11px;
-}
-
-.stock-column, .sold-column {
-  text-align: center;
-  font-weight: 500;
-}
-
-.sales-column {
-  text-align: right;
-  font-weight: bold;
-}
-
-.product-column {
   max-width: 200px;
 }
 
@@ -2061,51 +2013,29 @@ export default {
   cursor: help;
 }
 
-/* Low stock warning */
-.low-stock {
-  color: #dc2626;
-  font-weight: bold;
+.category-column .badge {
+  font-size: 11px;
 }
 
-/* Center align stock and sold columns */
-.stock-column, .sold-column {
+.stock-column,
+.sold-column {
   text-align: center;
   font-weight: 500;
 }
 
-/* Right align sales and price columns */
-.sales-column, .price-column {
+.sales-column,
+.price-column {
   text-align: right;
   font-weight: bold;
 }
 
-/* Action buttons */
 .actions-column {
   text-align: center;
 }
 
-.action-buttons {
-  display: flex;
-  justify-content: center;
-  gap: 5px;
-}
-
-.action-buttons .btn-sm {
+.actions-column .btn-sm {
   padding: 4px 8px;
   font-size: 12px;
-}
-
-.critical-stock {
-  color: #dc2626;
-  font-weight: bold;
-  background-color: #fef2f2;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.low-stock {
-  color: #d97706;
-  font-weight: bold;
 }
 
 .header-left {
@@ -2115,12 +2045,11 @@ export default {
 }
 
 .date-range-info {
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
 .date-range-info i {
   margin-right: 4px;
 }
-
 </style>
