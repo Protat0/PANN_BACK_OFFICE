@@ -206,6 +206,10 @@ export default {
     productId: {
       type: String,
       required: true
+    },
+    product: {        // ✅ NEW
+      type: Object,
+      required: true
     }
   },
   setup(props) {
@@ -333,9 +337,8 @@ export default {
       batchDetailsModal.value?.open(batch)
     }
 
-    const adjustQuantity = (batch) => {
-      // ✅ Opens stock adjustment modal (existing component)
-      stockUpdateModal.value?.openStock?.(batch)
+    const adjustQuantity = () => {
+      stockUpdateModal.value?.openStock?.(props.product)
     }
 
     // --- Data Initialization ---

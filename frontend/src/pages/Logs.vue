@@ -162,7 +162,7 @@
           :class="{ 'table-warning': isNewEntry(sessionLog) }"
         >
           <td>
-            <span class="badge fw-semibold" :class="getLogTypeBadgeClass(sessionLog.logType)">
+            <span class="badge fw-semibold" style="color: white;" :class="getLogTypeBadgeClass(sessionLog.logType)">
               {{ sessionLog.formattedLogId }}
             </span>
           </td>
@@ -171,7 +171,7 @@
           <td class="text-secondary">{{ sessionLog.event_type }}</td>
           <td class="text-center text-tertiary">{{ getAmountQty(sessionLog) }}</td>
           <td class="text-center">
-            <span class="badge" :class="getStatusBadgeClass(sessionLog.status)">
+            <span class="badge" style="color: white;" :class="getStatusBadgeClass(sessionLog.status)">
               {{ sessionLog.status }}
             </span>
           </td>

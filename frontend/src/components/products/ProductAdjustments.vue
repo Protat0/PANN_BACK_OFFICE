@@ -31,7 +31,7 @@
           </select>
         </div>
         <div class="col-md-4">
-          <label class="form-label text-secondary">Date Range</label>
+          <label class="form-label text-secondary">Date Filter</label>
           <input 
             v-model="dateRange" 
             type="date" 

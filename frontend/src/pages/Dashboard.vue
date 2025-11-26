@@ -240,24 +240,29 @@
           <template #header>
             <!-- Date Range Picker -->
             <div class="date-range-picker">
+              
               <div class="date-input-group">
                 <label class="date-label">From:</label>
                 <input 
                   type="date" 
                   v-model="topProductsStartDate"
-                  @change="loadTopProducts"
+                  @change="onTopProductsDateChange"
                   class="date-input"
+                  :max="topProductsEndDate || null"   
                 />
               </div>
+
               <div class="date-input-group">
                 <label class="date-label">To:</label>
                 <input 
                   type="date" 
                   v-model="topProductsEndDate"
-                  @change="loadTopProducts"
+                  @change="onTopProductsDateChange"
                   class="date-input"
+                  :min="topProductsStartDate || null"  
                 />
               </div>
+
               <button 
                 @click="resetTopProductsDateRange"
                 class="btn btn-sm btn-secondary"
@@ -266,7 +271,13 @@
                 Reset
               </button>
             </div>
+
+            <!-- OPTIONAL: small inline error message -->
+            <p v-if="topProductsDateError" class="text-red-600 text-sm mt-1">
+              {{ topProductsDateError }}
+            </p>
           </template>
+
           
           <template #content>
             <!-- Loading State -->
@@ -502,6 +513,21 @@ export default {
   },
   methods: {
     // ========== HELPER METHODS ==========
+     onTopProductsDateChange() {
+        this.topProductsDateError = null
+
+        // Only load when BOTH dates exist
+        if (this.topProductsStartDate && this.topProductsEndDate) {
+          this.loadTopProducts()
+        }
+      },
+
+      resetTopProductsDateRange() {
+        this.topProductsStartDate = null
+        this.topProductsEndDate = null
+        this.topProductsDateError = null
+        this.loadTopProducts()
+      },
     formatCurrency(value) {
       // Use the imported formatCurrencyHelper function
       return formatCurrencyHelper(value)

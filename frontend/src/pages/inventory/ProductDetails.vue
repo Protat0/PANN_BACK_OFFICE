@@ -110,6 +110,7 @@
             v-else-if="activeTab === 'Purchases' && hasVisitedTab('Purchases')"
             :key="`purchases-${id}`"
             :product-id="id" 
+            :product="currentProduct" 
           />
 
           <!-- Adjustments Tab - Only render when active and has been visited -->
