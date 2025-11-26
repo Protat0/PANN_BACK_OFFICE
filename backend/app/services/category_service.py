@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 class CategoryService:
     VALID_CATEGORY_PREFIXES = ('CTGY-', 'UNCTGRY-', 'UNGTY-')
     UNCATEGORIZED_ID_CANDIDATES = ['UNCTGRY-001', 'UNGTY-001']
+    DEFAULT_SUBCATEGORY_NAME = 'None'
 
     def __init__(self):
         """Initialize CategoryService with string-based architecture"""
@@ -30,6 +31,31 @@ class CategoryService:
         """Allow CTGY-* plus legacy uncategorized IDs"""
         return isinstance(category_id, str) and category_id.startswith(self.VALID_CATEGORY_PREFIXES)
 
+    def _ensure_subcategory_present(self, category_id, category_doc, subcategory_name):
+        """Ensure a subcategory exists for a given category; create if missing."""
+        subcategories = category_doc.get('sub_categories', [])
+        exists = any(sub.get('name') == subcategory_name for sub in subcategories)
+
+        if not exists:
+            subcategory = {
+                'subcategory_id': self.generate_subcategory_id(),
+                'name': subcategory_name,
+                'description': f'Default {subcategory_name} subcategory',
+                'products': [],
+                'status': 'active',
+                'created_at': datetime.utcnow().isoformat()
+            }
+
+            self.collection.update_one(
+                {'_id': category_id},
+                {
+                    '$push': {'sub_categories': subcategory},
+                    '$set': {'last_updated': datetime.utcnow().isoformat()}
+                }
+            )
+
+            category_doc.setdefault('sub_categories', []).append(subcategory)
+
     def ensure_uncategorized_category_exists(self):
         """Ensure an 'Uncategorized' category exists, create if not"""
         try:
@@ -43,6 +69,11 @@ class CategoryService:
             })
             
             if uncategorized:
+                self._ensure_subcategory_present(
+                    uncategorized['_id'],
+                    uncategorized,
+                    self.DEFAULT_SUBCATEGORY_NAME
+                )
                 logger.info("Uncategorized category already exists")
                 return uncategorized
             
@@ -55,8 +86,8 @@ class CategoryService:
                 'status': 'active',
                 'sub_categories': [{
                     'subcategory_id': 'SUBCAT-00001',
-                    'name': 'General',
-                    'description': 'General uncategorized products',
+                    'name': self.DEFAULT_SUBCATEGORY_NAME,
+                    'description': 'Default holding subcategory for uncategorized products',
                     'products': [],
                     'created_at': now.isoformat(),
                     'status': 'active'
@@ -235,14 +266,14 @@ class CategoryService:
         
         # Check if "None" subcategory already exists
         none_exists = any(
-            sub.get('name', '').lower() == 'none'
+            sub.get('name', '').lower() == self.DEFAULT_SUBCATEGORY_NAME.lower()
             for sub in subcategories_list
         )
         
         # Add default "None" subcategory if it doesn't exist
         if not none_exists:
             none_subcategory = {
-                'name': 'None',
+                'name': self.DEFAULT_SUBCATEGORY_NAME,
                 'description': 'Default holding subcategory for products without specific subcategorization'
             }
             subcategories_list.insert(0, none_subcategory)
@@ -1466,9 +1497,9 @@ class CategoryService:
             return []
 
     def move_product_to_none_subcategory(self, product_id, category_id, current_user=None):
-        """Move product to the 'None' subcategory within the same category"""
+        """Move product to the default catch-all subcategory within the same category"""
         try:
-            logger.info(f"Moving product {product_id} to 'None' subcategory in category {category_id}")
+            logger.info(f"Moving product {product_id} to '{self.DEFAULT_SUBCATEGORY_NAME}' subcategory in category {category_id}")
             
             if not product_id.startswith('PROD-') or not self._is_valid_category_id(category_id):
                 raise ValueError("Invalid product or category ID format")
@@ -1483,7 +1514,14 @@ class CategoryService:
             # Remove from current subcategory
             self._remove_product_from_all_subcategories(product_id)
             
-            # Add to "None" subcategory
+            # Ensure subcategory exists
+            category = self.collection.find_one({'category_id': category_id})
+            if not category:
+                raise ValueError(f"Category {category_id} not found")
+
+            self._ensure_subcategory_present(category_id, category, self.DEFAULT_SUBCATEGORY_NAME)
+
+            # Add to default subcategory
             result = self.collection.update_one(
                 {'category_id': category_id},
                 {
@@ -1495,7 +1533,7 @@ class CategoryService:
                     },
                     '$set': {'last_updated': datetime.utcnow()}
                 },
-                array_filters=[{'elem.name': 'None'}]
+                array_filters=[{'elem.name': self.DEFAULT_SUBCATEGORY_NAME}]
             )
             
             if result.modified_count > 0:
@@ -1511,11 +1549,11 @@ class CategoryService:
                     }
                 )
                 
-                logger.info(f"Product moved to 'None' subcategory successfully")
+                logger.info(f"Product moved to '{self.DEFAULT_SUBCATEGORY_NAME}' subcategory successfully")
                 return {
                     'success': True,
-                    'action': 'moved_to_none',
-                    'message': f"Product '{product_name}' moved to 'None' subcategory"
+                    'action': 'moved_to_default',
+                    'message': f"Product '{product_name}' moved to '{self.DEFAULT_SUBCATEGORY_NAME}' subcategory"
                 }
             
             return {'success': False, 'message': 'Failed to move product to None subcategory'}
@@ -1558,9 +1596,9 @@ class CategoryService:
             if not target_category:
                 raise ValueError(f"Target category {new_category_id} not found")
             
-            # If no subcategory specified, use "None" as default
+            # If no subcategory specified, use default catch-all subcategory
             if not new_subcategory_name:
-                new_subcategory_name = "None"
+                new_subcategory_name = self.DEFAULT_SUBCATEGORY_NAME
             
             # Validate subcategory exists in target category
             subcategories = target_category.get('sub_categories', [])
@@ -1570,7 +1608,10 @@ class CategoryService:
             )
             
             if not subcategory_exists:
-                raise ValueError(f"Subcategory '{new_subcategory_name}' not found in category {new_category_id}")
+                if new_subcategory_name == self.DEFAULT_SUBCATEGORY_NAME:
+                    self._ensure_subcategory_present(new_category_id, target_category, new_subcategory_name)
+                else:
+                    raise ValueError(f"Subcategory '{new_subcategory_name}' not found in category {new_category_id}")
             
             # Update the product using ProductService
             update_data = {
@@ -1600,9 +1641,9 @@ class CategoryService:
             if not target_category:
                 raise ValueError(f"Target category {new_category_id} not found")
             
-            # If no subcategory specified, use "None" as default (matching single move behavior)
+            # If no subcategory specified, use default catch-all subcategory
             if not new_subcategory_name:
-                new_subcategory_name = "None"
+                new_subcategory_name = self.DEFAULT_SUBCATEGORY_NAME
             
             # Validate subcategory exists in target category
             subcategories = target_category.get('sub_categories', [])
@@ -1612,7 +1653,10 @@ class CategoryService:
             )
             
             if not subcategory_exists:
-                raise ValueError(f"Subcategory '{new_subcategory_name}' not found in category {new_category_id}")
+                if new_subcategory_name == self.DEFAULT_SUBCATEGORY_NAME:
+                    self._ensure_subcategory_present(new_category_id, target_category, new_subcategory_name)
+                else:
+                    raise ValueError(f"Subcategory '{new_subcategory_name}' not found in category {new_category_id}")
             
             # Bulk update products directly in database
             result = self.product_collection.update_many(
