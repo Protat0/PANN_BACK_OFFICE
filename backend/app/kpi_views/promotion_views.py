@@ -2,7 +2,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from datetime import datetime
+from datetime import datetime, timezone
 from ..services.promotions_service import PromotionService
 from ..decorators.authenticationDecorator import require_admin, require_authentication, get_authenticated_user_from_jwt
 import logging
@@ -101,16 +101,33 @@ class PromotionListView(APIView):
             # Add creator information
             promotion_data['created_by'] = request.current_user.get('user_id')
             
-            # Convert date strings to datetime objects if needed
+            # Convert date strings to timezone-aware UTC datetime objects
             for date_field in ['start_date', 'end_date']:
                 if date_field in promotion_data and isinstance(promotion_data[date_field], str):
                     try:
-                        promotion_data[date_field] = datetime.fromisoformat(
-                            promotion_data[date_field].replace('Z', '+00:00')
-                        )
-                    except ValueError:
+                        date_str = promotion_data[date_field]
+                        # Handle ISO format with or without timezone
+                        if date_str.endswith('Z'):
+                            date_str = date_str.replace('Z', '+00:00')
+                        elif '+' not in date_str and date_str.count('-') >= 3:
+                            # If no timezone info, assume UTC
+                            if 'T' in date_str:
+                                date_str = date_str + '+00:00'
+                            else:
+                                date_str = date_str + 'T00:00:00+00:00'
+                        
+                        dt = datetime.fromisoformat(date_str)
+                        # Ensure timezone-aware (convert to UTC)
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        else:
+                            dt = dt.astimezone(timezone.utc)
+                        
+                        promotion_data[date_field] = dt
+                    except (ValueError, AttributeError) as e:
+                        logger.error(f"Error parsing {date_field}: {e}")
                         return Response(
-                            {"error": f"Invalid {date_field} format. Use ISO format"},
+                            {"error": f"Invalid {date_field} format. Use ISO format: {str(e)}"},
                             status=status.HTTP_400_BAD_REQUEST
                         )
             
@@ -155,21 +172,65 @@ class PromotionDetailView(APIView):
     def put(self, request, promotion_id):
         """Update promotion"""
         try:
+            logger.info(f"[VIEW] Promotion update request for {promotion_id}")
             update_data = request.data.copy()
+            logger.debug(f"[VIEW] Raw update_data: {update_data}")
             
-            # Convert date strings if provided
+            # Convert date strings if provided - ensure timezone-aware UTC
             for date_field in ['start_date', 'end_date']:
-                if date_field in update_data and isinstance(update_data[date_field], str):
-                    try:
-                        update_data[date_field] = datetime.fromisoformat(
-                            update_data[date_field].replace('Z', '+00:00')
-                        )
-                    except ValueError:
-                        return Response(
-                            {"error": f"Invalid {date_field} format"},
-                            status=status.HTTP_400_BAD_REQUEST
-                        )
+                if date_field in update_data:
+                    logger.debug(f"[VIEW] Processing {date_field}: {update_data[date_field]} (type: {type(update_data[date_field])})")
+                    if isinstance(update_data[date_field], str):
+                        try:
+                            date_str = update_data[date_field]
+                            logger.debug(f"[VIEW] {date_field} is string: '{date_str}'")
+                            # Handle ISO format with or without timezone
+                            if date_str.endswith('Z'):
+                                date_str = date_str.replace('Z', '+00:00')
+                                logger.debug(f"[VIEW] {date_field} had 'Z', converted to: '{date_str}'")
+                            elif '+' not in date_str and date_str.count('-') >= 3:
+                                # If no timezone info, assume UTC
+                                if 'T' in date_str:
+                                    date_str = date_str + '+00:00'
+                                else:
+                                    date_str = date_str + 'T00:00:00+00:00'
+                                logger.debug(f"[VIEW] {date_field} had no timezone, added UTC: '{date_str}'")
+                            
+                            dt = datetime.fromisoformat(date_str)
+                            logger.debug(f"[VIEW] {date_field} parsed to datetime: {dt} (tzinfo: {dt.tzinfo})")
+                            
+                            # Ensure timezone-aware (convert to UTC)
+                            if dt.tzinfo is None:
+                                logger.debug(f"[VIEW] {date_field} is NAIVE, adding UTC timezone")
+                                dt = dt.replace(tzinfo=timezone.utc)
+                            else:
+                                logger.debug(f"[VIEW] {date_field} is AWARE, converting to UTC")
+                                dt = dt.astimezone(timezone.utc)
+                            
+                            logger.debug(f"[VIEW] {date_field} final: {dt} (tzinfo: {dt.tzinfo})")
+                            update_data[date_field] = dt
+                        except (ValueError, AttributeError, TypeError) as e:
+                            logger.error(f"[VIEW] Error parsing {date_field}: {e}")
+                            import traceback
+                            logger.error(f"[VIEW] Traceback: {traceback.format_exc()}")
+                            return Response(
+                                {"error": f"Invalid {date_field} format: {str(e)}"},
+                                status=status.HTTP_400_BAD_REQUEST
+                            )
+                    elif isinstance(update_data[date_field], datetime):
+                        logger.debug(f"[VIEW] {date_field} is already datetime: {update_data[date_field]} (tzinfo: {update_data[date_field].tzinfo})")
+                        # Ensure it's timezone-aware UTC
+                        dt = update_data[date_field]
+                        if dt.tzinfo is None:
+                            logger.debug(f"[VIEW] {date_field} datetime is NAIVE, adding UTC")
+                            update_data[date_field] = dt.replace(tzinfo=timezone.utc)
+                        else:
+                            logger.debug(f"[VIEW] {date_field} datetime is AWARE, converting to UTC")
+                            update_data[date_field] = dt.astimezone(timezone.utc)
+                        logger.debug(f"[VIEW] {date_field} after normalization: {update_data[date_field]} (tzinfo: {update_data[date_field].tzinfo})")
             
+            logger.info(f"[VIEW] Calling promotion_service.update_promotion with normalized data")
+            logger.debug(f"[VIEW] Final update_data: {update_data}")
             result = self.promotion_service.update_promotion(
                 promotion_id, 
                 update_data, 

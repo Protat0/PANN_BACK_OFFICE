@@ -172,17 +172,51 @@ class PromotionService:
                     'errors': validation_result['errors']
                 }
             
+            # Helper function to normalize datetime
+            def normalize_datetime_field(dt):
+                """Normalize a datetime to timezone-aware UTC"""
+                if dt is None:
+                    return None
+                if isinstance(dt, str):
+                    date_str = dt
+                    if date_str.endswith('Z'):
+                        date_str = date_str.replace('Z', '+00:00')
+                    elif '+' not in date_str and date_str.count('-') >= 3:
+                        if 'T' in date_str:
+                            date_str = date_str + '+00:00'
+                        else:
+                            date_str = date_str + 'T00:00:00+00:00'
+                    dt = datetime.fromisoformat(date_str)
+                if isinstance(dt, datetime):
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    else:
+                        dt = dt.astimezone(timezone.utc)
+                return dt
+            
+            # Normalize datetime fields in update_data to timezone-aware UTC before saving
+            normalized_update_data = update_data.copy()
+            for date_field in ['start_date', 'end_date']:
+                if date_field in normalized_update_data:
+                    normalized_update_data[date_field] = normalize_datetime_field(normalized_update_data[date_field])
+            
+            # Normalize existing_promotion dates before comparison (dates from MongoDB may be naive)
+            normalized_existing = existing_promotion.copy()
+            for date_field in ['start_date', 'end_date']:
+                if date_field in normalized_existing and normalized_existing[date_field] is not None:
+                    normalized_existing[date_field] = normalize_datetime_field(normalized_existing[date_field])
+            
             # Prepare update document
             update_doc = {
                 '$set': {
-                    **update_data,
-                    'updated_at': datetime.utcnow(),
+                    **normalized_update_data,
+                    'updated_at': datetime.now(timezone.utc),
                     'updated_by': user_id
                 }
             }
             
-            # Track what changed for audit
-            changes = self._detect_promotion_changes(existing_promotion, update_data)
+            # Track what changed for audit - use normalized data
+            changes = self._detect_promotion_changes(normalized_existing, normalized_update_data)
             
             # Update promotion
             self.collection.update_one(
@@ -514,13 +548,47 @@ class PromotionService:
                 old_value = old_data.get(field)
                 new_value = new_data[field]
                 
-                # Handle datetime comparison
+                # Handle datetime comparison - normalize timezones first
                 if isinstance(old_value, datetime) and isinstance(new_value, datetime):
-                    if old_value != new_value:
-                        changes[field] = {
-                            'from': old_value.isoformat(),
-                            'to': new_value.isoformat()
-                        }
+                    # Normalize both to timezone-aware UTC for comparison
+                    try:
+                        old_dt = old_value
+                        new_dt = new_value
+                        
+                        # Normalize old_value - handle naive datetimes FIRST
+                        if old_dt.tzinfo is None:
+                            # Make naive datetime aware by assuming UTC
+                            old_dt = old_dt.replace(tzinfo=timezone.utc)
+                        else:
+                            # Convert aware datetime to UTC
+                            old_dt = old_dt.astimezone(timezone.utc)
+                        
+                        # Normalize new_value - handle naive datetimes FIRST  
+                        if new_dt.tzinfo is None:
+                            # Make naive datetime aware by assuming UTC
+                            new_dt = new_dt.replace(tzinfo=timezone.utc)
+                        else:
+                            # Convert aware datetime to UTC
+                            new_dt = new_dt.astimezone(timezone.utc)
+                        
+                        # Verify both are now timezone-aware before comparison
+                        if old_dt.tzinfo is None or new_dt.tzinfo is None:
+                            raise ValueError(f"Datetime normalization failed - old_dt.tzinfo: {old_dt.tzinfo}, new_dt.tzinfo: {new_dt.tzinfo}")
+                        
+                        # Now safe to compare - both are guaranteed timezone-aware UTC
+                        if old_dt != new_dt:
+                            changes[field] = {
+                                'from': old_value.isoformat() if hasattr(old_value, 'isoformat') else str(old_value),
+                                'to': new_value.isoformat() if hasattr(new_value, 'isoformat') else str(new_value)
+                            }
+                    except Exception as dt_error:
+                        # If datetime comparison fails, just compare as strings
+                        logger.warning(f"Error comparing datetimes for {field}: {dt_error}")
+                        if str(old_value) != str(new_value):
+                            changes[field] = {
+                                'from': str(old_value),
+                                'to': str(new_value)
+                            }
                 elif old_value != new_value:
                     changes[field] = {
                         'from': old_value,
@@ -1146,6 +1214,108 @@ class PromotionService:
         try:
             errors = []
             
+            # Helper function to normalize datetime to timezone-aware UTC
+            def normalize_datetime_for_validation(dt, field_name="unknown"):
+                """Convert datetime to timezone-aware UTC if needed - always returns timezone-aware or None"""
+                logger.debug(f"[NORMALIZE] Starting normalization for {field_name}: type={type(dt)}, value={dt}")
+                
+                if dt is None:
+                    logger.debug(f"[NORMALIZE] {field_name} is None, returning None")
+                    return None
+                
+                # Handle string input
+                if isinstance(dt, str):
+                    logger.debug(f"[NORMALIZE] {field_name} is string: '{dt}'")
+                    try:
+                        date_str = dt.strip()
+                        if not date_str:
+                            logger.debug(f"[NORMALIZE] {field_name} is empty string, returning None")
+                            return None
+                        if date_str.endswith('Z'):
+                            date_str = date_str.replace('Z', '+00:00')
+                            logger.debug(f"[NORMALIZE] {field_name} had 'Z' suffix, converted to: '{date_str}'")
+                        elif '+' not in date_str and date_str.count('-') >= 3:
+                            if 'T' in date_str:
+                                date_str = date_str + '+00:00'
+                            else:
+                                date_str = date_str + 'T00:00:00+00:00'
+                            logger.debug(f"[NORMALIZE] {field_name} had no timezone, added UTC: '{date_str}'")
+                        dt = datetime.fromisoformat(date_str)
+                        logger.debug(f"[NORMALIZE] {field_name} parsed from string to datetime: {dt} (tzinfo: {dt.tzinfo})")
+                    except (ValueError, AttributeError, TypeError) as e:
+                        logger.error(f"[NORMALIZE] Error parsing datetime string '{dt}' for {field_name}: {e}")
+                        return None
+                
+                # Handle datetime object - ensure it's timezone-aware UTC
+                if isinstance(dt, datetime):
+                    logger.debug(f"[NORMALIZE] {field_name} is datetime: {dt} (tzinfo: {dt.tzinfo})")
+                    try:
+                        # Critical: Check if naive and make aware BEFORE any operations
+                        if dt.tzinfo is None:
+                            logger.debug(f"[NORMALIZE] {field_name} is NAIVE, adding UTC timezone")
+                            # Naive datetime - assume UTC and add timezone
+                            dt = dt.replace(tzinfo=timezone.utc)
+                            logger.debug(f"[NORMALIZE] {field_name} after replace: {dt} (tzinfo: {dt.tzinfo})")
+                        else:
+                            logger.debug(f"[NORMALIZE] {field_name} is AWARE (tzinfo: {dt.tzinfo}), converting to UTC")
+                            # Already timezone-aware - convert to UTC (this is safe)
+                            dt = dt.astimezone(timezone.utc)
+                            logger.debug(f"[NORMALIZE] {field_name} after astimezone: {dt} (tzinfo: {dt.tzinfo})")
+                        # Final verification - ensure it's timezone-aware
+                        if dt.tzinfo is None:
+                            logger.warning(f"[NORMALIZE] {field_name} still naive after normalization, fixing again")
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        logger.debug(f"[NORMALIZE] {field_name} final result: {dt} (tzinfo: {dt.tzinfo})")
+                        return dt
+                    except (TypeError, ValueError) as e:
+                        # Catch comparison errors here
+                        logger.error(f"[NORMALIZE] TypeError/ValueError normalizing {field_name} {dt} (type: {type(dt)}, tzinfo: {dt.tzinfo if isinstance(dt, datetime) else 'N/A'}): {e}")
+                        import traceback
+                        logger.error(f"[NORMALIZE] Traceback: {traceback.format_exc()}")
+                        return None
+                    except Exception as e:
+                        logger.error(f"[NORMALIZE] Unexpected error normalizing {field_name} {dt}: {e}")
+                        import traceback
+                        logger.error(f"[NORMALIZE] Traceback: {traceback.format_exc()}")
+                        return None
+                
+                # If it's not a string or datetime, return None
+                logger.warning(f"[NORMALIZE] Unexpected type for {field_name}: {type(dt)}, value: {dt}")
+                return None
+            
+            # Normalize dates in existing_promotion immediately (MongoDB dates may be naive)
+            # Do this in a try-except to catch any comparison errors
+            logger.info(f"[VALIDATE] Starting validation for promotion update")
+            logger.debug(f"[VALIDATE] existing_promotion keys: {list(existing_promotion.keys())}")
+            logger.debug(f"[VALIDATE] existing_promotion start_date: {existing_promotion.get('start_date')} (type: {type(existing_promotion.get('start_date'))})")
+            logger.debug(f"[VALIDATE] existing_promotion end_date: {existing_promotion.get('end_date')} (type: {type(existing_promotion.get('end_date'))})")
+            logger.debug(f"[VALIDATE] update_data keys: {list(update_data.keys())}")
+            logger.debug(f"[VALIDATE] update_data start_date: {update_data.get('start_date')} (type: {type(update_data.get('start_date'))})")
+            logger.debug(f"[VALIDATE] update_data end_date: {update_data.get('end_date')} (type: {type(update_data.get('end_date'))})")
+            
+            try:
+                normalized_existing = existing_promotion.copy()
+                for date_field in ['start_date', 'end_date']:
+                    if date_field in normalized_existing:
+                        logger.debug(f"[VALIDATE] Normalizing existing {date_field}: {normalized_existing[date_field]} (type: {type(normalized_existing[date_field])})")
+                        try:
+                            original_value = normalized_existing[date_field]
+                            normalized_value = normalize_datetime_for_validation(normalized_existing[date_field], f"existing_{date_field}")
+                            normalized_existing[date_field] = normalized_value
+                            logger.debug(f"[VALIDATE] Normalized existing {date_field}: {original_value} -> {normalized_value}")
+                        except Exception as e:
+                            logger.error(f"[VALIDATE] Error normalizing {date_field} in existing_promotion: {e}")
+                            import traceback
+                            logger.error(f"[VALIDATE] Traceback: {traceback.format_exc()}")
+                            # Keep original value if normalization fails
+                            pass
+            except Exception as e:
+                logger.error(f"[VALIDATE] Error creating normalized_existing: {e}")
+                import traceback
+                logger.error(f"[VALIDATE] Traceback: {traceback.format_exc()}")
+                # Use original existing_promotion if normalization fails
+                normalized_existing = existing_promotion
+            
             # Cannot update certain fields if promotion is active
             if existing_promotion.get('status') == 'active':
                 restricted_fields = ['type', 'discount_value', 'target_type', 'target_ids']
@@ -1155,16 +1325,129 @@ class PromotionService:
             
             # Validate dates if provided
             if 'start_date' in update_data or 'end_date' in update_data:
-                start_date = update_data.get('start_date', existing_promotion['start_date'])
-                end_date = update_data.get('end_date', existing_promotion['end_date'])
-                
-                if isinstance(start_date, str):
-                    start_date = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                if isinstance(end_date, str):
-                    end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-                
-                if end_date <= start_date:
-                    errors.append('end_date must be after start_date')
+                logger.info(f"[VALIDATE] Date validation triggered - start_date in update: {'start_date' in update_data}, end_date in update: {'end_date' in update_data}")
+                # Get dates from update_data or normalized_existing, then normalize
+                try:
+                    # Get start_date - from update_data if provided, otherwise from existing
+                    start_date = update_data.get('start_date')
+                    logger.debug(f"[VALIDATE] start_date from update_data: {start_date} (type: {type(start_date)})")
+                    if start_date is None:
+                        start_date = normalized_existing.get('start_date')
+                        logger.debug(f"[VALIDATE] start_date from normalized_existing: {start_date} (type: {type(start_date)})")
+                    
+                    # Normalize start_date if it exists
+                    if start_date is not None:
+                        logger.debug(f"[VALIDATE] Normalizing start_date: {start_date} (type: {type(start_date)})")
+                        start_date = normalize_datetime_for_validation(start_date, "start_date")
+                        logger.debug(f"[VALIDATE] start_date after normalization: {start_date} (type: {type(start_date)}, tzinfo: {start_date.tzinfo if isinstance(start_date, datetime) else 'N/A'})")
+                    
+                    # Get end_date - from update_data if provided, otherwise from existing
+                    end_date = update_data.get('end_date')
+                    logger.debug(f"[VALIDATE] end_date from update_data: {end_date} (type: {type(end_date)})")
+                    if end_date is None:
+                        end_date = normalized_existing.get('end_date')
+                        logger.debug(f"[VALIDATE] end_date from normalized_existing: {end_date} (type: {type(end_date)})")
+                    
+                    # Normalize end_date if it exists
+                    if end_date is not None:
+                        logger.debug(f"[VALIDATE] Normalizing end_date: {end_date} (type: {type(end_date)})")
+                        end_date = normalize_datetime_for_validation(end_date, "end_date")
+                        logger.debug(f"[VALIDATE] end_date after normalization: {end_date} (type: {type(end_date)}, tzinfo: {end_date.tzinfo if isinstance(end_date, datetime) else 'N/A'})")
+                    
+                    # Only validate if both dates are present and valid
+                    if start_date is not None and end_date is not None:
+                        logger.info(f"[VALIDATE] Both dates present, starting comparison validation")
+                        logger.debug(f"[VALIDATE] Before re-normalization - start_date: {start_date} (type: {type(start_date)}, tzinfo: {start_date.tzinfo if isinstance(start_date, datetime) else 'N/A'})")
+                        logger.debug(f"[VALIDATE] Before re-normalization - end_date: {end_date} (type: {type(end_date)}, tzinfo: {end_date.tzinfo if isinstance(end_date, datetime) else 'N/A'})")
+                        
+                        # Re-normalize both dates to ensure they're timezone-aware UTC
+                        # This is critical because dates from MongoDB may be naive
+                        logger.debug(f"[VALIDATE] Re-normalizing start_date")
+                        start_date = normalize_datetime_for_validation(start_date, "start_date_final")
+                        logger.debug(f"[VALIDATE] Re-normalizing end_date")
+                        end_date = normalize_datetime_for_validation(end_date, "end_date_final")
+                        
+                        logger.debug(f"[VALIDATE] After re-normalization - start_date: {start_date} (type: {type(start_date)}, tzinfo: {start_date.tzinfo if isinstance(start_date, datetime) else 'N/A'})")
+                        logger.debug(f"[VALIDATE] After re-normalization - end_date: {end_date} (type: {type(end_date)}, tzinfo: {end_date.tzinfo if isinstance(end_date, datetime) else 'N/A'})")
+                        
+                        # Final validation - both must be timezone-aware datetime objects
+                        if (start_date is not None and end_date is not None and 
+                            isinstance(start_date, datetime) and isinstance(end_date, datetime)):
+                            
+                            logger.info(f"[VALIDATE] Both are datetime objects, checking timezone awareness")
+                            logger.debug(f"[VALIDATE] start_date.tzinfo: {start_date.tzinfo}")
+                            logger.debug(f"[VALIDATE] end_date.tzinfo: {end_date.tzinfo}")
+                            
+                            # CRITICAL: Ensure both are timezone-aware BEFORE any operations
+                            # Handle naive datetimes first by adding timezone
+                            if start_date.tzinfo is None:
+                                logger.warning(f"[VALIDATE] start_date is still NAIVE after normalization! Fixing...")
+                                start_date = start_date.replace(tzinfo=timezone.utc)
+                                logger.debug(f"[VALIDATE] start_date after fix: {start_date} (tzinfo: {start_date.tzinfo})")
+                            else:
+                                logger.debug(f"[VALIDATE] start_date is aware, converting to UTC")
+                                # Only call astimezone if already timezone-aware
+                                start_date = start_date.astimezone(timezone.utc)
+                                logger.debug(f"[VALIDATE] start_date after UTC conversion: {start_date} (tzinfo: {start_date.tzinfo})")
+                            
+                            if end_date.tzinfo is None:
+                                logger.warning(f"[VALIDATE] end_date is still NAIVE after normalization! Fixing...")
+                                end_date = end_date.replace(tzinfo=timezone.utc)
+                                logger.debug(f"[VALIDATE] end_date after fix: {end_date} (tzinfo: {end_date.tzinfo})")
+                            else:
+                                logger.debug(f"[VALIDATE] end_date is aware, converting to UTC")
+                                # Only call astimezone if already timezone-aware
+                                end_date = end_date.astimezone(timezone.utc)
+                                logger.debug(f"[VALIDATE] end_date after UTC conversion: {end_date} (tzinfo: {end_date.tzinfo})")
+                            
+                            # Final verification - both MUST be timezone-aware before comparison
+                            logger.info(f"[VALIDATE] Final timezone check - start_date.tzinfo: {start_date.tzinfo}, end_date.tzinfo: {end_date.tzinfo}")
+                            if start_date.tzinfo is None or end_date.tzinfo is None:
+                                logger.error(
+                                    f"[VALIDATE] CRITICAL: Datetime normalization failed!\n"
+                                    f"  start_date: {start_date} (tzinfo: {start_date.tzinfo})\n"
+                                    f"  end_date: {end_date} (tzinfo: {end_date.tzinfo})"
+                                )
+                                errors.append('Date timezone normalization failed')
+                            else:
+                                # Now safe to compare - both are guaranteed to be timezone-aware UTC
+                                logger.info(f"[VALIDATE] Both dates are timezone-aware, attempting comparison")
+                                logger.debug(f"[VALIDATE] Comparing: end_date ({end_date}) <= start_date ({start_date})")
+                                try:
+                                    # Final check before comparison
+                                    assert start_date.tzinfo is not None, "start_date must be timezone-aware"
+                                    assert end_date.tzinfo is not None, "end_date must be timezone-aware"
+                                    
+                                    logger.debug(f"[VALIDATE] Assertions passed, performing comparison")
+                                    comparison_result = end_date <= start_date
+                                    logger.debug(f"[VALIDATE] Comparison result: {comparison_result}")
+                                    
+                                    if comparison_result:
+                                        logger.info(f"[VALIDATE] Validation failed: end_date <= start_date")
+                                        errors.append('end_date must be after start_date')
+                                    else:
+                                        logger.info(f"[VALIDATE] Date validation passed")
+                                except (TypeError, AssertionError) as compare_error:
+                                    # Log detailed error for debugging
+                                    logger.error(
+                                        f"[VALIDATE] Date comparison error: {compare_error}\n"
+                                        f"  start_date: {start_date} (type: {type(start_date)}, tzinfo: {start_date.tzinfo if hasattr(start_date, 'tzinfo') else 'N/A'})\n"
+                                        f"  end_date: {end_date} (type: {type(end_date)}, tzinfo: {end_date.tzinfo if hasattr(end_date, 'tzinfo') else 'N/A'})"
+                                    )
+                                    import traceback
+                                    logger.error(f"[VALIDATE] Comparison error traceback: {traceback.format_exc()}")
+                                    errors.append(f'Invalid date comparison: {str(compare_error)}')
+                        elif start_date is None or end_date is None:
+                            logger.warning(f"[VALIDATE] One or both dates are None after normalization - start_date: {start_date}, end_date: {end_date}")
+                            errors.append('Invalid date format - dates could not be parsed')
+                        else:
+                            logger.warning(f"[VALIDATE] Dates are not datetime objects - start_date type: {type(start_date)}, end_date type: {type(end_date)}")
+                            errors.append('Invalid date format - dates are not datetime objects')
+                except Exception as date_error:
+                    logger.error(f"[VALIDATE] Exception during date validation: {date_error}")
+                    import traceback
+                    logger.error(f"[VALIDATE] Date validation exception traceback: {traceback.format_exc()}")
+                    errors.append(f'Invalid date format: {str(date_error)}')
                 
                 # Cannot modify start date if promotion has already started
                 if existing_promotion.get('is_active') and 'start_date' in update_data:
@@ -1195,11 +1478,41 @@ class PromotionService:
             }
             
         except Exception as e:
-            logger.error(f"Error validating promotion update: {e}")
+            # Log the full exception with traceback for debugging
+            import traceback
+            error_traceback = traceback.format_exc()
+            error_message = str(e)
+            
+            logger.error(f"[VALIDATE] ========== EXCEPTION IN VALIDATION ==========")
+            logger.error(f"[VALIDATE] Exception type: {type(e).__name__}")
+            logger.error(f"[VALIDATE] Exception message: {error_message}")
+            logger.error(f"[VALIDATE] Full traceback:\n{error_traceback}")
+            
+            # Check if this is the datetime comparison error
+            if 'offset-naive' in error_message or 'offset-aware' in error_message or 'can\'t compare' in error_message:
+                logger.error(f"[VALIDATE] ========== DATETIME COMPARISON ERROR DETECTED ==========")
+                logger.error(f"[VALIDATE] This is a datetime timezone comparison error!")
+                logger.error(f"[VALIDATE] Error occurred at: {traceback.format_exc().split('File')[1] if 'File' in error_traceback else 'Unknown location'}")
+                
+                # Try to extract context about what was being compared
+                logger.error(f"[VALIDATE] Attempting to log current state...")
+                try:
+                    logger.error(f"[VALIDATE] update_data: {update_data}")
+                    logger.error(f"[VALIDATE] existing_promotion start_date: {existing_promotion.get('start_date')} (type: {type(existing_promotion.get('start_date'))})")
+                    logger.error(f"[VALIDATE] existing_promotion end_date: {existing_promotion.get('end_date')} (type: {type(existing_promotion.get('end_date'))})")
+                except:
+                    logger.error(f"[VALIDATE] Could not log state due to error")
+            
+            logger.error(f"[VALIDATE] ============================================")
+            
+            # Provide more specific error message based on exception type
+            if 'offset-naive' in error_message or 'offset-aware' in error_message or 'can\'t compare' in error_message:
+                error_message = f'Date timezone mismatch error: {error_message}'
+            
             return {
                 'is_valid': False,
-                'errors': ['Update validation system error'],
-                'message': f'Update validation error: {str(e)}'
+                'errors': [error_message or 'Update validation system error'],
+                'message': f'Update validation error: {error_message}'
             }
 
     def _validate_promotion_targets(self, promotion):
@@ -1603,3 +1916,174 @@ class PromotionService:
         except Exception as e:
             logger.error(f"Error generating usage report for {promotion_id}: {e}")
             return {}
+    
+    def merge_pwd_senior_citizen_promotions(self, user_id=None):
+        """
+        Merge PWD and Senior Citizen promotions into a single combined promotion.
+        
+        Returns:
+            dict: Result with success status and details
+        """
+        try:
+            # Find PWD and Senior Citizen promotions - check both 'name' and 'promotion_name' fields
+            pwd_promos = list(self.collection.find({
+                'isDeleted': {'$ne': True},
+                '$or': [
+                    {'name': {'$regex': 'pwd|person with disability', '$options': 'i'}},
+                    {'promotion_name': {'$regex': 'pwd|person with disability', '$options': 'i'}}
+                ]
+            }))
+            
+            senior_citizen_promos = list(self.collection.find({
+                'isDeleted': {'$ne': True},
+                '$or': [
+                    {'name': {'$regex': 'senior|citizen|senior citizen', '$options': 'i'}},
+                    {'promotion_name': {'$regex': 'senior|citizen|senior citizen', '$options': 'i'}}
+                ]
+            }))
+            
+            # Remove any duplicates (promotions matching both patterns)
+            pwd_ids = {str(p.get('promotion_id') or p.get('_id')) for p in pwd_promos}
+            senior_citizen_promos = [p for p in senior_citizen_promos if str(p.get('promotion_id') or p.get('_id')) not in pwd_ids]
+            
+            if not pwd_promos and not senior_citizen_promos:
+                return {
+                    'success': False,
+                    'message': 'No PWD or Senior Citizen promotions found to merge'
+                }
+            
+            all_promos_to_merge = pwd_promos + senior_citizen_promos
+            
+            # Use the most recent/active promotion as base
+            all_promos_to_merge.sort(key=lambda x: x.get('created_at', datetime.min), reverse=True)
+            base_promo = all_promos_to_merge[0]
+            
+            # Aggregate statistics
+            total_usage = sum(p.get('current_usage', 0) for p in all_promos_to_merge)
+            total_revenue_impact = sum(p.get('total_revenue_impact', 0.0) for p in all_promos_to_merge)
+            combined_usage_history = []
+            
+            for promo in all_promos_to_merge:
+                history = promo.get('usage_history', [])
+                combined_usage_history.extend(history)
+            
+            # Create merged promotion
+            merged_promo_data = {
+                'name': 'PWD & Senior Citizen',
+                'description': 'Combined promotion for Persons with Disabilities and Senior Citizens',
+                'type': base_promo.get('type', 'percentage'),
+                'discount_value': base_promo.get('discount_value', 0),
+                'discount_config': base_promo.get('discount_config', {}),
+                'target_type': base_promo.get('target_type', 'all'),
+                'target_ids': base_promo.get('target_ids', []),
+                'start_date': min((p.get('start_date', datetime.utcnow()) for p in all_promos_to_merge), 
+                                 default=datetime.utcnow()),
+                'end_date': max((p.get('end_date', datetime.utcnow()) for p in all_promos_to_merge), 
+                               default=datetime.utcnow()),
+                'isDeleted': False,
+                'usage_limit': base_promo.get('usage_limit'),
+                'current_usage': total_usage,
+                'total_revenue_impact': total_revenue_impact,
+                'usage_history': combined_usage_history[-100:],  # Keep last 100 entries
+                'created_by': user_id or base_promo.get('created_by'),
+                'created_at': datetime.utcnow(),
+                'updated_at': datetime.utcnow(),
+                'status': 'active' if any(p.get('status') == 'active' for p in all_promos_to_merge) else base_promo.get('status', 'scheduled'),
+                'merged_from': [p.get('promotion_id') or p.get('_id') for p in all_promos_to_merge]
+            }
+            
+            # Generate new promotion ID
+            merged_promo_id = self.generate_promotion_id()
+            merged_promo_data['_id'] = merged_promo_id
+            merged_promo_data['promotion_id'] = merged_promo_id
+            
+            # Insert merged promotion
+            self.collection.insert_one(merged_promo_data)
+            
+            # Get old promotion IDs for updating references
+            old_promo_ids = [p.get('promotion_id') or p.get('_id') for p in all_promos_to_merge]
+            
+            # Update sales records that reference old promotions
+            sales_collection = self.db.sales
+            sales_log_collection = self.db.sales_log
+            
+            # Update in sales collection
+            sales_collection.update_many(
+                {'promotion_applied.promotion_id': {'$in': old_promo_ids}},
+                {
+                    '$set': {
+                        'promotion_applied.promotion_id': merged_promo_id,
+                        'promotion_applied.name': 'PWD & Senior Citizen',
+                        'last_updated': datetime.utcnow()
+                    }
+                }
+            )
+            
+            # Update in sales_log collection if it has promotion references
+            if sales_log_collection:
+                sales_log_collection.update_many(
+                    {'promotion_applied.promotion_id': {'$in': old_promo_ids}},
+                    {
+                        '$set': {
+                            'promotion_applied.promotion_id': merged_promo_id,
+                            'promotion_applied.name': 'PWD & Senior Citizen',
+                            'last_updated': datetime.utcnow()
+                        }
+                    }
+                )
+            
+            # Soft delete old promotions
+            for promo in all_promos_to_merge:
+                promo_id = promo.get('promotion_id') or promo.get('_id')
+                self.collection.update_one(
+                    {'_id': promo_id},
+                    {
+                        '$set': {
+                            'isDeleted': True,
+                            'deleted_at': datetime.utcnow(),
+                            'deleted_reason': 'Merged into PWD & Senior Citizen promotion',
+                            'merged_into': merged_promo_id,
+                            'updated_at': datetime.utcnow()
+                        }
+                    }
+                )
+            
+            # Log the merge operation
+            try:
+                self.audit_service.log_action(
+                    action='promotions_merged',
+                    resource_type='promotion',
+                    resource_id=merged_promo_id,
+                    user_id=user_id,
+                    changes={
+                        'merged_promotions': old_promo_ids,
+                        'new_promotion_id': merged_promo_id,
+                        'merged_statistics': {
+                            'total_usage': total_usage,
+                            'total_revenue_impact': total_revenue_impact
+                        }
+                    },
+                    metadata={'merge_type': 'pwd_senior_citizen'}
+                )
+            except Exception as audit_error:
+                logger.warning(f"Failed to log merge audit: {audit_error}")
+            
+            return {
+                'success': True,
+                'message': f'Successfully merged {len(all_promos_to_merge)} promotions',
+                'merged_promotion_id': merged_promo_id,
+                'merged_promotion_name': 'PWD & Senior Citizen',
+                'old_promotion_ids': old_promo_ids,
+                'statistics': {
+                    'total_usage': total_usage,
+                    'total_revenue_impact': total_revenue_impact
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error merging PWD and Senior Citizen promotions: {e}")
+            return {
+                'success': False,
+                'message': f'Error merging promotions: {str(e)}',
+                'error': str(e)
+            }
