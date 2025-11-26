@@ -197,7 +197,7 @@ const handleLoginSuccess = async () => {
 }
 
 const handleForgotPassword = () => {
-  alert('Forgot password functionality would be implemented here')
+  router.push('/forgot-password')
 }
 
 // Enhanced onMounted with debugging

@@ -18,6 +18,9 @@ class User:
         self.last_updated = kwargs.get('last_updated', datetime.utcnow())
         self.last_login = kwargs.get('last_login')
         self.source = kwargs.get('source', 'system')
+        # Password reset fields
+        self.reset_token = kwargs.get('reset_token')
+        self.reset_token_expires = kwargs.get('reset_token_expires')
 
     def to_dict(self):
         return {
@@ -31,7 +34,9 @@ class User:
             'date_created': self.date_created,
             'last_updated': self.last_updated,
             'last_login': self.last_login,
-            'source': self.source
+            'source': self.source,
+            'reset_token': self.reset_token,
+            'reset_token_expires': self.reset_token_expires
         }
 
 class Customer:

@@ -2,6 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
 
 import Login from '../pages/Login.vue'
+import ForgotPassword from '../pages/ForgotPassword.vue'
+import ResetPassword from '../pages/ResetPassword.vue'
 import MainLayout from '../layouts/MainLayout.vue'
 
 import Dashboard from '../pages/Dashboard.vue'
@@ -49,6 +51,22 @@ const router = createRouter({
       path: '/login',
       name: 'Login',
       component: Login,
+    },
+    {
+      path: '/forgot-password',
+      name: 'ForgotPassword',
+      component: ForgotPassword,
+      meta: {
+        title: 'Forgot Password'
+      }
+    },
+    {
+      path: '/reset-password',
+      name: 'ResetPassword',
+      component: ResetPassword,
+      meta: {
+        title: 'Reset Password'
+      }
     },
     // Protected routes that use the main layout
     {

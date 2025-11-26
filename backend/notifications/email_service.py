@@ -492,6 +492,133 @@ class EmailService:
         """
         
         return self.send_email(to_email, subject, html_content, plain_text_content)
+    
+    def send_password_reset_email(self, to_email, reset_token, user_name=None):
+        """
+        Send password reset email with secure link
+        
+        Args:
+            to_email (str): User's email address
+            reset_token (str): Secure reset token
+            user_name (str, optional): User's name for personalization
+        
+        Returns:
+            dict: Result with success status
+        """
+        # Get frontend URL from environment
+        frontend_url = config('FRONTEND_URL', default='http://localhost:5173')
+        reset_link = f"{frontend_url}/reset-password?token={reset_token}"
+        
+        subject = "Reset Your Password - PANN POS System"
+        
+        # HTML email template
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    max-width: 600px;
+                    margin: 0 auto;
+                    padding: 20px;
+                }}
+                .container {{
+                    background-color: #f9f9f9;
+                    border-radius: 8px;
+                    padding: 30px;
+                    margin: 20px 0;
+                }}
+                .header {{
+                    background-color: #FF5722;
+                    color: white;
+                    padding: 20px;
+                    text-align: center;
+                    border-radius: 8px 8px 0 0;
+                }}
+                .content {{
+                    background-color: white;
+                    padding: 30px;
+                    border-radius: 0 0 8px 8px;
+                }}
+                .button {{
+                    display: inline-block;
+                    padding: 12px 30px;
+                    background-color: #FF5722;
+                    color: white;
+                    text-decoration: none;
+                    border-radius: 5px;
+                    margin: 20px 0;
+                }}
+                .warning {{
+                    background-color: #fff3cd;
+                    border-left: 4px solid #ffc107;
+                    padding: 15px;
+                    margin: 20px 0;
+                    border-radius: 4px;
+                }}
+                .footer {{
+                    text-align: center;
+                    margin-top: 20px;
+                    color: #666;
+                    font-size: 12px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🔐 Password Reset Request</h1>
+                </div>
+                <div class="content">
+                    <p>Hello {user_name or 'there'},</p>
+                    <p>We received a request to reset your password for your PANN POS account. Click the button below to create a new password:</p>
+                    <p style="text-align: center;">
+                        <a href="{reset_link}" class="button">Reset Password</a>
+                    </p>
+                    <p>Or copy and paste this link into your browser:</p>
+                    <p style="word-break: break-all; color: #666;">{reset_link}</p>
+                    
+                    <div class="warning">
+                        <p><strong>⚠️ Security Notice:</strong></p>
+                        <ul>
+                            <li>This link will expire in <strong>1 hour</strong></li>
+                            <li>If you didn't request this reset, please ignore this email</li>
+                            <li>Your password will remain unchanged until you create a new one</li>
+                        </ul>
+                    </div>
+                    
+                    <p>For security reasons, we never send passwords via email.</p>
+                </div>
+                <div class="footer">
+                    <p>© 2025 PANN POS System. All rights reserved.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Plain text version
+        plain_text_content = f"""
+        Hello {user_name or 'there'},
+        
+        We received a request to reset your password for your PANN POS account.
+        
+        Click this link to reset your password:
+        {reset_link}
+        
+        This link will expire in 1 hour.
+        
+        If you didn't request this reset, please ignore this email.
+        Your password will remain unchanged until you create a new one.
+        
+        © 2025 PANN POS System. All rights reserved.
+        """
+        
+        return self.send_email(to_email, subject, html_content, plain_text_content)
 
 # Singleton instance
 email_service = EmailService()

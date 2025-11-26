@@ -60,6 +60,9 @@ from .kpi_views.authentication_views import (
     RefreshTokenView,
     CurrentUserView,
     VerifyTokenView,
+    RequestPasswordResetView,
+    ResetPasswordView,
+    VerifyResetTokenView,
 )
 
 from .kpi_views.product_views import (
@@ -297,6 +300,11 @@ urlpatterns = [
     path('auth/refresh/', RefreshTokenView.as_view(), name='refresh-token'),
     path('auth/me/', CurrentUserView.as_view(), name='current-user'),
     path('auth/verify-token/', VerifyTokenView.as_view(), name='verify-token'),
+    
+    # Password Reset
+    path('auth/forgot-password/', RequestPasswordResetView.as_view(), name='request-password-reset'),
+    path('auth/reset-password/', ResetPasswordView.as_view(), name='reset-password'),
+    path('auth/verify-reset-token/', VerifyResetTokenView.as_view(), name='verify-reset-token'),
     
     # ========== CUSTOMER AUTHENTICATION ==========
     path('auth/customer/login/', CustomerLoginView.as_view(), name='customer-login'),
