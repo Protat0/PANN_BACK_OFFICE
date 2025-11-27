@@ -167,7 +167,7 @@ class RequestPasswordResetView(APIView):
             auth_service = AuthService()
             
             # Find user by email
-            user = auth_service.user_service.get_user_by_email(email)
+            user = auth_service.user_collection.find_one({"email": email})
             
             # Always return success message (security best practice - don't reveal if email exists)
             success_message = "If an account exists with this email, you will receive password reset instructions."
@@ -185,7 +185,7 @@ class RequestPasswordResetView(APIView):
             reset_token_expires = datetime.utcnow() + timedelta(hours=1)
             
             # Update user with reset token
-            auth_service.user_service.users_collection.update_one(
+            auth_service.user_collection.update_one(
                 {"_id": user['_id']},
                 {
                     "$set": {
@@ -241,7 +241,7 @@ class ResetPasswordView(APIView):
             auth_service = AuthService()
             
             # Find user by reset token
-            user = auth_service.user_service.users_collection.find_one({
+            user = auth_service.user_collection.find_one({
                 "reset_token": token
             })
             
@@ -260,11 +260,11 @@ class ResetPasswordView(APIView):
                     )
             
             # Hash the new password
-            from werkzeug.security import generate_password_hash
-            hashed_password = generate_password_hash(new_password)
+            import bcrypt
+            hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
             
             # Update user password and clear reset token
-            auth_service.user_service.users_collection.update_one(
+            auth_service.user_collection.update_one(
                 {"_id": user['_id']},
                 {
                     "$set": {
@@ -305,7 +305,7 @@ class VerifyResetTokenView(APIView):
             auth_service = AuthService()
             
             # Find user by reset token
-            user = auth_service.user_service.users_collection.find_one({
+            user = auth_service.user_collection.find_one({
                 "reset_token": token
             })
             
