@@ -154,6 +154,7 @@ class RequestPasswordResetView(APIView):
     """Request password reset - sends email with reset link"""
     def post(self, request):
         try:
+            logging.info("Password reset request received")
             email = request.data.get('email')
             
             if not email:
@@ -162,6 +163,7 @@ class RequestPasswordResetView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
+            logging.info(f"Processing password reset for email: {email}")
             auth_service = AuthService()
             
             # Find user by email
@@ -210,9 +212,9 @@ class RequestPasswordResetView(APIView):
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
-            logging.error(f"Error in RequestPasswordResetView: {str(e)}")
+            logging.error(f"Error in RequestPasswordResetView: {str(e)}", exc_info=True)
             return Response(
-                {"error": "An error occurred processing your request"}, 
+                {"error": f"An error occurred processing your request: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
