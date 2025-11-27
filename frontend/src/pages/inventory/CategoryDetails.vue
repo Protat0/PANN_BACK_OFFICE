@@ -732,8 +732,8 @@ export default {
 }
 
 .category-details-table :deep(.table-responsive) {
-  overflow-x: hidden !important;
-  overflow-y: visible;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;   /* 🔥 FIXED */
 }
 
 .category-details-table :deep(.data-table) {
@@ -747,8 +747,7 @@ export default {
 }
 
 .category-details-table :deep(.table-header-sticky) {
-  overflow: hidden;
-  scrollbar-width: none;
+  overflow: hidden !important;     /* reinforce */
 }
 
 .category-details-table :deep(.table-header-sticky::-webkit-scrollbar) {
