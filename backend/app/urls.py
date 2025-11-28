@@ -65,6 +65,11 @@ from .kpi_views.authentication_views import (
     VerifyResetTokenView,
 )
 
+from .kpi_views.oauth_views import (
+    OAuthAuthorizeView,
+    OAuthCallbackView,
+)
+
 from .kpi_views.product_views import (
     # Product CRUD views
     ProductListView,
@@ -305,6 +310,10 @@ urlpatterns = [
     path('auth/forgot-password/', RequestPasswordResetView.as_view(), name='request-password-reset'),
     path('auth/reset-password/', ResetPasswordView.as_view(), name='reset-password'),
     path('auth/verify-reset-token/', VerifyResetTokenView.as_view(), name='verify-reset-token'),
+    
+    # OAuth Authentication
+    path('auth/oauth/<str:provider>/authorize/', OAuthAuthorizeView.as_view(), name='oauth-authorize'),
+    path('auth/oauth/<str:provider>/callback/', OAuthCallbackView.as_view(), name='oauth-callback'),
     
     # ========== CUSTOMER AUTHENTICATION ==========
     path('auth/customer/login/', CustomerLoginView.as_view(), name='customer-login'),
