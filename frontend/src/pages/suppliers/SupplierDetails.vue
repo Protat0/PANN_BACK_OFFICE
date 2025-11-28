@@ -430,8 +430,8 @@
             <div v-if="selectedOrders.length > 0" class="alert alert-info mx-3 mb-3 d-flex justify-content-between align-items-center">
               <span>{{ selectedOrders.length }} order(s) selected</span>
               <div class="btn-group btn-group-sm">
-                <button class="btn btn-outline-primary" @click="bulkExportOrders">Export Selected</button>
-                <button class="btn btn-outline-warning" @click="bulkUpdateStatus">Update Status</button>
+              <!--  <button class="btn btn-outline-primary" @click="bulkExportOrders">Export Selected</button>
+                <button class="btn btn-outline-warning" @click="bulkUpdateStatus">Update Status</button> -->
                 <button class="btn btn-outline-danger" @click="bulkDeleteOrders">Delete Selected</button>
               </div>
             </div>

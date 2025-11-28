@@ -135,6 +135,7 @@ const resetForm = () => {
   width: 100%;
   padding: 2.5rem;
   border-radius: 1rem;
+  background-color: white;
   box-shadow: var(--shadow-2xl);
   animation: slideIn 0.3s ease-out;
 }
