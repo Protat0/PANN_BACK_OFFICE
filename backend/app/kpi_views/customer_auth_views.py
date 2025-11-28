@@ -192,7 +192,8 @@ class CustomerLogoutView(APIView):
             token = auth_header.split(' ')[1]
             try:
                 payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-                customer_id = payload.get('customer_id')
+                # Support both 'customer_id' (regular login) and 'sub' (OAuth login)
+                customer_id = payload.get('customer_id') or payload.get('sub')
             except jwt.ExpiredSignatureError:
                 return Response({
                     'success': False,
@@ -236,7 +237,8 @@ class CustomerProfileView(APIView):
             token = auth_header.split(' ')[1]
             try:
                 payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-                customer_id = payload.get('customer_id')
+                # Support both 'customer_id' (regular login) and 'sub' (OAuth login)
+                customer_id = payload.get('customer_id') or payload.get('sub')
             except jwt.ExpiredSignatureError:
                 return Response({
                     'success': False,
@@ -298,7 +300,8 @@ class CustomerUpdateProfileView(APIView):
             token = auth_header.split(' ')[1]
             try:
                 payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-                customer_id = payload.get('customer_id')
+                # Support both 'customer_id' (regular login) and 'sub' (OAuth login)
+                customer_id = payload.get('customer_id') or payload.get('sub')
             except jwt.ExpiredSignatureError:
                 return Response({
                     'success': False,
@@ -380,7 +383,8 @@ class CustomerChangePasswordView(APIView):
             token = auth_header.split(' ')[1]
             try:
                 payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-                customer_id = payload.get('customer_id')
+                # Support both 'customer_id' (regular login) and 'sub' (OAuth login)
+                customer_id = payload.get('customer_id') or payload.get('sub')
             except jwt.ExpiredSignatureError:
                 return Response({
                     'success': False,
