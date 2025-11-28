@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from ..services.pos.online_transactions_services import OnlineTransactionService
 from datetime import datetime, timedelta
 import logging
@@ -22,6 +22,7 @@ class OnlineTransactionServiceView(APIView):
 
 class CreateOnlineOrderView(OnlineTransactionServiceView):
     """Create a new online order"""
+    permission_classes = [AllowAny]  # Allow customers to create orders with JWT tokens
     
     def post(self, request):
         try:
