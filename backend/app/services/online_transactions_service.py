@@ -124,25 +124,6 @@ class OnlineTransactionService:
 
         self.online_transactions.insert_one(order_record)
         doc = order_record
-        if customer:
-            earned_points = order_record.get('loyalty_points_earned', 0)
-            redeemed_points = order_record.get('points_redeemed', 0)
-
-            # Current points (default 0)
-            current_points = int(customer.get('loyalty_points', 0))
-
-            # Compute new total
-            new_total = current_points - redeemed_points + earned_points
-            new_total = max(new_total, 0)  # prevent negative
-
-            # Update customer record
-            self.customers.update_one(
-                {'_id': customer_id},
-                {'$set': {'loyalty_points': new_total}}
-            )
-
-            # Reflect in response
-            order_record['updated_loyalty_points'] = new_total
 
         return {
             'success': True,
