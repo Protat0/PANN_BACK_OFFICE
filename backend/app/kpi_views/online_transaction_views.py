@@ -73,7 +73,7 @@ class GetOnlineOrderView(OnlineTransactionServiceView):
 
 class GetCustomerOrdersView(OnlineTransactionServiceView):
     """Get all orders for a specific customer"""
-    
+    permission_classes = [AllowAny]
     def get(self, request, customer_id):
         try:
             status_filter = request.query_params.get('status')
