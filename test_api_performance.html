@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Performance Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #333; }
+        .test-item { margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 4px; }
+        .test-item.running { background: #fffbf0; border-color: #ffc107; }
+        .test-item.success { background: #f0f9ff; border-color: #4caf50; }
+        .test-item.error { background: #fff0f0; border-color: #f44336; }
+        .test-item.timeout { background: #fff3e0; border-color: #ff9800; }
+        button { background: #2196f3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #1976d2; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .result { margin-top: 10px; font-family: monospace; font-size: 12px; }
+        .status { font-weight: bold; }
+        .summary { margin-top: 20px; padding: 15px; background: #e3f2fd; border-radius: 4px; }
+        .metric { display: inline-block; margin: 5px 15px 5px 0; }
+        .metric-value { font-weight: bold; font-size: 18px; }
+        .critical { color: #f44336; }
+        .warning { color: #ff9800; }
+        .good { color: #4caf50; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 API Performance Diagnostic Tool</h1>
+        <p>This tool tests the API endpoints to identify performance bottlenecks.</p>
+        
+        <div>
+            <button onclick="runAllTests()" id="runBtn">Run All Tests</button>
+            <button onclick="clearResults()">Clear Results</button>
+        </div>
+        
+        <div id="summary" class="summary" style="display:none;">
+            <h3>Summary</h3>
+            <div id="summaryContent"></div>
+        </div>
+        
+        <div id="tests"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/v1';
+        const TIMEOUT = 30000; // 30 seconds
+        
+        const tests = [
+            {
+                name: 'Products API (Limited 10)',
+                url: '/products/?limit=10',
+                method: 'GET',
+                description: 'Fetch first 10 products with pagination - should be FAST'
+            },
+            {
+                name: 'Products API (Limited 50)',
+                url: '/products/?limit=50&page=1',
+                method: 'GET',
+                description: 'Fetch 50 products with pagination'
+            },
+            {
+                name: 'Products API (Limited 100)',
+                url: '/products/?limit=100',
+                method: 'GET',
+                description: 'Fetch 100 products with pagination'
+            },
+            {
+                name: 'Products API (All - No Limit)',
+                url: '/products/',
+                method: 'GET',
+                description: 'Fetch ALL products - old way (should still work but slower)'
+            },
+            {
+                name: 'Sales Display (By Item - Last Month)',
+                url: '/sales-display/by-item/?start_date=2025-11-01&end_date=2025-11-30',
+                method: 'GET',
+                description: 'Sales by item for last month'
+            },
+            {
+                name: 'Sales Display (By Item - All)',
+                url: '/sales-display/by-item/',
+                method: 'GET',
+                description: 'All sales by item (no date filter)'
+            },
+            {
+                name: 'Invoice Stats (Last Month)',
+                url: '/invoices/stats/?start_date=2025-11-01&end_date=2025-11-30',
+                method: 'GET',
+                description: 'Invoice statistics'
+            },
+            {
+                name: 'Recent Sales',
+                url: '/sales/recent/?limit=20',
+                method: 'GET',
+                description: 'Get recent 20 sales'
+            },
+            {
+                name: 'Sales Report (Monthly)',
+                url: '/sales-report/by-period/?period=monthly&start_date=2025-01-01&end_date=2025-12-31',
+                method: 'GET',
+                description: 'Monthly sales report'
+            }
+        ];
+        
+        let results = [];
+        
+        async function testEndpoint(test) {
+            const startTime = performance.now();
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
+                
+                const response = await fetch(API_BASE + test.url, {
+                    method: test.method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                const endTime = performance.now();
+                const duration = (endTime - startTime) / 1000; // Convert to seconds
+                
+                // Try to get response size
+                const text = await response.text();
+                const sizeKB = (new Blob([text]).size / 1024).toFixed(2);
+                const sizeMB = (sizeKB / 1024).toFixed(2);
+                
+                return {
+                    success: response.ok,
+                    status: response.status,
+                    duration: duration.toFixed(3),
+                    size: sizeKB > 1024 ? `${sizeMB} MB` : `${sizeKB} KB`,
+                    sizeBytes: new Blob([text]).size
+                };
+                
+            } catch (error) {
+                const endTime = performance.now();
+                const duration = (endTime - startTime) / 1000;
+                
+                if (error.name === 'AbortError') {
+                    return {
+                        success: false,
+                        error: 'Timeout (> 30s)',
+                        duration: duration.toFixed(3),
+                        timeout: true
+                    };
+                }
+                
+                return {
+                    success: false,
+                    error: error.message,
+                    duration: duration.toFixed(3)
+                };
+            }
+        }
+        
+        function createTestElement(test, index) {
+            const div = document.createElement('div');
+            div.className = 'test-item';
+            div.id = `test-${index}`;
+            div.innerHTML = `
+                <div><strong>${test.name}</strong></div>
+                <div style="font-size: 12px; color: #666;">${test.description}</div>
+                <div style="font-size: 12px; color: #999; margin-top: 5px;">${test.method} ${test.url}</div>
+                <div class="result" id="result-${index}">
+                    <span class="status">Pending...</span>
+                </div>
+            `;
+            return div;
+        }
+        
+        async function runTest(test, index) {
+            const testEl = document.getElementById(`test-${index}`);
+            const resultEl = document.getElementById(`result-${index}`);
+            
+            testEl.className = 'test-item running';
+            resultEl.innerHTML = '<span class="status">⏳ Running...</span>';
+            
+            const result = await testEndpoint(test);
+            results[index] = result;
+            
+            if (result.timeout) {
+                testEl.className = 'test-item timeout';
+                resultEl.innerHTML = `
+                    <span class="status critical">❌ TIMEOUT</span><br>
+                    Duration: ${result.duration}s (exceeded 30s limit)<br>
+                    Error: ${result.error}
+                `;
+            } else if (!result.success) {
+                testEl.className = 'test-item error';
+                resultEl.innerHTML = `
+                    <span class="status critical">❌ FAILED</span><br>
+                    Status: ${result.status || 'N/A'}<br>
+                    Duration: ${result.duration}s<br>
+                    Error: ${result.error || 'Unknown error'}
+                `;
+            } else {
+                const durClass = result.duration > 10 ? 'critical' : result.duration > 5 ? 'warning' : 'good';
+                testEl.className = 'test-item success';
+                resultEl.innerHTML = `
+                    <span class="status good">✅ SUCCESS</span><br>
+                    Status: ${result.status}<br>
+                    Duration: <span class="${durClass}">${result.duration}s</span><br>
+                    Size: ${result.size}
+                `;
+            }
+        }
+        
+        async function runAllTests() {
+            const runBtn = document.getElementById('runBtn');
+            runBtn.disabled = true;
+            runBtn.textContent = 'Running...';
+            
+            results = [];
+            const testsContainer = document.getElementById('tests');
+            testsContainer.innerHTML = '';
+            
+            // Create all test elements
+            tests.forEach((test, index) => {
+                testsContainer.appendChild(createTestElement(test, index));
+            });
+            
+            // Run tests sequentially to avoid overwhelming the server
+            for (let i = 0; i < tests.length; i++) {
+                await runTest(tests[i], i);
+            }
+            
+            showSummary();
+            
+            runBtn.disabled = false;
+            runBtn.textContent = 'Run All Tests';
+        }
+        
+        function showSummary() {
+            const summaryDiv = document.getElementById('summary');
+            const summaryContent = document.getElementById('summaryContent');
+            
+            const totalTests = results.length;
+            const successTests = results.filter(r => r && r.success).length;
+            const failedTests = results.filter(r => r && !r.success && !r.timeout).length;
+            const timeoutTests = results.filter(r => r && r.timeout).length;
+            
+            const avgDuration = results.reduce((sum, r) => sum + parseFloat(r.duration || 0), 0) / totalTests;
+            const slowTests = results.filter(r => r && parseFloat(r.duration) > 5);
+            const criticalTests = results.filter(r => r && (parseFloat(r.duration) > 10 || r.timeout));
+            
+            let recommendations = [];
+            
+            if (timeoutTests > 0) {
+                recommendations.push(`<strong class="critical">❌ CRITICAL:</strong> ${timeoutTests} endpoint(s) exceeded 30s timeout!`);
+            }
+            
+            if (criticalTests.length > 0) {
+                recommendations.push(`<strong class="critical">❌ CRITICAL:</strong> ${criticalTests.length} endpoint(s) took > 10 seconds.`);
+            }
+            
+            // Check for large responses
+            const largeResponses = results.filter(r => r && r.sizeBytes > 1024 * 1024); // > 1MB
+            if (largeResponses.length > 0) {
+                recommendations.push(`<strong class="warning">⚠️ WARNING:</strong> ${largeResponses.length} endpoint(s) returned > 1MB of data.`);
+            }
+            
+            summaryContent.innerHTML = `
+                <div class="metric">Total Tests: <span class="metric-value">${totalTests}</span></div>
+                <div class="metric">Success: <span class="metric-value good">${successTests}</span></div>
+                <div class="metric">Failed: <span class="metric-value ${failedTests > 0 ? 'critical' : ''}">${failedTests}</span></div>
+                <div class="metric">Timeout: <span class="metric-value ${timeoutTests > 0 ? 'critical' : ''}">${timeoutTests}</span></div>
+                <hr>
+                <div class="metric">Avg Duration: <span class="metric-value ${avgDuration > 5 ? 'critical' : avgDuration > 2 ? 'warning' : 'good'}">${avgDuration.toFixed(2)}s</span></div>
+                <div class="metric">Slow (>5s): <span class="metric-value ${slowTests.length > 0 ? 'warning' : 'good'}">${slowTests.length}</span></div>
+                <div class="metric">Critical (>10s): <span class="metric-value ${criticalTests.length > 0 ? 'critical' : 'good'}">${criticalTests.length}</span></div>
+                ${recommendations.length > 0 ? '<hr><div style="margin-top: 10px;"><h4>Recommendations:</h4>' + recommendations.map(r => `<div style="margin: 5px 0;">${r}</div>`).join('') + '</div>' : ''}
+                <hr>
+                <div style="margin-top: 10px;">
+                    <h4>Next Steps:</h4>
+                    <ul>
+                        <li>If Products API is slow: Add pagination, indexes, or reduce payload size</li>
+                        <li>If Sales queries are slow: Add indexes on transaction_date and status fields</li>
+                        <li>If all queries are slow: Check MongoDB Atlas network latency or upgrade cluster</li>
+                        <li>Consider implementing caching (Redis) for frequently accessed data</li>
+                    </ul>
+                </div>
+            `;
+            
+            summaryDiv.style.display = 'block';
+        }
+        
+        function clearResults() {
+            document.getElementById('tests').innerHTML = '';
+            document.getElementById('summary').style.display = 'none';
+            results = [];
+        }
+    </script>
+</body>
+</html>

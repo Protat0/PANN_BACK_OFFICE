@@ -40,6 +40,10 @@ class ApiProductsService {
       if (filters.search) params.search = filters.search
       if (filters.include_deleted) params.include_deleted = filters.include_deleted
 
+      // Pagination support (NEW - for performance optimization)
+      if (filters.limit) params.limit = filters.limit
+      if (filters.page) params.page = filters.page
+
       const response = await api.get(`${this.basePath}/`, { params })
       return this.handleResponse(response)
     } catch (error) {

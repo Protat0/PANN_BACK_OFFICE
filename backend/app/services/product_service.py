@@ -396,8 +396,20 @@ class ProductService:
         except Exception as e:
             raise Exception(f"Error creating product: {str(e)}")
     
-    def get_all_products(self, filters=None, include_deleted=False):
-        """Get all products with optional filters"""
+    def get_all_products(self, filters=None, include_deleted=False, page=1, limit=None, exclude_images=False):
+        """Get all products with optional filters and pagination
+        
+        Args:
+            filters: Dictionary of filter criteria
+            include_deleted: Include soft-deleted products
+            page: Page number (1-indexed)
+            limit: Number of items per page (None = no pagination)
+            exclude_images: Exclude image_url field (for performance)
+        
+        Returns:
+            Dictionary with products data and pagination info if limit is set,
+            otherwise returns list of products (backwards compatible)
+        """
         try:
             query = {}
             
@@ -434,8 +446,44 @@ class ProductService:
                         {'_id': search_regex}
                     ]
             
-            products = list(self.product_collection.find(query).sort('product_name', 1))
-            return products
+            # Projection: Exclude large fields for performance
+            projection = None
+            if exclude_images:
+                projection = {
+                    'image_url': 0,  # Exclude base64 image (250KB each!)
+                    'image_filename': 0,  # Don't need this either
+                    'image_type': 0,
+                    'image_size': 0
+                }
+            
+            # If no limit specified, return all products (backwards compatible)
+            if limit is None:
+                products = list(self.product_collection.find(query, projection).sort('product_name', 1))
+                return products
+            
+            # Pagination logic
+            skip = (page - 1) * limit
+            total_count = self.product_collection.count_documents(query)
+            
+            products = list(
+                self.product_collection
+                .find(query, projection)
+                .sort('product_name', 1)
+                .skip(skip)
+                .limit(limit)
+            )
+            
+            return {
+                'products': products,
+                'pagination': {
+                    'page': page,
+                    'limit': limit,
+                    'total': total_count,
+                    'total_pages': (total_count + limit - 1) // limit,
+                    'has_next': skip + limit < total_count,
+                    'has_prev': page > 1
+                }
+            }
         
         except Exception as e:
             raise Exception(f"Error getting products: {str(e)}")

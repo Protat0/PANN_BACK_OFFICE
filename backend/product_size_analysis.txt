@@ -1,0 +1,35 @@
+Product Size Analysis
+======================================================================
+
+Product: Pancit Canton
+Total Size: 0.24 MB
+
+Field Breakdown:
+  image_url: 0.2425 MB (99.32%)
+  sync_logs: 0.0011 MB (0.43%)
+  stock_history: 0.0002 MB (0.08%)
+  deletion_log: 0.0001 MB (0.05%)
+  image_filename: 0.0000 MB (0.02%)
+  description: 0.0000 MB (0.01%)
+  date_received: 0.0000 MB (0.01%)
+  created_at: 0.0000 MB (0.01%)
+  updated_at: 0.0000 MB (0.01%)
+  oldest_batch_expiry: 0.0000 MB (0.01%)
+  newest_batch_expiry: 0.0000 MB (0.01%)
+  barcode: 0.0000 MB (0.01%)
+  product_name: 0.0000 MB (0.01%)
+  subcategory_name: 0.0000 MB (0.01%)
+  _id: 0.0000 MB (0.00%)
+  image_type: 0.0000 MB (0.00%)
+  category_id: 0.0000 MB (0.00%)
+  SKU: 0.0000 MB (0.00%)
+  status: 0.0000 MB (0.00%)
+  image_size: 0.0000 MB (0.00%)
+  expiry_alert: 0.0000 MB (0.00%)
+  unit: 0.0000 MB (0.00%)
+  selling_price: 0.0000 MB (0.00%)
+  is_taxable: 0.0000 MB (0.00%)
+  isDeleted: 0.0000 MB (0.00%)
+  cost_price: 0.0000 MB (0.00%)
+  total_stock: 0.0000 MB (0.00%)
+  low_stock_threshold: 0.0000 MB (0.00%)

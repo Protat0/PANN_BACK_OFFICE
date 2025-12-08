@@ -40,15 +40,34 @@ class ProductListView(APIView):
             
             include_deleted = request.GET.get('include_deleted', 'false').lower() == 'true'
             
-            products = product_service.get_all_products(
+            # Pagination parameters
+            page = int(request.GET.get('page', 1))
+            limit = request.GET.get('limit')
+            if limit:
+                limit = int(limit)
+            
+            result = product_service.get_all_products(
                 filters=filters if filters else None, 
-                include_deleted=include_deleted
+                include_deleted=include_deleted,
+                page=page,
+                limit=limit
             )
             
-            return Response({
-                'message': f'Found {len(products)} products',
-                'data': products
-            }, status=status.HTTP_200_OK)
+            # Handle both paginated and non-paginated responses
+            if isinstance(result, dict) and 'products' in result:
+                # Paginated response
+                return Response({
+                    'message': f'Found {result["pagination"]["total"]} products',
+                    'data': result['products'],
+                    'pagination': result['pagination']
+                }, status=status.HTTP_200_OK)
+            else:
+                # Non-paginated response (backwards compatible)
+                return Response({
+                    'message': f'Found {len(result)} products',
+                    'data': result
+                }, status=status.HTTP_200_OK)
+                
         except Exception as e:
             logger.error(f"Error in ProductListView.get: {e}")
             return Response(

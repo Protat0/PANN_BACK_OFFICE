@@ -27,8 +27,13 @@ const filters = ref({
   status: '',
   stock_level: '',
   search: '',
-  include_deleted: false
+  include_deleted: false,
+  limit: 100, // Pagination: limit results for better performance
+  page: 1     // Pagination: current page
 })
+
+// Pagination info from API
+const pagination = ref(null)
 
 // Error states
 const error = ref(null)
@@ -147,8 +152,16 @@ export function useProducts() {
       const response = await apiProductsService.getAllProducts(mergedFilters)
       products.value = response.data || []
       
+      // Store pagination info if available
+      if (response.pagination) {
+        pagination.value = response.pagination
+      }
+      
       if (Object.keys(customFilters).length > 0 || products.value.length > 0) {
-        toast.success(`Loaded ${products.value.length} products`)
+        const paginationMsg = pagination.value 
+          ? ` (page ${pagination.value.page} of ${pagination.value.total_pages})`
+          : ''
+        toast.success(`Loaded ${products.value.length} products${paginationMsg}`)
       }
       return response
     } catch (err) {
@@ -869,6 +882,7 @@ const bulkDeleteProducts = async (productIds, hardDelete = false) => {
     lowStockProducts,
     expiringProducts,
     filters,
+    pagination,
     error,
     validationErrors,
     loading,

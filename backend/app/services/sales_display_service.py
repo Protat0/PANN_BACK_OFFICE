@@ -16,6 +16,7 @@ class SalesDisplayService():
         """
         Get sales by item with proper date filtering using transaction_date
         Includes option to filter out voided transactions
+        OPTIMIZED: Only fetches products that have sales data
         """
         try:
             # Build query filter
@@ -49,15 +50,67 @@ class SalesDisplayService():
             sales = list(self.sales_collection.find(query_filter))
             print(f"📊 Found {len(sales)} sales records")
             
-            # Process products, categories, batches (keep your existing logic)
-            products = self.fetch_all_products()
-            categories = self.fetch_all_categories()
-            batches = self.fetch_all_batches()
+            # OPTIMIZATION 1: Aggregate sales items FIRST to get unique product IDs
+            product_id_to_sold_qty = defaultdict(int)
+            product_id_to_total_sales = defaultdict(float)
+            product_ids_in_sales = set()
 
+            for doc in sales:
+                # Skip voided transactions unless included
+                if not include_voided and doc.get('status') == 'voided':
+                    continue
+                
+                for item in doc.get('items', []):
+                    pid = item.get('product_id')
+                    if not pid:
+                        continue
+                    product_ids_in_sales.add(pid)
+                    product_id_to_sold_qty[pid] += item.get('quantity', 0)
+                    product_id_to_total_sales[pid] += item.get('subtotal', 0.0)
+
+            print(f"📦 Found {len(product_ids_in_sales)} unique products in sales")
+            
+            # OPTIMIZATION 2: Only fetch products that have sales (not all 357!)
+            # Use $in query to fetch only needed products
+            # OPTIMIZATION 2.5: Exclude images for performance (250KB per product!)
+            projection = {
+                'image_url': 0,  # Exclude base64 image (99% of document size!)
+                'image_filename': 0,
+                'image_type': 0,
+                'image_size': 0
+            }
+            
+            if product_ids_in_sales:
+                products = list(self.db.products.find({
+                    '$or': [
+                        {'_id': {'$in': list(product_ids_in_sales)}},
+                        {'product_id': {'$in': list(product_ids_in_sales)}}
+                    ]
+                }, projection))
+            else:
+                products = []
+            
+            print(f"✅ Fetched {len(products)} products (optimized, images excluded)")
+            
+            # OPTIMIZATION 3: Fetch categories (small dataset, acceptable)
+            categories = self.fetch_all_categories()
+            
             # Map category_id -> category_name
             category_id_to_name = {}
             for cat in categories:
                 category_id_to_name[cat.get('category_id') or cat.get('_id')] = cat.get('name') or cat.get('category_name')
+
+            # OPTIMIZATION 4: Only fetch batches for products we have
+            if product_ids_in_sales:
+                batches = list(self.db.batches.find({
+                    'product_id': {'$in': list(product_ids_in_sales)}
+                }))
+                for b in batches:
+                    b['_id'] = str(b['_id'])
+            else:
+                batches = []
+            
+            print(f"📊 Fetched {len(batches)} batches (optimized)")
 
             # Group batches by product_id and sum quantity_remaining
             product_id_to_stock_remaining = defaultdict(int)
@@ -66,25 +119,6 @@ class SalesDisplayService():
                 qty_remaining = batch.get('quantity_remaining', 0)
                 if product_id:
                     product_id_to_stock_remaining[product_id] += qty_remaining
-
-            # Aggregate sales items for the filtered period
-            product_id_to_sold_qty = defaultdict(int)
-            product_id_to_total_sales = defaultdict(float)
-
-            def accumulate_items(container):
-                for doc in container:
-                    # Skip voided transactions unless included
-                    if not include_voided and doc.get('status') == 'voided':
-                        continue
-                    
-                    for item in doc.get('items', []):
-                        pid = item.get('product_id')
-                        if not pid:
-                            continue
-                        product_id_to_sold_qty[pid] += item.get('quantity', 0)
-                        product_id_to_total_sales[pid] += item.get('subtotal', 0.0)
-
-            accumulate_items(sales)
 
             # Build display list per product
             display_rows = []
@@ -204,8 +238,22 @@ class SalesDisplayService():
             return []
 
     # Keep your existing helper methods
-    def fetch_all_products(self):
-        products = list(self.db.products.find({}))
+    def fetch_all_products(self, exclude_images=True):
+        """Fetch all products with optional image exclusion for performance
+        
+        Args:
+            exclude_images: If True, excludes image_url field (default: True for performance)
+        """
+        projection = None
+        if exclude_images:
+            projection = {
+                'image_url': 0,  # Exclude 250KB base64 image!
+                'image_filename': 0,
+                'image_type': 0,
+                'image_size': 0
+            }
+        
+        products = list(self.db.products.find({}, projection))
         for p in products:
             p['_id'] = str(p['_id'])
         return products

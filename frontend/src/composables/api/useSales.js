@@ -168,7 +168,11 @@ export function useSales() {
       }
       
       // Fetch all products to get their cost prices
-      const response = await apiProductsService.getAllProducts({ limit: 10000 })
+      // ✅ OPTIMIZED: Exclude images since we only need cost_price field
+      const response = await apiProductsService.getAllProducts({ 
+        limit: 10000,
+        exclude_images: true 
+      })
       const products = response.data || []
       
       // Cache all product cost prices for future use
