@@ -51,7 +51,7 @@
                     :disabled="isLoading"
                     tabindex="-1"
                   >
-                    <Eye v-if="!showPassword" :size="20" />
+                    <Eye v-if="showPassword" :size="20" />
                     <EyeOff v-else :size="20" />
                   </button>
                 </div>

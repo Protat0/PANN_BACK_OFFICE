@@ -329,7 +329,7 @@ import {
 } from 'lucide-vue-next'
 
 // Composables
-import { useOrdersHistory } from '@/composables/ui/suppliers/useOrdersHistory'
+import { useSuppliers } from '@/composables/api/useSuppliers'
 
 // Components
 import CardTemplate from '@/components/common/CardTemplate.vue'
@@ -354,7 +354,7 @@ export default {
   },
   setup() {
     const router = useRouter()
-    const ordersComposable = useOrdersHistory()
+    const ordersComposable = useSuppliers() // All orders history methods are in useSuppliers
     
     // Local state
     const loading = ref(false)
