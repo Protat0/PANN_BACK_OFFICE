@@ -58,7 +58,6 @@
                     <option value="">Select discount type</option>
                     <option value="percentage">Percentage</option>
                     <option value="fixed_amount">Fixed Amount</option>
-                    <option value="buy_x_get_y">Buy One Get One (BOGO)</option>
                   </select>
                 </div>
                 
