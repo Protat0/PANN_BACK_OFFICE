@@ -34,15 +34,27 @@
               <!-- Password Field -->
               <div class="form-group">
                 <label for="password" class="form-label">Password:</label>
-                <input
-                  id="password"
-                  v-model="loginForm.password"
-                  type="password"
-                  class="form-input"
-                  placeholder="Enter your password"
-                  required
-                  :disabled="isLoading"
-                />
+                <div class="password-input-wrapper">
+                  <input
+                    id="password"
+                    v-model="loginForm.password"
+                    :type="showPassword ? 'text' : 'password'"
+                    class="form-input password-input"
+                    placeholder="Enter your password"
+                    required
+                    :disabled="isLoading"
+                  />
+                  <button
+                    type="button"
+                    class="password-toggle-btn"
+                    @click="togglePasswordVisibility"
+                    :disabled="isLoading"
+                    tabindex="-1"
+                  >
+                    <Eye v-if="!showPassword" :size="20" />
+                    <EyeOff v-else :size="20" />
+                  </button>
+                </div>
               </div>
 
               <!-- Success Message -->
@@ -82,6 +94,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/auth/useAuth.js'
+import { Eye, EyeOff } from 'lucide-vue-next'
 
 const router = useRouter()
 
@@ -101,8 +114,14 @@ const loginForm = ref({
   password: ''
 })
 
+const showPassword = ref(false)
 const successMessage = ref(null)
 const localError = ref(null)
+
+// Toggle password visibility
+const togglePasswordVisibility = () => {
+  showPassword.value = !showPassword.value
+}
 
 // Computed - combine local error with auth error
 const error = computed(() => localError.value || authError.value)
@@ -351,6 +370,48 @@ onMounted(() => {
 
 .form-input::placeholder {
   color: #9ca3af;
+}
+
+/* Password Input Wrapper */
+.password-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.password-input {
+  width: 100%;
+  padding-right: 3rem;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  transition: color 0.2s ease;
+  z-index: 1;
+}
+
+.password-toggle-btn:hover:not(:disabled) {
+  color: #667eea;
+}
+
+.password-toggle-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.password-toggle-btn:focus {
+  outline: none;
+  color: #667eea;
 }
 
 .error-message {

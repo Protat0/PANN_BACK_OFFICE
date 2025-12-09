@@ -70,8 +70,6 @@ class AuditLogService:
                 "user_id": user_data.get("user_id", user_data.get("username", "system")),  # USER-#### format
                 "username": user_data.get("username", user_data.get("email", "system")),
                 "branch_id": user_data.get("branch_id", 1),
-                "ip_address": user_data.get("ip_address"),
-                "user_agent": user_data.get("user_agent"),
                 "timestamp": datetime.utcnow(),
                 "status": "success",
                 "source": "audit_service",
@@ -494,8 +492,6 @@ class AuditLogService:
                 "session_id": session_data.get("session_id"),  # SESS-#####
                 "user_id": session_data.get("user_id"),  # USER-####
                 "login_time": str(session_data.get("login_time", "")),
-                "ip_address": session_data.get("ip_address"),
-                "user_agent": session_data.get("user_agent"),
                 "branch_id": session_data.get("branch_id")
             },
             metadata={"action": "create", "module": "sessions"}
