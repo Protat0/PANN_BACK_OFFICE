@@ -24,10 +24,11 @@ class CustomerProductService:
         """Get all active products available for customers"""
         try:
             # Base query - only active, in-stock, non-deleted products
+            # ✅ FIXED: Use total_stock instead of stock (total_stock has correct batch values)
             query = {
                 'status': 'active',
                 'isDeleted': {'$ne': True},
-                'stock': {'$gt': 0}  # Only show products with stock
+                'total_stock': {'$gt': 0}  # Use total_stock which has batch calculations
             }
             
             # Apply filters
@@ -134,11 +135,12 @@ class CustomerProductService:
     def get_products_by_category(self, category_id, page=1, limit=20):
         """Get products by category"""
         try:
+            # ✅ FIXED: Use total_stock instead of stock
             query = {
                 'category_id': category_id,
                 'status': 'active',
                 'isDeleted': {'$ne': True},
-                'stock': {'$gt': 0}
+                'total_stock': {'$gt': 0}
             }
             
             total = self.product_collection.count_documents(query)
@@ -180,6 +182,7 @@ class CustomerProductService:
             if not search_term:
                 return self.get_all_active_products(page=page, limit=limit)
             
+            # ✅ FIXED: Use total_stock instead of stock
             query = {
                 '$or': [
                     {'product_name': {'$regex': search_term, '$options': 'i'}},
@@ -187,7 +190,7 @@ class CustomerProductService:
                 ],
                 'status': 'active',
                 'isDeleted': {'$ne': True},
-                'stock': {'$gt': 0}
+                'total_stock': {'$gt': 0}
             }
             
             total = self.product_collection.count_documents(query)
@@ -227,11 +230,12 @@ class CustomerProductService:
     def get_featured_products(self, limit=10):
         """Get featured products - you may need to adjust this based on your schema"""
         try:
+            # ✅ FIXED: Use total_stock instead of stock
             # Adjust this query based on how you mark featured products in your schema
             query = {
                 'status': 'active',
                 'isDeleted': {'$ne': True},
-                'stock': {'$gt': 0}
+                'total_stock': {'$gt': 0}
             }
             
             products_cursor = self.product_collection.find(query).sort('date_received', -1).limit(limit)
@@ -263,20 +267,35 @@ class CustomerProductService:
                 if category:
                     category_name = category.get('category_name', 'Unknown')
             
-            return {
+            # ✅ FIXED: Use total_stock as primary stock value (has correct batch calculations)
+            stock_value = product.get('total_stock', product.get('stock', 0))
+            
+            formatted_product = {
                 '_id': str(product['_id']),
                 'product_name': product.get('product_name', ''),
                 'category_id': product.get('category_id', ''),
                 'category_name': category_name,
                 'SKU': product.get('SKU', ''),
                 'selling_price': float(product.get('selling_price', 0)),
-                'stock': int(product.get('stock', 0)),
+                'stock': int(stock_value) if stock_value is not None else 0,
                 'unit': product.get('unit', 'pcs'),
                 'is_taxable': product.get('is_taxable', True),
                 'status': product.get('status', 'active'),
                 'date_received': product.get('date_received').isoformat() if product.get('date_received') else None,
                 'low_stock_threshold': product.get('low_stock_threshold', 10)
             }
+            
+            # ✅ Add image fields for customer menu display
+            image_fields = ['image', 'image_url', 'image_filename', 'image_size', 'image_type', 'image_uploaded_at']
+            for field in image_fields:
+                if field in product and product[field] is not None:
+                    formatted_product[field] = product[field]
+            
+            # ✅ Add description if available
+            if product.get('description'):
+                formatted_product['description'] = product.get('description')
+            
+            return formatted_product
         except Exception as e:
             logger.error(f"Error formatting product: {e}")
             return {}
