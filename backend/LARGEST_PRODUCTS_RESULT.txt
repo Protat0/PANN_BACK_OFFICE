@@ -1,0 +1,89 @@
+================================================================================
+FINDING TOP 10 LARGEST PRODUCTS
+================================================================================
+Time: 2025-12-08 19:03:25.665568
+
+Connecting to MongoDB...
+Connected to: pos_system
+
+Fetching products...
+Found 357 products
+
+Analyzing sizes...
+
+================================================================================
+TOP 10 LARGEST PRODUCTS
+================================================================================
+
+#1: New uncat Prod
+    Code: N/A
+    ID: PROD-00358
+    Total: 1.69 MB (1,775,703 bytes)
+    Image: 1.69 MB (100.0%)
+
+#2: Porcupine2233
+    Code: N/A
+    ID: PROD-00354
+    Total: 0.80 MB (842,005 bytes)
+    Image: 0.80 MB (99.8%)
+
+#3: Pancit Canton Sweet and Spciy
+    Code: N/A
+    ID: PROD-00006
+    Total: 0.60 MB (625,646 bytes)
+    Image: 0.60 MB (99.7%)
+
+#4: Sample Drink 14242
+    Code: N/A
+    ID: PROD-00342
+    Total: 0.50 MB (528,682 bytes)
+    Image: 0.50 MB (99.8%)
+
+#5: Sample Drink 14242
+    Code: N/A
+    ID: PROD-00350
+    Total: 0.50 MB (528,677 bytes)
+    Image: 0.50 MB (99.8%)
+
+#6: Sample Drink 1421421
+    Code: N/A
+    ID: PROD-00348
+    Total: 0.50 MB (528,674 bytes)
+    Image: 0.50 MB (99.8%)
+
+#7: Sample Noodle 1231
+    Code: N/A
+    ID: PROD-00355
+    Total: 0.50 MB (528,652 bytes)
+    Image: 0.50 MB (99.8%)
+
+#8: Sample Product 1111
+    Code: N/A
+    ID: PROD-00336
+    Total: 0.50 MB (528,640 bytes)
+    Image: 0.50 MB (99.8%)
+
+#9: Purwaewao
+    Code: N/A
+    ID: PROD-00351
+    Total: 0.50 MB (528,548 bytes)
+    Image: 0.50 MB (99.8%)
+
+#10: Sample Drink 14242
+    Code: N/A
+    ID: PROD-00349
+    Total: 0.50 MB (528,476 bytes)
+    Image: 0.50 MB (99.8%)
+
+================================================================================
+SUMMARY
+================================================================================
+Total products: 357
+Total size: 8.34 MB
+Total images: 7.88 MB
+Average product: 23.92 KB
+Images are: 94.5% of total size
+
+Savings if images excluded: 7.88 MB
+================================================================================
+DONE!
