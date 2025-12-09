@@ -395,3 +395,4 @@ class Command(BaseCommand):
             self.stderr.write(self.style.ERROR(f"❌ Error: {str(e)}"))
             sys.exit(1)
 
+

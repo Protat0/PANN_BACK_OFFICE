@@ -117,3 +117,4 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.SUCCESS(f"\n✅ {greater_than_zero} products have stock > 0"))
 
+

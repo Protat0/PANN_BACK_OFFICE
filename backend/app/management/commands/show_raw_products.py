@@ -124,3 +124,4 @@ This will sync products.stock field with batch calculations.
         self.stdout.write(f"Summary: {visible_count} visible, {invisible_count} hidden from customers")
         self.stdout.write("=" * 120)
 
+

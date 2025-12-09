@@ -112,3 +112,4 @@ class Command(BaseCommand):
                 if 'image_url' in api_product:
                     self.stdout.write(f"  - image_url value: {api_product['image_url']}")
 
+

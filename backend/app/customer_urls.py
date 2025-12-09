@@ -16,3 +16,4 @@ urlpatterns = [
     path('products/<str:product_id>/', CustomerProductDetailView.as_view(), name='customer-product-detail'),
 ]
 
+
