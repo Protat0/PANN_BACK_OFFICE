@@ -7,8 +7,8 @@
           <div class="logo-placeholder">
               <img src="../assets/Logo_1.png" alt="PANN Logo" class="logo-image" />
           </div>
-          <h2 class="brand-title">POS System</h2>
-          <p class="brand-subtitle">Point of Sale Management</p>
+          <h2 class="brand-title">Back Office</h2>
+          <p class="brand-subtitle">Inventory and User Management</p>
         </div>
 
         <!-- Right Side - Login Form -->
