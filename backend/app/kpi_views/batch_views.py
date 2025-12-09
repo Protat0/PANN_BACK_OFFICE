@@ -652,8 +652,16 @@ class BatchStatisticsView(BatchView):
             # Get expiring soon (within 7 days)
             expiring_soon = self.batch_service.get_expiring_batches(7)
             
-            # Calculate total stock from active batches
-            total_stock = sum(b.get('quantity_remaining', 0) for b in all_batches if b.get('status') == 'active')
+            # Calculate total stock from active batches (excluding expired)
+            now = datetime.now()
+            total_stock = sum(
+                b.get('quantity_remaining', 0) 
+                for b in all_batches 
+                if b.get('status') == 'active' and (
+                    not b.get('expiry_date') or 
+                    b.get('expiry_date') >= now
+                )
+            )
             
             statistics = {
                 'total_batches': total_batches,
@@ -687,8 +695,14 @@ class BatchStatisticsView(BatchView):
                     
                     supplier_stats[supplier_id]['total_batches'] += 1
                     if batch.get('status') == 'active':
-                        supplier_stats[supplier_id]['active_batches'] += 1
-                        supplier_stats[supplier_id]['total_stock'] += batch.get('quantity_remaining', 0)
+                        # Only count stock if not expired by date
+                        is_expired_by_date = (
+                            batch.get('expiry_date') and 
+                            batch.get('expiry_date') < now
+                        )
+                        if not is_expired_by_date:
+                            supplier_stats[supplier_id]['active_batches'] += 1
+                            supplier_stats[supplier_id]['total_stock'] += batch.get('quantity_remaining', 0)
                     elif batch.get('status') == 'depleted':
                         supplier_stats[supplier_id]['depleted_batches'] += 1
                     elif batch.get('status') == 'expired':

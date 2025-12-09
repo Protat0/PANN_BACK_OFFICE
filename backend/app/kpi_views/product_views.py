@@ -42,7 +42,8 @@ class ProductListView(APIView):
             
             products = product_service.get_all_products(
                 filters=filters if filters else None, 
-                include_deleted=include_deleted
+                include_deleted=include_deleted,
+                include_images=False  # Exclude images for faster loading in product list
             )
             
             return Response({
@@ -664,7 +665,8 @@ class ProductExportView(APIView):
             # ===============================
             products = product_service.get_all_products(
                 filters=filters if filters else None, 
-                include_deleted=filters.get('include_deleted', False)
+                include_deleted=filters.get('include_deleted', False),
+                include_images=False  # Exclude images from export
             )
             
             # ✅ Filter uncategorized in Python (fallback if DB filtering not yet added)
@@ -809,7 +811,8 @@ class ProductExportView(APIView):
             # Get products with filters
             products = product_service.get_all_products(
                 filters=filters if filters else None, 
-                include_deleted=filters.get('include_deleted', False)
+                include_deleted=filters.get('include_deleted', False),
+                include_images=False  # Exclude images from export
             )
             
             print(f"🔍 Found {len(products)} products for export")

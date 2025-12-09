@@ -480,7 +480,7 @@ class SystemStatusView(APIView):
             # Get counts efficiently
             users = user_service.get_all_users()
             customers = customer_service.get_all_customers()
-            products = product_service.get_all_products()
+            products = product_service.get_all_products(include_images=False)  # Exclude images for system status
             
             return Response({
                 "system": "PANN User Management System",

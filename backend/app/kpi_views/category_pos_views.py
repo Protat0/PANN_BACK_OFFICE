@@ -108,7 +108,8 @@ class POSBarcodeView(APIView):
             # Find product by barcode using ProductService filter
             products = product_service.get_all_products(
                 filters={'search': barcode},  # This will search barcode field
-                include_deleted=False
+                include_deleted=False,
+                include_images=False  # Exclude images for POS performance
             )
             
             # Find exact barcode match
@@ -163,7 +164,8 @@ class POSSearchView(APIView):
             # Search products using ProductService
             products = product_service.get_all_products(
                 filters={'search': search_term.strip()},
-                include_deleted=False
+                include_deleted=False,
+                include_images=False  # Exclude images for POS performance
             )
             
             # Filter active products and format for POS

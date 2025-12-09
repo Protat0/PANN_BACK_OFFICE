@@ -300,7 +300,8 @@ class BatchService:
             if status:
                 query['status'] = status
             
-            batches = list(self.batch_collection.find(query).sort('expiry_date', 1))
+            # Sort by date_received descending (latest first)
+            batches = list(self.batch_collection.find(query).sort('date_received', -1))
             return batches
         
         except Exception as e:
@@ -316,12 +317,22 @@ class BatchService:
                 'quantity_remaining': {'$gt': 0}
             }).sort('expiry_date', 1))
             
+            # Filter out expired batches based on expiry_date
+            now = datetime.utcnow()
+            non_expired_batches = []
+            for batch in active_batches:
+                if batch.get('expiry_date'):
+                    # Skip if expired
+                    if batch['expiry_date'] < now:
+                        continue
+                non_expired_batches.append(batch)
+            
             # Calculate summary fields
             update_data = {}
             
-            if active_batches:
+            if non_expired_batches:
                 # Get expiry dates (filter out None values)
-                expiry_dates = [batch['expiry_date'] for batch in active_batches if batch.get('expiry_date')]
+                expiry_dates = [batch['expiry_date'] for batch in non_expired_batches if batch.get('expiry_date')]
 
                 if expiry_dates:
                     update_data['oldest_batch_expiry'] = min(expiry_dates)
@@ -336,17 +347,17 @@ class BatchService:
                     update_data['newest_batch_expiry'] = None
                     update_data['expiry_alert'] = False
 
-                # Calculate total stock from active batches
-                total_stock = sum(batch['quantity_remaining'] for batch in active_batches)
+                # Calculate total stock from non-expired active batches
+                total_stock = sum(batch['quantity_remaining'] for batch in non_expired_batches)
                 update_data['total_stock'] = total_stock
                 update_data['stock'] = total_stock  # Sync stock field with total_stock
 
-                # Update cost_price from oldest batch (FIFO)
-                # active_batches is already sorted by expiry_date (oldest first)
-                oldest_batch = active_batches[0]
+                # Update cost_price from oldest non-expired batch (FIFO)
+                # non_expired_batches is already sorted by expiry_date (oldest first)
+                oldest_batch = non_expired_batches[0]
                 update_data['cost_price'] = oldest_batch.get('cost_price', 0)
             else:
-                # No active batches
+                # No active non-expired batches
                 update_data.update({
                     'oldest_batch_expiry': None,
                     'newest_batch_expiry': None,

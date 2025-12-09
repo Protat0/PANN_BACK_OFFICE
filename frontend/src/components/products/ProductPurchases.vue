@@ -244,8 +244,20 @@ export default {
     })
 
     const totalActiveQuantity = computed(() => {
+      const now = new Date()
       return batches.value
-        .filter(batch => batch.status === 'active')
+        .filter(batch => {
+          // Only count active batches that are not expired
+          if (batch.status !== 'active') return false
+          
+          // Exclude expired batches based on expiry_date
+          if (batch.expiry_date) {
+            const expiryDate = new Date(batch.expiry_date)
+            if (expiryDate < now) return false
+          }
+          
+          return true
+        })
         .reduce((sum, batch) => sum + (batch.quantity_remaining || 0), 0)
     })
 

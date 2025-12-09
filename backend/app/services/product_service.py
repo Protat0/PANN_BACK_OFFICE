@@ -396,7 +396,7 @@ class ProductService:
         except Exception as e:
             raise Exception(f"Error creating product: {str(e)}")
     
-    def get_all_products(self, filters=None, include_deleted=False):
+    def get_all_products(self, filters=None, include_deleted=False, include_images=True):
         """Get all products with optional filters"""
         try:
             query = {}
@@ -404,6 +404,18 @@ class ProductService:
             # By default, exclude deleted products unless specifically requested
             if not include_deleted:
                 query['isDeleted'] = {'$ne': True}
+            
+            # Define projection to exclude image fields if not needed
+            projection = None
+            if not include_images:
+                projection = {
+                    'image': 0,
+                    'image_url': 0,
+                    'image_filename': 0,
+                    'image_size': 0,
+                    'image_type': 0,
+                    'image_uploaded_at': 0
+                }
             
             if filters:
                 # Category filter
@@ -434,7 +446,73 @@ class ProductService:
                         {'_id': search_regex}
                     ]
             
-            products = list(self.product_collection.find(query).sort('product_name', 1))
+            # Apply projection if images should be excluded
+            if projection:
+                products = list(self.product_collection.find(query, projection).sort('product_name', 1))
+            else:
+                products = list(self.product_collection.find(query).sort('product_name', 1))
+            
+            # OPTIMIZED: Fetch all batches in ONE query and group by product_id
+            now = datetime.utcnow()
+            batch_collection = self.db.batches
+            
+            # Get all product IDs
+            product_ids = [p['_id'] for p in products]
+            
+            # Fetch all active batches for ALL products in a single query
+            all_batches = list(batch_collection.find({
+                'product_id': {'$in': product_ids},
+                'status': 'active',
+                'quantity_remaining': {'$gt': 0}
+            }))
+            
+            # Group batches by product_id for fast lookup
+            from collections import defaultdict
+            batches_by_product = defaultdict(list)
+            for batch in all_batches:
+                batches_by_product[batch['product_id']].append(batch)
+            
+            # Now enrich each product (no more database queries in the loop!)
+            for product in products:
+                active_batches = batches_by_product.get(product['_id'], [])
+                
+                # Filter out expired batches (handle both datetime and string dates)
+                non_expired_batches = []
+                for batch in active_batches:
+                    expiry_date = batch.get('expiry_date')
+                    if not expiry_date:
+                        # No expiry date, include the batch
+                        non_expired_batches.append(batch)
+                    else:
+                        # Convert to datetime if it's a string
+                        if isinstance(expiry_date, str):
+                            try:
+                                from dateutil import parser
+                                expiry_date = parser.parse(expiry_date)
+                            except Exception:
+                                # If parsing fails, include the batch to be safe
+                                non_expired_batches.append(batch)
+                                continue
+                        
+                        # Check if not expired
+                        if isinstance(expiry_date, datetime) and expiry_date >= now:
+                            non_expired_batches.append(batch)
+                
+                # Calculate total stock from non-expired batches
+                total_stock = sum(batch['quantity_remaining'] for batch in non_expired_batches)
+                product['total_stock'] = total_stock
+                product['stock'] = total_stock  # Keep both fields in sync
+                
+                # Calculate average cost price from non-expired batches
+                if non_expired_batches:
+                    total_cost = sum(
+                        batch.get('cost_price', 0) * batch['quantity_remaining']
+                        for batch in non_expired_batches
+                    )
+                    product['average_cost_price'] = total_cost / total_stock if total_stock > 0 else 0
+                else:
+                    product['average_cost_price'] = product.get('cost_price', 0)
+            
             return products
         
         except Exception as e:

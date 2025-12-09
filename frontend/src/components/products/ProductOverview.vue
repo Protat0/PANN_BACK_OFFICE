@@ -219,14 +219,38 @@ export default {
     // ===================== STOCK =====================
 
     const currentStock = computed(() => {
-      const activeBatches = batches.value.filter(b => b.status === 'active')
+      const now = new Date()
+      const activeBatches = batches.value.filter(b => {
+        // Only count active batches that are not expired
+        if (b.status !== 'active') return false
+        
+        // Exclude expired batches based on expiry_date
+        if (b.expiry_date) {
+          const expiryDate = new Date(b.expiry_date)
+          if (expiryDate < now) return false
+        }
+        
+        return true
+      })
       return activeBatches.reduce((sum, b) => sum + (b.quantity_remaining || 0), 0)
     })
 
     // ===================== PRICING =====================
 
     const averageCostPrice = computed(() => {
-      const activeBatches = batches.value.filter(b => b.status === 'active')
+      const now = new Date()
+      const activeBatches = batches.value.filter(b => {
+        // Only count active batches that are not expired
+        if (b.status !== 'active') return false
+        
+        // Exclude expired batches based on expiry_date
+        if (b.expiry_date) {
+          const expiryDate = new Date(b.expiry_date)
+          if (expiryDate < now) return false
+        }
+        
+        return true
+      })
 
       if (activeBatches.length === 0 || currentStock.value === 0) {
         const sorted = [...batches.value].sort((a, b) => new Date(b.date_received) - new Date(a.date_received))
@@ -262,7 +286,14 @@ export default {
     // ===================== BATCH INFO =====================
 
     const nearestExpiryDate = computed(() => {
-      const active = batches.value.filter(b => b.status === 'active' && b.expiry_date)
+      const now = new Date()
+      const active = batches.value.filter(b => {
+        if (b.status !== 'active' || !b.expiry_date) return false
+        
+        // Only include batches that haven't expired yet
+        const expiryDate = new Date(b.expiry_date)
+        return expiryDate >= now
+      })
       if (!active.length) return null
       return [...active].sort((a, b) => new Date(a.expiry_date) - new Date(b.expiry_date))[0]?.expiry_date
     })
