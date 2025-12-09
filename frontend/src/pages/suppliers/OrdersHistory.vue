@@ -527,7 +527,7 @@ import {
 } from 'lucide-vue-next'
 
 // Composables
-import { useOrdersHistory } from '@/composables/ui/suppliers/useOrdersHistory'
+import { useSuppliers } from '@/composables/api/useSuppliers'
 
 export default {
   name: 'OrdersHistory',
@@ -548,11 +548,11 @@ export default {
   },
   setup() {
     const router = useRouter()
-    const ordersComposable = useOrdersHistory()
+    const ordersComposable = useSuppliers() // All orders history methods are in useSuppliers
     
     // Use composable's loading and error states
-    const loading = computed(() => ordersComposable.loading.value)
-    const error = computed(() => ordersComposable.error.value)
+    const loading = computed(() => ordersComposable.ordersHistoryLoading?.value)
+    const error = computed(() => ordersComposable.ordersHistoryError?.value)
     
     // Local state for UI
     const currentPage = ref(1)
@@ -567,15 +567,9 @@ export default {
     const editingOrder = ref(null)
 
     // Use composable's filtered orders directly
-    const displayOrders = computed(() => {
-      return ordersComposable.filteredOrders.value || []
-    })
+    const displayOrders = computed(() => ordersComposable.ordersHistoryFilteredOrders?.value || [])
 
-    const supplierOptions = computed(() => {
-      const source = ordersComposable.supplierOptions
-      if (!source) return []
-      return Array.isArray(source.value) ? source.value : source
-    })
+    const supplierOptions = computed(() => ordersComposable.ordersHistorySupplierOptions?.value || [])
 
     const paginatedOrders = computed(() => {
       if (!displayOrders.value?.length) return []
@@ -646,12 +640,14 @@ export default {
 
     const applyFilters = () => {
       if (ordersComposable?.filters?.value) {
-        ordersComposable.filters.value.status = statusFilter.value
-        ordersComposable.filters.value.supplier = supplierFilter.value
-        ordersComposable.filters.value.dateRange = dateFilter.value
-        ordersComposable.filters.value.search = searchFilter.value
-        if (ordersComposable.applyFilters) {
-          ordersComposable.applyFilters()
+        if (ordersComposable.ordersHistoryFilters?.value) {
+          ordersComposable.ordersHistoryFilters.value.status = statusFilter.value
+          ordersComposable.ordersHistoryFilters.value.supplier = supplierFilter.value
+          ordersComposable.ordersHistoryFilters.value.dateRange = dateFilter.value
+          ordersComposable.ordersHistoryFilters.value.search = searchFilter.value
+        }
+        if (ordersComposable.applyOrdersFilters) {
+          ordersComposable.applyOrdersFilters()
         }
       }
       currentPage.value = 1
@@ -1008,7 +1004,7 @@ export default {
 
     const exportOrders = () => {
       if (ordersComposable?.exportOrdersData) {
-        ordersComposable.exportOrdersData('csv')
+        ordersComposable.exportOrdersData?.('csv')
         alert('Orders exported to CSV successfully!')
       } else {
         alert('Export functionality not available')

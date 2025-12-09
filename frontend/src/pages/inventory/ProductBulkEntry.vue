@@ -342,7 +342,7 @@ import BarcodeScanner from '../../components/products/BarcodeScanner.vue'
 import NotificationModal from '../../components/common/NotificationModal.vue'
 import SaveAsDraftModal from '../../components/common/SaveAsDraftModal.vue'
 import { useSaveAsDraftModal } from '../../composables/ui/useSaveAsDraftModal.js'
-import { useProducts } from '../../composables/ui/products/useProducts.js'
+import { useProducts } from '../../composables/api/useProducts.js'
 
 export default {
   name: 'ProductBulkEntry',

@@ -13,7 +13,7 @@
           border-color="warning"
           border-position="start"
           title="Active Orders"
-          :value="reportsComposable.activeOrdersCount.value"
+          :value="reportsComposable.reportsActiveOrdersCount?.value"
           value-color="warning"
           subtitle="Pending Purchase Orders"
           clickable
@@ -26,7 +26,7 @@
           border-color="success"
           border-position="start"
           title="Top Performers"
-          :value="reportsComposable.topPerformersCount.value"
+          :value="reportsComposable.reportsTopPerformersCount?.value"
           value-color="success"
           subtitle="High Volume Suppliers"
           clickable
@@ -40,7 +40,7 @@
       <h6>Debug Info:</h6>
       <p>Loading: {{ suppliersComposable.loading?.value ?? 'undefined' }}</p>
       <p>Suppliers Length: {{ suppliersComposable.suppliers?.value?.length ?? 'undefined' }}</p>
-      <p>Report Data: {{ JSON.stringify(reportsComposable.reportData) }}</p>
+      <p>Report Data: {{ JSON.stringify(reportsComposable.reportDataComputed?.value || {}) }}</p>
     </div>
 
     <!-- Loading State -->
@@ -221,18 +221,18 @@
     </div>
 
     <!-- Active Orders Modal -->
-     <ActiveOrdersModal
-      :show="reportsComposable.showActiveOrdersModal.value"
-      :orders="reportsComposable.activeOrders.value"
-      :loading="reportsComposable.loading.value"
+    <ActiveOrdersModal
+      :show="reportsComposable.showActiveOrdersModal?.value"
+      :orders="reportsComposable.activeOrders?.value"
+      :loading="reportsComposable.reportsLoading?.value"
       @close="reportsComposable.closeActiveOrdersModal"
     />
 
     <!-- Top Performers Modal -->
     <TopPerformersModal
-      :show="reportsComposable.showTopPerformersModal.value"
-      :suppliers="reportsComposable.topPerformers.value"
-      :loading="reportsComposable.loading.value"
+      :show="reportsComposable.showTopPerformersModal?.value"
+      :suppliers="reportsComposable.topPerformers?.value"
+      :loading="reportsComposable.reportsLoading?.value"
       @close="reportsComposable.closeTopPerformersModal"
     />
 
@@ -301,14 +301,7 @@ import {
 } from 'lucide-vue-next'
 
 // Composables
-import { useSuppliers } from '@/composables/ui/suppliers/useSuppliers'
-import { useSupplierForm } from '@/composables/ui/suppliers/useSupplierForm'
-import { useExport } from '@/composables/ui/suppliers/useExport'
-import { useDropdown } from '@/composables/ui/suppliers/useDropdown'
-import { useBulkSuppliers } from '@/composables/ui/suppliers/useBulkSuppliers'
-import { useImportSuppliers } from '@/composables/ui/suppliers/useImportSuppliers'
-import { useCreateOrder } from '@/composables/ui/suppliers/useCreateOrder'
-import { useSupplierReports } from '@/composables/ui/suppliers/useSupplierReports'
+import { useSuppliers } from '@/composables/api/useSuppliers'
 import { useToast } from '@/composables/ui/useToast'
 
 // Components
@@ -342,17 +335,19 @@ export default {
     TopPerformersModal
   },
   setup() {
-    // Initialize composables
+    // Initialize composables - all methods are now in useSuppliers
     const suppliersComposable = useSuppliers()
-    const formComposable = useSupplierForm()
-    const exportComposable = useExport()
-    const addDropdown = useDropdown()
-    const bulkComposable = useBulkSuppliers()
-    const importComposable = useImportSuppliers()
-    const createOrderComposable = useCreateOrder()
-    const reportsComposable = useSupplierReports()
     const { success, error: showError } = useToast()
     const router = useRouter()
+    
+    // Extract sub-composables from the consolidated useSuppliers
+    const formComposable = suppliersComposable
+    const exportComposable = suppliersComposable
+    const addDropdown = suppliersComposable
+    const bulkComposable = suppliersComposable
+    const importComposable = suppliersComposable
+    const createOrderComposable = suppliersComposable
+    const reportsComposable = suppliersComposable
 
     // Local reactive state for UI
     const searchMode = ref(false)
