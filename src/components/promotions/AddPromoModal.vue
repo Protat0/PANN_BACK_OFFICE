@@ -58,7 +58,6 @@
                   <select class="form-select input-theme" v-model="formData.status">
                     <option value="draft">Draft</option>
                     <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
                   </select>
                 </div>
                 <div class="col-md-6 mb-3">
@@ -146,8 +145,9 @@
                   <select class="form-select input-theme" v-model="formData.status">
                     <option value="draft">Draft</option>
                     <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="expired">Expired</option>
+                    <option value="scheduled" disabled>Scheduled (auto)</option>
+                    <option value="deactivated" disabled>Deactivated (auto)</option>
+                    <option value="expired" disabled>Expired (auto)</option>
                   </select>
                 </div>
                 <div class="col-md-6 mb-3">
@@ -365,13 +365,14 @@ const resetForm = () => {
 }
 
 const populateForm = (promotion) => {
+  const rawDiscount = String(promotion.discount_value ?? '').replace('%', '')
   formData.value = {
     promotion_name: promotion.promotion_name || '',
     discount_type: promotion.discount_type || '',
-    discount_value: promotion.discount_value || '',
+    discount_value: rawDiscount !== '' ? parseFloat(rawDiscount) : '',
     status: promotion.status || 'draft',
-    start_date: promotion.start_date || '',
-    end_date: promotion.end_date || '',
+    start_date: promotion.start_date ? new Date(promotion.start_date) : null,
+    end_date: promotion.end_date ? new Date(promotion.end_date) : null,
     affected_category: promotion.affected_category || '',
     usage_limit: promotion.usage_limit || null,
     min_purchase_amount: promotion.min_purchase_amount ?? 100,
@@ -492,7 +493,7 @@ const formatDiscountValue = (value, type) => {
 }
 
 const formatStatus = (status) => {
-  const statuses = { active: 'Active', inactive: 'Inactive', expired: 'Expired', draft: 'Draft', scheduled: 'Draft' }
+  const statuses = { draft: 'Draft', active: 'Active', scheduled: 'Scheduled', deactivated: 'Deactivated', expired: 'Expired' }
   return statuses[status] || status
 }
 
@@ -514,10 +515,11 @@ const getDiscountTypeBadgeClass = (type) => {
 
 const getStatusBadgeClass = (status) => {
   const classes = {
+    draft: 'bg-warning text-dark',
     active: 'bg-success text-white',
-    inactive: 'bg-secondary text-white',
-    expired: 'bg-danger text-white',
-    draft: 'bg-warning text-dark'
+    scheduled: 'bg-info text-white',
+    deactivated: 'bg-secondary text-white',
+    expired: 'bg-danger text-white'
   }
   return classes[status] || 'bg-secondary text-white'
 }

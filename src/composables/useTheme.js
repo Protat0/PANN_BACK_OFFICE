@@ -1,4 +1,4 @@
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 export function useTheme() {
   const currentTheme = ref('light')
@@ -80,21 +80,31 @@ export function useTheme() {
     setTheme(newTheme)
   }
 
+  let _mediaQuery = null
+  let _systemThemeHandler = null
+
   // Watch for system theme changes
   const watchSystemTheme = () => {
     if (window.matchMedia) {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-      mediaQuery.addEventListener('change', (e) => {
+      _mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+      _systemThemeHandler = (e) => {
         if (!localStorage.getItem('theme')) {
           setTheme(e.matches ? 'dark' : 'light')
         }
-      })
+      }
+      _mediaQuery.addEventListener('change', _systemThemeHandler)
     }
   }
 
   onMounted(() => {
     loadSavedTheme()
     watchSystemTheme()
+  })
+
+  onUnmounted(() => {
+    if (_mediaQuery && _systemThemeHandler) {
+      _mediaQuery.removeEventListener('change', _systemThemeHandler)
+    }
   })
 
   return {

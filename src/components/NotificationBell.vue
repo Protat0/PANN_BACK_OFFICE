@@ -3,6 +3,7 @@
   <div class="notification-container">
     <!-- Bell button -->
     <button
+      ref="bellButton"
       class="notification-bell"
       :class="{ 'has-notifications': unreadCount > 0 }"
       @click="toggleDropdown"
@@ -13,8 +14,9 @@
       </span>
     </button>
 
-    <!-- Dropdown -->
-    <div v-if="showDropdown" class="notification-dropdown" @click.stop>
+    <!-- Dropdown — teleported to body so it escapes the header stacking context -->
+    <Teleport to="body">
+    <div v-if="showDropdown" ref="dropdownEl" class="notification-dropdown" :style="dropdownStyle" @click.stop>
       <!-- Header -->
       <div class="dropdown-header">
         <h3>Notifications</h3>
@@ -101,13 +103,7 @@
         </router-link>
       </div>
     </div>
-
-    <!-- Click-outside overlay -->
-    <div
-      v-if="showDropdown"
-      class="notification-overlay"
-      @click="showDropdown = false"
-    ></div>
+    </Teleport>
   </div>
 </template>
 
@@ -121,6 +117,9 @@ const unreadCount = ref(0)
 const showDropdown = ref(false)
 const loading = ref(false)
 const markingAllAsRead = ref(false)
+const bellButton = ref(null)
+const dropdownEl = ref(null)
+const dropdownStyle = ref({})
 let pollInterval = null
 
 // ── Fetching ──────────────────────────────────────────────────────
@@ -148,16 +147,37 @@ async function fetchNotifications() {
 
 // ── UI state ──────────────────────────────────────────────────────
 
+function handleOutsideClick(e) {
+  if (
+    bellButton.value?.contains(e.target) ||
+    dropdownEl.value?.contains(e.target)
+  ) return
+  closeDropdown()
+}
+
 async function toggleDropdown() {
   showDropdown.value = !showDropdown.value
   if (showDropdown.value) {
+    // Compute fixed position from the bell button's viewport rect
+    const rect = bellButton.value.getBoundingClientRect()
+    dropdownStyle.value = {
+      top: `${rect.bottom + 8}px`,
+      right: `${window.innerWidth - rect.right}px`
+    }
+    document.body.style.overflow = 'hidden'
+    document.addEventListener('click', handleOutsideClick)
     await fetchNotifications()
     await fetchUnreadCount()
+  } else {
+    document.body.style.overflow = ''
+    document.removeEventListener('click', handleOutsideClick)
   }
 }
 
 function closeDropdown() {
   showDropdown.value = false
+  document.body.style.overflow = ''
+  document.removeEventListener('click', handleOutsideClick)
 }
 
 // ── Actions ───────────────────────────────────────────────────────
@@ -181,7 +201,7 @@ async function markAllAsRead() {
   if (unreadCount.value === 0) return
   markingAllAsRead.value = true
   try {
-    await apiNotifications.MarkAllAsRead()
+    await apiNotifications.MarkAllRecentAsRead({ limit: 10 })
     notifications.value.forEach(n => { n.is_read = true })
     unreadCount.value = 0
   } catch {
@@ -243,6 +263,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopPolling()
+  document.body.style.overflow = ''
+  document.removeEventListener('click', handleOutsideClick)
 })
 </script>
 
@@ -290,26 +312,15 @@ onBeforeUnmount(() => {
 }
 
 .notification-dropdown {
-  position: absolute;
-  top: 100%;
-  right: 0;
+  position: fixed;
   background: white;
   border-radius: 12px;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   border: 1px solid #e5e7eb;
   width: 400px;
   max-height: 500px;
-  z-index: 1000;
+  z-index: 9999;
   overflow: hidden;
-}
-
-.notification-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 999;
 }
 
 .dropdown-header {

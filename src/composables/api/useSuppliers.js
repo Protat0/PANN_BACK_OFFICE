@@ -216,8 +216,19 @@ export function useSuppliers() {
     formErrors.value = {}
     if (!formData.supplier_name.trim()) {
       formErrors.value.supplier_name = 'Supplier name is required'
-      return { success: false }
     }
+    if (formData.email && formData.email.trim()) {
+      const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+      if (!emailPattern.test(formData.email.trim())) {
+        formErrors.value.email = 'Invalid email format'
+      }
+    }
+    if (formData.phone_number && formData.phone_number.trim()) {
+      if (formData.phone_number.trim().length < 10) {
+        formErrors.value.phone_number = 'Phone number must be at least 10 digits'
+      }
+    }
+    if (Object.keys(formErrors.value).length > 0) return { success: false }
 
     formLoading.value = true
     try {
@@ -246,10 +257,27 @@ export function useSuppliers() {
   const showTopPerformersModal = ref(false)
   const reportsLoading = ref(false)
 
-  const reportsActiveOrdersCount = computed(() => 0)
-  const reportsTopPerformersCount = computed(() => suppliers.value.filter(s => s.isFavorite).length)
+  const reportsActiveOrdersCount = computed(() =>
+    suppliers.value.reduce((sum, s) => sum + (s.activeOrders || 0), 0)
+  )
+  const reportsTopPerformersCount = computed(() =>
+    suppliers.value.filter(s => !s.isDeleted && (s.totalSpent || 0) > 0).length
+  )
   const activeOrders = computed(() => [])
-  const topPerformers = computed(() => suppliers.value.filter(s => s.isFavorite))
+  const topPerformers = computed(() =>
+    suppliers.value
+      .filter(s => !s.isDeleted && (s.totalSpent || 0) > 0)
+      .sort((a, b) => (b.totalSpent || 0) - (a.totalSpent || 0))
+      .slice(0, 5)
+      .map(s => ({
+        ...s,
+        totalOrders: s.purchaseOrders || 0,
+        totalValue: s.totalSpent || 0,
+        averageOrderValue: s.purchaseOrders ? (s.totalSpent || 0) / s.purchaseOrders : 0,
+        lastOrder: s.lastOrderDate || null,
+        topProducts: []
+      }))
+  )
 
   const openActiveOrdersModal = () => { showActiveOrdersModal.value = true }
   const closeActiveOrdersModal = () => { showActiveOrdersModal.value = false }

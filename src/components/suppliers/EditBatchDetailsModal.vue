@@ -339,6 +339,7 @@ import { useCategories } from '@/composables/api/useCategories'
 import { useProducts } from '@/composables/api/useProducts'
 import { useShipments } from '@/composables/api/useShipments'
 import apiProductsService from '@/services/apiProducts'
+import { tokenStore } from '@/services/tokenStore.js'
 import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL
@@ -450,7 +451,7 @@ export default {
         name: product.product_name || '',
         sku: product.sku || '',
         categoryId: product.category_id || '',
-        categoryName: category?.category_name || '',
+        categoryName: category?.category_name || product.category_name || '',
         subcategoryName: product.subcategory_name || ''
       }
     }
@@ -469,7 +470,7 @@ export default {
         // Fetch the shipment and categories at the same time — both are fast.
         const [shipment] = await Promise.all([
           fetchShipmentWithBatches(props.receipt.id, true),
-          categories.value.length ? Promise.resolve() : fetchCategories()
+          fetchCategories()
         ])
 
         const batches = shipment?.batches || []
@@ -480,13 +481,17 @@ export default {
         if (uniqueProductIds.length) {
           const results = await Promise.all(
             uniqueProductIds.map(id =>
-              apiProductsService.getProductById(id).catch(() => null)
+              apiProductsService.getProductById(id, true).catch(() => null)
             )
           )
           results.forEach((res, i) => {
             const product = res?.data ?? res
             if (product?.product_id) {
               productCache.value[product.product_id] = product
+              // batch uses "PROD-00025" but API returns product_id "00025" — cache under both
+              if (uniqueProductIds[i] !== product.product_id) {
+                productCache.value[uniqueProductIds[i]] = product
+              }
             } else if (product) {
               productCache.value[uniqueProductIds[i]] = product
             }
@@ -736,7 +741,7 @@ export default {
       saving.value = true
       
       try {
-        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+        const token = tokenStore.get()
         
         // Update each batch with new details
         const updates = []

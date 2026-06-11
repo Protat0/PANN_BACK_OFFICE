@@ -232,6 +232,7 @@ const pageKeys = ref({ 1: null }) // cursor map: page number → start_key
 const exporting = ref(false)
 const searchValue = ref('')
 const customerModal = ref(null)
+const deleteModal = ref(null)
 const searchDebounce = ref(null)
 const modalMode = ref('create')
 const selectedCustomer = ref(null)

@@ -241,7 +241,7 @@
       :show="createOrderComposable.showCreateOrderModal?.value || false"
       :supplier="createOrderComposable.selectedSupplier?.value"
       @close="createOrderComposable.closeCreateOrderModal"
-      @save="handleOrderSave"
+      @saved="handleOrderSave"
     />
 
     <!-- Add Supplier Modal -->

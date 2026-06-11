@@ -1,12 +1,7 @@
 <template>
   <div class="app-layout">
     <!-- Sidebar Component -->
-    <Sidebar 
-      @menu-changed="handleMenuChange"
-      @show-profile="handleShowProfile"
-      @logout="handleLogout"
-      @sidebar-toggled="handleSidebarToggle"
-    />
+    <Sidebar @sidebar-toggled="handleSidebarToggle" />
     
    <!-- Main Content Area -->
     <main class="main-content" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
@@ -32,48 +27,13 @@
     <!-- Dark Mode Toggle Button -->
     <DarkModeToggle />
 
-    <!-- Profile Modal (if needed) -->
-    <div v-if="showProfileModal" class="modal-overlay" @click="closeProfileModal">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h2>My Profile</h2>
-          <button class="modal-close-btn" @click="closeProfileModal">
-            <X :size="20" />
-          </button>
-        </div>
-        <div class="profile-info">
-          <div class="profile-field">
-            <label>User:</label>
-            <span>{{ userInfo.full_name || 'N/A' }}</span>
-          </div>
-          <div class="profile-field">
-            <label>Email:</label>
-            <span>{{ userInfo.email || 'N/A' }}</span>
-          </div>
-          <div class="profile-field">
-            <label>Role:</label>
-            <span>{{ userInfo.role || 'N/A' }}</span>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-cancel btn-sm" @click="closeProfileModal">
-            Close
-          </button>
-          <button class="btn btn-edit btn-sm">
-            Edit Profile
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Toast Container - Add this for global toast notifications -->
+<!-- Toast Container - Add this for global toast notifications -->
     <ToastContainer />
   </div>
 </template>
 
 <script>
 import { useToast } from '../composables/ui/useToast.js'
-import { useAuth } from '@/composables/auth/useAuth.js'
 import Sidebar from './Sidebar.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 import DarkModeToggle from '@/components/common/DarkModeToggle.vue'
@@ -88,21 +48,14 @@ export default {
     ToastContainer
   },
   setup() {
-    // Use the auth composable
-    const { logout } = useAuth()
-    
-    // Make toast available globally in this layout if needed
     const { success, error, warning, info } = useToast()
-    
     return {
-      authLogout: logout,
       toast: { success, error, warning, info }
     }
   },
   data() {
     return {
-      sidebarCollapsed: false,
-      showProfileModal: false
+      sidebarCollapsed: false
     }
   },
   computed: {
@@ -144,47 +97,16 @@ export default {
     userInfo() {
       // Try both possible storage keys for backward compatibility
       let userData = localStorage.getItem('user') || localStorage.getItem('userData')
-      return userData ? JSON.parse(userData) : {}
+      try {
+        return userData ? JSON.parse(userData) : {}
+      } catch {
+        return {}
+      }
     }
   },
   methods: {
-    handleMenuChange(menu) {
-      this.$router.push(`/${menu}`)
-    },
-    handleShowProfile() {
-      this.showProfileModal = true
-    },
-    closeProfileModal() {
-      this.showProfileModal = false
-    },
     handleSidebarToggle(collapsed) {
       this.sidebarCollapsed = collapsed
-    },
-    async handleLogout() {
-      const logoutToastId = this.toast.loading('Logging out...')
-      
-      try {
-        // Use the auth composable logout method
-        await this.authLogout()
-        
-        this.toast.dismiss(logoutToastId)
-        this.toast.success('Successfully logged out', { duration: 2000 })
-        
-        // Small delay before redirect
-        setTimeout(() => {
-          this.$router.push('/login')
-        }, 1500)
-        
-      } catch (error) {
-        console.error('Logout error:', error)
-        this.toast.dismiss(logoutToastId)
-        this.toast.warning('Logged out with connection issues', { duration: 3000 })
-        
-        // Still redirect even if logout API failed
-        setTimeout(() => {
-          this.$router.push('/login')
-        }, 1500)
-      }
     }
   },
   mounted() {

@@ -423,7 +423,8 @@ export default {
       topProductsLoading: false,
       topProductsError: null,
       topProductsStartDate: null,
-      topProductsEndDate: null
+      topProductsEndDate: null,
+      topProductsDateError: null
     }
   },
   computed: {

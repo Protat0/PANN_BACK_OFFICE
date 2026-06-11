@@ -45,7 +45,7 @@ export function useProducts() {
       const searchTerm = filters.value.search.toLowerCase()
       result = result.filter(product => 
         product.product_name?.toLowerCase().includes(searchTerm) ||
-        product.SKU?.toLowerCase().includes(searchTerm) ||
+        product.sku?.toLowerCase().includes(searchTerm) ||
         product.product_id?.toLowerCase().includes(searchTerm) ||
         product.barcode?.toLowerCase().includes(searchTerm)
       )
@@ -130,7 +130,7 @@ export function useProducts() {
       const response = await apiProductsService.getProductBySku(sku)
       return true
     } catch (err) {
-      if (err.message.includes('404') || err.message.includes('not found')) {
+      if (err.response?.status === 404) {
         return false
       }
       throw err
@@ -877,7 +877,7 @@ const bulkDeleteProducts = async (productIds, hardDelete = false) => {
   const addProductForm = ref({
     product_name: '',
     category_id: '',
-    SKU: '',
+    sku: '',
     unit: '',
     stock: 0,
     low_stock_threshold: 10,
@@ -904,7 +904,7 @@ const bulkDeleteProducts = async (productIds, hardDelete = false) => {
   
   const isAddProductFormValid = computed(() => {
     return addProductForm.value.product_name.trim() !== '' &&
-           addProductForm.value.SKU.trim() !== '' &&
+           addProductForm.value.sku.trim() !== '' &&
            addProductForm.value.category_id !== '' &&
            addProductForm.value.unit !== '' &&
            addProductForm.value.cost_price >= 0 &&
@@ -954,7 +954,7 @@ const bulkDeleteProducts = async (productIds, hardDelete = false) => {
       addProductForm.value = {
         product_name: addProductModalProduct.value.product_name || '',
         category_id: addProductModalProduct.value.category_id || '',
-        SKU: addProductModalProduct.value.SKU || '',
+        sku: addProductModalProduct.value.sku || '',
         unit: addProductModalProduct.value.unit || '',
         stock: addProductModalProduct.value.stock || 0,
         low_stock_threshold: addProductModalProduct.value.low_stock_threshold || 10,
@@ -978,7 +978,7 @@ const bulkDeleteProducts = async (productIds, hardDelete = false) => {
       addProductForm.value = {
         product_name: '',
         category_id: '',
-        SKU: '',
+        sku: '',
         unit: '',
         stock: 0,
         low_stock_threshold: 10,
@@ -999,12 +999,12 @@ const bulkDeleteProducts = async (productIds, hardDelete = false) => {
   }
   
   const validateSKU = async () => {
-    if (!addProductForm.value.SKU || addProductForm.value.SKU.trim() === '') {
+    if (!addProductForm.value.sku || addProductForm.value.sku.trim() === '') {
       skuError.value = null
       return
     }
 
-    if (isEditMode.value && addProductModalProduct.value && addProductForm.value.SKU === addProductModalProduct.value.SKU) {
+    if (isEditMode.value && addProductModalProduct.value && addProductForm.value.sku === addProductModalProduct.value.sku) {
       skuError.value = null
       return
     }
@@ -1012,7 +1012,7 @@ const bulkDeleteProducts = async (productIds, hardDelete = false) => {
     isValidatingSku.value = true
     
     try {
-      const exists = await apiProductsService.productExistsBySku(addProductForm.value.SKU)
+      const exists = await apiProductsService.productExistsBySku(addProductForm.value.sku)
       if (exists) {
         skuError.value = 'This SKU already exists'
       } else {
@@ -1086,7 +1086,7 @@ const bulkDeleteProducts = async (productIds, hardDelete = false) => {
   
   const generateBarcode = () => {
     const timestamp = Date.now().toString().slice(-6)
-    const sku = addProductForm.value.SKU.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
+    const sku = addProductForm.value.sku.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()
     addProductForm.value.barcode = `${sku}${timestamp}`
   }
   
@@ -1119,7 +1119,7 @@ const bulkDeleteProducts = async (productIds, hardDelete = false) => {
       const formData = {
         product_name: addProductForm.value.product_name,
         category_id: addProductForm.value.category_id,
-        SKU: addProductForm.value.SKU,
+        sku: addProductForm.value.sku,
         unit: addProductForm.value.unit,
         stock: addProductForm.value.stock,
         low_stock_threshold: addProductForm.value.low_stock_threshold,
@@ -1715,7 +1715,7 @@ const bulkDeleteProducts = async (productIds, hardDelete = false) => {
       const search = searchFilter.value.toLowerCase()
       filtered = filtered.filter(product => 
         product.product_name?.toLowerCase().includes(search) ||
-        product.SKU?.toLowerCase().includes(search) ||
+        product.sku?.toLowerCase().includes(search) ||
         product.product_id?.toLowerCase().includes(search) ||
         product.category_name?.toLowerCase().includes(search)
       )
@@ -1821,7 +1821,7 @@ const bulkDeleteProducts = async (productIds, hardDelete = false) => {
         headers.join(','),
         ...filteredProductsForUI.value.map(product => [
           `"${product.product_name}"`,
-          product.SKU || '',
+          product.sku || '',
           getCategoryName(product.category_id),
           product.selling_price,
           product.cost_price,

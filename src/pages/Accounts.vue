@@ -353,6 +353,8 @@ const viewUser = (user) => accountModal.value?.show('view', user)
 
 const editUser = (user) => accountModal.value?.show('edit', user)
 
+const handleModalClose = () => {}
+
 const handleModalSubmit = async (userData, mode) => {
   try {
     // Use user_id if available, fallback to _id (until modal is updated)

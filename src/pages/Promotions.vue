@@ -348,15 +348,15 @@ const getEffectiveStatus = (promotion) => {
 }
 
 const formatStatus = (status) => ({
-  active: 'Active', inactive: 'Inactive', expired: 'Expired',
-  draft: 'Draft', scheduled: 'Scheduled'
+  draft: 'Draft', active: 'Active', scheduled: 'Scheduled',
+  deactivated: 'Deactivated', expired: 'Expired'
 }[status] || status)
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'
 const formatDateTime = (d) => d ? new Date(d).toLocaleString() : '—'
 const getDiscountTypeBadgeClass = (type) => ({ percentage: 'bg-primary', fixed_amount: 'bg-success' }[type] || 'bg-secondary')
 const getStatusBadgeClass = (status) => ({
-  active: 'bg-success', inactive: 'bg-secondary',
-  expired: 'bg-danger', draft: 'bg-warning', scheduled: 'bg-info'
+  draft: 'bg-warning', active: 'bg-success',
+  scheduled: 'bg-info', deactivated: 'bg-secondary', expired: 'bg-danger'
 }[status] || 'bg-secondary')
 
 onMounted(async () => { await fetchPromotions() })

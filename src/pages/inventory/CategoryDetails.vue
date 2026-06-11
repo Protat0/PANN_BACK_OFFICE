@@ -319,6 +319,7 @@ export default {
       loading: categoriesLoading,
       error: categoriesError,
       fetchCategoryById,
+      fetchCategories,
       fetchProductsByCategory,
       moveProductToCategory,
       bulkMoveProductsToUncategorized,
@@ -327,7 +328,8 @@ export default {
     } = useCategories()
 
     const {
-      exportProducts
+      exportProducts,
+      fetchProducts
     } = useProducts()
 
     // Local state
@@ -487,6 +489,15 @@ export default {
           categoryProducts.value = categoryProducts.value.filter(p => !selectedProducts.value.includes(p.product_id))
           selectedProducts.value = []
         }
+        // Refresh all three caches so counts and uncategorized list stay in sync:
+        // - fetchCategoryById: updates currentCategory.sub_categories[].product_count (this page's header count)
+        // - fetchCategories: updates categories[] in the global list (Categories page card counts + uncategorized count)
+        // - fetchProducts: updates products[] so UncategorizedProducts page shows the moved product
+        await Promise.all([
+          fetchCategoryById(categoryId.value),
+          fetchCategories(),
+          fetchProducts()
+        ])
       } catch (err) {
         console.error(`Failed to remove product(s): ${err.message}`)
       } finally {

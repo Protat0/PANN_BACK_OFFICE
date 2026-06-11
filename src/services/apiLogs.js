@@ -38,6 +38,16 @@ class SessionLogsAPI {
         return this.handleResponse(response);
 
     } catch (error) {
+        if (error.response?.status === 404) {
+            // Combined endpoint not yet deployed — fall back to session logs only
+            try {
+                const response = await api.get('/session-logs/display/');
+                return this.handleResponse(response);
+            } catch (fallbackError) {
+                console.error("Error fetching session logs (fallback):", fallbackError);
+                this.handleError(fallbackError);
+            }
+        }
         console.error("Error fetching combined logs:", error);
         this.handleError(error);
     }

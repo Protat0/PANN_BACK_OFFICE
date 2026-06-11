@@ -427,7 +427,7 @@ const populateForm = () => {
     username: props.customer.username || '',
     full_name: props.customer.full_name || '',
     email: props.customer.email || '',
-    phone: props.customer.phone || '',
+    phone: props.customer.phone_number || '',
     password: '',
     new_password: '',
     confirm_password: '',
@@ -495,7 +495,7 @@ const handleSubmit = async () => {
       username: form.value.username.trim(),
       full_name: form.value.full_name.trim(),
       email: form.value.email.trim(),
-      phone: form.value.phone.trim(),
+      phone_number: form.value.phone.trim(),
       delivery_address: form.value.delivery_address
     };
 

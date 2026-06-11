@@ -319,6 +319,7 @@ const reportsRoutePrefixes = ['/salesbyitem', '/salesbycategory', '/reports']
 
 export default {
   name: 'ModernSidebar',
+  emits: ['sidebar-toggled'],
   components: {
     LayoutDashboard,
     Package,
@@ -571,8 +572,11 @@ export default {
     // Load collapsed state from localStorage
     const savedState = localStorage.getItem('sidebar-collapsed')
     if (savedState !== null) {
-      this.isCollapsed = JSON.parse(savedState)
-      // Emit initial state to parent
+      try {
+        this.isCollapsed = JSON.parse(savedState)
+      } catch {
+        this.isCollapsed = false
+      }
       this.$emit('sidebar-toggled', this.isCollapsed)
     }
     this.syncSubmenusWithRoute()

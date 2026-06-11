@@ -38,10 +38,9 @@
           <p class="text-tertiary-medium mb-0">Manage products that need to be categorized</p>
         </div>
         <div class="d-flex gap-2">
-          <!-- Export button -->
-          <button 
-            class="btn btn-export btn-sm btn-with-icon-sm" 
-            type="button" 
+          <button
+            class="btn btn-export btn-sm btn-with-icon-sm"
+            type="button"
             :disabled="isExporting || uncategorizedProducts.length === 0"
             @click="exportUncategorizedProducts()"
             title="Export uncategorized products as CSV"
@@ -96,14 +95,14 @@
               <!-- Bulk Categorization -->
               <div v-if="selectedProducts.length > 0" class="d-flex align-items-center gap-2">
                 <span class="text-tertiary-medium">Move {{ selectedProducts.length }} product(s) to:</span>
-                <select 
-                  class="form-select form-select-sm input-theme" 
+                <select
+                  class="form-select form-select-sm input-theme"
                   v-model="bulkTargetCategory"
                   style="min-width: 200px;"
                 >
                   <option value="">Choose Category</option>
-                  <option 
-                    v-for="category in activeCategories" 
+                  <option
+                    v-for="category in activeCategories"
                     :key="category.category_id"
                     :value="category.category_id"
                   >
@@ -117,25 +116,25 @@
                   style="min-width: 150px;"
                 >
                   <option value="">Choose Subcategory</option>
-                  <option 
-                    v-for="subcategory in getSubcategoriesForCategory(bulkTargetCategory)" 
-                    :key="subcategory.name" 
+                  <option
+                    v-for="subcategory in getSubcategoriesForCategory(bulkTargetCategory)"
+                    :key="subcategory.name"
                     :value="subcategory.name"
                   >
                     {{ subcategory.name }}
                   </option>
                 </select>
-                <button 
+                <button
                   class="btn btn-success btn-sm"
                   @click="moveSelectedToCategory"
-                  :disabled="!bulkTargetCategory || !bulkTargetSubcategory || bulkMoveLoading"
+                  :disabled="!bulkTargetCategory || !bulkTargetSubcategory || bulkDeleteLoading"
                 >
-                  <div v-if="bulkMoveLoading" class="spinner-border spinner-border-sm me-2" role="status">
+                  <div v-if="bulkDeleteLoading" class="spinner-border spinner-border-sm me-2" role="status">
                     <span class="visually-hidden">Moving...</span>
                   </div>
-                  {{ bulkMoveLoading ? 'Moving...' : 'Move' }}
+                  {{ bulkDeleteLoading ? 'Moving...' : 'Move' }}
                 </button>
-                <button 
+                <button
                   class="btn btn-cancel btn-sm"
                   @click="clearSelection"
                 >
@@ -146,14 +145,14 @@
               <!-- Search -->
               <div class="search-container ms-auto">
                 <div class="position-relative">
-                  <input 
-                    v-model="searchFilter" 
-                    type="text" 
+                  <input
+                    v-model="searchFilter"
+                    type="text"
                     class="form-control form-control-sm search-input input-theme"
                     placeholder="Search products..."
                     style="min-width: 250px;"
                   />
-                  <button 
+                  <button
                     v-if="searchFilter"
                     class="btn btn-sm btn-link position-absolute end-0 top-50 translate-middle-y text-tertiary-medium"
                     @click="searchFilter = ''"
@@ -178,9 +177,9 @@
         <template #header>
           <tr>
             <th style="width: 40px;">
-              <input 
-                type="checkbox" 
-                class="form-check-input" 
+              <input
+                type="checkbox"
+                class="form-check-input"
                 :checked="isAllSelected"
                 @change="toggleSelectAll"
                 :indeterminate.prop="isIndeterminate"
@@ -216,15 +215,15 @@
               <div class="fw-medium text-primary">{{ product.product_name }}</div>
             </td>
             <td>
-              <select 
+              <select
                 class="form-select form-select-sm input-theme"
-                v-model="product.selectedCategory"
-                @change="onCategorySelect(product)"
-                :disabled="moveProductLoading"
+                :value="rowCategory(product.product_id)"
+                @change="onCategorySelect(product, $event.target.value)"
+                :disabled="categoryMoveLoading"
               >
                 <option value="">Select Category</option>
-                <option 
-                  v-for="category in activeCategories" 
+                <option
+                  v-for="category in activeCategories"
                   :key="category.category_id"
                   :value="category.category_id"
                 >
@@ -235,14 +234,14 @@
             <td>
               <select
                 class="form-select form-select-sm input-theme"
-                v-model="product.selectedSubcategory"
-                @change="moveProductToCategory(product.product_id, product.selectedCategory, product.selectedSubcategory)"
-                :disabled="!product.selectedCategory || moveProductLoading"
+                :value="rowSubcategory(product.product_id)"
+                @change="handleSubcategoryChange(product, $event.target.value)"
+                :disabled="!rowCategory(product.product_id) || categoryMoveLoading"
               >
                 <option value="">Select Subcategory</option>
-                <option 
-                  v-for="subcategory in getSubcategoriesForCategory(product.selectedCategory)" 
-                  :key="subcategory.name" 
+                <option
+                  v-for="subcategory in getSubcategoriesForCategory(rowCategory(product.product_id))"
+                  :key="subcategory.name"
                   :value="subcategory.name"
                 >
                   {{ subcategory.name }}
@@ -274,7 +273,7 @@
             <Package :size="64" class="text-success mb-3" />
             <h5 class="text-success">All Products Categorized!</h5>
             <p class="text-tertiary-medium mb-3">
-              {{ uncategorizedProducts.length === 0 ? 
+              {{ uncategorizedProducts.length === 0 ?
                 'No uncategorized products found. All products have been properly categorized.' :
                 'No products match your search criteria.' }}
             </p>
@@ -303,7 +302,6 @@ export default {
   setup() {
     const toast = useToast()
 
-    // Composables
     const {
       products: allProducts,
       loading: productsLoading,
@@ -311,8 +309,8 @@ export default {
       fetchProducts,
       moveProductToCategory: moveProduct,
       bulkMoveProductsToCategory,
-      moveProductLoading,
-      bulkMoveLoading
+      categoryMoveLoading,
+      bulkDeleteLoading
     } = useProducts()
 
     const {
@@ -329,20 +327,16 @@ export default {
     const currentPage = ref(1)
     const itemsPerPage = ref(10)
     const isExporting = ref(false)
+    // Per-row category/subcategory selections keyed by product_id.
+    // Kept outside the computed so they survive recomputes triggered by allProducts changes.
+    const rowSelections = ref({})
 
     // Computed properties
     const loading = computed(() => productsLoading.value || categoriesLoading.value)
     const error = computed(() => productsError.value)
 
-    // ✅ True uncategorized filter
     const uncategorizedProducts = computed(() =>
-      allProducts.value
-        .filter(p => !p.category_id || p.category_id === 'UNCTGRY-001')
-        .map(p => ({
-          ...p,
-          selectedCategory: '',
-          selectedSubcategory: ''
-        }))
+      allProducts.value.filter(p => !p.category_id || p.category_id === 'UNCTGRY-001')
     )
 
     const filteredProducts = computed(() => {
@@ -380,19 +374,31 @@ export default {
       )
     )
 
+    // Row selection helpers
+    const rowCategory = id => rowSelections.value[id]?.category || ''
+    const rowSubcategory = id => rowSelections.value[id]?.subcategory || ''
+
     // Methods
     const getSubcategoriesForCategory = id => {
       const cat = activeCategories.value.find(c => c.category_id === id)
       return cat?.sub_categories || []
     }
 
-    const onCategorySelect = product => (product.selectedSubcategory = '')
+    const onCategorySelect = (product, catId) => {
+      rowSelections.value[product.product_id] = { category: catId, subcategory: '' }
+    }
 
-    const moveProductToCategory = async (id, catId, subcat) => {
+    const handleSubcategoryChange = async (product, subcat) => {
+      const catId = rowSelections.value[product.product_id]?.category
       if (!catId || !subcat) return
+      rowSelections.value[product.product_id] = { category: catId, subcategory: subcat }
+
       try {
-        await moveProduct(id, catId, subcat)
-        selectedProducts.value = selectedProducts.value.filter(pid => pid !== id)
+        await moveProduct(product.product_id, catId, subcat)
+        selectedProducts.value = selectedProducts.value.filter(pid => pid !== product.product_id)
+        delete rowSelections.value[product.product_id]
+        // Refresh so the product disappears from the list
+        await fetchProducts()
       } catch (err) {
         console.error('Error moving product:', err)
         toast.error(`Failed to move product: ${err.message}`)
@@ -428,7 +434,6 @@ export default {
 
     const handlePageChange = page => (currentPage.value = page)
 
-    // ✅ Frontend-only CSV export
     const exportUncategorizedProducts = async () => {
       try {
         isExporting.value = true
@@ -438,7 +443,6 @@ export default {
           return
         }
 
-        // Build CSV
         const headers = [
           'Product ID', 'Product Name', 'SKU', 'Category ID', 'Subcategory',
           'Stock', 'Cost Price', 'Selling Price', 'Status', 'Created At'
@@ -494,7 +498,6 @@ export default {
       return 'text-success fw-medium'
     }
 
-    // Init
     onMounted(async () => {
       await Promise.all([fetchProducts(), fetchCategories()])
     })
@@ -512,8 +515,8 @@ export default {
       currentPage,
       itemsPerPage,
       isExporting,
-      moveProductLoading,
-      bulkMoveLoading,
+      categoryMoveLoading,
+      bulkDeleteLoading,
 
       // computed
       filteredProducts,
@@ -522,10 +525,14 @@ export default {
       isIndeterminate,
       totalValue,
 
+      // row selection helpers
+      rowCategory,
+      rowSubcategory,
+
       // methods
       getSubcategoriesForCategory,
       onCategorySelect,
-      moveProductToCategory,
+      handleSubcategoryChange,
       moveSelectedToCategory,
       toggleSelectAll,
       clearSelection,
@@ -593,7 +600,7 @@ export default {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .search-container {
     margin-left: 0 !important;
     margin-top: 1rem;

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { tokenStore } from './tokenStore.js';
 
 // Notifications are mounted at /api/v1/notifications/, not under /admin/
 const NOTIF_BASE = import.meta.env.VITE_API_URL.replace(/\/admin\/?$/, '/notifications');
@@ -14,7 +15,7 @@ const notifApi = axios.create({
 
 notifApi.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
+    const token = tokenStore.get();
     if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
@@ -131,6 +132,16 @@ class NotificationsAPI {
       return response.data;
     } catch (error) {
       console.error('Error marking all as read:', error);
+      throw error;
+    }
+  }
+
+  async MarkAllRecentAsRead(params = {}) {
+    try {
+      const response = await notifApi.patch('/mark-all-read/recent/', null, { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error marking recent as read:', error);
       throw error;
     }
   }

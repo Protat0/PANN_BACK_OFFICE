@@ -90,15 +90,15 @@
               <div class="position-relative">
                 <input 
                   id="SKU"
-                  v-model="productForm.SKU" 
+                  v-model="productForm.sku"
                   type="text" 
                   required 
                   :disabled="isLoading || isValidatingSku"
                   placeholder="Enter any unique identifier (e.g., ABC123, NOODLE-001, etc.)"
                   class="form-control input-theme"
-                  :class="{ 
-                    'is-invalid': validationErrors.SKU || skuError,
-                    'validation-error': validationErrors.SKU || skuError
+                  :class="{
+                    'is-invalid': validationErrors.sku || skuError,
+                    'validation-error': validationErrors.sku || skuError
                   }"
                   @blur="validateSKU"
                 />
@@ -107,8 +107,8 @@
                     <span class="visually-hidden">Validating...</span>
                   </div>
                 </div>
-                <div v-if="validationErrors.SKU || skuError" class="invalid-feedback">
-                  {{ validationErrors.SKU || skuError }}
+                <div v-if="validationErrors.sku || skuError" class="invalid-feedback">
+                  {{ validationErrors.sku || skuError }}
                 </div>
               </div>
               <small class="text-tertiary-medium">
@@ -622,7 +622,7 @@ export default {
 
     const productForm = ref({
       product_name: '',
-      SKU: '',
+      sku: '',
       category_id: '',
       subcategory_name: '',
       unit: '',
@@ -670,8 +670,8 @@ export default {
       if (!productForm.value.product_name.trim()) {
         errors.product_name = 'Product name is required'
       }
-      if (!productForm.value.SKU.trim()) {
-        errors.SKU = 'SKU is required'
+      if (!productForm.value.sku.trim()) {
+        errors.sku = 'SKU is required'
       }
       if (!productForm.value.unit) {
         errors.unit = 'Unit is required'
@@ -702,7 +702,7 @@ export default {
         }
       }
 
-      if (skuError.value) errors.SKU = skuError.value
+      if (skuError.value) errors.sku = skuError.value
 
       validationErrors.value = errors
       showValidationSummary.value = Object.keys(errors).length > 0
@@ -713,7 +713,7 @@ export default {
     const resetForm = () => {
       productForm.value = {
         product_name: '',
-        SKU: '',
+        sku: '',
         category_id: '',
         subcategory_name: '',
         unit: '',
@@ -760,8 +760,8 @@ export default {
     }
 
     const validateSKU = async () => {
-      if (!productForm.value.SKU.trim()) return skuError.value = ''
-      if (isEditMode.value && productForm.value.SKU === editingProduct.value?.SKU) {
+      if (!productForm.value.sku.trim()) return skuError.value = ''
+      if (isEditMode.value && productForm.value.sku === editingProduct.value?.sku) {
         return skuError.value = ''
       }
 
@@ -769,7 +769,7 @@ export default {
       skuError.value = ''
 
       try {
-        const exists = await checkSkuExists(productForm.value.SKU)
+        const exists = await checkSkuExists(productForm.value.sku)
         if (exists) skuError.value = 'This SKU is already used'
       } catch {
         skuError.value = 'Unable to validate SKU'
@@ -868,7 +868,8 @@ export default {
           action: isEditMode.value ? 'updated' : 'created',
           withBatch: !isEditMode.value && createWithStock.value
         })
-        closeModal()
+        hide()
+        resetForm()
 
       } catch (err) {
         console.error('[AddProductModal] handleSubmit error:', err)

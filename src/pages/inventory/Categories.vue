@@ -231,7 +231,6 @@ export default {
     const toast = useToast()
     const searchInput = ref(null)
     const searchMode = ref(false)
-    const uncategorizedCount = ref(0)
     const categoryToDelete = ref(null)
     
     // Use the categories composable
@@ -255,6 +254,15 @@ export default {
       clearError,
       initializeCategories
     } = useCategories()
+
+    // Reactive count — auto-updates whenever categories[] is refreshed from anywhere
+    const uncategorizedCount = computed(() => {
+      const unc = categories.value.find(c =>
+        c.category_id?.startsWith('UNCTGRY-') ||
+        c.category_name?.toLowerCase() === 'uncategorized'
+      )
+      return unc?.sub_categories?.reduce((t, s) => t + (s.product_count || 0), 0) || 0
+    })
 
     // Filter out uncategorized category from display
     const displayedCategories = computed(() => {
@@ -338,21 +346,13 @@ export default {
       try {
         clearError()
         await fetchCategories()
-        // Update uncategorized count after refresh
-        uncategorizedCount.value = getUncategorizedCount()
       } catch (error) {
         console.error('Error refreshing categories:', error)
       }
     }
 
     const fetchUncategorizedCount = async () => {
-      try {
-        // Update the count from current categories
-        uncategorizedCount.value = getUncategorizedCount()
-      } catch (error) {
-        console.error('Error fetching uncategorized count:', error)
-        uncategorizedCount.value = 0
-      }
+      // No-op: uncategorizedCount is now a computed that updates automatically
     }
 
     return {
@@ -387,7 +387,6 @@ export default {
       getProductCount,
       isCategoryInactive,
       getCategoryBorderColor,
-      getUncategorizedCount,
       
       // Local methods
       handleToggleSearchMode,
@@ -456,7 +455,6 @@ export default {
       if (!this.categoryToDelete) return
       try {
         await this.softDeleteCategory(this.categoryToDelete.category_id)
-        await this.fetchUncategorizedCount()
       } catch (error) {
         console.error('Error deleting category:', error)
       } finally {

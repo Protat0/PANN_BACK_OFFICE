@@ -805,6 +805,7 @@ import DeleteConfirmationModal from '@/components/common/DeleteConfirmationModal
 import { useToast } from '@/composables/ui/useToast'
 import { useAuth } from '@/composables/auth/useAuth'
 import { useShipments } from '@/composables/api/useShipments'
+import { tokenStore } from '@/services/tokenStore.js'
 import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL
@@ -954,7 +955,7 @@ export default {
       this.error = null
       
       try {
-        const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+        const token = tokenStore.get()
         
         // ===== STEP 1: Fetch Supplier Info =====
         const supplierResponse = await axios.get(
@@ -1326,7 +1327,7 @@ export default {
       this.saving = true
       
       try {
-        const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+        const token = tokenStore.get()
         
         const backendData = {
           supplier_name: this.editForm.name,
@@ -1390,7 +1391,7 @@ export default {
       this.supplier.isFavorite = !this.supplier.isFavorite
       
       try {
-        const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+        const token = tokenStore.get()
         
         await axios.put(
           `${API_BASE_URL}/suppliers/${this.supplier.id}/`,
@@ -1424,7 +1425,7 @@ export default {
       this.deleting = true
       
       try {
-        const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+        const token = tokenStore.get()
         
         await axios.delete(
           `${API_BASE_URL}/suppliers/${this.supplier.id}/`,
@@ -2064,7 +2065,7 @@ export default {
         return
       }
 
-      const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token') || localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+      const token = tokenStore.get()
 
       if (!token) {
         this.showError('Authentication token not found. Please sign in again.')
