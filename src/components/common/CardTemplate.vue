@@ -12,32 +12,32 @@
     <!-- Card Body -->
     <div class="card-body" :style="bodyStyles">
       <!-- Title -->
-      <h6 v-if="title" :class="titleClasses">{{ title }}</h6>
-      
+      <h6 v-if="title" :class="titleClasses">
+        <span v-if="loading" class="skeleton-bar" style="width: 55%"></span>
+        <template v-else>{{ title }}</template>
+      </h6>
+
       <!-- Main Content -->
-      <slot name="content">
+      <slot v-if="!loading" name="content">
         <div v-if="content" v-html="content"></div>
       </slot>
-      
+
       <!-- Value Display -->
       <div v-if="value !== null && value !== undefined" :class="valueClasses">
-        {{ formattedValue }}
+        <span v-if="loading" class="skeleton-bar" style="width: 40%"></span>
+        <template v-else>{{ formattedValue }}</template>
       </div>
-      
+
       <!-- Subtitle/Description -->
-      <small v-if="subtitle" :class="subtitleClasses">{{ subtitle }}</small>
+      <small v-if="subtitle" :class="subtitleClasses">
+        <span v-if="loading" class="skeleton-bar" style="width: 65%"></span>
+        <template v-else>{{ subtitle }}</template>
+      </small>
     </div>
 
     <!-- Card Footer (optional) -->
     <div v-if="$slots.footer" class="card-footer">
       <slot name="footer"></slot>
-    </div>
-
-    <!-- Loading Overlay -->
-    <div v-if="loading" class="card-loading-overlay">
-      <div class="spinner-border text-accent" role="status">
-        <span class="visually-hidden">Loading...</span>
-      </div>
     </div>
   </div>
 </template>
@@ -651,22 +651,29 @@ export default {
 
 .card-loading {
   pointer-events: none;
-  background-color: var(--state-disabled);
-  opacity: 0.6;
 }
 
-.card-loading-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: inherit;
-  z-index: 10;
-  background-color: var(--surface-overlay);
+/* ==========================================================================
+   SKELETON LOADER - SEMANTIC
+   ========================================================================== */
+
+.skeleton-bar {
+  display: inline-block;
+  width: 100%;
+  height: 1em;
+  border-radius: 0.25rem;
+  background-color: var(--surface-tertiary);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  vertical-align: middle;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 /* ==========================================================================
@@ -741,9 +748,14 @@ export default {
   .card-clickable {
     transition: none !important;
   }
-  
+
   .card-clickable:hover {
     transform: none;
+  }
+
+  .skeleton-bar {
+    animation: none !important;
+    opacity: 0.6;
   }
 }
 
@@ -772,13 +784,6 @@ export default {
 /* Card content text hierarchy */
 .card-body {
   @apply text-secondary;
-}
-
-/* Enhanced loading spinner */
-.card-loading-overlay .spinner-border {
-  width: 2rem;
-  height: 2rem;
-  border-width: 0.25rem;
 }
 
 /* Border position variants with better visual impact */

@@ -57,14 +57,6 @@
       </div>
     </div>
 
-    <!-- Loading State -->
-    <div v-if="loading" class="text-center py-5">
-      <div class="spinner-border text-accent" role="status">
-        <span class="visually-hidden">Loading...</span>
-      </div>
-      <p class="mt-3 text-secondary">Loading orders...</p>
-    </div>
-
     <!-- Error State -->
     <div v-if="error" class="alert alert-danger text-center" role="alert">
       <p class="mb-3">{{ error }}</p>
@@ -173,10 +165,10 @@
 
     <!-- Orders Table -->
     <DataTable
-      v-if="!loading"
       :total-items="ordersComposable.filteredOrders.length"
       :current-page="currentPage"
       :items-per-page="itemsPerPage"
+      :loading="loading"
       @page-changed="handlePageChange"
     >
       <template #header>

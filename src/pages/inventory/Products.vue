@@ -1,7 +1,7 @@
 <template>
   <div class="container-fluid pt-2 pb-4 products-page surface-secondary">
     <!-- Reports Section -->
-    <div class="row mb-3" v-if="!loading">
+    <div class="row mb-3">
       <div class="col-6 col-md-3 mb-2">
         <CardTemplate
           size="xs"
@@ -10,6 +10,7 @@
           title="Low Stock"
           :value="productStats.lowStock"
           subtitle="Critical Items"
+          :loading="loading && !hasProducts"
         />
       </div>
       <div class="col-6 col-md-3 mb-2">
@@ -20,6 +21,7 @@
           title="Expiring"
           :value="expiringCount"
           subtitle="30 Days"
+          :loading="loading && !hasProducts"
         />
       </div>
       <div class="col-6 col-md-3 mb-2">
@@ -30,6 +32,7 @@
           title="Total"
           :value="productStats.total"
           subtitle="Products"
+          :loading="loading && !hasProducts"
         />
       </div>
       <div class="col-6 col-md-3 mb-2">
@@ -43,14 +46,6 @@
           :loading="categoriesLoading"
         />
       </div>
-    </div>
-
-    <!-- Loading State -->
-    <div v-if="loading && !hasProducts" class="text-center py-5">
-      <div class="spinner-border text-accent" role="status">
-        <span class="visually-hidden">Loading...</span>
-      </div>
-      <p class="mt-3 text-tertiary-medium">Loading products...</p>
     </div>
 
     <!-- Error State -->
@@ -202,10 +197,10 @@
     <!-- Data Table -->
     <div class="table-wrapper">
       <DataTable
-        v-if="!loading || hasProducts"
         :total-items="filteredProducts.length"
         :current-page="currentPage"
         :items-per-page="itemsPerPage"
+        :loading="loading && !hasProducts"
         @page-changed="handlePageChange"
       >
         <template #header>
