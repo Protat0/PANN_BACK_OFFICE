@@ -124,7 +124,7 @@ class SalesAPIService {
         ...params
       };
 
-      const response = await api.get('reports/top-item/', {
+      const response = await api.get('reports/top-items/', {
         params: queryParams
       });
 
@@ -146,8 +146,13 @@ class SalesAPIService {
         limit: params.limit || 10,
         ...params
       };
+      // The backend lets frequency override explicit dates — drop it when a
+      // custom date range is requested
+      if (queryParams.start_date && queryParams.end_date) {
+        delete queryParams.frequency;
+      }
 
-      const response = await api.get('reports/top-chart-item/', {
+      const response = await api.get('reports/top-items/', {
         params: queryParams
       });
 
@@ -190,8 +195,10 @@ class SalesAPIService {
    */
   async getSalesStatistics(params = {}) {
     try {
-      const response = await api.get('/invoices/stats/', { params });
-      return this.handleResponse(response);
+      const response = await api.get('reports/sales-summary/', { params });
+      const data = this.handleResponse(response);
+      // Alias for consumers that expect total_sales (backend returns total_revenue)
+      return { ...data, total_sales: data?.total_revenue ?? 0 };
     } catch (error) {
       console.error("Error fetching sales statistics:", error);
       this.handleError(error);
@@ -308,7 +315,10 @@ class SalesAPIService {
         limit: params.limit || 20,
         ...params
       };
-      const response = await api.get('/sales/recent/', { params: queryParams });
+      // Recent raw sales only exist on the POS API segment — there is no
+      // /api/v1/admin/ equivalent. Absolute URL bypasses the admin baseURL.
+      const posBase = (api.defaults.baseURL || '').replace(/\/admin\/?$/, '/pos');
+      const response = await api.get(`${posBase}/sales/recent/`, { params: queryParams });
       return this.handleResponse(response);
     } catch (error) {
       console.error('Error fetching recent sales:', error);
@@ -327,11 +337,27 @@ class SalesAPIService {
         throw new Error('start_date and end_date are required');
       }
       const queryParams = {
-        period: params.period || 'monthly',
-        ...params
+        start_date: params.start_date,
+        end_date: params.end_date,
+        period_type: params.period_type || params.period || 'monthly'
       };
-      const response = await api.get('/sales-report/by-period/', { params: queryParams });
-      return this.handleResponse(response);
+      const response = await api.get('reports/sales-by-period/', { params: queryParams });
+      const result = this.handleResponse(response);
+
+      // Normalize buckets: expose a `period` key and a total_sales alias
+      // (backend buckets carry total_revenue plus date/week_start/year+month)
+      const breakdown = Array.isArray(result?.breakdown) ? result.breakdown : [];
+      const data = breakdown.map(bucket => ({
+        ...bucket,
+        period: bucket.date
+          || bucket.week_start
+          || (bucket.year && bucket.month
+            ? `${bucket.year}-${String(bucket.month).padStart(2, '0')}`
+            : bucket.period_label),
+        total_sales: bucket.total_revenue
+      }));
+
+      return { ...result, data };
     } catch (error) {
       console.error('Error fetching sales by period:', error);
       this.handleError(error);
