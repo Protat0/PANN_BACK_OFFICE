@@ -96,7 +96,7 @@ const handleSubmit = async () => {
   error.value = ''
 
   try {
-    const response = await axios.post(`${API_URL}/auth/forgot-password/`, {
+    const response = await axios.post(`${API_URL}/auth/password-reset/request/`, {
       email: email.value
     })
 
