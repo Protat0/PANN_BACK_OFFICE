@@ -64,16 +64,8 @@
       </div>
     </div>
 
-    <!-- Loading State -->
-    <div v-if="loading" class="text-center py-5">
-      <div class="spinner-border text-accent" role="status">
-        <span class="visually-hidden">Loading...</span>
-      </div>
-      <p class="text-tertiary-medium mt-2">Loading adjustments...</p>
-    </div>
-
     <!-- Error State -->
-    <div v-else-if="error" class="status-error" role="alert">
+    <div v-if="error" class="status-error" role="alert">
       <strong>Error:</strong> {{ error }}
     </div>
 
@@ -81,6 +73,7 @@
     <TableTemplate
       v-else
       :items-per-page="itemsPerPage"
+      :loading="loading"
       :total-items="filteredAdjustments.length"
       :current-page="currentPage"
       @page-changed="handlePageChange"

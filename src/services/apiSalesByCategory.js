@@ -13,7 +13,7 @@ class CategoryDisplayService {
    */
   async getSalesByCategory(start_date, end_date, include_voided = false, include_trends = false) {
     try {
-      const response = await api.get('/sales/category/', {
+      const response = await api.get('reports/sales-by-category/', {
         params: {
           start_date,
           end_date,
@@ -39,7 +39,7 @@ class CategoryDisplayService {
    */
   async getTopCategories(start_date, end_date, limit = 5) {
     try {
-      const response = await api.get('/sales/category/top/', {
+      const response = await api.get('reports/top-categories/', {
         params: {
           start_date,
           end_date,
@@ -63,7 +63,7 @@ class CategoryDisplayService {
    */
   async getCategoryPerformance(category_id, start_date, end_date) {
     try {
-      const response = await api.get(`/sales/category/${category_id}/`, {
+      const response = await api.get(`reports/category-performance/${category_id}/`, {
         params: {
           start_date,
           end_date
@@ -76,21 +76,6 @@ class CategoryDisplayService {
     }
   }
 
-  /**
-   * (Optional) Export category sales report
-   */
-  async exportCategorySales(start_date, end_date) {
-    try {
-      const response = await api.get('/sales/category/export/', {
-        params: { start_date, end_date },
-        responseType: 'blob'
-      });
-      return response;
-    } catch (error) {
-      console.error('❌ Error exporting category sales:', error);
-      throw error;
-    }
-  }
 }
 
 // Export singleton instance

@@ -72,16 +72,8 @@
       </div>
     </div>
 
-    <!-- Loading State -->
-    <div v-if="loading" class="text-center py-5">
-      <div class="spinner-border text-accent" role="status">
-        <span class="visually-hidden">Loading...</span>
-      </div>
-      <p class="text-tertiary-medium mt-2">Loading purchase history...</p>
-    </div>
-
     <!-- Error State -->
-    <div v-else-if="error" class="status-error" role="alert">
+    <div v-if="error" class="status-error" role="alert">
       <strong>Error:</strong> {{ error }}
     </div>
 
@@ -91,6 +83,7 @@
       :items-per-page="itemsPerPage"
       :total-items="batches.length"
       :current-page="currentPage"
+      :loading="loading"
       @page-changed="handlePageChange"
     >
       <template #header>

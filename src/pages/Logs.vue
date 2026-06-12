@@ -99,12 +99,6 @@
       </div>
     </div>
 
-    <!-- Loading State -->
-    <div v-if="loading && session_logs.length === 0" class="text-center py-5">
-      <div class="spinner-border text-accent mb-3"></div>
-      <p class="text-secondary">Loading system logs...</p>
-    </div>
-
     <!-- Error State -->
     <div v-if="error" class="status-error rounded p-4 text-center mb-4">
       <i class="bi bi-exclamation-triangle fs-2 mb-3"></i>
@@ -135,11 +129,11 @@
 
     <!-- Data Table -->
     <TableTemplate
-      v-if="!loading || session_logs.length > 0"
       :items-per-page="parseInt(pageSize)"
       :total-items="filteredLogs.length"
       :current-page="currentPage"
       :show-pagination="true"
+      :loading="loading && session_logs.length === 0"
       @page-changed="goToPage"
     >
       <template #header>
