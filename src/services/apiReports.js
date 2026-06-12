@@ -185,6 +185,26 @@ class SalesAPIService {
   }
 
   // ====================================================================
+  // DASHBOARD SUMMARY
+  // ====================================================================
+
+  /**
+   * One-call aggregate for the dashboard KPI cards.
+   * @returns {Promise<Object>} { total_profit: {value, period},
+   *   total_items_sold: {value, period}, monthly_revenue: {value, period_label},
+   *   top_month: {year, month, month_name, revenue} | null, total_products }
+   */
+  async getDashboardSummary() {
+    try {
+      const response = await api.get('reports/dashboard-summary/');
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error("Error fetching dashboard summary:", error);
+      this.handleError(error);
+    }
+  }
+
+  // ====================================================================
   // SALES STATISTICS AND REPORTS
   // ====================================================================
 

@@ -19,13 +19,17 @@
         <div v-if="content" v-html="content"></div>
       </slot>
       
-      <!-- Value Display -->
-      <div v-if="value !== null && value !== undefined" :class="valueClasses">
+      <!-- Value Display (skeleton while loading) -->
+      <div v-if="skeleton" :class="valueClasses">
+        <SkeletonLoader width="60%" height="1.75rem" />
+      </div>
+      <div v-else-if="value !== null && value !== undefined" :class="valueClasses">
         {{ formattedValue }}
       </div>
-      
-      <!-- Subtitle/Description -->
-      <small v-if="subtitle" :class="subtitleClasses">{{ subtitle }}</small>
+
+      <!-- Subtitle/Description (skeleton while loading) -->
+      <SkeletonLoader v-if="skeleton" width="40%" height="0.75rem" class="mt-1" />
+      <small v-else-if="subtitle" :class="subtitleClasses">{{ subtitle }}</small>
     </div>
 
     <!-- Card Footer (optional) -->
@@ -43,8 +47,13 @@
 </template>
 
 <script>
+import SkeletonLoader from './SkeletonLoader.vue'
+
 export default {
   name: 'CardTemplate',
+  components: {
+    SkeletonLoader
+  },
   props: {
     // Size variants - now includes 'custom'
     size: {
@@ -135,6 +144,12 @@ export default {
     },
     
     loading: {
+      type: Boolean,
+      default: false
+    },
+
+    // Render skeleton bars in place of value/subtitle while data loads
+    skeleton: {
       type: Boolean,
       default: false
     },
