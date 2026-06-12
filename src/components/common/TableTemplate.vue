@@ -2,11 +2,18 @@
   <div class="table-container">
     <div class="table-responsive">
       <table class="table table-hover data-table">
-        <thead class="table-header table-header-sticky">
+        <thead class="table-header table-header-sticky" ref="headerRow">
           <slot name="header"></slot>
         </thead>
         <tbody>
-          <slot name="body"></slot>
+          <template v-if="loading">
+            <tr v-for="row in skeletonRows" :key="`skeleton-row-${row}`" class="skeleton-row">
+              <td v-for="col in resolvedSkeletonColumns" :key="`skeleton-col-${col}`">
+                <div class="skeleton-cell" :style="{ width: skeletonCellWidth(col) }"></div>
+              </td>
+            </tr>
+          </template>
+          <slot v-else name="body"></slot>
         </tbody>
       </table>
     </div>
@@ -83,11 +90,32 @@ export default {
     currentPage: {
       type: Number,
       default: 1
+    },
+
+    // Skeleton loader props
+    loading: {
+      type: Boolean,
+      default: false
+    },
+    skeletonRows: {
+      type: Number,
+      default: 5
+    },
+    skeletonColumns: {
+      type: Number,
+      default: null
     }
   },
-  
+
   emits: ['page-changed'],
-  
+
+  data() {
+    return {
+      detectedColumnCount: 6,
+      skeletonWidths: ['85%', '60%', '75%', '50%', '90%', '65%', '70%', '55%']
+    }
+  },
+
   computed: {
     totalPages() {
       return Math.ceil(this.totalItems / this.itemsPerPage)
@@ -98,10 +126,40 @@ export default {
     },
     endItem() {
       return Math.min(this.currentPage * this.itemsPerPage, this.totalItems)
+    },
+    resolvedSkeletonColumns() {
+      return this.skeletonColumns || this.detectedColumnCount
     }
   },
-  
+
+  mounted() {
+    this.detectColumnCount()
+  },
+
+  watch: {
+    loading(isLoading) {
+      if (isLoading) {
+        this.$nextTick(() => this.detectColumnCount())
+      }
+    }
+  },
+
   methods: {
+    detectColumnCount() {
+      const headerRow = this.$refs.headerRow?.querySelector('tr')
+      if (!headerRow) return
+
+      let count = 0
+      for (const cell of headerRow.children) {
+        count += cell.colSpan || 1
+      }
+      if (count > 0) this.detectedColumnCount = count
+    },
+
+    skeletonCellWidth(col) {
+      return this.skeletonWidths[(col - 1) % this.skeletonWidths.length]
+    },
+
     handleScroll(event) {
       const scrollTop = event.target.scrollTop
       const tableContainer = event.target
@@ -499,6 +557,27 @@ export default {
   box-shadow: var(--shadow-md);
 }
 
+/* Skeleton Loader */
+.skeleton-row {
+  pointer-events: none;
+}
+
+.skeleton-cell {
+  height: 0.875rem;
+  border-radius: 0.25rem;
+  background-color: var(--surface-tertiary);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
   .table-responsive {
@@ -550,11 +629,16 @@ export default {
   .page-link-icon svg {
     transition: none !important;
   }
-  
+
   .data-table :deep(.action-btn:hover),
   .pagination .page-link:hover,
   .page-link-icon:hover {
     transform: none !important;
+  }
+
+  .skeleton-cell {
+    animation: none !important;
+    opacity: 0.6;
   }
 }
 

@@ -24,11 +24,6 @@
       @export="exportData"
     />
 
-    <div v-if="loading && promotions.length === 0" class="loading-state">
-      <div class="spinner-border"></div>
-      <p>Loading promotions...</p>
-    </div>
-
     <div v-if="error" class="error-state">
       <div class="alert alert-danger">
         <p>{{ error }}</p>
@@ -37,11 +32,11 @@
     </div>
 
     <TableTemplate
-      v-if="!loading || promotions.length > 0"
       :items-per-page="pagination.items_per_page"
       :total-items="pagination.total_items"
       :current-page="pagination.current_page"
       :show-pagination="true"
+      :loading="loading && promotions.length === 0"
       @page-changed="handlePageChange"
     >
       <template #header>
@@ -307,7 +302,7 @@ onMounted(async () => { await fetchPromotions() })
 .promotions-page { padding: 1.5rem; max-width: 1400px; margin: 0 auto; }
 .page-header { margin-bottom: 1.5rem; }
 .page-title { font-size: 2rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.25rem 0; }
-.loading-state, .error-state, .empty-state { text-align: center; padding: 3rem; background: var(--surface-primary); border-radius: 0.75rem; box-shadow: var(--shadow-md); margin-top: 1rem; }
+.error-state, .empty-state { text-align: center; padding: 3rem; background: var(--surface-primary); border-radius: 0.75rem; box-shadow: var(--shadow-md); margin-top: 1rem; }
 .spinner-border { width: 2rem; height: 2rem; border: 0.25em solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spinner-border 0.75s linear infinite; }
 .spinner-border-sm { width: 0.875rem; height: 0.875rem; border-width: 0.15em; }
 @keyframes spinner-border { to { transform: rotate(360deg); } }

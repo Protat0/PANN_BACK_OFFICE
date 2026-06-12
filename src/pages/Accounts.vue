@@ -26,12 +26,6 @@
       @export="exportData"
     />
 
-    <!-- Loading State -->
-    <div v-if="loading && users.length === 0" class="loading-state">
-      <div class="spinner-border"></div>
-      <p>Loading users...</p>
-    </div>
-
     <!-- Error State -->
     <div v-if="error" class="error-state">
       <div class="alert alert-danger">
@@ -49,11 +43,11 @@
 
     <!-- Data Table -->
     <TableTemplate
-      v-if="!loading || users.length > 0"
       :items-per-page="pagination.limit"
       :total-items="pagination.total"
       :current-page="pagination.page"
       :show-pagination="true"
+      :loading="loading && users.length === 0"
       @page-changed="handlePageChange"
     >
       <template #header>
@@ -466,7 +460,6 @@ onMounted(() => {
   font-size: 0.875rem;
 }
 
-.loading-state,
 .error-state,
 .empty-state {
   text-align: center;
