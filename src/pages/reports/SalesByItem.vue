@@ -11,12 +11,14 @@
           <h3>Net Sales</h3>
         </div>
          
-        <!-- Loading state for top items -->
-        <div v-if="loadingTopItems" class="loading-state-small">
-          <div class="spinner-border-sm"></div>
-          <p>Loading top items...</p>
-        </div>
-        
+        <!-- Loading state for top items (skeleton) -->
+        <ul v-if="loadingTopItems" class="LCL2" aria-busy="true">
+          <li v-for="n in 5" :key="`sk-top-${n}`" class="list-item">
+            <span class="sk sk-line" style="width: 55%"></span>
+            <span class="sk sk-line" style="width: 22%"></span>
+          </li>
+        </ul>
+
         <!-- Top items list -->
         <ul v-else-if="topItems && topItems.length > 0" class="LCL2">
           <li
@@ -60,9 +62,8 @@
           </select>
         </div>
         <div class="chart-container">
-          <div v-if="loadingChart" class="chart-loading">
-            <div class="spinner-border text-primary"></div>
-            <p>Loading chart data...</p>
+          <div v-if="loadingChart" class="chart-loading" aria-busy="true">
+            <span class="sk sk-chart"></span>
           </div>
           <BarChart
             v-else
@@ -136,12 +137,11 @@
         </div>
       </div>
 
-      <!-- Loading State -->
-      <div v-if="salesByItemLoading" class="loading-state">
-        <div class="spinner-border text-primary"></div>
-        <p>Loading sales data...</p>
+      <!-- Loading State (skeleton) -->
+      <div v-if="salesByItemLoading" class="table-skeleton" aria-busy="true">
+        <span v-for="n in 8" :key="`sk-row-${n}`" class="sk sk-row"></span>
       </div>
-      
+
       <!-- Sales by Item Table -->
       <div v-else class="table-container">
         <table class="table table-striped">
@@ -2051,5 +2051,71 @@ export default {
 
 .date-range-info i {
   margin-right: 4px;
+}
+
+/* ==========================================================================
+   SKELETON LOADING STATES
+   ========================================================================== */
+.sk {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  background-color: var(--surface-secondary);
+  border-radius: 0.375rem;
+}
+
+.sk::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.35),
+    transparent
+  );
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.dark-theme .sk::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.08),
+    transparent
+  );
+}
+
+.sk-line {
+  height: 0.85rem;
+}
+
+.sk-chart {
+  width: 100%;
+  height: 100%;
+  min-height: 140px;
+  border-radius: 0.5rem;
+}
+
+.table-skeleton {
+  padding: 0.5rem 0;
+}
+
+.sk-row {
+  height: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk::after {
+    animation: none;
+  }
 }
 </style>

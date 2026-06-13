@@ -426,6 +426,12 @@ export default {
 
 .verification-badge--verified {
   background-color: var(--status-success-bg);
+  /* Darker green for contrast against the light-green badge in light mode */
+  color: var(--success-dark);
+}
+
+/* In dark mode the badge background is a faint tint, so keep the lighter green */
+.dark-theme .verification-badge--verified {
   color: var(--status-success);
 }
 
