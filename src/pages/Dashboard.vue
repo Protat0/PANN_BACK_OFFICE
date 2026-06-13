@@ -183,6 +183,7 @@
                     <tr>
                       <th>Time</th>
                       <th>Transaction ID</th>
+                      <th>Source</th>
                       <th>Customer</th>
                       <th>Items</th>
                       <th>Payment Method</th>
@@ -201,6 +202,11 @@
                       </td>
                       <td class="id-cell">
                         {{ formatTransactionId(transaction._id || transaction.id) }}
+                      </td>
+                      <td class="source-cell">
+                        <span class="source-badge" :class="transaction.source === 'online' ? 'source-online' : 'source-pos'">
+                          {{ transaction.source === 'online' ? 'Online' : 'POS' }}
+                        </span>
                       </td>
                       <td class="customer-cell">
                         {{ transaction.customer_name || transaction.customer?.full_name || 'Walk-in' }}
@@ -656,6 +662,10 @@ export default {
       }
       if (status === 'pending') {
         return 'Pending'
+      }
+      // Online order statuses (processing, out_for_delivery, ...) display as-is
+      if (typeof status === 'string' && status) {
+        return status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ')
       }
       return 'Active'
     },
@@ -1224,6 +1234,24 @@ export default {
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: capitalize;
+}
+
+.source-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.source-pos {
+  background-color: #e0e7ff;
+  color: #3730a3;
+}
+
+.source-online {
+  background-color: #fce7f3;
+  color: #9d174d;
 }
 
 .payment-cash {
