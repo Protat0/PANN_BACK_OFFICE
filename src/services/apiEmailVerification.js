@@ -5,9 +5,10 @@
 
 class EmailVerificationService {
   constructor() {
-    // Email verification endpoints are at /api/v1/notifications/email/
-    const baseUrl = import.meta.env.VITE_API_URL
-    this.baseURL = `${baseUrl}/notifications/email`
+    // Notifications are mounted at /api/v1/notifications/ (not under /admin/)
+    const adminUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1/admin'
+    const apiRoot = adminUrl.replace(/\/admin$/, '')
+    this.baseURL = `${apiRoot}/notifications/email`
   }
 
   /**
@@ -79,7 +80,7 @@ class EmailVerificationService {
   async resendVerificationCode(email) {
     try {
       const token = localStorage.getItem('access_token')
-      const response = await fetch(`${this.baseURL}/resend-verification/`, {
+      const response = await fetch(`${this.baseURL}/resend/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

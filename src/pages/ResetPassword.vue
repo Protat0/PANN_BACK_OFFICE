@@ -183,7 +183,7 @@ onMounted(async () => {
 
   // Verify the token
   try {
-    const response = await axios.post(`${API_URL}/auth/verify-reset-token/`, {
+    const response = await axios.post(`${API_URL}/auth/password-reset/verify/`, {
       token: token.value
     })
 
@@ -218,7 +218,7 @@ const handleSubmit = async () => {
   error.value = ''
 
   try {
-    const response = await axios.post(`${API_URL}/auth/reset-password/`, {
+    const response = await axios.post(`${API_URL}/auth/password-reset/reset/`, {
       token: token.value,
       new_password: password.value
     })

@@ -5,7 +5,7 @@
       <div class="brand-container" v-if="!isCollapsed">
         <div class="brand-logo">
           <div class="logo-circle">
-            <span class="logo-text">P</span>
+            <img src="../assets/Logo_1.png" alt="PANN Logo" class="logo-image" />
           </div>
         </div>
         <div class="brand-info">
@@ -30,7 +30,7 @@
         <!-- Stacked logo and button vertically -->
         <div class="collapsed-header-row">
           <div class="logo-circle">
-            <span class="logo-text">P</span>
+            <img src="../assets/Logo_1.png" alt="PANN Logo" class="logo-image" />
           </div>
           <button 
             class="btn btn-icon-only btn-sm sidebar-toggle collapsed-toggle"
@@ -680,19 +680,15 @@ export default {
 .logo-circle {
   width: 40px;
   height: 40px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-.logo-text {
-  font-weight: 700;
-  font-size: 1.25rem;
-  color: var(--text-inverse);
+.logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .brand-title {
@@ -777,11 +773,28 @@ export default {
   transition: all 0.3s ease;
 }
 
+/* When the profile is selected, invert the avatar so it contrasts with the
+   active card in both themes (dark mode -> light avatar, light mode -> dark). */
+.profile-card.active .profile-avatar {
+  background-color: var(--text-primary);
+  border-color: var(--text-inverse);
+}
+
+.profile-card.active .profile-avatar .text-accent {
+  color: var(--surface-primary);
+}
+
 .profile-name {
   font-weight: 600;
   font-size: 0.875rem;
   color: var(--text-primary);
   transition: color 0.3s ease;
+}
+
+/* Match active nav items: inverse text on the selected card
+   (light in light mode, dark in dark mode). */
+.profile-card.active .profile-name {
+  color: var(--text-inverse);
 }
 
 .profile-role {
@@ -956,6 +969,14 @@ export default {
   background-color: var(--surface-primary);
   border-top: 1px solid var(--border-primary);
   transition: all 0.3s ease;
+}
+
+/* Keep the icon/spinner and label on one centered row in every state */
+.sidebar-footer .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
 /* ==========================================================================

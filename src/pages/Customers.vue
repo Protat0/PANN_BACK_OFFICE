@@ -1,14 +1,6 @@
 <template>
   <div class="page-container p-4">
 
-    <!-- Loading State -->
-    <div v-if="isLoading && !hasCustomers" class="text-center py-12">
-      <div class="spinner-border text-accent mb-4" role="status">
-        <span class="visually-hidden">Loading...</span>
-      </div>
-      <p class="text-secondary">Loading customers...</p>
-    </div>
-
     <!-- Error State -->
     <div v-if="error" class="status-error rounded-lg p-4 mb-4">
       <h3 class="text-lg fw-medium text-status-error mb-2">Error Loading Customers</h3>
@@ -58,7 +50,8 @@
         :items-per-page="itemsPerPage"
         :total-items="totalItemsForPagination"
         :current-page="currentPage"
-        :show-pagination="totalItemsForPagination > itemsPerPage"
+        :show-pagination="totalCustomers > itemsPerPage"
+        :loading="isLoading && !hasCustomers"
         @page-changed="handlePageChange"
         class="shadow-md"
       >

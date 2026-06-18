@@ -1,7 +1,6 @@
 import { ref, computed } from 'vue'
 import salesDisplayService from '../../services/apiSalesByItem.js'
 import salesAPIService from '../../services/apiReports.js'
-import apiProductsService from '../../services/apiProducts.js'
 
 // Global state for sales data
 const salesByItemRows = ref([])
@@ -40,9 +39,6 @@ const profitError = ref(null)
 const monthlyIncome = ref(0)
 const monthlyIncomeLoading = ref(false)
 const monthlyIncomeError = ref(null)
-
-// Product cost cache for profit calculations
-const productCostCache = ref(new Map())
 
 // Pagination
 const salesByItemPagination = ref({
@@ -153,46 +149,6 @@ export function useSales() {
     } else {
       return error.message || 'Failed to load sales data. Please try again.'
     }
-  }
-
-  /**
-   * Fetch and cache product cost prices for profit calculations
-   */
-  const fetchProductCostPrices = async (productIds) => {
-    try {
-      // Filter out product IDs we don't have cached
-      const missingIds = productIds.filter(id => !productCostCache.value.has(id))
-      
-      if (missingIds.length === 0) {
-        return
-      }
-      
-      // Fetch all products to get their cost prices
-      const response = await apiProductsService.getAllProducts({ limit: 10000 })
-      const products = response.data || []
-      
-      // Cache all product cost prices for future use
-      let cachedCount = 0
-      products.forEach(product => {
-        if (product._id && product.cost_price !== undefined) {
-          productCostCache.value.set(product._id, parseFloat(product.cost_price) || 0)
-          cachedCount++
-        }
-      })
-      
-    } catch (error) {
-      console.warn('Failed to fetch product cost prices:', error)
-    }
-  }
-
-  /**
-   * Get cached cost price for a product, or return 0 if not found
-   */
-  const getProductCostPrice = (productId) => {
-    const costPrice = productCostCache.value.get(productId) || 0
-    // Only provide debug info when cost price is missing and we're in a profit calculation context
-    // Chart operations don't need cost prices, so we'll keep this quiet for chart-only operations
-    return costPrice
   }
 
   /**
@@ -756,41 +712,16 @@ export function useSales() {
           data = response.results
         }
 
-        // First, fetch cost prices for all products in the sales data
-        const productIds = data.map(item => item.id || item._id || item.product_id).filter(Boolean)
-        if (productIds.length > 0) {
-          await fetchProductCostPrices(productIds)
-        }
-
         // Calculate total profit: Revenue - (Cost Price × Quantity Sold)
+        // cost_price comes directly from the sales-by-item rows
         let calculatedProfit = 0
-        let totalRevenue = 0
-        
+
         data.forEach(item => {
           const itemTotalSales = parseFloat(item.total_sales) || 0 // This is revenue
           const itemsSold = parseInt(item.items_sold) || 0
-          const productId = item.id || item._id || item.product_id
-          
-          // Try to get cost price from sales data first, then from cache
-          let costPrice = parseFloat(item.cost_price) || 0
-          if (costPrice === 0 && productId) {
-            costPrice = getProductCostPrice(productId)
-          }
-          
-          totalRevenue += itemTotalSales
-          
-          // Calculate profit: Revenue - (Cost Price × Quantity Sold)
-          if (costPrice > 0) {
-            const itemCosts = costPrice * itemsSold
-            const itemProfit = itemTotalSales - itemCosts
-            calculatedProfit += itemProfit
-          } else {
-            // Only log missing cost price in debug mode to reduce console noise
-            // Chart operations don't need cost prices, only profit calculations do
-            if (productId && process.env.NODE_ENV === 'development') {
-              console.debug(`No cost price for ${productId}, profit calculation skipped`)
-            }
-          }
+          const costPrice = parseFloat(item.cost_price) || 0
+
+          calculatedProfit += itemTotalSales - costPrice * itemsSold
         })
 
         totalProfit.value = calculatedProfit
@@ -858,41 +789,16 @@ export function useSales() {
           data = response.results
         }
 
-        // First, fetch cost prices for all products in the sales data
-        const productIds = data.map(item => item.id || item._id || item.product_id).filter(Boolean)
-        if (productIds.length > 0) {
-          await fetchProductCostPrices(productIds)
-        }
-
         // Calculate total profit: Revenue - (Cost Price × Quantity Sold)
+        // cost_price comes directly from the sales-by-item rows
         let calculatedProfit = 0
-        let totalRevenue = 0
-        
+
         data.forEach(item => {
           const itemTotalSales = parseFloat(item.total_sales) || 0 // This is revenue
           const itemsSold = parseInt(item.items_sold) || 0
-          const productId = item.id || item._id || item.product_id
-          
-          // Try to get cost price from sales data first, then from cache
-          let costPrice = parseFloat(item.cost_price) || 0
-          if (costPrice === 0 && productId) {
-            costPrice = getProductCostPrice(productId)
-          }
-          
-          totalRevenue += itemTotalSales
-          
-          // Calculate profit: Revenue - (Cost Price × Quantity Sold)
-          if (costPrice > 0) {
-            const itemCosts = costPrice * itemsSold
-            const itemProfit = itemTotalSales - itemCosts
-            calculatedProfit += itemProfit
-          } else {
-            // Only log missing cost price in debug mode to reduce console noise
-            // Chart operations don't need cost prices, only profit calculations do
-            if (productId && process.env.NODE_ENV === 'development') {
-              console.debug(`No cost price for ${productId}, profit calculation skipped`)
-            }
-          }
+          const costPrice = parseFloat(item.cost_price) || 0
+
+          calculatedProfit += itemTotalSales - costPrice * itemsSold
         })
 
         totalProfit.value = calculatedProfit
@@ -1253,9 +1159,6 @@ export function useSales() {
     monthlyIncomeLoading,
     monthlyIncomeError,
     
-    // Product cost cache
-    productCostCache,
-    
     // Pagination
     salesByItemPagination,
     
@@ -1292,8 +1195,6 @@ export function useSales() {
     formatDateForAPI,
     validateDateRange,
     getErrorMessage,
-    fetchProductCostPrices,
-    getProductCostPrice,
     formatCurrency,
     calculateDateRange,
     generateChartColors,

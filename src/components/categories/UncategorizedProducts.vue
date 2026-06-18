@@ -13,14 +13,6 @@
       </ol>
     </nav>
 
-    <!-- Loading State -->
-    <div v-if="loading" class="text-center py-4">
-      <div class="spinner-border text-accent" role="status">
-        <span class="visually-hidden">Loading uncategorized products...</span>
-      </div>
-      <p class="mt-2 text-tertiary-medium">Loading uncategorized products...</p>
-    </div>
-
     <!-- Error State -->
     <div v-if="error" class="status-error" role="alert">
       <strong>Error:</strong> {{ error }}
@@ -30,7 +22,7 @@
     </div>
 
     <!-- Main Content -->
-    <div v-if="!loading && !error">
+    <div v-if="!error">
       <!-- Page Header -->
       <div class="d-flex justify-content-between align-items-start mb-4">
         <div>
@@ -172,6 +164,7 @@
         :total-items="filteredProducts.length"
         :current-page="currentPage"
         :items-per-page="itemsPerPage"
+        :loading="loading && uncategorizedProducts.length === 0"
         @page-changed="handlePageChange"
       >
         <template #header>

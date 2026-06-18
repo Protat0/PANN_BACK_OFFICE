@@ -13,14 +13,6 @@
       </ol>
     </nav>
 
-    <!-- Loading State -->
-    <div v-if="loading" class="text-center py-4">
-      <div class="spinner-border text-accent" role="status">
-        <span class="visually-hidden">Loading category details...</span>
-      </div>
-      <p class="mt-2 text-tertiary-medium">Loading category details...</p>
-    </div>
-
     <!-- Error State -->
     <div v-if="error" class="status-error mb-3">
       <strong>Error:</strong> {{ error }}
@@ -30,7 +22,7 @@
     </div>
 
     <!-- Main Content -->
-    <div v-if="!loading && !error && currentCategory">
+    <div v-if="!categoriesLoading && !error && currentCategory">
       <!-- Page Header -->
       <div class="d-flex justify-content-between align-items-start mb-4">
         <div>
@@ -166,6 +158,7 @@
         :total-items="filteredProducts.length"
         :current-page="currentPage"
         :items-per-page="itemsPerPage"
+        :loading="productsLoading && categoryProducts.length === 0"
         @page-changed="handlePageChange"
       >
         <template #header>
@@ -349,7 +342,6 @@ export default {
     const pendingRemoval = ref(null) // { type: 'single', product } | { type: 'bulk' }
 
     // Computed properties
-    const loading = computed(() => categoriesLoading.value || productsLoading.value)
     const error = computed(() => categoriesError.value || productsError.value)
 
     const filteredProducts = computed(() => {
@@ -668,7 +660,7 @@ export default {
 
     return {
       // State
-      loading, error, currentCategory, categoryProducts, currentPage, itemsPerPage,
+      categoriesLoading, productsLoading, error, currentCategory, categoryProducts, currentPage, itemsPerPage,
       subcategoryFilter, selectedProducts, isExporting, categoryId,
       moveProductLoading, bulkMoveLoading,
       

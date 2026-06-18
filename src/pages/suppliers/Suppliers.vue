@@ -43,12 +43,41 @@
       <p>Report Data: {{ JSON.stringify(reportsComposable.reportDataComputed?.value || {}) }}</p>
     </div>
 
-    <!-- Loading State -->
-    <div v-if="suppliersComposable.loading?.value && (!suppliersComposable.suppliers?.value || suppliersComposable.suppliers.value.length === 0)" class="text-center py-5">
-      <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Loading...</span>
+    <!-- Loading State (skeleton) -->
+    <div
+      v-if="suppliersComposable.loading?.value && (!suppliersComposable.suppliers?.value || suppliersComposable.suppliers.value.length === 0)"
+      class="row g-4"
+      aria-busy="true"
+    >
+      <div v-for="n in 6" :key="`supplier-skeleton-${n}`" class="col-12 col-md-6 col-lg-4">
+        <div class="card h-100 supplier-skeleton-card">
+          <div class="card-body d-flex flex-column">
+            <!-- Header: icon + name -->
+            <div class="d-flex align-items-center mb-3">
+              <span class="sk sk-circle me-3"></span>
+              <span class="sk sk-line" style="width: 55%"></span>
+            </div>
+            <!-- Contact lines -->
+            <div class="mb-3">
+              <span class="sk sk-line mb-2" style="width: 80%"></span>
+              <span class="sk sk-line mb-2" style="width: 60%"></span>
+              <span class="sk sk-line" style="width: 70%"></span>
+            </div>
+            <!-- Stats -->
+            <div class="mb-3 mt-auto">
+              <span class="sk sk-line mb-2" style="width: 40%"></span>
+              <span class="sk sk-line mb-2"></span>
+              <span class="sk sk-line mb-2"></span>
+              <span class="sk sk-line"></span>
+            </div>
+            <!-- Action buttons -->
+            <div class="d-flex gap-2 mt-2">
+              <span class="sk sk-btn flex-fill"></span>
+              <span class="sk sk-btn flex-fill"></span>
+            </div>
+          </div>
+        </div>
       </div>
-      <p class="mt-3 text-tertiary-medium">Loading suppliers...</p>
     </div>
 
     <!-- Error State -->
@@ -738,6 +767,73 @@ export default {
   .btn-sm {
     font-size: 0.8rem;
     padding: 0.375rem 0.5rem;
+  }
+}
+
+/* ==========================================================================
+   SKELETON LOADING STATE
+   ========================================================================== */
+.supplier-skeleton-card {
+  border: 1px solid var(--border-secondary);
+}
+
+.sk {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  background-color: var(--surface-secondary);
+  border-radius: 0.375rem;
+}
+
+.sk-line {
+  width: 100%;
+  height: 0.85rem;
+}
+
+.sk-circle {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sk-btn {
+  height: 2rem;
+  border-radius: 0.5rem;
+}
+
+.sk::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.35),
+    transparent
+  );
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.dark-theme .sk::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.08),
+    transparent
+  );
+}
+
+@keyframes skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk::after {
+    animation: none;
   }
 }
 </style>

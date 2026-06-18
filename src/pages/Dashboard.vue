@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="dashboard">
     <!-- KPI Cards Grid - Using CardTemplate with custom sizes -->
     <div class="kpi-grid">
@@ -9,7 +9,8 @@
         :min-height="300"
         :padding="20"
         title="Total Profit"
-        :value="profitLoading ? 'Loading...' : formattedTotalProfit"
+        :value="formattedTotalProfit"
+        :skeleton="profitLoading"
         value-color="primary"
         :subtitle="profitSubtitle"
         border-color="primary"
@@ -32,9 +33,10 @@
         :height="140"
         :padding="16"
         title="Total Products"
-        :value="productsLoading ? 'Loading...' : totalProducts"
+        :value="totalProducts"
+        :skeleton="productsLoading"
         value-color="success"
-        :subtitle="productsLoading ? 'Fetching data...' : `Updated: ${lastUpdated}`"
+        :subtitle="`Updated: ${lastUpdated}`"
         border-color="success"
         border-position="all"
         shadow="md"
@@ -54,7 +56,8 @@
         :height="140"
         :padding="16"
         title="Monthly Revenue"
-        :value="monthlyIncomeLoading ? 'Loading...' : formattedMonthlyRevenue"
+        :value="formattedMonthlyRevenue"
+        :skeleton="monthlyIncomeLoading"
         value-color="secondary"
         :subtitle="monthlyRevenueSubtitle"
         border-color="secondary"
@@ -76,7 +79,8 @@
         :height="140"
         :padding="16"
         title="Top Performing Month"
-        :value="topMonthLoading ? 'Loading...' : topMonthName"
+        :value="topMonthName"
+        :skeleton="topMonthLoading"
         value-color="info"
         :subtitle="topMonthSubtitle"
         border-color="info"
@@ -98,7 +102,8 @@
         :height="140"
         :padding="16"
         title="Total Items Sold"
-        :value="salesStatsLoading ? 'Loading...' : totalOrders"
+        :value="totalOrders"
+        :skeleton="salesStatsLoading"
         value-color="error"
         :subtitle="salesDataSubtitle"
         border-color="error"
@@ -159,8 +164,9 @@
           
           <template #content>
             <div class="transactions-content">
-              <div v-if="transactionsLoading && recentTransactions.length === 0" class="loading-state">
-                <p>Loading transactions...</p>
+              <div v-if="transactionsLoading && recentTransactions.length === 0" class="transactions-skeleton">
+                <SkeletonLoader height="2rem" border-radius="0.5rem" />
+                <SkeletonLoader v-for="n in 5" :key="n" height="2.5rem" border-radius="0.5rem" />
               </div>
               <div v-else-if="transactionsError" class="error-state">
                 <p>{{ transactionsError }}</p>
@@ -177,6 +183,7 @@
                     <tr>
                       <th>Time</th>
                       <th>Transaction ID</th>
+                      <th>Source</th>
                       <th>Customer</th>
                       <th>Items</th>
                       <th>Payment Method</th>
@@ -195,6 +202,11 @@
                       </td>
                       <td class="id-cell">
                         {{ formatTransactionId(transaction._id || transaction.id) }}
+                      </td>
+                      <td class="source-cell">
+                        <span class="source-badge" :class="transaction.source === 'online' ? 'source-online' : 'source-pos'">
+                          {{ transaction.source === 'online' ? 'Online' : 'POS' }}
+                        </span>
                       </td>
                       <td class="customer-cell">
                         {{ transaction.customer_name || transaction.customer?.full_name || 'Walk-in' }}
@@ -281,8 +293,14 @@
           
           <template #content>
             <!-- Loading State -->
-            <div v-if="topProductsLoading" class="top-products-loading">
-              <p>Loading top products...</p>
+            <div v-if="topProductsLoading" class="top-products-skeleton">
+              <div v-for="n in 5" :key="n" class="skeleton-product-row">
+                <SkeletonLoader width="2rem" height="2rem" border-radius="50%" />
+                <div class="skeleton-product-info">
+                  <SkeletonLoader width="70%" height="0.875rem" />
+                  <SkeletonLoader width="45%" height="0.75rem" />
+                </div>
+              </div>
             </div>
             
             <!-- Error State -->
@@ -326,8 +344,8 @@
 
 <script>
 import CardTemplate from '../components/common/CardTemplate.vue'
+import SkeletonLoader from '../components/common/SkeletonLoader.vue'
 import { formatCurrency as formatCurrencyHelper, formatNumber as formatNumberHelper } from '@/helpers/currencyHelpers'
-import { useProducts } from '@/composables/api/useProducts.js'
 import { useSales } from '@/composables/api/useSales.js'
 import salesAPIService from '@/services/apiReports.js'
 import { RefreshCw } from 'lucide-vue-next'
@@ -336,64 +354,34 @@ export default {
   name: 'Dashboard',
   components: {
     CardTemplate,
+    SkeletonLoader,
     RefreshCw
   },
   setup() {
-    const { 
-      products, 
-      productStats, 
-      fetchProducts, 
-      initializeProducts,
-      loading: productsLoading, 
-      error: productsError 
-    } = useProducts()
-
+    // Shared KPI state — populated by loadSalesData() from the
+    // dashboard-summary endpoint
     const {
       totalSalesCount,
       salesStatsLoading,
       salesStatsError,
-      loadTotalSalesCount,
-      loadTotalSalesCountAllTime,
       totalProfit,
       profitLoading,
       profitError,
-      loadTotalProfit,
-      loadTotalProfitAllTime,
       monthlyIncome,
       monthlyIncomeLoading,
-      monthlyIncomeError,
-      loadMonthlyIncome,
-      loadCurrentMonthIncome,
-      chartData: salesChartData,
-      selectedFrequency: salesSelectedFrequency,
-      getTopChartItems,
-      onFrequencyChange,
-      calculateDateRange
+      monthlyIncomeError
     } = useSales()
 
     return {
-      products,
-      productStats,
-      fetchProducts,
-      initializeProducts,
-      productsLoading,
-      productsError,
       totalSalesCount,
       salesStatsLoading,
       salesStatsError,
-      loadTotalSalesCount,
-      loadTotalSalesCountAllTime,
       totalProfit,
       profitLoading,
       profitError,
-      loadTotalProfit,
-      loadTotalProfitAllTime,
       monthlyIncome,
       monthlyIncomeLoading,
-      monthlyIncomeError,
-      loadMonthlyIncome,
-      loadCurrentMonthIncome,
-      calculateDateRange
+      monthlyIncomeError
     }
   },
   data() {
@@ -401,11 +389,10 @@ export default {
       isShowingAllTimeSales: false, // Track if we're showing all-time data due to no last month sales
       isShowingAllTimeProfit: false, // Track if we're showing all-time profit due to no last month profit
       currentMonthPeriod: null, // Track current month period for monthly income
-      // Raw data values
-      rawData: {
-        totalProfit: 78452.23,
-        monthlyIncome: 120042
-      },
+      // Products card state (from dashboard summary)
+      summaryTotalProducts: null,
+      productsLoading: false,
+      productsError: null,
       // Transaction viewer state
       recentTransactions: [],
       transactionsLoading: false,
@@ -439,19 +426,7 @@ export default {
       return this.isShowingAllTimeProfit ? 'All time' : `From ${this.lastMonthPeriod}`
     },
     totalProducts() {
-      // Use dynamic data from products API - check multiple sources for total count
-      let count = 0
-      
-      // First try productStats.total (computed from products array)
-      if (this.productStats?.total !== undefined) {
-        count = this.productStats.total
-      }
-      // Fallback to direct products array length if productStats not available yet
-      else if (this.products && Array.isArray(this.products)) {
-        count = this.products.length
-      }
-      
-      return formatNumberHelper(count)
+      return formatNumberHelper(this.summaryTotalProducts ?? 0)
     },
     lastUpdated() {
       return new Date().toLocaleDateString('en-US', {
@@ -677,8 +652,11 @@ export default {
     },
     
     getStatusText(status) {
-      if (status === true || status === 'voided' || status === 'void') {
+      if (status === true || status === 'voided' || status === 'void' || status === 'cancelled') {
         return 'Voided'
+      }
+      if (status === 'refunded') {
+        return 'Refunded'
       }
       if (status === 'completed' || status === 'complete') {
         return 'Completed'
@@ -686,11 +664,15 @@ export default {
       if (status === 'pending') {
         return 'Pending'
       }
+      // Online order statuses (processing, out_for_delivery, ...) display as-is
+      if (typeof status === 'string' && status) {
+        return status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ')
+      }
       return 'Active'
     },
-    
+
     getStatusClass(status) {
-      if (status === true || status === 'voided' || status === 'void') {
+      if (status === true || status === 'voided' || status === 'void' || status === 'cancelled' || status === 'refunded') {
         return 'status-voided'
       }
       if (status === 'completed' || status === 'complete') {
@@ -701,124 +683,36 @@ export default {
       }
       return 'status-active'
     },
-    async loadProductsData() {
-      try {
-        // Use initializeProducts for cleaner initial data loading
-        await this.initializeProducts()
-      } catch (error) {
-        // Error loading products data - fallback to fetchProducts if initializeProducts fails
-        try {
-          await this.fetchProducts()
-        } catch (fallbackError) {
-          // Fallback fetchProducts also failed
-          // The error is already handled by the useProducts composable
-          // and will be reflected in the productsError reactive variable
-        }
-      }
-    },
     async loadSalesData() {
-      try {
-        // Calculate last month's date range for reference
-        const now = new Date()
-        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0) // Last day of previous month
-        
-        // Format dates for API (YYYY-MM-DD format)
-        const startDate = startOfLastMonth.toISOString().split('T')[0]
-        const endDate = endOfLastMonth.toISOString().split('T')[0]
-        
-        
-        // Load the last month's sales count
-        await this.loadTotalSalesCount(startDate, endDate)
-        const lastMonthCount = this.totalSalesCount
-        
-        // Load all-time count for comparison
-        await this.loadTotalSalesCountAllTime()
-        const allTimeCount = this.totalSalesCount
-        
-        // Use all-time count if last month shows 0, otherwise use last month
-        if (lastMonthCount > 0) {
-          this.totalSalesCount = lastMonthCount
-          this.isShowingAllTimeSales = false
-        } else {
-          this.totalSalesCount = allTimeCount
-          this.isShowingAllTimeSales = true
-        }
-        
-        // Also load profit data with the same date range
-        await this.loadTotalProfit(startDate, endDate)
-        const lastMonthProfit = this.totalProfit
-
-        // Load all-time profit for comparison
-        await this.loadTotalProfitAllTime()
-        const allTimeProfit = this.totalProfit
-        
-        // Use all-time profit if last month shows 0, otherwise use last month
-        if (lastMonthProfit > 0) {
-          // Restore the last month profit value
-          this.totalProfit = lastMonthProfit
-          this.isShowingAllTimeProfit = false
-        } else {
-          // Keep the all-time profit value (already set)
-          this.isShowingAllTimeProfit = true
-        }
-        
-        // Load current month's revenue (separate from the last month date range used for sales/profit)
-        await this.loadCurrentMonthIncome()
-        
-        // Set the current month period for the subtitle
-        const currentDate = new Date()
-        const currentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
-        this.currentMonthPeriod = currentMonth.toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long'
-        })
-        
-        // Load top performing month
-        await this.loadTopPerformingMonth()
-        
-        // Initialize top products date range (but don't load yet - wait for transactions)
-        await this.initializeTopProductsDateRange()
-        
-      } catch (error) {
-        // Error loading sales data
-      }
-    },
-    
-    async loadTopPerformingMonth() {
+      this.profitLoading = true
+      this.salesStatsLoading = true
+      this.monthlyIncomeLoading = true
+      this.productsLoading = true
       this.topMonthLoading = true
       this.topMonthError = null
-      
+
       try {
-        // Get last 12 months of data
-        const now = new Date()
-        const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1) // 12 months ago
-        const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0) // End of current month
-        
-        // Format dates for API (YYYY-MM-DD format)
-        const startDateStr = startDate.toISOString().split('T')[0]
-        const endDateStr = endDate.toISOString().split('T')[0]
-        
-        const response = await salesAPIService.getSalesByPeriod({
-          start_date: startDateStr,
-          end_date: endDateStr,
-          period: 'monthly'
-        })
-        
-        // Handle different response formats
-        let monthlyData = []
-        if (response?.periods && Array.isArray(response.periods)) {
-          monthlyData = response.periods
-        } else if (response?.data && Array.isArray(response.data)) {
-          monthlyData = response.data
-        } else if (Array.isArray(response)) {
-          monthlyData = response
-        } else if (response?.monthly && Array.isArray(response.monthly)) {
-          monthlyData = response.monthly
-        }
-        
-        if (monthlyData.length === 0) {
-          // Fallback: use current month as top month
+        const summary = await salesAPIService.getDashboardSummary()
+
+        this.totalProfit = summary.total_profit?.value || 0
+        this.isShowingAllTimeProfit = summary.total_profit?.period === 'all_time'
+
+        this.totalSalesCount = summary.total_items_sold?.value || 0
+        this.isShowingAllTimeSales = summary.total_items_sold?.period === 'all_time'
+
+        this.monthlyIncome = summary.monthly_revenue?.value || 0
+        this.currentMonthPeriod = summary.monthly_revenue?.period_label || null
+
+        this.summaryTotalProducts = summary.total_products ?? 0
+
+        if (summary.top_month) {
+          this.topPerformingMonth = {
+            monthName: summary.top_month.month_name,
+            revenue: summary.top_month.revenue,
+            month: summary.top_month.month,
+            year: summary.top_month.year
+          }
+        } else {
           const currentDate = new Date()
           this.topPerformingMonth = {
             monthName: currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
@@ -826,77 +720,29 @@ export default {
             month: currentDate.getMonth(),
             year: currentDate.getFullYear()
           }
-        } else {
-          // Find the month with highest revenue
-          let topMonth = null
-          let maxRevenue = 0
-          
-          monthlyData.forEach(month => {
-            // Handle different data structures
-            const revenue = parseFloat(month.total_sales || month.revenue || month.amount || month.total || 0)
-            const monthKey = month.period || month.month || month._id || month.label
-            
-            if (revenue > maxRevenue) {
-              maxRevenue = revenue
-              
-              // Parse month name from various formats
-              let monthName = 'Unknown'
-              if (monthKey) {
-                if (typeof monthKey === 'string') {
-                  // Try to parse month name from string like "2025-10" or "October 2025"
-                  const parts = monthKey.split('-')
-                  if (parts.length === 2) {
-                    const year = parseInt(parts[0])
-                    const monthNum = parseInt(parts[1])
-                    const date = new Date(year, monthNum - 1, 1)
-                    monthName = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-                  } else {
-                    monthName = monthKey
-                  }
-                } else if (monthKey.year && monthKey.month) {
-                  const date = new Date(monthKey.year, monthKey.month - 1, 1)
-                  monthName = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-                }
-              }
-              
-              topMonth = {
-                monthName: monthName,
-                revenue: revenue,
-                month: monthKey?.month || new Date().getMonth(),
-                year: monthKey?.year || new Date().getFullYear(),
-                raw: month
-              }
-            }
-          })
-          
-          if (topMonth) {
-            this.topPerformingMonth = topMonth
-          } else {
-            // Fallback to current month
-            const currentDate = new Date()
-            this.topPerformingMonth = {
-              monthName: currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-              revenue: this.monthlyIncome || 0,
-              month: currentDate.getMonth(),
-              year: currentDate.getFullYear()
-            }
-          }
         }
-        
-        this.topMonthError = null
+
+        this.profitError = null
+        this.salesStatsError = null
+        this.monthlyIncomeError = null
+        this.productsError = null
       } catch (error) {
-        this.topMonthError = error.message || 'Failed to load top month data'
-        // Fallback to current month
-        const currentDate = new Date()
-        this.topPerformingMonth = {
-          monthName: currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-          revenue: this.monthlyIncome || 0,
-          month: currentDate.getMonth(),
-          year: currentDate.getFullYear()
-        }
+        const message = error.message || 'Failed to load dashboard summary'
+        this.profitError = message
+        this.salesStatsError = message
+        this.monthlyIncomeError = message
+        this.productsError = message
+        this.topMonthError = message
       } finally {
+        this.profitLoading = false
+        this.salesStatsLoading = false
+        this.monthlyIncomeLoading = false
+        this.productsLoading = false
         this.topMonthLoading = false
       }
+
+      // Initialize top products date range (loaded after transactions)
+      this.initializeTopProductsDateRange()
     },
     
     // ========== TOP PRODUCTS METHODS ==========
@@ -1077,11 +923,8 @@ export default {
     }
   },
   async mounted() {
-    // Load products and sales data when component mounts
-    await Promise.all([
-      this.loadProductsData(),
-      this.loadSalesData()
-    ])
+    // Load all KPI card data in one dashboard-summary call
+    await this.loadSalesData()
     
     // Load recent transactions first
     await this.loadRecentTransactions()
@@ -1392,6 +1235,24 @@ export default {
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: capitalize;
+}
+
+.source-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.source-pos {
+  background-color: #e0e7ff;
+  color: #3730a3;
+}
+
+.source-online {
+  background-color: #fce7f3;
+  color: #9d174d;
 }
 
 .payment-cash {
@@ -1757,12 +1618,39 @@ export default {
   box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.1);
 }
 
-.top-products-loading,
 .top-products-error,
 .top-products-empty {
   text-align: center;
   padding: 2rem 1rem;
   color: var(--text-secondary);
+}
+
+/* Skeleton loading states */
+.transactions-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 0.5rem 0;
+}
+
+.top-products-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+.skeleton-product-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.skeleton-product-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
 }
 
 .top-products-list {
